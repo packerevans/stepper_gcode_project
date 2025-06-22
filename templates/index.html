@@ -6,8 +6,54 @@
       font-family: 'Segoe UI', sans-serif;
       background: #ffffff;
       color: #000000;
-      padding: 40px;
+      padding: 0;
       margin: 0;
+    }
+
+    .sidebar {
+      height: 100%;
+      width: 0;
+      position: fixed;
+      top: 0;
+      left: 0;
+      background-color: #d2b48c;
+      overflow-x: hidden;
+      transition: 0.3s;
+      padding-top: 60px;
+      z-index: 1000;
+    }
+
+    .sidebar a {
+      padding: 12px 24px;
+      text-decoration: none;
+      font-size: 18px;
+      color: #000;
+      display: block;
+      transition: 0.3s;
+    }
+
+    .sidebar a:hover {
+      background-color: #b08d5c;
+    }
+
+    .openbtn {
+      font-size: 26px;
+      cursor: pointer;
+      background-color: #d2b48c;
+      color: #000;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 0 0 8px 0;
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 1100;
+    }
+
+    .main-content {
+      margin-left: 0;
+      transition: margin-left 0.3s;
+      padding: 40px;
     }
 
     h1 {
@@ -43,8 +89,8 @@
       justify-content: space-between;
     }
 
-    button {
-      background-color: #d2b48c; /* light brown */
+    button[type="submit"] {
+      background-color: #d2b48c;
       color: #000;
       border: none;
       padding: 12px 20px;
@@ -54,93 +100,54 @@
       transition: background-color 0.2s;
     }
 
-    button:hover {
+    button[type="submit"]:hover {
       background-color: #b08d5c;
-    }
-
-    .navbar {
-      background-color: #d2b48c;
-      padding: 10px 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      position: relative;
-      border-radius: 8px;
-      margin-bottom: 20px;
-    }
-
-    .nav-links {
-      list-style: none;
-      display: flex;
-      gap: 20px;
-    }
-
-    .nav-links li a {
-      color: #000;
-      text-decoration: none;
-      font-weight: bold;
-    }
-
-    .menu-toggle {
-      display: none;
-      font-size: 26px;
-      cursor: pointer;
-    }
-
-    @media (max-width: 768px) {
-      .nav-links {
-        flex-direction: column;
-        background-color: #d2b48c;
-        position: absolute;
-        top: 60px;
-        right: 0;
-        width: 200px;
-        display: none;
-        padding: 10px;
-        border-radius: 0 0 8px 8px;
-      }
-
-      .nav-links.open {
-        display: flex;
-      }
-
-      .menu-toggle {
-        display: block;
-      }
     }
   </style>
 </head>
 <body>
-  <nav class="navbar">
-    <div class="menu-toggle" id="menu-toggle">&#9776;</div>
-    <ul class="nav-links" id="nav-links">
-      <li><a href="{{ url_for('index') }}">Manual Command</a></li>
-      <li><a href="{{ url_for('designs') }}">Preloaded Designs</a></li>
-    </ul>
-  </nav>
+  <div id="mySidebar" class="sidebar">
+    <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
+    <a href="{{ url_for('index') }}">Manual Command</a>
+    <a href="{{ url_for('designs') }}">Preloaded Designs</a>
+  </div>
 
-  <img src="{{ url_for('static', filename='sand.png') }}" alt="Sand Table Header" style="width: 100%; max-height: 300px; object-fit: cover; border-radius: 8px; margin-bottom: 30px;">
-  <h1>Arduino Command Terminal</h1>
-  <form method="POST" id="commandForm">
-    <input type="text" name="command" id="commandInput" placeholder="Enter command (ex: A1 L30 U-10)">
-    <div class="controls">
-      <label>
-        Repeat:
-        <input type="number" name="repeat" value="3200" min="1" max="3200">
-      </label>
-      <button type="submit">Send to Arduino</button>
-    </div>
-  </form>
+  <button class="openbtn" onclick="openNav()">☰</button>
 
-  <p style="max-width: 600px; margin: 30px auto 0; font-size: 15px; color: #333;">
-    <strong>Note:</strong> The upper arm uses a stepper motor configured for 1/16 microstepping. This means:
-    <br><br>
-    <code>3200 steps = 1 full revolution</code>
-    <br><br>
-    Use this to estimate how many steps to move your upper arm based on the rotation you want. For example, <code>R1600</code> would rotate the arm halfway (180°).
-  </p>
+  <div class="main-content">
+    <img src="{{ url_for('static', filename='sand.png') }}" alt="Sand Table Header" style="width: 100%; max-height: 300px; object-fit: cover; border-radius: 8px; margin-bottom: 30px;">
+    <h1>Arduino Command Terminal</h1>
+    <form method="POST" id="commandForm">
+      <input type="text" name="command" id="commandInput" placeholder="Enter command (ex: A1 L30 U-10)">
+      <div class="controls">
+        <label>
+          Repeat:
+          <input type="number" name="repeat" value="3200" min="1" max="3200">
+        </label>
+        <button type="submit">Send to Arduino</button>
+      </div>
+    </form>
+
+    <p style="max-width: 600px; margin: 30px auto 0; font-size: 15px; color: #333;">
+      <strong>Note:</strong> The upper arm uses a stepper motor configured for 1/16 microstepping. This means:
+      <br><br>
+      <code>3200 steps = 1 full revolution</code>
+      <br><br>
+      Use this to estimate how many steps to move your upper arm based on the rotation you want. For example, <code>R1600</code> would rotate the arm halfway (180°).
+    </p>
+  </div>
 
   <script>
+    function openNav() {
+      document.getElementById("mySidebar").style.width = "200px";
+      document.querySelector(".main-content").style.marginLeft = "200px";
+    }
+
+    function closeNav() {
+      document.getElementById("mySidebar").style.width = "0";
+      document.querySelector(".main-content").style.marginLeft = "0";
+    }
+
     const input = document.getElementById("commandInput");
     let history = [];
     let index = -1;
@@ -170,11 +177,6 @@
         }
         e.preventDefault();
       }
-    });
-
-    document.getElementById("menu-toggle").addEventListener("click", function () {
-      const nav = document.getElementById("nav-links");
-      nav.classList.toggle("open");
     });
   </script>
 </body></html>
