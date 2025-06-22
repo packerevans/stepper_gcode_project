@@ -57,9 +57,68 @@
     button:hover {
       background-color: #b08d5c;
     }
+
+    .navbar {
+      background-color: #d2b48c;
+      padding: 10px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+
+    .nav-links {
+      list-style: none;
+      display: flex;
+      gap: 20px;
+    }
+
+    .nav-links li a {
+      color: #000;
+      text-decoration: none;
+      font-weight: bold;
+    }
+
+    .menu-toggle {
+      display: none;
+      font-size: 26px;
+      cursor: pointer;
+    }
+
+    @media (max-width: 768px) {
+      .nav-links {
+        flex-direction: column;
+        background-color: #d2b48c;
+        position: absolute;
+        top: 60px;
+        right: 0;
+        width: 200px;
+        display: none;
+        padding: 10px;
+        border-radius: 0 0 8px 8px;
+      }
+
+      .nav-links.open {
+        display: flex;
+      }
+
+      .menu-toggle {
+        display: block;
+      }
+    }
   </style>
 </head>
 <body>
+  <nav class="navbar">
+    <div class="menu-toggle" id="menu-toggle">&#9776;</div>
+    <ul class="nav-links" id="nav-links">
+      <li><a href="{{ url_for('index') }}">Manual Command</a></li>
+      <li><a href="{{ url_for('designs') }}">Preloaded Designs</a></li>
+    </ul>
+  </nav>
+
   <img src="{{ url_for('static', filename='sand.png') }}" alt="Sand Table Header" style="width: 100%; max-height: 300px; object-fit: cover; border-radius: 8px; margin-bottom: 30px;">
   <h1>Arduino Command Terminal</h1>
   <form method="POST" id="commandForm">
@@ -112,8 +171,10 @@
         e.preventDefault();
       }
     });
+
+    document.getElementById("menu-toggle").addEventListener("click", function () {
+      const nav = document.getElementById("nav-links");
+      nav.classList.toggle("open");
+    });
   </script>
-
-
-
 </body></html>
