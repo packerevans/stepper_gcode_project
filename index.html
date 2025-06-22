@@ -1,32 +1,61 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Arduino Terminal</title>
+<html lang="en"><head>
+  <meta charset="UTF-8">
+  <title>Arduino Command Terminal</title>
   <style>
     body {
-      font-family: monospace;
-      background: #111;
-      color: #0f0;
-      padding: 30px;
+      font-family: 'Segoe UI', sans-serif;
+      background: #ffffff;
+      color: #000000;
+      padding: 40px;
+      margin: 0;
     }
-    input[type="text"], input[type="number"] {
+
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    form {
+      max-width: 600px;
+      margin: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    input[type="text"],
+    input[type="number"] {
+      padding: 12px;
       font-size: 16px;
-      padding: 8px;
-      width: 70%;
-      background: #222;
-      color: #0f0;
-      border: 1px solid #0f0;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      background: #f9f9f9;
+      color: #000000;
     }
+
+    input[type="number"] {
+      width: 80px;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
     button {
-      padding: 10px 20px;
-      font-size: 16px;
-      margin-left: 10px;
-      background: #0f0;
-      color: #111;
+      background-color: #d2b48c; /* light brown */
+      color: #000;
       border: none;
+      padding: 12px 20px;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background-color 0.2s;
     }
-    .form-line {
-      margin-bottom: 15px;
+
+    button:hover {
+      background-color: #b08d5c;
     }
   </style>
 </head>
@@ -34,12 +63,13 @@
   <img src="{{ url_for('static', filename='sand.png') }}" alt="Sand Table Header" style="width: 100%; max-height: 300px; object-fit: cover; border-radius: 8px; margin-bottom: 30px;">
   <h1>Arduino Command Terminal</h1>
   <form method="POST" id="commandForm">
-    <div class="form-line">
-      <input type="text" name="command" id="commandInput" placeholder="Enter command (ex: A1 L30 U-10 R1600)">
-    </div>
-    <div class="form-line">
-      Repeat: <input type="number" name="repeat" value="1" min="1" max="100">
-      <button type="submit">Send</button>
+    <input type="text" name="command" id="commandInput" placeholder="Enter command (e.g. A1 L30 U-10 R1600)">
+    <div class="controls">
+      <label>
+        Repeat:
+        <input type="number" name="repeat" value="1" min="1" max="100">
+      </label>
+      <button type="submit">Send to Arduino</button>
     </div>
   </form>
 
@@ -48,7 +78,7 @@
     let history = [];
     let index = -1;
 
-    document.getElementById("commandForm").addEventListener("submit", function (e) {
+    document.getElementById("commandForm").addEventListener("submit", function () {
       const value = input.value.trim();
       if (value) {
         history.unshift(value);
@@ -75,5 +105,7 @@
       }
     });
   </script>
-</body>
-</html>
+
+
+
+</body></html>
