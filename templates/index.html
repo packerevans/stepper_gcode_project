@@ -1,4 +1,6 @@
-<html lang="en"><head>
+<!DOCTYPE html>
+<html lang="en">
+<head>
   <meta charset="UTF-8">
   <title>Arduino Command Terminal</title>
   <style>
@@ -118,23 +120,15 @@
     <img src="{{ url_for('static', filename='sand.png') }}" alt="Sand Table Header" style="width: 100%; max-height: 300px; object-fit: cover; border-radius: 8px; margin-bottom: 30px;">
     <h1>Arduino Command Terminal</h1>
     <form method="POST" id="commandForm">
-      <input type="text" name="command" id="commandInput" placeholder="Enter command (ex: A1 L30 U-10)">
+      <input type="text" name="command" id="commandInput" placeholder="Enter command (ex: G1 X100 Y100)">
       <div class="controls">
         <label>
           Repeat:
-          <input type="number" name="repeat" value="3200" min="1" max="3200">
+          <input type="number" name="repeat" value="1" min="1" max="100">
         </label>
         <button type="submit">Send to Arduino</button>
       </div>
     </form>
-
-    <p style="max-width: 600px; margin: 30px auto 0; font-size: 15px; color: #333;">
-      <strong>Note:</strong> The upper arm uses a stepper motor configured for 1/16 microstepping. This means:
-      <br><br>
-      <code>3200 steps = 1 full revolution</code>
-      <br><br>
-      Use this to estimate how many steps to move your upper arm based on the rotation you want. For example, <code>R1600</code> would rotate the arm halfway (180°).
-    </p>
   </div>
 
   <script>
@@ -179,4 +173,5 @@
       }
     });
   </script>
-</body></html>
+</body>
+</html>

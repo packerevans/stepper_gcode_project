@@ -2,10 +2,25 @@ from flask import Flask, render_template, request, redirect, url_for
 import serial
 import time
 
-arduino = serial.Serial('/dev/ttyACM0', 9600, timeout=1)
-time.sleep(2)
+# Initialize serial connection to Arduino
+arduino = serial.Serial('/dev/ttyACM0', 9600, timeout=2)
+time.sleep(2)  # Give Arduino time to reset
 
 app = Flask(__name__)
+
+def send_command(command):
+    """Send command and wait for Arduino to confirm it's done."""
+    print(f"Sending: {command}")
+    arduino.write((command + '\n').encode())
+    arduino.flush()
+
+    # Wait for "Movement complete." confirmation
+    while True:
+        response = arduino.readline().decode().strip()
+        if response:
+            print(f"Arduino: {response}")
+        if "Movement complete." in response or "Paused" in response:
+            break
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -14,8 +29,7 @@ def index():
         repeat = int(request.form.get('repeat', 1))
         if command:
             for _ in range(repeat):
-                arduino.write((command + '\n').encode())
-                time.sleep(0.2)
+                send_command(command)
         return redirect(url_for('index'))
     return render_template('index.html')
 
@@ -25,16 +39,16 @@ def designs():
     if request.method == 'POST':
         design = request.form.get('design')
         if design == "Spiral":
-            arduino.write(b"A1 L100 U3200\n")
+            send_command("A1 L100 U3200")
         elif design == "Zigzag":
-            arduino.write(b"A1 L300 U300\n")
+            send_command("A1 L300 U300")
         elif design == "Circle":
-            arduino.write(b"A1 L50 U3200\n")
+            send_command("A1 L50 U3200")
         elif design == "Wave":
-            arduino.write(b"A1 L200 U200\n")
-        time.sleep(0.5)
+            send_command("A1 L200 U200")
         return redirect(url_for('designs'))
     return render_template('designs.html')
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
