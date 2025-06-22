@@ -73,6 +73,14 @@
     </div>
   </form>
 
+  <p style="max-width: 600px; margin: 30px auto 0; font-size: 15px; color: #333;">
+    <strong>Note:</strong> The upper arm uses a stepper motor configured for 1/16 microstepping. This means:
+    <br><br>
+    <code>3200 steps = 1 full revolution</code>
+    <br><br>
+    Use this to estimate how many steps to move your upper arm based on the rotation you want. For example, <code>R1600</code> would rotate the arm halfway (180°).
+  </p>
+
   <script>
     const input = document.getElementById("commandInput");
     let history = [];
