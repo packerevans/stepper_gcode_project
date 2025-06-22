@@ -3,7 +3,7 @@ import serial
 import time
 
 # Setup serial connection to Arduino
-arduino = serial.Serial('/dev/ttyUSB0', 9600, timeout=1)
+arduino = serial.Serial('/dev/ttyACM0', 9600, timeout=1)
 time.sleep(2)  # Wait for Arduino to reset
 
 app = Flask(__name__)
