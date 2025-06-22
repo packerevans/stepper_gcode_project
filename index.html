@@ -1,18 +1,78 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Arduino Command Terminal</title>
-    <style>
-        body { font-family: monospace; background-color: #111; color: #0f0; padding: 20px; }
-        input[type=text] { width: 80%; padding: 10px; font-size: 16px; }
-        button { padding: 10px 20px; font-size: 16px; margin-left: 10px; }
-    </style>
+  <title>Arduino Terminal</title>
+  <style>
+    body {
+      font-family: monospace;
+      background: #111;
+      color: #0f0;
+      padding: 30px;
+    }
+    input[type="text"], input[type="number"] {
+      font-size: 16px;
+      padding: 8px;
+      width: 70%;
+      background: #222;
+      color: #0f0;
+      border: 1px solid #0f0;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin-left: 10px;
+      background: #0f0;
+      color: #111;
+      border: none;
+    }
+    .form-line {
+      margin-bottom: 15px;
+    }
+  </style>
 </head>
 <body>
-    <h1>Arduino Command Terminal</h1>
-    <form method="POST">
-        <input type="text" name="command" placeholder="Enter command (ex: A1 L30 U-10)">
-        <button type="submit">Send to Arduino</button>
-    </form>
+  <h1>Arduino Command Terminal</h1>
+  <form method="POST" id="commandForm">
+    <div class="form-line">
+      <input type="text" name="command" id="commandInput" placeholder="Enter command (ex: A1 L30 U-10 R1600)">
+    </div>
+    <div class="form-line">
+      Repeat: <input type="number" name="repeat" value="1" min="1" max="100">
+      <button type="submit">Send</button>
+    </div>
+  </form>
+
+  <script>
+    const input = document.getElementById("commandInput");
+    let history = [];
+    let index = -1;
+
+    document.getElementById("commandForm").addEventListener("submit", function (e) {
+      const value = input.value.trim();
+      if (value) {
+        history.unshift(value);
+        index = -1;
+      }
+    });
+
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowUp") {
+        if (index + 1 < history.length) {
+          index++;
+          input.value = history[index];
+        }
+        e.preventDefault();
+      } else if (e.key === "ArrowDown") {
+        if (index > 0) {
+          index--;
+          input.value = history[index];
+        } else {
+          index = -1;
+          input.value = "";
+        }
+        e.preventDefault();
+      }
+    });
+  </script>
 </body>
 </html>
