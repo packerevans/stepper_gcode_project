@@ -38,10 +38,16 @@ def index():
 def designs():
     if request.method == 'POST':
         design = request.form.get('design')
+        gcode_file = None
+
         if design == "Snowflake":
-            filepath = os.path.join("designs", "snowflake.gcode")
+            gcode_file = "designs/snowflake.gcode"
+        elif design == "Lines":
+            gcode_file = "designs/lines.gcode"
+
+        if gcode_file:
             try:
-                with open(filepath, "r") as file:
+                with open(gcode_file, "r") as file:
                     for line in file:
                         line = line.strip()
                         if not line or line.startswith(";"):
