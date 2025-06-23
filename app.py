@@ -1,25 +1,28 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, jsonify
 import serial
 import time
-import os
+import threading
 
-# Initialize serial connection to Arduino
 arduino = serial.Serial('/dev/ttyACM0', 9600, timeout=2)
-time.sleep(2)  # Give Arduino time to reset
+time.sleep(2)
 
 app = Flask(__name__)
+serial_log = []  # Global list to store logs
+
+lock = threading.Lock()  # Thread-safe log writing
 
 def send_command(command):
-    """Send command and wait for Arduino to confirm it's done."""
-    print(f"Sending: {command}")
+    """Send command to Arduino and log response."""
+    with lock:
+        serial_log.append(f"> {command}")
     arduino.write((command + '\n').encode())
     arduino.flush()
 
-    # Wait for Arduino to respond with "Movement complete." or "Paused"
     while True:
         response = arduino.readline().decode().strip()
         if response:
-            print(f"Arduino: {response}")
+            with lock:
+                serial_log.append(f"< {response}")
         if "Movement complete." in response or "Paused" in response:
             break
 
@@ -39,7 +42,6 @@ def designs():
     if request.method == 'POST':
         design = request.form.get('design')
         gcode_file = None
-
         if design == "Snowflake":
             gcode_file = "designs/snowflake.gcode"
         elif design == "Lines":
@@ -54,9 +56,20 @@ def designs():
                             continue
                         send_command(line)
             except Exception as e:
-                print(f"Error reading G-code file: {e}")
+                with lock:
+                    serial_log.append(f"[ERROR] {str(e)}")
         return redirect(url_for('designs'))
     return render_template('designs.html')
+
+@app.route('/terminal')
+def terminal():
+    return render_template('terminal.html')
+
+@app.route('/terminal/logs')
+def terminal_logs():
+    with lock:
+        # Return the last 100 lines (to keep it light)
+        return jsonify(serial_log[-100:])
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Arduino Terminal</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #ffffff;
+      color: #000000;
+      margin: 0;
+      padding: 0;
+    }
+
+    .sidebar {
+      height: 100%;
+      width: 0;
+      position: fixed;
+      top: 0;
+      left: 0;
+      background-color: #d2b48c;
+      overflow-x: hidden;
+      transition: 0.3s;
+      padding-top: 60px;
+      z-index: 1000;
+    }
+
+    .sidebar a {
+      padding: 12px 24px;
+      text-decoration: none;
+      font-size: 18px;
+      color: #000;
+      display: block;
+      transition: 0.3s;
+    }
+
+    .sidebar a:hover {
+      background-color: #b08d5c;
+    }
+
+    .openbtn {
+      font-size: 26px;
+      cursor: pointer;
+      background-color: #d2b48c;
+      color: #000;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 0 0 8px 0;
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 1100;
+    }
+
+    .main-content {
+      margin-left: 0;
+      transition: margin-left 0.3s;
+      padding: 40px;
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    #log {
+      background: #f5f5f5;
+      color: #000;
+      padding: 20px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      height: 75vh;
+      overflow-y: scroll;
+      white-space: pre-wrap;
+      font-family: monospace;
+      font-size: 14px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+  </style>
+</head>
+<body>
+  <div id="mySidebar" class="sidebar">
+    <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
+    <a href="{{ url_for('index') }}">Manual Command</a>
+    <a href="{{ url_for('designs') }}">Preloaded Designs</a>
+    <a href="{{ url_for('terminal') }}">Terminal</a>
+  </div>
+
+  <button class="openbtn" onclick="openNav()">☰</button>
+
+  <div class="main-content">
+    <h2>Arduino Terminal</h2>
+    <div id="log">Loading logs...</div>
+  </div>
+
+  <script>
+    function openNav() {
+      document.getElementById("mySidebar").style.width = "200px";
+      document.querySelector(".main-content").style.marginLeft = "200px";
+    }
+
+    function closeNav() {
+      document.getElementById("mySidebar").style.width = "0";
+      document.querySelector(".main-content").style.marginLeft = "0";
+    }
+
+    async function fetchLogs() {
+      const res = await fetch("/terminal/logs");
+      const data = await res.json();
+      document.getElementById("log").textContent = data.join("\n");
+    }
+
+    setInterval(fetchLogs, 2000); // Refresh every 2 seconds
+    fetchLogs();
+  </script>
+</body>
+</html>
