@@ -1,14 +1,16 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify
+from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
 import serial
 import time
 import threading
+import subprocess  # for reboot command
 
 arduino = serial.Serial('/dev/ttyACM0', 9600, timeout=2)
 time.sleep(2)
 
 app = Flask(__name__)
-serial_log = []  # Global list to store logs
+app.secret_key = 'your-secret-key'  # Required for flashing messages
 
+serial_log = []  # Global list to store logs
 lock = threading.Lock()  # Thread-safe log writing
 
 def send_command(command):
@@ -70,6 +72,20 @@ def terminal_logs():
     with lock:
         # Return the last 100 lines (to keep it light)
         return jsonify(serial_log[-100:])
+
+@app.route('/reboot', methods=['POST'])
+def reboot():
+    try:
+        # Log reboot request
+        with lock:
+            serial_log.append("[INFO] System reboot initiated by user.")
+        # Flash a message to user
+        flash("System reboot initiated.", "info")
+        # Perform reboot (Linux)
+        subprocess.Popen(['sudo', 'reboot'])
+    except Exception as e:
+        flash(f"Failed to reboot system: {e}", "error")
+    return redirect(url_for('terminal'))
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
