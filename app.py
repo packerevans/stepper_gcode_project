@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for
 import serial
 import time
+import os
 
 # Initialize serial connection to Arduino
 arduino = serial.Serial('/dev/ttyACM0', 9600, timeout=2)
@@ -14,7 +15,7 @@ def send_command(command):
     arduino.write((command + '\n').encode())
     arduino.flush()
 
-    # Wait for "Movement complete." confirmation
+    # Wait for Arduino to respond with "Movement complete." or "Paused"
     while True:
         response = arduino.readline().decode().strip()
         if response:
@@ -33,22 +34,23 @@ def index():
         return redirect(url_for('index'))
     return render_template('index.html')
 
-
 @app.route('/designs', methods=['GET', 'POST'])
 def designs():
     if request.method == 'POST':
         design = request.form.get('design')
-        if design == "Spiral":
-            send_command("A1 L100 U3200")
-        elif design == "Zigzag":
-            send_command("A1 L300 U300")
-        elif design == "Circle":
-            send_command("A1 L50 U3200")
-        elif design == "Wave":
-            send_command("A1 L200 U200")
+        if design == "Snowflake":
+            filepath = os.path.join("designs", "snowflake.gcode")
+            try:
+                with open(filepath, "r") as file:
+                    for line in file:
+                        line = line.strip()
+                        if not line or line.startswith(";"):
+                            continue
+                        send_command(line)
+            except Exception as e:
+                print(f"Error reading G-code file: {e}")
         return redirect(url_for('designs'))
     return render_template('designs.html')
-
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
