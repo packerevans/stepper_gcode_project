@@ -3,6 +3,7 @@ import serial
 import time
 import threading
 
+# Open serial connection to Arduino
 arduino = serial.Serial('/dev/ttyACM0', 9600, timeout=2)
 time.sleep(2)
 
@@ -11,7 +12,7 @@ serial_log = []
 lock = threading.Lock()
 
 def send_command(command):
-    """Send command to Arduino and log response."""
+    """Send command to Arduino and log it."""
     with lock:
         serial_log.append(f"> {command}")
     arduino.write((command + '\n').encode())
@@ -19,7 +20,7 @@ def send_command(command):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('index.html')  # main slider control page
 
 @app.route('/set_value')
 def set_value():
@@ -45,6 +46,18 @@ def get_values():
         except:
             pass
     return jsonify(values)
+
+@app.route('/command')
+def command():
+    """Handle pause/resume commands from buttons."""
+    cmd = request.args.get('type')
+    if cmd == "pause":
+        send_command("PAUSE")
+        return "Paused"
+    elif cmd == "resume":
+        send_command("RESUME")
+        return "Resumed"
+    return "Invalid command", 400
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
