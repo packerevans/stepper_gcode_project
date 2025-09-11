@@ -2,177 +2,71 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Packers Sand Table</title>
+  <title>Sand Table Control</title>
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
-      background: #ffffff;
-      color: #000000;
-      padding: 0;
-      margin: 0;
-    }
-
-    .sidebar {
-      height: 100%;
-      width: 0;
-      position: fixed;
-      top: 0;
-      left: 0;
-      background-color: #d2b48c;
-      overflow-x: hidden;
-      transition: 0.3s;
-      padding-top: 60px;
-      z-index: 1000;
-    }
-
-    .sidebar a {
-      padding: 12px 24px;
-      text-decoration: none;
-      font-size: 18px;
-      color: #000;
-      display: block;
-      transition: 0.3s;
-    }
-
-    .sidebar a:hover {
-      background-color: #b08d5c;
-    }
-
-    .openbtn {
-      font-size: 26px;
-      cursor: pointer;
-      background-color: #d2b48c;
-      color: #000;
-      padding: 10px 20px;
-      border: none;
-      border-radius: 0 0 8px 0;
-      position: fixed;
-      top: 0;
-      left: 0;
-      z-index: 1100;
-    }
-
-    .main-content {
-      margin-left: 0;
-      transition: margin-left 0.3s;
+      background: #f5f5f5;
       padding: 40px;
-    }
-
-    h1 {
       text-align: center;
-      margin-bottom: 30px;
     }
-
-    form {
-      max-width: 600px;
-      margin: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 15px;
+    h1 { margin-bottom: 20px; }
+    .slider-container {
+      margin: 20px auto;
+      max-width: 500px;
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
-
-    input[type="text"],
-    input[type="number"] {
-      padding: 12px;
-      font-size: 16px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      background: #f9f9f9;
-      color: #000000;
+    input[type=range] {
+      width: 100%;
     }
-
-    input[type="number"] {
-      width: 80px;
-    }
-
-    .controls {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    button[type="submit"] {
-      background-color: #d2b48c;
-      color: #000;
-      border: none;
-      padding: 12px 20px;
-      border-radius: 6px;
-      font-size: 16px;
-      cursor: pointer;
-      transition: background-color 0.2s;
-    }
-
-    button[type="submit"]:hover {
-      background-color: #b08d5c;
+    .value-label {
+      font-size: 18px;
+      margin-bottom: 10px;
     }
   </style>
 </head>
 <body>
-  <div id="mySidebar" class="sidebar">
-    <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
-    <a href="{{ url_for('index') }}">Manual Command</a>
-    <a href="{{ url_for('designs') }}">Preloaded Designs</a>
-    <a href="{{ url_for('terminal') }}">Terminal</a>
+  <h1>Sand Table Control</h1>
+
+  <div class="slider-container">
+    <div class="value-label">Arm Value: <span id="armValue">1000</span></div>
+    <input type="range" id="armSlider" min="0" max="6000" value="1000" oninput="updateArm(this.value)">
   </div>
 
-  <button class="openbtn" onclick="openNav()">☰</button>
-
-  <div class="main-content">
-    <img src="{{ url_for('static', filename='sand.png') }}" alt="Sand Table Header" style="width: 100%; max-height: 300px; object-fit: cover; border-radius: 8px; margin-bottom: 30px;">
-    <h1>Arduino Command Terminal</h1>
-    <form method="POST" id="commandForm">
-      <input type="text" name="command" id="commandInput" placeholder="Enter command (ex: G1 X100 Y100)">
-      <div class="controls">
-        <label>
-          Repeat:
-          <input type="number" name="repeat" value="1" min="1" max="100">
-        </label>
-        <button type="submit">Send to Arduino</button>
-      </div>
-    </form>
+  <div class="slider-container">
+    <div class="value-label">Base Value: <span id="baseValue">1000</span></div>
+    <input type="range" id="baseSlider" min="0" max="6000" value="1000" oninput="updateBase(this.value)">
   </div>
 
   <script>
-    function openNav() {
-      document.getElementById("mySidebar").style.width = "200px";
-      document.querySelector(".main-content").style.marginLeft = "200px";
+    function updateArm(val) {
+      document.getElementById("armValue").innerText = val;
+      fetch(`/set_value?type=ARM&value=${val}`);
     }
 
-    function closeNav() {
-      document.getElementById("mySidebar").style.width = "0";
-      document.querySelector(".main-content").style.marginLeft = "0";
+    function updateBase(val) {
+      document.getElementById("baseValue").innerText = val;
+      fetch(`/set_value?type=BASE&value=${val}`);
     }
 
-    const input = document.getElementById("commandInput");
-    let history = [];
-    let index = -1;
+    // Poll Arduino for current values every 1 second
+    function refreshValues() {
+      fetch('/get_values')
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById("armValue").innerText = data.ARM;
+          document.getElementById("armSlider").value = data.ARM;
+          document.getElementById("baseValue").innerText = data.BASE;
+          document.getElementById("baseSlider").value = data.BASE;
+        })
+        .catch(err => console.error(err));
+    }
 
-    document.getElementById("commandForm").addEventListener("submit", function () {
-      const value = input.value.trim();
-      if (value) {
-        history.unshift(value);
-        index = -1;
-      }
-    });
-
-    input.addEventListener("keydown", function (e) {
-      if (e.key === "ArrowUp") {
-        if (index + 1 < history.length) {
-          index++;
-          input.value = history[index];
-        }
-        e.preventDefault();
-      } else if (e.key === "ArrowDown") {
-        if (index > 0) {
-          index--;
-          input.value = history[index];
-        } else {
-          index = -1;
-          input.value = "";
-        }
-        e.preventDefault();
-      }
-    });
+    setInterval(refreshValues, 1000);
+    refreshValues();
   </script>
 </body>
 </html>
