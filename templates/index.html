@@ -1,16 +1,66 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
+<html lang="en"><head>
   <meta charset="UTF-8">
-  <title>Sand Table Control</title>
+  <title>Packers Sand Table</title>
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
-      background: #f5f5f5;
+      background: #ffffff;
+      color: #000000;
+      padding: 0;
+      margin: 0;
+    }
+
+    .sidebar {
+      height: 100%;
+      width: 0;
+      position: fixed;
+      top: 0;
+      left: 0;
+      background-color: #d2b48c;
+      overflow-x: hidden;
+      transition: 0.3s;
+      padding-top: 60px;
+      z-index: 1000;
+    }
+
+    .sidebar a {
+      padding: 12px 24px;
+      text-decoration: none;
+      font-size: 18px;
+      color: #000;
+      display: block;
+      transition: 0.3s;
+    }
+
+    .sidebar a:hover {
+      background-color: #b08d5c;
+    }
+
+    .openbtn {
+      font-size: 26px;
+      cursor: pointer;
+      background-color: #d2b48c;
+      color: #000;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 0 0 8px 0;
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 1100;
+    }
+
+    .main-content {
+      margin-left: 0;
+      transition: margin-left 0.3s;
       padding: 40px;
       text-align: center;
     }
-    h1 { margin-bottom: 20px; }
+
+    h1 {
+      margin-bottom: 20px;
+    }
+
     .slider-container {
       margin: 20px auto;
       max-width: 500px;
@@ -19,29 +69,124 @@
       border-radius: 8px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
-    input[type=range] {
-      width: 100%;
-    }
+
     .value-label {
       font-size: 18px;
       margin-bottom: 10px;
+      color: #000; /* keep text black */
+    }
+
+    /* === Slider Styling === */
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 8px;
+      background: #d2b48c; /* same as button background */
+      border-radius: 4px;
+      outline: none;
+    }
+
+    /* Chrome/Edge/Safari Thumb */
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #000; /* black dot */
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    input[type=range]::-webkit-slider-thumb:hover {
+      background: #333; /* darker black hover */
+    }
+
+    /* Firefox Thumb */
+    input[type=range]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #000; /* black dot */
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    input[type=range]::-moz-range-thumb:hover {
+      background: #333;
+    }
+
+    .control-buttons {
+      margin-top: 20px;
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+    }
+
+    .control-buttons button {
+      background-color: #d2b48c;
+      color: #000;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .control-buttons button:hover {
+      background-color: #b08d5c;
     }
   </style>
 </head>
 <body>
-  <h1>Sand Table Control</h1>
-
-  <div class="slider-container">
-    <div class="value-label">Arm Value: <span id="armValue">1000</span></div>
-    <input type="range" id="armSlider" min="0" max="6000" value="1000" oninput="updateArm(this.value)">
+  <!-- Sidebar -->
+  <div id="mySidebar" class="sidebar">
+    <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
+    <a href="{{ url_for('index') }}">Manual Command</a>
+    <a href="{{ url_for('designs') }}">Preloaded Designs</a>
+    <a href="{{ url_for('sliders') }}">Slider Control</a>
   </div>
 
-  <div class="slider-container">
-    <div class="value-label">Base Value: <span id="baseValue">1000</span></div>
-    <input type="range" id="baseSlider" min="0" max="6000" value="1000" oninput="updateBase(this.value)">
+  <!-- Open Sidebar Button -->
+  <button class="openbtn" onclick="openNav()">☰</button>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <img src="{{ url_for('static', filename='sand.png') }}" alt="Sand Table Header" style="width: 100%; max-height: 300px; object-fit: cover; border-radius: 8px; margin-bottom: 30px;">
+
+    <h1>Sand Table Control</h1>
+
+    <!-- Arm Slider -->
+    <div class="slider-container">
+      <div class="value-label">Arm Value: <span id="armValue">1000</span></div>
+      <input type="range" id="armSlider" min="0" max="6000" value="1000" oninput="updateArm(this.value)">
+    </div>
+
+    <!-- Base Slider -->
+    <div class="slider-container">
+      <div class="value-label">Base Value: <span id="baseValue">1000</span></div>
+      <input type="range" id="baseSlider" min="0" max="6000" value="1000" oninput="updateBase(this.value)">
+    </div>
+
+    <!-- Control Buttons -->
+    <div class="control-buttons">
+      <button onclick="sendCommand('pause')">Pause</button>
+      <button onclick="sendCommand('resume')">Resume</button>
+    </div>
   </div>
 
   <script>
+    function openNav() {
+      document.getElementById("mySidebar").style.width = "200px";
+      document.querySelector(".main-content").style.marginLeft = "200px";
+    }
+
+    function closeNav() {
+      document.getElementById("mySidebar").style.width = "0";
+      document.querySelector(".main-content").style.marginLeft = "0";
+    }
+
     function updateArm(val) {
       document.getElementById("armValue").innerText = val;
       fetch(`/set_value?type=ARM&value=${val}`);
@@ -50,6 +195,13 @@
     function updateBase(val) {
       document.getElementById("baseValue").innerText = val;
       fetch(`/set_value?type=BASE&value=${val}`);
+    }
+
+    function sendCommand(cmd) {
+      fetch(`/command?type=${cmd}`)
+        .then(res => res.text())
+        .then(data => console.log(data))
+        .catch(err => console.error(err));
     }
 
     // Poll Arduino for current values every 1 second
@@ -68,5 +220,4 @@
     setInterval(refreshValues, 1000);
     refreshValues();
   </script>
-</body>
-</html>
+</body></html>
