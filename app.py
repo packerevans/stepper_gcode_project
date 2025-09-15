@@ -1,7 +1,8 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_from_directory
 import serial
 import time
 import threading
+import os
 
 # Open serial connection to Arduino
 arduino = serial.Serial('/dev/ttyACM0', 9600, timeout=2)
@@ -58,6 +59,23 @@ def command():
         send_command("RESUME")
         return "Resumed"
     return "Invalid command", 400
+
+# ---------- NEW: Designs route ----------
+@app.route('/designs')
+def designs():
+    """List available .gcode design files."""
+    designs_path = os.path.join(os.getcwd(), "designs")
+    files = []
+    if os.path.exists(designs_path):
+        files = [f for f in os.listdir(designs_path) if f.endswith(".gcode")]
+    return render_template("designs.html", files=files)
+
+@app.route('/designs/<filename>')
+def download_design(filename):
+    """Serve .gcode file for download or use."""
+    return send_from_directory("designs", filename)
+
+# ---------------------------------------
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
