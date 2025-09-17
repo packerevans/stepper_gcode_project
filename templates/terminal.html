@@ -1,98 +1,91 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Sand Table Control</title>
-  <style>
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      background: #ffffff;
-      color: #000;
-      margin: 0;
-      padding: 0;
-      text-align: center;
-    }
-
-    header img {
-      max-width: 300px;
-      margin: 20px auto;
-      display: block;
-    }
-
-    .slider-container {
-      margin: 30px auto;
-      max-width: 500px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-    }
-
-    input[type=range] {
-      flex-grow: 1;
-    }
-
-    button {
-      background-color: #d2b48c;
-      border: none;
-      padding: 10px 20px;
-      font-size: 16px;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: background-color 0.2s;
-    }
-
-    button:hover {
-      background-color: #b08d5c;
-    }
-
-    .controls {
-      margin: 20px;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <title>Terminal Control</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body { background: white; margin: 0; font-family: sans-serif; }
+        .container { padding: 20px; }
+        .slider-container { margin: 20px 0; }
+        .terminal-window {
+            background: black;
+            color: lime;
+            font-family: monospace;
+            padding: 10px;
+            height: 300px;
+            overflow-y: auto;
+            border-radius: 8px;
+        }
+        .btn { padding: 8px 12px; margin: 5px; cursor: pointer; }
+    </style>
 </head>
 <body>
-  <header>
-    <img src="{{ url_for('static', filename='sand.png') }}" alt="Sand Logo">
-    <h1>Sand Table Control</h1>
-  </header>
+    <!-- Slide Menu (copied from index.html) -->
+    <div class="menu">
+        <a href="{{ url_for('index') }}">Home</a>
+        <a href="{{ url_for('terminal') }}">Terminal</a>
+    </div>
 
-  <!-- ARM Slider -->
-  <div class="slider-container">
-    <label for="armSlider">ARM:</label>
-    <input type="range" id="armSlider" min="0" max="3000" value="0">
-    <button onclick="sendValue('ARM', document.getElementById('armSlider').value)">Send</button>
-  </div>
+    <div class="container">
+        <h2>Arduino Control</h2>
 
-  <!-- BASE Slider -->
-  <div class="slider-container">
-    <label for="baseSlider">BASE:</label>
-    <input type="range" id="baseSlider" min="0" max="3000" value="0">
-    <button onclick="sendValue('BASE', document.getElementById('baseSlider').value)">Send</button>
-  </div>
+        <!-- Arm slider -->
+        <div class="slider-container">
+            <label>Arm: <span id="armValue">1500</span></label>
+            <input type="range" id="armSlider" min="0" max="3000" value="1500">
+            <button class="btn" onclick="sendCommand('ARM:' + document.getElementById('armSlider').value)">Send</button>
+        </div>
 
-  <!-- Control Buttons -->
-  <div class="controls">
-    <button onclick="sendCommand('pause')">Pause</button>
-    <button onclick="sendCommand('resume')">Resume</button>
-    <form method="POST" action="{{ url_for('reboot') }}" style="display:inline;">
-      <button type="submit">Reboot</button>
-    </form>
-    <a href="{{ url_for('terminal') }}"><button>Terminal</button></a>
-  </div>
+        <!-- Base slider -->
+        <div class="slider-container">
+            <label>Base: <span id="baseValue">1500</span></label>
+            <input type="range" id="baseSlider" min="0" max="3000" value="1500">
+            <button class="btn" onclick="sendCommand('BASE:' + document.getElementById('baseSlider').value)">Send</button>
+        </div>
 
-  <script>
-    async function sendValue(type, value) {
-      const res = await fetch(`/set_value?type=${type}&value=${value}`);
-      const txt = await res.text();
-      alert(txt);
-    }
+        <!-- Reboot button -->
+        <div>
+            <button class="btn" onclick="rebootPi()">Reboot Raspberry Pi</button>
+        </div>
 
-    async function sendCommand(cmd) {
-      const res = await fetch(`/command?type=${cmd}`);
-      const txt = await res.text();
-      alert(txt);
-    }
-  </script>
+        <!-- Terminal output -->
+        <h3>Serial Output</h3>
+        <div id="terminal" class="terminal-window"></div>
+    </div>
+
+    <script>
+        // Update slider values live
+        document.getElementById('armSlider').oninput = function() {
+            document.getElementById('armValue').innerText = this.value;
+        };
+        document.getElementById('baseSlider').oninput = function() {
+            document.getElementById('baseValue').innerText = this.value;
+        };
+
+        // Send command
+        function sendCommand(cmd) {
+            fetch("/send", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ command: cmd })
+            });
+        }
+
+        // Reboot Pi
+        function rebootPi() {
+            fetch("/reboot", { method: "POST" });
+        }
+
+        // Terminal logs updater
+        async function updateLogs() {
+            const res = await fetch("/terminal/logs");
+            const data = await res.json();
+            const term = document.getElementById("terminal");
+            term.innerHTML = data.join("<br>");
+            term.scrollTop = term.scrollHeight; // auto-scroll
+        }
+        setInterval(updateLogs, 1000);
+    </script>
 </body>
 </html>
