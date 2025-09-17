@@ -1,93 +1,98 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Arduino Terminal</title>
+  <meta charset="UTF-8" />
+  <title>Sand Table Control</title>
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
-      background: #111;
-      color: #eee;
+      background: #ffffff;
+      color: #000;
       margin: 0;
-      padding: 20px;
-    }
-    h2 { text-align: center; }
-
-    .control {
-      margin: 20px auto;
-      max-width: 400px;
+      padding: 0;
       text-align: center;
     }
-    input[type=range] { width: 80%; }
-    button {
-      margin: 10px;
-      padding: 10px 20px;
-      background: tan;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
+
+    header img {
+      max-width: 300px;
+      margin: 20px auto;
+      display: block;
     }
-    button:hover { background: peru; }
-    #log {
-      background: #222;
-      border: 1px solid #444;
+
+    .slider-container {
+      margin: 30px auto;
+      max-width: 500px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    input[type=range] {
+      flex-grow: 1;
+    }
+
+    button {
+      background-color: #d2b48c;
+      border: none;
+      padding: 10px 20px;
+      font-size: 16px;
       border-radius: 8px;
-      padding: 10px;
-      height: 300px;
-      overflow-y: auto;
-      font-family: monospace;
-      font-size: 14px;
-      margin-top: 20px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    button:hover {
+      background-color: #b08d5c;
+    }
+
+    .controls {
+      margin: 20px;
     }
   </style>
 </head>
 <body>
-  <h2>Arduino Terminal</h2>
+  <header>
+    <img src="{{ url_for('static', filename='sand.png') }}" alt="Sand Logo">
+    <h1>Sand Table Control</h1>
+  </header>
 
-  <div class="control">
-    <label>Arm Steps: <span id="armValue">3000</span></label><br>
-    <input type="range" id="armSlider" min="0" max="10000" value="3000">
-    <button onclick="sendCommand('ARM:' + document.getElementById('armSlider').value)">Send Arm</button>
+  <!-- ARM Slider -->
+  <div class="slider-container">
+    <label for="armSlider">ARM:</label>
+    <input type="range" id="armSlider" min="0" max="3000" value="0">
+    <button onclick="sendValue('ARM', document.getElementById('armSlider').value)">Send</button>
   </div>
 
-  <div class="control">
-    <label>Base Steps: <span id="baseValue">3000</span></label><br>
-    <input type="range" id="baseSlider" min="0" max="10000" value="3000">
-    <button onclick="sendCommand('BASE:' + document.getElementById('baseSlider').value)">Send Base</button>
+  <!-- BASE Slider -->
+  <div class="slider-container">
+    <label for="baseSlider">BASE:</label>
+    <input type="range" id="baseSlider" min="0" max="3000" value="0">
+    <button onclick="sendValue('BASE', document.getElementById('baseSlider').value)">Send</button>
   </div>
 
-  <div class="control">
-    <button onclick="sendCommand('PAUSE')">Pause</button>
-    <button onclick="sendCommand('RESUME')">Resume</button>
+  <!-- Control Buttons -->
+  <div class="controls">
+    <button onclick="sendCommand('pause')">Pause</button>
+    <button onclick="sendCommand('resume')">Resume</button>
+    <form method="POST" action="{{ url_for('reboot') }}" style="display:inline;">
+      <button type="submit">Reboot</button>
+    </form>
+    <a href="{{ url_for('terminal') }}"><button>Terminal</button></a>
   </div>
-
-  <div id="log">Loading logs...</div>
 
   <script>
-    document.getElementById("armSlider").addEventListener("input", e => {
-      document.getElementById("armValue").textContent = e.target.value;
-    });
-    document.getElementById("baseSlider").addEventListener("input", e => {
-      document.getElementById("baseValue").textContent = e.target.value;
-    });
+    async function sendValue(type, value) {
+      const res = await fetch(`/set_value?type=${type}&value=${value}`);
+      const txt = await res.text();
+      alert(txt);
+    }
 
     async function sendCommand(cmd) {
-      await fetch("/send", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({command: cmd})
-      });
+      const res = await fetch(`/command?type=${cmd}`);
+      const txt = await res.text();
+      alert(txt);
     }
-
-    async function fetchLogs() {
-      const res = await fetch("/terminal/logs");
-      const data = await res.json();
-      document.getElementById("log").textContent = data.join("\n");
-      document.getElementById("log").scrollTop = document.getElementById("log").scrollHeight;
-    }
-
-    setInterval(fetchLogs, 1000);
-    fetchLogs();
   </script>
 </body>
 </html>
