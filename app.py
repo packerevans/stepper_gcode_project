@@ -75,6 +75,11 @@ def download_design(filename):
     """Serve .gcode file for download or use."""
     return send_from_directory("designs", filename)
 
+# ---------- NEW: Sliders route ----------
+@app.route('/sliders')
+def sliders():
+    """Render slider control page (reuse index.html or make new)."""
+    return render_template("index.html")
 # ---------------------------------------
 
 if __name__ == '__main__':
