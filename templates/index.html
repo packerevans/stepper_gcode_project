@@ -187,6 +187,21 @@
   <span id="speedValue">500</span>
   <button onclick="sendCommand('SPEED:' + document.getElementById('speedSlider').value)">Send</button>
 </div>
+<div class="slider-container">
+  <label for="armStepSlider">ARM DIR</label>
+  <input type="range" id="armStepSlider" min="10" max="10000" value="1000" 
+         oninput="armStepValue.textContent=this.value">
+  <span id="armStepValue">1000</span>
+  <button onclick="sendCommand('ARMSTEPS:' + document.getElementById('armStepSlider').value)">Send</button>
+</div>
+
+<div class="slider-container">
+  <label for="baseStepSlider">BASE DIR</label>
+  <input type="range" id="baseStepSlider" min="10" max="10000" value="1000" 
+         oninput="baseStepValue.textContent=this.value">
+  <span id="baseStepValue">1000</span>
+  <button onclick="sendCommand('BASESTEPS:' + document.getElementById('baseStepSlider').value)">Send</button>
+</div>
 
 
     <!-- Pause / Resume -->
