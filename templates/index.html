@@ -179,7 +179,6 @@
         <span id="baseValue">1</span>
         <button onclick="sendCommand('BASE:' + document.getElementById('baseSlider').value)">Send</button>
       </div>
-    </div>
     <div class="slider-container">
   <label for="speedSlider">SPEED</label>
   <input type="range" id="speedSlider" min="100" max="8000" value="00" 
@@ -189,7 +188,7 @@
 </div>
 <div class="slider-container">
   <label for="armStepSlider">ARM DIR</label>
-  <input type="range" id="armStepSlider" min="10" max="3500" value="0" 
+  <input type="range" id="armStepSlider" min="0" max="3500" value="0" 
          oninput="armStepValue.textContent=this.value">
   <span id="armStepValue">0</span>
   <button onclick="sendCommand('ARMSTEPS:' + document.getElementById('armStepSlider').value)">Send</button>
@@ -202,7 +201,7 @@
   <span id="baseStepValue">0</span>
   <button onclick="sendCommand('BASESTEPS:' + document.getElementById('baseStepSlider').value)">Send</button>
 </div>
-
+</div>
 
     <!-- Pause / Resume -->
     <div style="text-align: center; margin-top: 20px;">
