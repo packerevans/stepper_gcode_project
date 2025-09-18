@@ -169,28 +169,28 @@
     <div class="slider-section">
       <div class="slider-container">
         <label for="armSlider">ARM</label>
-        <input type="range" id="armSlider" min="0" max="3000" value="0" oninput="armValue.textContent=this.value">
-        <span id="armValue">1</span>
+        <input type="range" id="armSlider" min="0" max="3000" value="500" oninput="armValue.textContent=this.value">
+        <span id="armValue">500</span>
         <button onclick="sendCommand('ARM:' + document.getElementById('armSlider').value)">Send</button>
       </div>
       <div class="slider-container">
         <label for="baseSlider">BASE</label>
-        <input type="range" id="baseSlider" min="0" max="3000" value="0" oninput="baseValue.textContent=this.value">
+        <input type="range" id="baseSlider" min="0" max="3000" value="1" oninput="baseValue.textContent=this.value">
         <span id="baseValue">1</span>
         <button onclick="sendCommand('BASE:' + document.getElementById('baseSlider').value)">Send</button>
       </div>
     <div class="slider-container">
   <label for="speedSlider">SPEED</label>
-  <input type="range" id="speedSlider" min="100" max="8000" value="00" 
+  <input type="range" id="speedSlider" min="100" max="8000" value="1000" 
          oninput="speedValue.textContent=this.value">
-  <span id="speedValue">500</span>
+  <span id="speedValue">1000</span>
   <button onclick="sendCommand('SPEED:' + document.getElementById('speedSlider').value)">Send</button>
 </div>
 <div class="slider-container">
   <label for="armStepSlider">ARM DIR</label>
-  <input type="range" id="armStepSlider" min="0" max="3500" value="0" 
+  <input type="range" id="armStepSlider" min="0" max="3500" value="500" 
          oninput="armStepValue.textContent=this.value">
-  <span id="armStepValue">0</span>
+  <span id="armStepValue">500</span>
   <button onclick="sendCommand('ARMSTEPS:' + document.getElementById('armStepSlider').value)">Send</button>
 </div>
 
