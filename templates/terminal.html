@@ -1,91 +1,179 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Terminal Control</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <style>
-        body { background: white; margin: 0; font-family: sans-serif; }
-        .container { padding: 20px; }
-        .slider-container { margin: 20px 0; }
-        .terminal-window {
-            background: black;
-            color: lime;
-            font-family: monospace;
-            padding: 10px;
-            height: 300px;
-            overflow-y: auto;
-            border-radius: 8px;
-        }
-        .btn { padding: 8px 12px; margin: 5px; cursor: pointer; }
-    </style>
+  <meta charset="UTF-8" />
+  <title>Arduino Terminal</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #ffffff;
+      color: #000000;
+      margin: 0;
+      padding: 0;
+    }
+
+    .sidebar {
+      height: 100%;
+      width: 0;
+      position: fixed;
+      top: 0;
+      left: 0;
+      background-color: #d2b48c;
+      overflow-x: hidden;
+      transition: 0.3s;
+      padding-top: 60px;
+      z-index: 1000;
+    }
+
+    .sidebar a {
+      padding: 12px 24px;
+      text-decoration: none;
+      font-size: 18px;
+      color: #000;
+      display: block;
+      transition: 0.3s;
+    }
+
+    .sidebar a:hover {
+      background-color: #b08d5c;
+    }
+
+    .openbtn {
+      font-size: 26px;
+      cursor: pointer;
+      background-color: #d2b48c;
+      color: #000;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 0 0 8px 0;
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 1100;
+    }
+
+    .main-content {
+      margin-left: 0;
+      transition: margin-left 0.3s;
+      padding: 40px;
+      max-width: 900px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .header-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    h2 {
+      margin: 0;
+      text-align: center;
+      flex-grow: 1;
+    }
+
+    form#rebootForm button {
+      background-color: #d2b48c;
+      color: #000;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    form#rebootForm button:hover {
+      background-color: #b08d5c;
+    }
+
+    #flashMessages {
+      max-width: 900px;
+      margin: 0 auto 20px auto;
+      text-align: center;
+    }
+    #flashMessages p {
+      font-weight: bold;
+      margin: 0;
+    }
+    #flashMessages p.info {
+      color: green;
+    }
+    #flashMessages p.error {
+      color: red;
+    }
+
+    #log {
+      background: #fff;
+      color: #000;
+      padding: 20px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      height: 75vh;
+      overflow-y: scroll;
+      white-space: pre-wrap;
+      font-family: monospace;
+      font-size: 14px;
+    }
+  </style>
 </head>
 <body>
-    <!-- Slide Menu (copied from index.html) -->
-    <div class="menu">
-        <a href="{{ url_for('index') }}">Home</a>
-        <a href="{{ url_for('terminal') }}">Terminal</a>
+  <div id="mySidebar" class="sidebar">
+    <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
+    <a href="{{ url_for('index') }}">Manual Command</a>
+    <a href="{{ url_for('designs') }}">Preloaded Designs</a>
+    <a href="{{ url_for('terminal') }}">Terminal</a>
+  </div>
+
+  <button class="openbtn" onclick="openNav()">☰</button>
+
+  <div class="main-content">
+    <div class="header-row">
+      <h2>Arduino Terminal</h2>
+      <form id="rebootForm" method="POST" action="{{ url_for('reboot') }}">
+        <button type="submit">Reboot</button>
+      </form>
     </div>
 
-    <div class="container">
-        <h2>Arduino Control</h2>
-
-        <!-- Arm slider -->
-        <div class="slider-container">
-            <label>Arm: <span id="armValue">1500</span></label>
-            <input type="range" id="armSlider" min="0" max="3000" value="1500">
-            <button class="btn" onclick="sendCommand('ARM:' + document.getElementById('armSlider').value)">Send</button>
-        </div>
-
-        <!-- Base slider -->
-        <div class="slider-container">
-            <label>Base: <span id="baseValue">1500</span></label>
-            <input type="range" id="baseSlider" min="0" max="3000" value="1500">
-            <button class="btn" onclick="sendCommand('BASE:' + document.getElementById('baseSlider').value)">Send</button>
-        </div>
-
-        <!-- Reboot button -->
-        <div>
-            <button class="btn" onclick="rebootPi()">Reboot Raspberry Pi</button>
-        </div>
-
-        <!-- Terminal output -->
-        <h3>Serial Output</h3>
-        <div id="terminal" class="terminal-window"></div>
+    <div id="flashMessages">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <p class="{{ category }}">{{ message }}</p>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
     </div>
 
-    <script>
-        // Update slider values live
-        document.getElementById('armSlider').oninput = function() {
-            document.getElementById('armValue').innerText = this.value;
-        };
-        document.getElementById('baseSlider').oninput = function() {
-            document.getElementById('baseValue').innerText = this.value;
-        };
+    <div id="log">Loading logs...</div>
+  </div>
 
-        // Send command
-        function sendCommand(cmd) {
-            fetch("/send", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ command: cmd })
-            });
-        }
+  <script>
+    function openNav() {
+      document.getElementById("mySidebar").style.width = "200px";
+      document.querySelector(".main-content").style.marginLeft = "200px";
+    }
 
-        // Reboot Pi
-        function rebootPi() {
-            fetch("/reboot", { method: "POST" });
-        }
+    function closeNav() {
+      document.getElementById("mySidebar").style.width = "0";
+      document.querySelector(".main-content").style.marginLeft = "0";
+    }
 
-        // Terminal logs updater
-        async function updateLogs() {
-            const res = await fetch("/terminal/logs");
-            const data = await res.json();
-            const term = document.getElementById("terminal");
-            term.innerHTML = data.join("<br>");
-            term.scrollTop = term.scrollHeight; // auto-scroll
-        }
-        setInterval(updateLogs, 1000);
-    </script>
+    async function fetchLogs() {
+      try {
+        const res = await fetch("/terminal/logs");
+        if (!res.ok) throw new Error('Network response was not ok');
+        const data = await res.json();
+        document.getElementById("log").textContent = data.join("\n");
+      } catch (error) {
+        document.getElementById("log").textContent = "Error fetching logs: " + error;
+      }
+    }
+
+    setInterval(fetchLogs, 2000); // Refresh every 2 seconds
+    fetchLogs();
+  </script>
 </body>
 </html>
