@@ -173,17 +173,25 @@
     <div class="slider-section">
       <div class="slider-container">
         <label for="armSlider">ARM</label>
-        <input type="range" id="armSlider" min="0" max="3000" value="0" oninput="armValue.textContent=this.value">
+        <input type="range" id="armSlider" min="0" max="3000" value="1" oninput="armValue.textContent=this.value">
         <span id="armValue">0</span>
         <button onclick="sendCommand('ARM:' + document.getElementById('armSlider').value)">Send</button>
       </div>
       <div class="slider-container">
         <label for="baseSlider">BASE</label>
-        <input type="range" id="baseSlider" min="0" max="3000" value="0" oninput="baseValue.textContent=this.value">
+        <input type="range" id="baseSlider" min="0" max="3000" value="1" oninput="baseValue.textContent=this.value">
         <span id="baseValue">0</span>
         <button onclick="sendCommand('BASE:' + document.getElementById('baseSlider').value)">Send</button>
       </div>
     </div>
+    <div class="slider-container">
+  <label for="speedSlider">SPEED</label>
+  <input type="range" id="speedSlider" min="100" max="8000" value="4000" 
+         oninput="speedValue.textContent=this.value">
+  <span id="speedValue">1500</span>
+  <button onclick="sendCommand('SPEED:' + document.getElementById('speedSlider').value)">Send</button>
+</div>
+
 
     <!-- Pause / Resume -->
     <div style="text-align: center; margin-top: 20px;">
