@@ -91,7 +91,7 @@
       justify-content: space-between;
     }
 
-    button[type="submit"] {
+    button {
       background-color: #d2b48c;
       color: #000;
       border: none;
@@ -102,8 +102,45 @@
       transition: background-color 0.2s;
     }
 
-    button[type="submit"]:hover {
+    button:hover {
       background-color: #b08d5c;
+    }
+
+    .slider-section {
+      margin-top: 30px;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .slider-container {
+      display: flex;
+      align-items: center;
+      margin-bottom: 20px;
+      gap: 15px;
+    }
+
+    .slider-container label {
+      width: 60px;
+      font-weight: bold;
+    }
+
+    input[type="range"] {
+      flex-grow: 1;
+    }
+
+    .terminal {
+      max-width: 800px;
+      margin: 40px auto 0;
+      background: #ffffff;
+      color: #000000;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 12px;
+      height: 250px;
+      overflow-y: auto;
+      font-family: monospace;
+      white-space: pre-wrap;
     }
   </style>
 </head>
@@ -119,6 +156,8 @@
   <div class="main-content">
     <img src="{{ url_for('static', filename='sand.png') }}" alt="Sand Table Header" style="width: 100%; max-height: 300px; object-fit: cover; border-radius: 8px; margin-bottom: 30px;">
     <h1>Arduino Command Terminal</h1>
+    
+    <!-- Manual Textbox -->
     <form method="POST" id="commandForm">
       <input type="text" name="command" id="commandInput" placeholder="Enter command (ex: G1 X100 Y100)">
       <div class="controls">
@@ -129,6 +168,31 @@
         <button type="submit">Send to Arduino</button>
       </div>
     </form>
+
+    <!-- Sliders -->
+    <div class="slider-section">
+      <div class="slider-container">
+        <label for="armSlider">ARM</label>
+        <input type="range" id="armSlider" min="0" max="3000" value="0" oninput="armValue.textContent=this.value">
+        <span id="armValue">0</span>
+        <button onclick="sendCommand('ARM:' + document.getElementById('armSlider').value)">Send</button>
+      </div>
+      <div class="slider-container">
+        <label for="baseSlider">BASE</label>
+        <input type="range" id="baseSlider" min="0" max="3000" value="0" oninput="baseValue.textContent=this.value">
+        <span id="baseValue">0</span>
+        <button onclick="sendCommand('BASE:' + document.getElementById('baseSlider').value)">Send</button>
+      </div>
+    </div>
+
+    <!-- Pause / Resume -->
+    <div style="text-align: center; margin-top: 20px;">
+      <button onclick="sendCommand('PAUSE')">PAUSE</button>
+      <button onclick="sendCommand('RESUME')">RESUME</button>
+    </div>
+
+    <!-- Terminal View -->
+    <div id="terminal" class="terminal"></div>
   </div>
 
   <script>
@@ -146,11 +210,14 @@
     let history = [];
     let index = -1;
 
-    document.getElementById("commandForm").addEventListener("submit", function () {
+    document.getElementById("commandForm").addEventListener("submit", function (e) {
+      e.preventDefault();
       const value = input.value.trim();
       if (value) {
+        sendCommand(value);
         history.unshift(value);
         index = -1;
+        input.value = "";
       }
     });
 
@@ -172,6 +239,27 @@
         e.preventDefault();
       }
     });
+
+    function sendCommand(cmd) {
+      fetch("/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command: cmd })
+      })
+      .then(response => response.json())
+      .then(data => {
+        appendToTerminal("> " + cmd);
+        if (data.response) {
+          appendToTerminal(data.response);
+        }
+      });
+    }
+
+    function appendToTerminal(text) {
+      const term = document.getElementById("terminal");
+      term.textContent += text + "\n";
+      term.scrollTop = term.scrollHeight;
+    }
   </script>
 </body>
 </html>
