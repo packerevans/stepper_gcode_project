@@ -56,3 +56,8 @@ def reboot():
     log_message("System is rebooting…")
     subprocess.Popen(["sudo", "reboot"])  # real Pi reboot
     return jsonify(success=True, message="Rebooting Raspberry Pi…")
+
+
+# ---------------- MAIN ----------------
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
