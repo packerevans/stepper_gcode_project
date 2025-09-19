@@ -4,8 +4,15 @@ import serial, threading, time, subprocess
 app = Flask(__name__)
 
 # === SERIAL SETUP ===
-arduino = serial.Serial('/dev/ttyACM0', 9600, timeout=1)
-time.sleep(2)
+arduino = None  # NEW
+arduino_connected = False  # NEW
+
+try:
+    arduino = serial.Serial('/dev/ttyACM0', 9600, timeout=1)
+    time.sleep(2)
+    arduino_connected = True
+except Exception as e:  # NEW
+    print(f"Arduino not connected: {e}")
 
 serial_log = []
 lock = threading.Lock()
@@ -18,7 +25,7 @@ def log_message(msg):
 
 # Background reader thread
 def read_from_serial():
-    while True:
+    while arduino_connected:  # NEW
         try:
             line = arduino.readline().decode(errors="ignore").strip()
             if line:
@@ -26,18 +33,25 @@ def read_from_serial():
         except Exception as e:
             log_message(f"Error: {e}")
 
-threading.Thread(target=read_from_serial, daemon=True).start()
+if arduino_connected:  # NEW
+    threading.Thread(target=read_from_serial, daemon=True).start()
 
 @app.route("/")
 def index():
+    if not arduino_connected:  # NEW
+        return render_template("connect.html")
     return render_template("index.html")
 
 @app.route("/terminal")
 def terminal():
+    if not arduino_connected:  # NEW
+        return render_template("connect.html")
     return render_template("terminal.html")
 
 @app.route("/send", methods=["POST"])
 def send_command():
+    if not arduino_connected:  # NEW
+        return render_template("connect.html")
     data = request.json
     cmd = data.get("command")
     if cmd:
@@ -48,6 +62,8 @@ def send_command():
 
 @app.route("/terminal/logs")
 def get_logs():
+    if not arduino_connected:  # NEW
+        return render_template("connect.html")
     with lock:
         return jsonify(serial_log)
 
