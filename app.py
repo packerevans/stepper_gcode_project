@@ -1,17 +1,23 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, Response
 import serial, threading, time, subprocess
 
 app = Flask(__name__)
 
+# === NGROK HEADER FIX ===
+@app.after_request
+def apply_ngrok_header(response: Response):
+    response.headers["ngrok-skip-browser-warning"] = "true"
+    return response
+
 # === SERIAL SETUP ===
-arduino = None  # NEW
-arduino_connected = False  # NEW
+arduino = None
+arduino_connected = False
 
 try:
     arduino = serial.Serial('/dev/ttyACM0', 9600, timeout=1)
     time.sleep(2)
     arduino_connected = True
-except Exception as e:  # NEW
+except Exception as e:
     print(f"Arduino not connected: {e}")
 
 serial_log = []
@@ -25,7 +31,7 @@ def log_message(msg):
 
 # Background reader thread
 def read_from_serial():
-    while arduino_connected:  # NEW
+    while arduino_connected:
         try:
             line = arduino.readline().decode(errors="ignore").strip()
             if line:
@@ -33,24 +39,24 @@ def read_from_serial():
         except Exception as e:
             log_message(f"Error: {e}")
 
-if arduino_connected:  # NEW
+if arduino_connected:
     threading.Thread(target=read_from_serial, daemon=True).start()
 
 @app.route("/")
 def index():
-    if not arduino_connected:  # NEW
+    if not arduino_connected:
         return render_template("connect.html")
     return render_template("index.html")
 
 @app.route("/terminal")
 def terminal():
-    if not arduino_connected:  # NEW
+    if not arduino_connected:
         return render_template("connect.html")
     return render_template("terminal.html")
 
 @app.route("/send", methods=["POST"])
 def send_command():
-    if not arduino_connected:  # NEW
+    if not arduino_connected:
         return render_template("connect.html")
     data = request.json
     cmd = data.get("command")
@@ -62,7 +68,7 @@ def send_command():
 
 @app.route("/terminal/logs")
 def get_logs():
-    if not arduino_connected:  # NEW
+    if not arduino_connected:
         return render_template("connect.html")
     with lock:
         return jsonify(serial_log)
