@@ -1,5 +1,7 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, Response
+from flask import Flask, render_template, request, jsonify, Response
 import serial, threading, time, subprocess
+import asyncio
+import ble_controller  # Import the BLE handler
 
 app = Flask(__name__)
 
@@ -26,7 +28,7 @@ lock = threading.Lock()
 def log_message(msg):
     with lock:
         serial_log.append(msg)
-        if len(serial_log) > 200:  # limit length
+        if len(serial_log) > 200:
             serial_log.pop(0)
 
 # Background reader thread
@@ -42,6 +44,7 @@ def read_from_serial():
 if arduino_connected:
     threading.Thread(target=read_from_serial, daemon=True).start()
 
+# ---------------- ROUTES ----------------
 @app.route("/")
 def index():
     if not arduino_connected:
@@ -54,6 +57,10 @@ def terminal():
         return render_template("connect.html")
     return render_template("terminal.html")
 
+@app.route("/led_controls")
+def led_controls():
+    return render_template("led_controls.html")
+
 @app.route("/send", methods=["POST"])
 def send_command():
     if not arduino_connected:
@@ -61,7 +68,16 @@ def send_command():
     data = request.json
     cmd = data.get("command")
     if cmd:
-        arduino.write((cmd + "\n").encode())
+        # Handle LED commands
+        if cmd.startswith("LED:"):
+            try:
+                parts = cmd.split(":")[1].split(",")
+                r, g, b = map(int, parts)
+                asyncio.run(ble_controller.send_led_command(r, g, b))
+            except Exception as e:
+                log_message(f"Error sending LED: {e}")
+        else:
+            arduino.write((cmd + "\n").encode())
         log_message(f"Sent: {cmd}")
         return jsonify(success=True)
     return jsonify(success=False), 400
@@ -76,9 +92,8 @@ def get_logs():
 @app.route("/reboot", methods=["POST"])
 def reboot():
     log_message("System is rebooting…")
-    subprocess.Popen(["sudo", "reboot"])  # real Pi reboot
+    subprocess.Popen(["sudo", "reboot"])
     return jsonify(success=True, message="Rebooting Raspberry Pi…")
-
 
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
