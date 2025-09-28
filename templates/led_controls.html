@@ -6,210 +6,78 @@
   <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
   <link rel="apple-touch-icon" sizes="512x512" href="{{ url_for('static', filename='icons/icon-512.png') }}">
   <style>
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      background: #ffffff;
-      color: #000000;
-      margin: 0;
-      padding: 0;
-    }
-
-    .sidebar {
-      height: 100%;
-      width: 0;
-      position: fixed;
-      top: 0;
-      left: 0;
-      background-color: #d2b48c;
-      overflow-x: hidden;
-      transition: 0.3s;
-      padding-top: 60px;
-      z-index: 1000;
-    }
-
-    .sidebar a {
-      padding: 12px 24px;
-      text-decoration: none;
-      font-size: 18px;
-      color: #000;
-      display: block;
-      transition: 0.3s;
-    }
-
-    .sidebar a:hover {
-      background-color: #b08d5c;
-    }
-
-    .openbtn {
-      font-size: 26px;
-      cursor: pointer;
-      background-color: #d2b48c;
-      color: #000;
-      padding: 10px 20px;
-      border: none;
-      border-radius: 0 0 8px 0;
-      position: fixed;
-      top: 0;
-      left: 0;
-      z-index: 1100;
-    }
-
-    .main-content {
-      margin-left: 0;
-      transition: margin-left 0.3s;
-      padding: 40px;
-    }
-
-    h1 {
-      text-align: center;
-      margin-bottom: 30px;
-    }
-
-    .slider-section {
-      max-width: 600px;
-      margin: 0 auto;
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-
-    .slider-container {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 15px;
-    }
-
-    .slider-container label {
-      width: 60px;
-      font-weight: bold;
-    }
-
-    input[type="range"] {
-      flex-grow: 1;
-    }
-
-    button {
-      background-color: #d2b48c;
-      color: #000;
-      border: none;
-      padding: 10px 16px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 14px;
-      transition: background-color 0.2s;
-    }
-
-    button:hover {
-      background-color: #b08d5c;
-    }
-
-    .color-display {
-      width: 100%;
-      height: 60px;
-      border-radius: 8px;
-      margin-top: 10px;
-      border: 1px solid #ccc;
-    }
+    body { font-family: 'Segoe UI', sans-serif; background: #ffffff; color: #000000; margin:0; padding:0; }
+    .sidebar { height:100%; width:0; position:fixed; top:0; left:0; background:#d2b48c; overflow-x:hidden; transition:0.3s; padding-top:60px; z-index:1000; }
+    .sidebar a { padding:12px 24px; text-decoration:none; font-size:18px; color:#000; display:block; transition:0.3s; }
+    .sidebar a:hover { background-color:#b08d5c; }
+    .openbtn { font-size:26px; cursor:pointer; background-color:#d2b48c; color:#000; padding:10px 20px; border:none; border-radius:0 0 8px 0; position:fixed; top:0; left:0; z-index:1100; }
+    .main-content { margin-left:0; transition:0.3s; padding:40px; }
+    h1 { text-align:center; margin-bottom:30px; }
+    .slider-section { max-width:600px; margin:0 auto; display:flex; flex-direction:column; gap:20px; }
+    .slider-container { display:flex; align-items:center; justify-content:space-between; gap:15px; }
+    .slider-container label { width:60px; font-weight:bold; }
+    input[type="range"] { flex-grow:1; }
+    button { background-color:#d2b48c; color:#000; border:none; padding:10px 16px; border-radius:6px; cursor:pointer; font-size:14px; transition:0.2s; }
+    button:hover { background-color:#b08d5c; }
+    .color-display { width:100%; height:60px; border-radius:8px; margin-top:10px; border:1px solid #ccc; }
   </style>
 </head>
 <body>
-  <div id="mySidebar" class="sidebar">
-    <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
-    <a href="{{ url_for('index') }}">Manual Command</a>
-    <a href="{{ url_for('terminal') }}">Terminal</a>
-    <a href="{{ url_for('led_controls') }}">LED Controls</a>
+<div id="mySidebar" class="sidebar">
+  <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
+  <a href="{{ url_for('index') }}">Manual Command</a>
+  <a href="{{ url_for('terminal') }}">Terminal</a>
+  <a href="{{ url_for('led_controls') }}">LED Controls</a>
+</div>
+
+<button class="openbtn" onclick="openNav()">☰</button>
+
+<div class="main-content">
+  <!-- Header image -->
+  <img src="{{ url_for('static', filename='led.png') }}" alt="LED Header" style="width:100%; max-height:300px; object-fit:cover; border-radius:8px; margin-bottom:30px;">
+
+  <h1>LED Strip Controls</h1>
+
+  <div class="slider-section">
+    <div class="slider-container"><label>Red</label><input type="range" id="redSlider" min="0" max="255" value="0" oninput="updateColorDisplay()"><span id="redVal">0</span></div>
+    <div class="slider-container"><label>Green</label><input type="range" id="greenSlider" min="0" max="255" value="0" oninput="updateColorDisplay()"><span id="greenVal">0</span></div>
+    <div class="slider-container"><label>Blue</label><input type="range" id="blueSlider" min="0" max="255" value="0" oninput="updateColorDisplay()"><span id="blueVal">0</span></div>
+    <div class="slider-container"><label>Brightness</label><input type="range" id="brightnessSlider" min="1" max="16" value="16" oninput="updateColorDisplay()"><span id="brightnessVal">16</span></div>
+
+    <div class="color-display" id="colorDisplay"></div>
+    <div style="text-align:center; margin-top:15px;"><button onclick="sendLEDCommand()">Set Color</button></div>
   </div>
+</div>
 
-  <button class="openbtn" onclick="openNav()">☰</button>
-
-  <div class="main-content">
-    <h1>LED Strip Controls</h1>
-
-    <div class="slider-section">
-      <div class="slider-container">
-        <label for="redSlider">Red</label>
-        <input type="range" id="redSlider" min="0" max="255" value="0" oninput="updateColorDisplay()">
-        <span id="redVal">0</span>
-      </div>
-
-      <div class="slider-container">
-        <label for="greenSlider">Green</label>
-        <input type="range" id="greenSlider" min="0" max="255" value="0" oninput="updateColorDisplay()">
-        <span id="greenVal">0</span>
-      </div>
-
-      <div class="slider-container">
-        <label for="blueSlider">Blue</label>
-        <input type="range" id="blueSlider" min="0" max="255" value="0" oninput="updateColorDisplay()">
-        <span id="blueVal">0</span>
-      </div>
-
-      <div class="slider-container">
-        <label for="brightnessSlider">Brightness</label>
-        <input type="range" id="brightnessSlider" min="1" max="16" value="16" oninput="updateColorDisplay()">
-        <span id="brightnessVal">16</span>
-      </div>
-
-      <div class="color-display" id="colorDisplay"></div>
-      <div style="text-align:center; margin-top:15px;">
-        <button onclick="sendLEDCommand()">Set Color</button>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    function openNav() {
-      document.getElementById("mySidebar").style.width = "200px";
-      document.querySelector(".main-content").style.marginLeft = "200px";
-    }
-
-    function closeNav() {
-      document.getElementById("mySidebar").style.width = "0";
-      document.querySelector(".main-content").style.marginLeft = "0";
-    }
-
-    function updateColorDisplay() {
-      const r = parseInt(document.getElementById('redSlider').value);
-      const g = parseInt(document.getElementById('greenSlider').value);
-      const b = parseInt(document.getElementById('blueSlider').value);
-      const br = parseInt(document.getElementById('brightnessSlider').value);
-      document.getElementById('redVal').textContent = r;
-      document.getElementById('greenVal').textContent = g;
-      document.getElementById('blueVal').textContent = b;
-      document.getElementById('brightnessVal').textContent = br;
-
-      const scaledR = Math.round(r * (br/16));
-      const scaledG = Math.round(g * (br/16));
-      const scaledB = Math.round(b * (br/16));
-      document.getElementById('colorDisplay').style.backgroundColor =
-        `rgb(${scaledR}, ${scaledG}, ${scaledB})`;
-    }
-
-    async function sendLEDCommand() {
-      const r = parseInt(document.getElementById('redSlider').value);
-      const g = parseInt(document.getElementById('greenSlider').value);
-      const b = parseInt(document.getElementById('blueSlider').value);
-      const br = parseInt(document.getElementById('brightnessSlider').value);
-
-      // Scale colors by brightness
-      const scaledR = Math.round(r * (br/16));
-      const scaledG = Math.round(g * (br/16));
-      const scaledB = Math.round(b * (br/16));
-
-      // Send command to Python backend via existing /send route
-      const cmd = `LED:${scaledR},${scaledG},${scaledB}`;
-      await fetch("/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ command: cmd })
-      });
-
-      alert(`Sent LED command: ${cmd}`);
-    }
-
-    // initialize display
-    updateColorDisplay();
-  </script>
+<script>
+function openNav(){document.getElementById("mySidebar").style.width="200px";document.querySelector(".main-content").style.marginLeft="200px";}
+function closeNav(){document.getElementById("mySidebar").style.width="0";document.querySelector(".main-content").style.marginLeft="0";}
+function updateColorDisplay(){
+  const r=parseInt(document.getElementById('redSlider').value),
+        g=parseInt(document.getElementById('greenSlider').value),
+        b=parseInt(document.getElementById('blueSlider').value),
+        br=parseInt(document.getElementById('brightnessSlider').value);
+  document.getElementById('redVal').textContent=r;
+  document.getElementById('greenVal').textContent=g;
+  document.getElementById('blueVal').textContent=b;
+  document.getElementById('brightnessVal').textContent=br;
+  const scaledR=Math.round(r*(br/16)),
+        scaledG=Math.round(g*(br/16)),
+        scaledB=Math.round(b*(br/16));
+  document.getElementById('colorDisplay').style.backgroundColor=`rgb(${scaledR},${scaledG},${scaledB})`;
+}
+async function sendLEDCommand(){
+  const r=parseInt(document.getElementById('redSlider').value),
+        g=parseInt(document.getElementById('greenSlider').value),
+        b=parseInt(document.getElementById('blueSlider').value),
+        br=parseInt(document.getElementById('brightnessSlider').value),
+        scaledR=Math.round(r*(br/16)),
+        scaledG=Math.round(g*(br/16)),
+        scaledB=Math.round(b*(br/16)),
+        cmd=`LED:${scaledR},${scaledG},${scaledB}`;
+  await fetch("/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({command:cmd})});
+}
+updateColorDisplay();
+</script>
 </body>
 </html>
