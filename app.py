@@ -63,37 +63,51 @@ def led_controls():
 
 @app.route("/send", methods=["POST"])
 def send_command():
-    if not arduino_connected:
-        return render_template("connect.html")
     data = request.json
     cmd = data.get("command")
-    if cmd:
-        try:
-            if cmd.startswith("LED:"):
-                # Send RGB LED values over BLE
-                parts = cmd.split(":")[1].split(",")
-                r, g, b = map(int, parts)
-                asyncio.run(ble_controller.send_led_command(r, g, b))
-            elif cmd in ["CONNECT", "DISCONNECT", "POWER:ON", "POWER:OFF"]:
-                # Handle BLE power/connect/disconnect commands
-                asyncio.run(ble_controller.handle_command(cmd))
-            else:
-                # Forward anything else to Arduino over serial
+
+    if not cmd:
+        return jsonify(success=False), 400
+
+    print(f"[SEND] Received command: {cmd}")  # 👈 Debug print
+
+    try:
+        # --- BLE Commands ---
+        if cmd.startswith("LED:"):
+            parts = cmd.split(":")[1].split(",")
+            r, g, b = map(int, parts)
+            asyncio.run(ble_controller.send_led_command(r, g, b))
+
+        elif cmd == "CONNECT":
+            asyncio.run(ble_controller.connect())
+
+        elif cmd == "DISCONNECT":
+            asyncio.run(ble_controller.disconnect())
+
+        elif cmd == "POWER:ON":
+            asyncio.run(ble_controller.power_on())
+
+        elif cmd == "POWER:OFF":
+            asyncio.run(ble_controller.power_off())
+
+        # --- Arduino fallback (manual commands) ---
+        else:
+            if arduino_connected and arduino:
                 arduino.write((cmd + "\n").encode())
 
-            log_message(f"Sent: {cmd}")
-            return jsonify(success=True)
+        log_message(f"Sent: {cmd}")
+        return jsonify(success=True)
 
-        except Exception as e:
-            log_message(f"Error sending {cmd}: {e}")
-            return jsonify(success=False, error=str(e)), 500
-
-    return jsonify(success=False), 400
+    except Exception as e:
+        log_message(f"Error sending {cmd}: {e}")
+        return jsonify(success=False, error=str(e)), 500
 
 @app.route("/status", methods=["GET"])
 def get_status():
     """Return real BLE connection status."""
-    return jsonify({"connected": ble_controller.is_connected()})
+    connected = ble_controller.is_connected()
+    print(f"[STATUS] BLE connected = {connected}")  # 👈 Debug print
+    return jsonify({"connected": connected})
 
 @app.route("/terminal/logs")
 def get_logs():
