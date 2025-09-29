@@ -13,17 +13,12 @@ async def connect():
     """Connect to the LED strip via BLE."""
     global client
     if client and client.is_connected:
-        print("🔗 Already connected to LED strip")
         return True
     try:
         client = BleakClient(ADDRESS)
         await client.connect()
-        if client.is_connected:
-            print("✅ Connected to LED strip")
-            return True
-        else:
-            print("❌ Failed to connect (no error but not connected)")
-            return False
+        print("✅ Connected to LED strip")
+        return client.is_connected
     except Exception as e:
         print(f"❌ Connection failed: {e}")
         client = None
@@ -46,7 +41,7 @@ async def send_led_command(r: int, g: int, b: int):
     if not client or not client.is_connected:
         connected = await connect()
         if not connected:
-            print("❌ Not connected to LED strip, command dropped")
+            print("❌ Not connected to LED strip")
             return
     try:
         cmd = bytearray([0x7e, 0x07, 0x05, 0x03, r, g, b, 0x10, 0xef])
@@ -63,7 +58,25 @@ async def power_off():
     """Turn LED strip off (black)."""
     await send_led_command(0, 0, 0)
 
-def is_connected():
-    """Return True if the BLE client is connected."""
-    global client
-    return client is not None and client.is_connected
+async def handle_command(command: str):
+    """Process commands coming from the frontend."""
+    parts = command.split(":")
+    cmd = parts[0].upper()
+
+    if cmd == "CONNECT":
+        return await connect()
+    elif cmd == "DISCONNECT":
+        return await disconnect()
+    elif cmd == "POWER":
+        if len(parts) > 1 and parts[1].upper() == "ON":
+            return await power_on()
+        else:
+            return await power_off()
+    elif cmd == "LED":
+        try:
+            r, g, b = map(int, parts[1].split(","))
+            return await send_led_command(r, g, b)
+        except Exception as e:
+            print(f"⚠️ Invalid LED command: {e}")
+    else:
+        print(f"⚠️ Unknown command: {command}")
