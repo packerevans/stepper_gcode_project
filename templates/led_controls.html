@@ -71,8 +71,14 @@
 </div>
 
 <script>
-function openNav(){document.getElementById("mySidebar").style.width="200px";document.querySelector(".main-content").style.marginLeft="200px";}
-function closeNav(){document.getElementById("mySidebar").style.width="0";document.querySelector(".main-content").style.marginLeft="0";}
+function openNav(){
+  document.getElementById("mySidebar").style.width="200px";
+  document.querySelector(".main-content").style.marginLeft="200px";
+}
+function closeNav(){
+  document.getElementById("mySidebar").style.width="0";
+  document.querySelector(".main-content").style.marginLeft="0";
+}
 
 function updateColorDisplay(){
   const r=parseInt(document.getElementById('redSlider').value),
@@ -102,23 +108,44 @@ async function sendLEDCommand(){
   logToTerminal("Sent: " + cmd);
 }
 
-/* ---- Connection + Power ---- */
-let isConnected=false;
-let powerOn=true;
+/* ---- Real Connection Handling ---- */
+async function checkStatus(){
+  try {
+    const res = await fetch("/status");
+    const data = await res.json();
+    const indicator = document.getElementById("connIndicator");
+    const connBtn = document.getElementById("connBtn");
 
-function toggleConnection(){
-  isConnected=!isConnected;
-  document.getElementById("connIndicator").style.backgroundColor=isConnected?"green":"red";
-  document.getElementById("connBtn").textContent=isConnected?"Disconnect":"Connect";
-  logToTerminal(isConnected?"Connected to LED strip":"Disconnected from LED strip");
+    if(data.connected){
+      indicator.style.backgroundColor = "green";
+      connBtn.textContent = "Disconnect";
+    } else {
+      indicator.style.backgroundColor = "red";
+      connBtn.textContent = "Connect";
+    }
+  } catch(e){
+    console.error("Status check failed", e);
+  }
 }
 
-function togglePower(){
-  powerOn=!powerOn;
-  document.getElementById("powerBtn").textContent=powerOn?"Turn Off":"Turn On";
-  const cmd=powerOn?"POWER:ON":"POWER:OFF";
+async function toggleConnection(){
+  const btn = document.getElementById("connBtn");
+  const cmd = btn.textContent === "Connect" ? "CONNECT" : "DISCONNECT";
+  await fetch("/send", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({command:cmd})
+  });
   logToTerminal("Sent: " + cmd);
-  fetch("/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({command:cmd})});
+  setTimeout(checkStatus, 500); // update indicator shortly after
+}
+
+async function togglePower(){
+  powerOn = !powerOn;
+  const cmd = powerOn ? "POWER:ON" : "POWER:OFF";
+  document.getElementById("powerBtn").textContent = powerOn ? "Turn Off" : "Turn On";
+  await fetch("/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({command:cmd})});
+  logToTerminal("Sent: " + cmd);
 }
 
 /* ---- Terminal logger ---- */
@@ -129,6 +156,10 @@ function logToTerminal(msg){
   term.appendChild(line);
   term.scrollTop=term.scrollHeight;
 }
+
+/* ---- Auto status check ---- */
+setInterval(checkStatus, 2000);
+checkStatus();
 
 updateColorDisplay();
 </script>
