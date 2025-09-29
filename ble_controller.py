@@ -38,7 +38,7 @@ def create_rgb_command(r: int, g: int, b: int, brightness: int) -> bytearray:
 COMMANDS = {
     # 0x04 function is often for ON/OFF
     # For ON, we can send a full white at max brightness (0xFF, 0xFF, 0xFF, 0x10)
-    "POWER:ON": create_rgb_command(255, 255, 255, 16), 
+    "POWER:ON": bytearray([0x7e, 0x04, 0x04, 0x01, 0xff, 0x00, 0x00, 0x00, 0xef]),
     "POWER:OFF": bytearray([0x7e, 0x04, 0x04, 0x00, 0xff, 0x00, 0x00, 0x00, 0xef]), # Official OFF command
 }
 
