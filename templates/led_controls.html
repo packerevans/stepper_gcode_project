@@ -1,136 +1,318 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>LED Strip Controls</title>
-  <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
-  <link rel="apple-touch-icon" sizes="512x512" href="{{ url_for('static', filename='icons/icon-512.png') }}">
-  <style>
-    body { font-family: 'Segoe UI', sans-serif; background: #ffffff; color: #000000; margin:0; padding:0; }
-    .sidebar { height:100%; width:0; position:fixed; top:0; left:0; background:#d2b48c; overflow-x:hidden; transition:0.3s; padding-top:60px; z-index:1000; }
-    .sidebar a { padding:12px 24px; text-decoration:none; font-size:18px; color:#000; display:block; transition:0.3s; }
-    .sidebar a:hover { background-color:#b08d5c; }
-    .openbtn { font-size:26px; cursor:pointer; background-color:#d2b48c; color:#000; padding:10px 20px; border:none; border-radius:0 0 8px 0; position:fixed; top:0; left:0; z-index:1100; }
-    .main-content { margin-left:0; transition:0.3s; padding:40px; }
-    h1 { text-align:center; margin-bottom:30px; }
-    .slider-section { max-width:600px; margin:0 auto; display:flex; flex-direction:column; gap:20px; }
-    .slider-container { display:flex; align-items:center; justify-content:space-between; gap:15px; }
-    .slider-container label { width:60px; font-weight:bold; }
-    input[type="range"] { flex-grow:1; }
-    button { background-color:#d2b48c; color:#000; border:none; padding:10px 16px; border-radius:6px; cursor:pointer; font-size:14px; transition:0.2s; }
-    button:hover { background-color:#b08d5c; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LED Strip Controls</title>
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+    <link rel="apple-touch-icon" sizes="512x512" href="{{ url_for('static', filename='icons/icon-512.png') }}">
+    <style>
+        /* Modernized Styles */
+        :root {
+            --primary-color: #d2b48c; /* Khaki/Tan */
+            --secondary-color: #b08d5c; /* Darker Tan */
+            --text-color: #000000;
+            --background-color: #f7f7f7;
+            --terminal-bg: #ffffff;
+            --terminal-border: #ccc;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--background-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+        }
+        /* Sidebar Styles (kept from your start) */
+        .sidebar { height:100%; width:0; position:fixed; top:0; left:0; background:var(--primary-color); overflow-x:hidden; transition:0.3s; padding-top:60px; z-index:1000; box-shadow: 2px 0 5px rgba(0,0,0,0.1); }
+        .sidebar a { padding:12px 24px; text-decoration:none; font-size:18px; color:var(--text-color); display:block; transition:0.3s; }
+        .sidebar a:hover { background-color:var(--secondary-color); }
+        .openbtn { font-size:26px; cursor:pointer; background-color:var(--primary-color); color:var(--text-color); padding:10px 20px; border:none; border-radius:0 0 8px 0; position:fixed; top:0; left:0; z-index:1100; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .main-content { margin-left:0; transition:0.3s; padding:20px; max-width: 800px; margin: 0 auto; }
+        
+        h1 { 
+            text-align:center; 
+            margin-bottom:30px; 
+            color: var(--secondary-color);
+            font-weight: 300;
+        }
+        
+        /* Image Style */
+        .header-image {
+            width:100%; 
+            max-height:200px; 
+            object-fit:cover; 
+            border-radius:12px; 
+            margin-bottom:30px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
 
-    /* --- New UI elements --- */
-    .status-section { display:flex; justify-content:center; align-items:center; gap:20px; margin-bottom:25px; }
-    .indicator { width:20px; height:20px; border-radius:50%; background-color:red; border:1px solid #444; }
+        /* Control Sections */
+        .control-section {
+            background-color: var(--terminal-bg);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+            margin-bottom: 25px;
+        }
+        .status-section { 
+            display:flex; 
+            justify-content:center; 
+            align-items:center; 
+            gap:20px; 
+            margin-bottom:15px; 
+            padding: 10px 0;
+        }
+        .indicator { 
+            width:15px; 
+            height:15px; 
+            border-radius:50%; 
+            background-color:lightgray; /* Default */
+            transition: background-color 0.3s;
+        }
+        
+        /* Buttons */
+        button { 
+            background-color:var(--primary-color); 
+            color:var(--text-color); 
+            border:none; 
+            padding:10px 20px; 
+            border-radius:8px; 
+            cursor:pointer; 
+            font-size:16px; 
+            transition:0.2s ease-in-out; 
+            font-weight: 500;
+        }
+        button:hover { 
+            background-color:var(--secondary-color); 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        button:active {
+            transform: translateY(1px);
+        }
 
-    .bottom-section { display:flex; justify-content:center; align-items:flex-start; gap:20px; margin-top:25px; }
-    .color-display { width:100px; height:100px; border-radius:50%; border:1px solid #ccc; }
-    .terminal { background:#fff; color:#000; font-family:monospace; padding:10px; border-radius:6px; max-width:450px; height:120px; overflow-y:auto; font-size:13px; border:1px solid #ccc; }
-  </style>
+        /* Sliders */
+        .slider-section { display:flex; flex-direction: column; gap: 10px;}
+        .slider-container { display:flex; align-items:center; justify-content:space-between; gap:15px; }
+        .slider-container label { width:80px; font-weight:bold; }
+        input[type="range"] { flex-grow:1; -webkit-appearance: none; appearance: none; height: 8px; background: #ddd; border-radius: 5px; cursor: pointer; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--secondary-color); cursor: pointer; box-shadow: 0 0 5px rgba(0,0,0,0.2); }
+        
+        /* Color Display and Terminal */
+        .bottom-section { display:flex; justify-content:space-around; align-items:flex-start; gap:20px; margin-top:25px; }
+        .bottom-section > div { flex: 1; display: flex; flex-direction: column; align-items: center; }
+
+        .color-display { 
+            width:120px; 
+            height:120px; 
+            border-radius:50%; 
+            border:5px solid var(--terminal-border);
+            transition: background-color 0.5s;
+        }
+        .terminal { 
+            background:var(--terminal-bg); 
+            color:var(--text-color); 
+            font-family:'Consolas', 'Courier New', monospace; 
+            padding:15px; 
+            border-radius:8px; 
+            width: 100%;
+            height:150px; 
+            overflow-y:auto; 
+            font-size:12px; 
+            border:1px solid var(--terminal-border);
+            white-space: pre-wrap;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.05);
+        }
+    </style>
 </head>
 <body>
 <div id="mySidebar" class="sidebar">
-  <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
-  <a href="{{ url_for('index') }}">Manual Command</a>
-  <a href="{{ url_for('terminal') }}">Terminal</a>
-  <a href="{{ url_for('led_controls') }}">LED Controls</a>
+    <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
+    <a href="{{ url_for('index') }}">Manual Command</a>
+    <a href="{{ url_for('terminal') }}">Terminal</a>
+    <a href="{{ url_for('led_controls') }}">LED Controls</a>
 </div>
 
 <button class="openbtn" onclick="openNav()">☰</button>
 
 <div class="main-content">
-  <!-- Header image -->
-  <img src="{{ url_for('static', filename='led.png') }}" alt="LED Header" style="width:100%; max-height:300px; object-fit:cover; border-radius:8px; margin-bottom:30px;">
+    <img src="{{ url_for('static', filename='led.png') }}" alt="LED Header" class="header-image">
 
-  <h1>LED Strip Controls</h1>
+    <h1>LED Strip Controller</h1>
 
-  <!-- Status and Toggles moved above sliders -->
-  <div class="status-section">
-    <div class="indicator" id="connIndicator"></div>
-    <button onclick="toggleConnection()" id="connBtn">Connect</button>
-    <button onclick="togglePower()" id="powerBtn">Turn Off</button>
-  </div>
-
-  <div class="slider-section">
-    <div class="slider-container"><label>Red</label><input type="range" id="redSlider" min="0" max="255" value="0" oninput="updateColorDisplay()"><span id="redVal">0</span></div>
-    <div class="slider-container"><label>Green</label><input type="range" id="greenSlider" min="0" max="255" value="0" oninput="updateColorDisplay()"><span id="greenVal">0</span></div>
-    <div class="slider-container"><label>Blue</label><input type="range" id="blueSlider" min="0" max="255" value="0" oninput="updateColorDisplay()"><span id="blueVal">0</span></div>
-    <div class="slider-container"><label>Brightness</label><input type="range" id="brightnessSlider" min="1" max="16" value="16" oninput="updateColorDisplay()"><span id="brightnessVal">16</span></div>
-
-    <div style="text-align:center; margin-top:15px;">
-      <button onclick="sendLEDCommand()">Set Color</button>
+    <div class="control-section">
+        <h2>Connection & Power</h2>
+        <div class="status-section">
+            <span style="font-weight:bold;">BLE Status:</span>
+            <div class="indicator" id="connIndicator"></div>
+            <span id="connStatusText">DISCONNECTED</span>
+            
+            <button onclick="toggleConnection()" id="connBtn">Connect</button>
+            <button onclick="togglePower()" id="powerBtn">Turn OFF</button>
+        </div>
     </div>
-  </div>
 
-  <!-- New bottom section: circle + terminal -->
-  <div class="bottom-section">
-    <div class="color-display" id="colorDisplay"></div>
-    <div class="terminal" id="terminal"></div>
-  </div>
+    <div class="control-section">
+        <h2>Color Selector</h2>
+        <div class="slider-section">
+            <div class="slider-container"><label>Red</label><input type="range" id="redSlider" min="0" max="255" value="255" oninput="updateColorDisplay()"><span id="redVal">255</span></div>
+            <div class="slider-container"><label>Green</label><input type="range" id="greenSlider" min="0" max="255" value="255" oninput="updateColorDisplay()"><span id="greenVal">255</span></div>
+            <div class="slider-container"><label>Blue</label><input type="range" id="blueSlider" min="0" max="255" value="255" oninput="updateColorDisplay()"><span id="blueVal">255</span></div>
+            <div class="slider-container"><label>Brightness</label><input type="range" id="brightnessSlider" min="1" max="16" value="16" oninput="updateColorDisplay()"><span id="brightnessVal">16</span></div>
+
+            <div style="text-align:center; margin-top:20px;">
+                <button onclick="sendLEDCommand()">Set Color</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="bottom-section">
+        <div>
+            <h3>Current Color</h3>
+            <div class="color-display" id="colorDisplay"></div>
+        </div>
+        <div>
+            <h3>Terminal Log</h3>
+            <div class="terminal" id="terminal"></div>
+        </div>
+    </div>
 </div>
 
 <script>
-function openNav(){document.getElementById("mySidebar").style.width="200px";document.querySelector(".main-content").style.marginLeft="200px";}
-function closeNav(){document.getElementById("mySidebar").style.width="0";document.querySelector(".main-content").style.marginLeft="0";}
+    // --- Sidebar Functions (Kept) ---
+    function openNav() {
+        document.getElementById("mySidebar").style.width = "200px";
+        document.querySelector(".main-content").style.marginLeft = "200px";
+    }
 
-function updateColorDisplay(){
-  const r=parseInt(document.getElementById('redSlider').value),
-        g=parseInt(document.getElementById('greenSlider').value),
-        b=parseInt(document.getElementById('blueSlider').value),
-        br=parseInt(document.getElementById('brightnessSlider').value);
-  document.getElementById('redVal').textContent=r;
-  document.getElementById('greenVal').textContent=g;
-  document.getElementById('blueVal').textContent=b;
-  document.getElementById('brightnessVal').textContent=br;
-  const scaledR=Math.round(r*(br/16)),
-        scaledG=Math.round(g*(br/16)),
-        scaledB=Math.round(b*(br/16));
-  document.getElementById('colorDisplay').style.backgroundColor=`rgb(${scaledR},${scaledG},${scaledB})`;
-}
+    function closeNav() {
+        document.getElementById("mySidebar").style.width = "0";
+        document.querySelector(".main-content").style.marginLeft = "0";
+    }
 
-async function sendLEDCommand(){
-  const r=parseInt(document.getElementById('redSlider').value),
-        g=parseInt(document.getElementById('greenSlider').value),
-        b=parseInt(document.getElementById('blueSlider').value),
-        br=parseInt(document.getElementById('brightnessSlider').value),
-        scaledR=Math.round(r*(br/16)),
-        scaledG=Math.round(g*(br/16)),
-        scaledB=Math.round(b*(br/16)),
-        cmd=`LED:${scaledR},${scaledG},${scaledB}`;
-  await fetch("/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({command:cmd})});
-  logToTerminal("Sent: " + cmd);
-}
+    // --- State and UI Updates ---
+    let isConnected = false;
+    let powerOn = true;
+    let brightnessValue = 16; 
 
-/* ---- Connection + Power ---- */
-let isConnected=false;
-let powerOn=true;
+    function updateColorDisplay() {
+        const r = parseInt(document.getElementById('redSlider').value);
+        const g = parseInt(document.getElementById('greenSlider').value);
+        const b = parseInt(document.getElementById('blueSlider').value);
+        const br = parseInt(document.getElementById('brightnessSlider').value);
 
-function toggleConnection(){
-  isConnected=!isConnected;
-  document.getElementById("connIndicator").style.backgroundColor=isConnected?"green":"red";
-  document.getElementById("connBtn").textContent=isConnected?"Disconnect":"Connect";
-  logToTerminal(isConnected?"Connected to LED strip":"Disconnected from LED strip");
-}
+        document.getElementById('redVal').textContent = r;
+        document.getElementById('greenVal').textContent = g;
+        document.getElementById('blueVal').textContent = b;
+        document.getElementById('brightnessVal').textContent = br;
+        
+        brightnessValue = br; 
 
-function togglePower(){
-  powerOn=!powerOn;
-  document.getElementById("powerBtn").textContent=powerOn?"Turn Off":"Turn On";
-  const cmd=powerOn?"POWER:ON":"POWER:OFF";
-  logToTerminal("Sent: " + cmd);
-  fetch("/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({command:cmd})});
-}
+        // Scale RGB values based on brightness (max 16) for display visualization
+        const scaledR = Math.round(r * (br / 16));
+        const scaledG = Math.round(g * (br / 16));
+        const scaledB = Math.round(b * (br / 16));
+        
+        document.getElementById('colorDisplay').style.backgroundColor = `rgb(${scaledR},${scaledG},${scaledB})`;
+    }
 
-/* ---- Terminal logger ---- */
-function logToTerminal(msg){
-  const term=document.getElementById("terminal");
-  const line=document.createElement("div");
-  line.textContent=msg;
-  term.appendChild(line);
-  term.scrollTop=term.scrollHeight;
-}
+    function updateConnectionStatusUI(connected) {
+        // Only update UI if status changes
+        if (isConnected !== connected) {
+            isConnected = connected;
+            const indicator = document.getElementById("connIndicator");
+            const statusText = document.getElementById("connStatusText");
+            const btn = document.getElementById("connBtn");
 
-updateColorDisplay();
+            indicator.style.backgroundColor = connected ? "green" : "red";
+            statusText.textContent = connected ? "CONNECTED" : "DISCONNECTED";
+            btn.textContent = connected ? "Disconnect" : "Connect";
+            logToTerminal(`Status: Bluetooth ${connected ? 'CONNECTED' : 'DISCONNECTED'}`);
+        }
+    }
+
+    function updatePowerStatusUI(on) {
+        powerOn = on;
+        document.getElementById("powerBtn").textContent = on ? "Turn OFF" : "Turn ON";
+    }
+
+    // --- Backend Communication ---
+
+    async function sendCommand(cmd) {
+        logToTerminal(`API Call: ${cmd}`);
+        try {
+            const response = await fetch("/send", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ command: cmd })
+            });
+            const data = await response.json();
+            if (data.success) {
+                // Log success, but the actual status change is handled by the poller
+            } else {
+                logToTerminal(`Error sending ${cmd}: ${data.error || 'Unknown Error'}`, 'error');
+            }
+        } catch (e) {
+            logToTerminal(`Network Error sending ${cmd}: ${e.message}`, 'error');
+        }
+    }
+
+    async function sendLEDCommand() {
+        const r = parseInt(document.getElementById('redSlider').value);
+        const g = parseInt(document.getElementById('greenSlider').value);
+        const b = parseInt(document.getElementById('blueSlider').value);
+        
+        // Send RAW RGB values and the brightness value (1-16)
+        const cmd = `LED:${r},${g},${b},${brightnessValue}`;
+        await sendCommand(cmd);
+        updatePowerStatusUI(true); // Sending a color usually means power is ON
+    }
+
+    async function toggleConnection() {
+        const cmd = isConnected ? "DISCONNECT" : "CONNECT";
+        await sendCommand(cmd);
+    }
+
+    async function togglePower() {
+        const cmd = powerOn ? "POWER:OFF" : "POWER:ON";
+        // Optimistic UI update, rely on backend result for final state if needed
+        updatePowerStatusUI(!powerOn); 
+        await sendCommand(cmd);
+    }
+
+    // --- Terminal Logger ---
+    function logToTerminal(msg, type = 'info') {
+        const term = document.getElementById("terminal");
+        const line = document.createElement("div");
+        line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        if (type === 'error') {
+            line.style.color = 'red';
+            line.style.fontWeight = 'bold';
+        }
+        term.appendChild(line);
+        term.scrollTop = term.scrollHeight; // Auto-scroll to bottom
+    }
+
+    // --- Status Polling ---
+    async function pollStatus() {
+        try {
+            const response = await fetch("/status");
+            if (!response.ok) throw new Error('Failed to fetch status');
+            const data = await response.json();
+            updateConnectionStatusUI(data.connected);
+        } catch (e) {
+            updateConnectionStatusUI(false);
+        }
+    }
+
+    // --- Initialization ---
+    document.addEventListener('DOMContentLoaded', () => {
+        updateColorDisplay();
+        // Start polling the connection status every 2 seconds
+        setInterval(pollStatus, 2000);
+        // Set initial power state (assumed OFF)
+        updatePowerStatusUI(false); 
+    });
 </script>
 </body>
 </html>
