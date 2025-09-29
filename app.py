@@ -127,6 +127,23 @@ def reboot():
     subprocess.Popen(["sudo", "reboot"])
     return jsonify(success=True, message="Rebooting Raspberry Pi…")
 
+@app.route("/shutdown", methods=["POST"])
+def shutdown():
+    log_message("System is shutting down…")
+    subprocess.Popen(["sudo", "shutdown", "now"])
+    return jsonify(success=True, message="Shutting down…")
+
+@app.route("/pull", methods=["POST"])
+def pull():
+    try:
+        result = subprocess.check_output(["git", "pull"], stderr=subprocess.STDOUT).decode()
+        log_message("Git pull:\n" + result)
+        return jsonify(success=True, message="Pulled successfully", output=result)
+    except subprocess.CalledProcessError as e:
+        log_message("Git pull error:\n" + e.output.decode())
+        return jsonify(success=False, error=e.output.decode()), 500
+
+
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
     # The BLE loop starts automatically on import of ble_controller
