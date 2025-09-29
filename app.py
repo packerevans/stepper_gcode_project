@@ -68,19 +68,32 @@ def send_command():
     data = request.json
     cmd = data.get("command")
     if cmd:
-        # Handle LED commands
-        if cmd.startswith("LED:"):
-            try:
+        try:
+            if cmd.startswith("LED:"):
+                # Send RGB LED values over BLE
                 parts = cmd.split(":")[1].split(",")
                 r, g, b = map(int, parts)
                 asyncio.run(ble_controller.send_led_command(r, g, b))
-            except Exception as e:
-                log_message(f"Error sending LED: {e}")
-        else:
-            arduino.write((cmd + "\n").encode())
-        log_message(f"Sent: {cmd}")
-        return jsonify(success=True)
+            elif cmd in ["CONNECT", "DISCONNECT", "POWER:ON", "POWER:OFF"]:
+                # Handle BLE power/connect/disconnect commands
+                asyncio.run(ble_controller.handle_command(cmd))
+            else:
+                # Forward anything else to Arduino over serial
+                arduino.write((cmd + "\n").encode())
+
+            log_message(f"Sent: {cmd}")
+            return jsonify(success=True)
+
+        except Exception as e:
+            log_message(f"Error sending {cmd}: {e}")
+            return jsonify(success=False, error=str(e)), 500
+
     return jsonify(success=False), 400
+
+@app.route("/status", methods=["GET"])
+def get_status():
+    """Return real BLE connection status."""
+    return jsonify({"connected": ble_controller.is_connected()})
 
 @app.route("/terminal/logs")
 def get_logs():
