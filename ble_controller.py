@@ -80,3 +80,8 @@ async def handle_command(command: str):
             print(f"⚠️ Invalid LED command: {e}")
     else:
         print(f"⚠️ Unknown command: {command}")
+
+def is_connected():
+    """Return True if the BLE client is connected."""
+    global client
+    return client is not None and client.is_connected
