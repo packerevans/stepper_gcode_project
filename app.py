@@ -19,8 +19,9 @@ try:
     arduino = serial.Serial('/dev/ttyACM0', 9600, timeout=1)
     time.sleep(2)
     arduino_connected = True
+    print("✅ Arduino connected on /dev/ttyACM0")
 except Exception as e:
-    print(f"Arduino not connected: {e}")
+    print(f"⚠️ Arduino not connected: {e}")
 
 serial_log = []
 lock = threading.Lock()
@@ -64,30 +65,31 @@ def led_controls():
 @app.route("/send", methods=["POST"])
 def send_command():
     data = request.json
-    cmd = data.get("command")
+    cmd = data.get("command", "").strip()  # always sanitize
+    cmd_upper = cmd.upper()
 
     if not cmd:
         return jsonify(success=False), 400
 
-    print(f"[SEND] Received command: {cmd}")  # 👈 Debug print
+    print(f"[SEND] Received command: {cmd}")  # Debug print
 
     try:
         # --- BLE Commands ---
-        if cmd.startswith("LED:"):
+        if cmd_upper.startswith("LED:"):
             parts = cmd.split(":")[1].split(",")
             r, g, b = map(int, parts)
             asyncio.run(ble_controller.send_led_command(r, g, b))
 
-        elif cmd == "CONNECT":
+        elif cmd_upper == "CONNECT":
             asyncio.run(ble_controller.connect())
 
-        elif cmd == "DISCONNECT":
+        elif cmd_upper == "DISCONNECT":
             asyncio.run(ble_controller.disconnect())
 
-        elif cmd == "POWER:ON":
+        elif cmd_upper == "POWER:ON":
             asyncio.run(ble_controller.power_on())
 
-        elif cmd == "POWER:OFF":
+        elif cmd_upper == "POWER:OFF":
             asyncio.run(ble_controller.power_off())
 
         # --- Arduino fallback (manual commands) ---
@@ -100,13 +102,14 @@ def send_command():
 
     except Exception as e:
         log_message(f"Error sending {cmd}: {e}")
+        print(f"⚠️ Error sending {cmd}: {e}")
         return jsonify(success=False, error=str(e)), 500
 
 @app.route("/status", methods=["GET"])
 def get_status():
     """Return real BLE connection status."""
     connected = ble_controller.is_connected()
-    print(f"[STATUS] BLE connected = {connected}")  # 👈 Debug print
+    print(f"[STATUS] BLE connected = {connected}")
     return jsonify({"connected": connected})
 
 @app.route("/terminal/logs")
