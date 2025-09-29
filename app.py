@@ -19,9 +19,8 @@ try:
     arduino = serial.Serial('/dev/ttyACM0', 9600, timeout=1)
     time.sleep(2)
     arduino_connected = True
-    print("✅ Arduino connected on /dev/ttyACM0")
 except Exception as e:
-    print(f"⚠️ Arduino not connected: {e}")
+    print(f"Arduino not connected: {e}")
 
 serial_log = []
 lock = threading.Lock()
@@ -64,53 +63,37 @@ def led_controls():
 
 @app.route("/send", methods=["POST"])
 def send_command():
+    if not arduino_connected:
+        return render_template("connect.html")
     data = request.json
-    cmd = data.get("command", "").strip()  # always sanitize
-    cmd_upper = cmd.upper()
-
-    if not cmd:
-        return jsonify(success=False), 400
-
-    print(f"[SEND] Received command: {cmd}")  # Debug print
-
-    try:
-        # --- BLE Commands ---
-        if cmd_upper.startswith("LED:"):
-            parts = cmd.split(":")[1].split(",")
-            r, g, b = map(int, parts)
-            asyncio.run(ble_controller.send_led_command(r, g, b))
-
-        elif cmd_upper == "CONNECT":
-            asyncio.run(ble_controller.connect())
-
-        elif cmd_upper == "DISCONNECT":
-            asyncio.run(ble_controller.disconnect())
-
-        elif cmd_upper == "POWER:ON":
-            asyncio.run(ble_controller.power_on())
-
-        elif cmd_upper == "POWER:OFF":
-            asyncio.run(ble_controller.power_off())
-
-        # --- Arduino fallback (manual commands) ---
-        else:
-            if arduino_connected and arduino:
+    cmd = data.get("command")
+    if cmd:
+        try:
+            if cmd.startswith("LED:"):
+                # Send RGB LED values over BLE
+                parts = cmd.split(":")[1].split(",")
+                r, g, b = map(int, parts)
+                asyncio.run(ble_controller.send_led_command(r, g, b))
+            elif cmd in ["CONNECT", "DISCONNECT", "POWER:ON", "POWER:OFF"]:
+                # Handle BLE power/connect/disconnect commands
+                asyncio.run(ble_controller.handle_command(cmd))
+            else:
+                # Forward anything else to Arduino over serial
                 arduino.write((cmd + "\n").encode())
 
-        log_message(f"Sent: {cmd}")
-        return jsonify(success=True)
+            log_message(f"Sent: {cmd}")
+            return jsonify(success=True)
 
-    except Exception as e:
-        log_message(f"Error sending {cmd}: {e}")
-        print(f"⚠️ Error sending {cmd}: {e}")
-        return jsonify(success=False, error=str(e)), 500
+        except Exception as e:
+            log_message(f"Error sending {cmd}: {e}")
+            return jsonify(success=False, error=str(e)), 500
+
+    return jsonify(success=False), 400
 
 @app.route("/status", methods=["GET"])
 def get_status():
     """Return real BLE connection status."""
-    connected = ble_controller.is_connected()
-    print(f"[STATUS] BLE connected = {connected}")
-    return jsonify({"connected": connected})
+    return jsonify({"connected": ble_controller.is_connected()})
 
 @app.route("/terminal/logs")
 def get_logs():
