@@ -4,9 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LED Strip Controls</title>
-    <!-- Assuming Flask URLs for icons. Changed URL to a generic placeholder for display -->
-    <link rel="icon" type="image/png" sizes="192x192" href="https://placehold.co/192x192/000000/FFFFFF?text=LED">
-    <link rel="apple-touch-icon" sizes="512x512" href="https://placehold.co/512x512/000000/FFFFFF?text=LED">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+    <link rel="apple-touch-icon" sizes="512x512" href="{{ url_for('static', filename='icons/icon-512.png') }}">
     
     <style>
         /* --- Root Variables (Light Mode) --- */
@@ -236,7 +235,7 @@
 
     <div class="main-content">
         <!-- Using a generic placeholder image -->
-        <img src="https://placehold.co/800x250/d2b48c/333?text=LED+Strip+Controller" alt="LED Header" class="header-image">
+        <img src="{{ url_for('static', filename='led.png') }}" alt="LED Header" class="header-image">
 
         <h1>LED Strip Controller</h1>
 
