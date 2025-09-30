@@ -9,32 +9,32 @@
     <style>
         /* --- Root Variables (Light Mode) --- */
         :root {
-            --color-primary: #d2b48c; /* Khaki/Tan (Accent) */
-            --color-secondary: #b08d5c; /* Darker Tan (Accent Hover) */
-            --color-background: #f0ffef; /* Very light green/off-white */
+            --color-primary: #3498db; /* Blue (Accent) */
+            --color-secondary: #2980b9; /* Darker Blue (Accent Hover) */
+            --color-background: #f4f7f6; /* Light Gray/Off-White */
             --color-surface: #ffffff; /* White Card/Container Background */
             --color-text: #2c3e50; /* Dark Blue Text */
             --color-shadow: rgba(0, 0, 0, 0.1);
             
             /* Terminal Colors (Light) */
-            --color-terminal-bg: #1e1e1e; /* Dark Terminal Background */
-            --color-terminal-text: #e0e0e0; /* Light Text */
-            --color-terminal-prompt: #98fb98; /* Pale Green Prompt */
+            --color-terminal-bg: #1e1e1e; 
+            --color-terminal-text: #e0e0e0; 
+            --color-terminal-prompt: #98fb98; 
 
             --border-radius: 12px;
         }
 
         /* --- Dark Mode Variables --- */
         body[data-theme='dark'] {
-            --color-background: #121212;
-            --color-surface: #1e1e1e;
-            --color-text: #f0f0f0;
+            --color-background: #1e272e; /* Darker background */
+            --color-surface: #2c3e50; /* Dark surface */
+            --color-text: #ecf0f1; /* Light text */
             --color-shadow: rgba(255, 255, 255, 0.1);
 
             /* Terminal Colors (Dark) */
             --color-terminal-bg: #000000;
             --color-terminal-text: #cccccc;
-            --color-terminal-prompt: #00ff00; /* Bright Green Prompt */
+            --color-terminal-prompt: #00ff00; 
         }
         
         /* --- Base Styles --- */
@@ -68,7 +68,8 @@
 
         .openbtn {
             font-size: 26px; cursor: pointer; background-color: var(--color-primary);
-            color: var(--color-text); padding: 10px 20px; border: none;
+            color: white; /* Changed button text to white for contrast */
+            padding: 10px 20px; border: none;
             border-radius: 0 0 var(--border-radius) 0; position: fixed;
             top: 0; left: 0; z-index: 1100; box-shadow: 0 2px 5px var(--color-shadow);
         }
@@ -81,7 +82,7 @@
         /* --- Custom Button Styles (Applying modern look) --- */
         .btn-action {
             background-color: var(--color-primary); 
-            color: var(--color-text);
+            color: white;
             border: none; padding: 10px 20px; border-radius: 8px; 
             font-size: 16px; cursor: pointer; 
             transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
@@ -114,7 +115,7 @@
             color: var(--color-terminal-text);
             padding: 20px;
             border-radius: var(--border-radius);
-            height: 70vh; /* Use viewport height for a large console */
+            height: 70vh; 
             overflow-y: scroll;
             white-space: pre-wrap;
             font-family: 'Consolas', 'Courier New', monospace;
@@ -128,7 +129,7 @@
         #loginScreen {
             position: fixed; top: 0; left: 0;
             width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.8); /* Semi-transparent overlay */
+            background: rgba(0, 0, 0, 0.8); 
             display: flex; flex-direction: column;
             justify-content: center; align-items: center;
             z-index: 2000;
@@ -143,7 +144,7 @@
             text-align: center;
             max-width: 350px;
             width: 90%;
-            border: 2px solid var(--color-secondary);
+            border: 2px solid var(--color-primary); /* Use primary color for border */
             transition: background 0.3s, border-color 0.3s;
         }
 
@@ -168,7 +169,7 @@
         #passwordInput:focus {
             outline: none;
             border-color: var(--color-primary);
-            box-shadow: 0 0 0 3px var(--color-primary), 0 0 0 5px rgba(210, 180, 140, 0.5);
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.5); /* Blue shadow glow */
         }
 
         #errorMsg {
@@ -201,6 +202,10 @@
             .system-actions button {
                 width: 100%;
             }
+            .system-actions {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
             #log {
                 height: 50vh;
             }
@@ -215,10 +220,13 @@
     <div id="loginScreen">
         <div id="loginBox">
             <h2>System Access Required</h2>
-            <img src="https://placehold.co/100x100/d2b48c/fff?text=Terminal.png" 
-                 alt="Terminal Placeholder Image" 
-                 class="mx-auto mb-5 rounded-full shadow-lg"
-            >
+            <!-- Inline SVG for 'terminal.png' replacement -->
+            <svg class="mx-auto mb-5 text-gray-700 dark:text-gray-300" xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 17l4-4-4-4"/>
+                <path d="M12 19h8"/>
+                <rect x="2" y="3" width="20" height="18" rx="2" ry="2"/>
+            </svg>
+
             <input type="password" id="passwordInput" placeholder="Access Code" onkeydown="handleKey(event)">
             <button class="btn-action w-full" onclick="checkPassword()">Unlock</button>
             <p id="errorMsg"></p>
@@ -235,10 +243,10 @@
     <button class="openbtn" onclick="openNav()">☰</button>
 
     <div class="main-content">
-        <div class="header-row flex items-center justify-between mb-5">
-            <h2 class="text-3xl font-light text-center flex-grow-0">System Console</h2>
+        <div class="header-row flex flex-col md:flex-row items-center justify-between mb-5">
+            <h2 class="text-3xl font-light text-center mb-4 md:mb-0">System Console</h2>
             
-            <div class="system-actions flex gap-3">
+            <div class="system-actions flex gap-3 flex-wrap justify-center">
                 <button id="pullBtn" class="btn-action" onclick="sendCommand('/pull', 'Git Pull')">
                     <span class="md:hidden">Pull</span>
                     <span class="hidden md:inline">🔄 Git Pull</span>
@@ -265,16 +273,11 @@
         // Constants for localStorage keys
         const AUTH_KEY = 'pi_console_authenticated';
         const THEME_KEY = 'pi_console_theme';
-        const CORRECT_PASSWORD = "2025"; // Matches the backend check
+        const CORRECT_PASSWORD = "2025"; 
 
         document.addEventListener('DOMContentLoaded', () => {
-            // 1. Initialize Theme
             initTheme();
-            
-            // 2. Check Authentication Status
             checkAuthStatus();
-            
-            // 3. Start fetching logs
             setInterval(fetchLogs, 2000); 
             fetchLogs();
         });
@@ -300,7 +303,6 @@
         }
         
         function handleKey(event) {
-            // Allows submitting password by pressing Enter
             if (event.key === 'Enter') {
                 checkPassword();
             }
@@ -309,29 +311,22 @@
         async function checkPassword() {
             const input = document.getElementById("passwordInput").value;
             const errorMsg = document.getElementById("errorMsg");
-            errorMsg.innerText = ''; // Clear previous error
+            errorMsg.innerText = ''; 
 
-            // Perform simple client-side check for immediate UI feedback 
-            // (The backend also checks, but the client side controls the modal display)
             if (input === CORRECT_PASSWORD) {
-                // Set persistence key and hide modal
                 localStorage.setItem(AUTH_KEY, 'true');
                 document.getElementById("loginScreen").style.display = "none";
-                document.getElementById("passwordInput").value = ''; // Clear input
+                document.getElementById("passwordInput").value = ''; 
                 
             } else {
                 errorMsg.innerText = "Access Denied. Try again.";
                 document.getElementById("passwordInput").value = '';
                 document.getElementById("passwordInput").focus();
             }
-            
-            // Optional: You could also call the backend endpoint here for verification
-            // However, for single-page persistence, the localStorage key is sufficient.
         }
 
         function openNav() {
             document.getElementById("mySidebar").style.width = "200px";
-            // Adjust main content margin only if screen is large enough
             if (window.innerWidth > 600) {
                  document.querySelector(".main-content").style.marginLeft = "200px";
             }
@@ -344,20 +339,25 @@
 
         async function flashMessage(message, category = 'info') {
             const msgDiv = document.getElementById("flashMessages");
-            // Simple custom flash message display instead of using Flask's template features
-            msgDiv.innerHTML = `<p class="${category === 'info' ? 'text-green-500' : 'text-red-500'} font-semibold p-2 bg-white rounded shadow">${message}</p>`;
+            const colorClass = category === 'info' ? 'text-green-500 bg-green-50' : 'text-red-500 bg-red-50';
+            
+            // Create a styled alert box
+            msgDiv.innerHTML = `<p class="${colorClass} font-semibold p-3 rounded-lg shadow-md border">${message}</p>`;
+            
+            // Clear message after 5 seconds
             setTimeout(() => { msgDiv.innerHTML = ''; }, 5000);
         }
 
+        // --- Improved Command Sender for Robust Error Handling ---
         async function sendCommand(url, commandName) {
-            if (!localStorage.getItem(AUTH_KEY) === 'true') {
-                 // Re-display login screen if authentication somehow got lost
+            if (localStorage.getItem(AUTH_KEY) !== 'true') {
                  document.getElementById("loginScreen").style.display = "flex"; 
                  flashMessage("Authentication required to run system commands.", "error");
                  return;
             }
 
-            if (!window.confirm(`Are you sure you want to run '${commandName}'?`)) {
+            // Replacing alert() with a modal/confirm alternative if running outside of canvas environment
+            if (!window.confirm(`Are you sure you want to run '${commandName}'? This action is IRREVERSIBLE.`)) {
                 return;
             }
             
@@ -367,18 +367,31 @@
                 const res = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({}) // Empty body for simple commands
+                    body: JSON.stringify({})
                 });
                 
-                const data = await res.json();
-
-                if (res.ok) {
-                    flashMessage(`${commandName} initiated: ${data.message || 'Success.'}`, 'info');
+                let data = { success: false, message: 'Server error: Could not parse response.' };
+                
+                // Check if the response is JSON before trying to parse it
+                const contentType = res.headers.get("content-type");
+                
+                if (contentType && contentType.includes("application/json")) {
+                    data = await res.json();
                 } else {
-                    flashMessage(`${commandName} failed: ${data.message || data.error || 'Server error.'}`, 'error');
+                    // This handles the "Unexpected token '<'" issue!
+                    const text = await res.text();
+                    data.message = `Command failed: Server returned an unexpected response (Status ${res.status}). Check Flask logs.`;
+                    console.error("Non-JSON Server Response for command:", commandName, "\nResponse Text:", text);
+                }
+
+                if (res.ok && data.success) {
+                    flashMessage(`${commandName} initiated successfully: ${data.message || 'Success.'}`, 'info');
+                } else {
+                    flashMessage(`${commandName} FAILED: ${data.message || 'An unknown server error occurred.'}`, 'error');
                 }
             } catch (error) {
-                flashMessage(`Network error executing ${commandName}: ${error.message}`, 'error');
+                flashMessage(`Network connection error for ${commandName}: ${error.message}`, 'error');
+                console.error(`Fetch error for ${commandName}:`, error);
             }
         }
 
@@ -393,16 +406,14 @@
 
                 logElement.textContent = data.join("\n");
                 
-                // Auto-scroll to bottom only if it was already near the bottom
                 if (isScrolledToBottom) {
                     logElement.scrollTop = logElement.scrollHeight;
                 }
 
             } catch (error) {
-                // Only show a persistent error if it's not the initial "Loading logs..." message
                 const logElement = document.getElementById("log");
                 if (!logElement.textContent.includes("Loading")) {
-                     logElement.textContent += "\nError fetching logs: " + error;
+                     logElement.textContent += `\n[ERROR] Failed to fetch logs: ${error.message}`;
                 }
             }
         }
