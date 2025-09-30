@@ -21,22 +21,23 @@ loop = asyncio.new_event_loop()
 def create_rgb_command(r: int, g: int, b: int, brightness: int) -> bytearray:
     """
     Creates the 9-byte command for setting RGB color with brightness (1-16).
+    The brightness value is clamped between 1 and 16 to match device requirements.
     """
     
-    # Ensure values are capped
+    # Ensure values are capped (R, G, B: 0-255; Brightness: 1-16)
     r = min(255, max(0, r))
     g = min(255, max(0, g))
     b = min(255, max(0, b))
-    brightness = min(16, max(1, brightness)) 
+    brightness = min(16, max(1, brightness))  # CRITICAL: Ensures brightness is in the 1-16 range
     
     return bytearray([
         0x7e, 0x07, 0x05, 0x03,  # Header: Start, Len (7), Function, Channel
         r, g, b,                 # R, G, B (Raw values from sliders)
-        brightness,              # Brightness (1 to 16, which is 0x01 to 0x10)
+        brightness,              # Brightness (1 to 16 byte)
         0xef                     # End Byte
     ])
 
-# Commands using the default brightness (16)
+# Predefined commands
 COMMANDS = {
     # UPDATED: Use the specific ON command bytearray
     "POWER:ON": bytearray([0x7e, 0x04, 0x04, 0x01, 0xff, 0x00, 0x00, 0x00, 0xef]), 
@@ -87,7 +88,7 @@ def is_connected() -> bool:
 # --- Command Execution Functions ---
 
 async def send_command(cmd_bytes: bytearray, cmd_name: str):
-    """A helper function to send byte commands over BLE."""
+    """A helper function to send byte commands over BLE, handles reconnection."""
     global is_connected_flag
     if not is_connected_flag:
         if not await connect_client(ADDRESS):
@@ -124,9 +125,11 @@ async def send_led_command(r: int, g: int, b: int, brightness: int):
 
 async def ble_runner():
     """Keeps the BLE connection alive and handles background tasks."""
+    # Attempt initial connection
     await connect_client(ADDRESS)
 
     while True:
+        # Reconnect logic
         if not is_connected():
             await connect_client(ADDRESS)
         await asyncio.sleep(10)
@@ -137,6 +140,7 @@ def start_ble_loop():
         asyncio.set_event_loop(loop_to_run)
         loop_to_run.run_until_complete(ble_runner())
 
+    # Start the thread as a daemon so it closes with the main application
     thread = threading.Thread(target=run_loop, args=(loop,), daemon=True)
     thread.start()
     print("BLE: Controller background thread started.")
