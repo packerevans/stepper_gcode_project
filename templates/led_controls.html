@@ -4,77 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LED Strip Controls</title>
-    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
-    <link rel="apple-touch-icon" sizes="512x512" href="{{ url_for('static', filename='icons/icon-512.png') }}">
+    <!-- Assuming Flask URLs for icons. Changed URL to a generic placeholder for display -->
+    <link rel="icon" type="image/png" sizes="192x192" href="https://placehold.co/192x192/000000/FFFFFF?text=LED">
+    <link rel="apple-touch-icon" sizes="512x512" href="https://placehold.co/512x512/000000/FFFFFF?text=LED">
     
     <style>
-        /* --- Mobile Responsiveness (For both pages) --- */
-@media (max-width: 600px) {
-    .main-content {
-        padding: 10px;
-    }
-    .header-image {
-        max-height: 120px;
-        margin-bottom: 15px;
-    }
-    h1, h2 {
-        font-size: 1.5em;
-        margin-bottom: 15px;
-    }
-    
-    /* Sand Table Page Specific Layout Adjustments */
-    .slider-container {
-        /* Changes grid layout from 4 columns to 2 */
-        grid-template-columns: 1fr 1fr; 
-        grid-template-rows: auto auto; /* Two rows for content */
-        gap: 10px;
-        padding: 10px 0;
-        border-bottom: 1px dashed var(--color-shadow);
-    }
-    .slider-container label {
-        grid-column: 1 / 2;
-        grid-row: 1 / 2;
-        align-self: flex-start;
-    }
-    input[type="range"] {
-        grid-column: 1 / 3; /* Slider spans both columns */
-        grid-row: 2 / 3;
-    }
-    .slider-input {
-        grid-column: 2 / 3;
-        grid-row: 1 / 2;
-        max-width: 80px;
-        justify-self: end;
-    }
-    .slider-container button {
-        grid-column: 1 / 3; /* Button spans both columns at the bottom */
-        grid-row: 3 / 4;
-        width: 100%;
-        padding: 8px;
-    }
-    
-    /* LED Page Specific Layout Adjustments */
-    .status-section {
-        flex-wrap: wrap;
-        justify-content: space-around;
-        gap: 10px;
-    }
-    .status-section button {
-        flex-basis: calc(50% - 10px);
-        padding: 10px 5px;
-        font-size: 14px;
-    }
-    .bottom-section {
-        flex-direction: column;
-        gap: 20px;
-    }
-    .bottom-section > div {
-        width: 100%;
-    }
-    .color-display {
-        margin-bottom: 10px;
-    }
-}
         /* --- Root Variables (Light Mode) --- */
         :root {
             --color-primary: #d2b48c; /* Khaki/Tan */
@@ -216,7 +150,7 @@
 
         .color-display {
             width: 120px; height: 120px; border-radius: 50%;
-            border: 5px solid var(--color-text); transition: background-color 0.5s, border-color 0.3s;
+            border: 5px solid var(--color-text); transition: background-color 0.5s, border-color 0.3s, opacity 0.5s;
         }
         
         /* --- Terminal --- */
@@ -261,17 +195,19 @@
                 font-size: 14px;
             }
             .slider-container {
-                flex-direction: column;
-                align-items: flex-start;
+                flex-direction: row; /* Keep sliders side-by-side on mobile if possible, but adjust spacing */
+                align-items: center;
                 gap: 5px;
                 padding: 5px 0;
                 border-bottom: 1px dashed #ccc5;
+                flex-wrap: nowrap;
             }
             .slider-container label {
-                width: auto;
+                width: 70px; /* Give a fixed width for labels */
+                min-width: 70px;
             }
             input[type="range"] {
-                width: 100%;
+                width: auto;
             }
             .bottom-section {
                 flex-direction: column;
@@ -287,6 +223,7 @@
 <body data-theme="light">
     <div id="mySidebar" class="sidebar">
         <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
+        <!-- Assuming Flask URLs -->
         <a href="{{ url_for('index') }}">Sand Table Controls</a>
         <a href="{{ url_for('led_controls') }}">LED Controls</a>
         <a href="{{ url_for('terminal') }}">Terminal</a>
@@ -298,7 +235,8 @@
     </button>
 
     <div class="main-content">
-        <img src="{{ url_for('static', filename='led.png') }}" alt="LED Header" class="header-image">
+        <!-- Using a generic placeholder image -->
+        <img src="https://placehold.co/800x250/d2b48c/333?text=LED+Strip+Controller" alt="LED Header" class="header-image">
 
         <h1>LED Strip Controller</h1>
 
@@ -332,10 +270,11 @@
                     <input type="range" id="blueSlider" min="0" max="255" value="255" oninput="updateColorDisplay()">
                     <span id="blueVal">255</span>
                 </div>
+                <!-- FIX: Corrected ID and range for Brightness slider -->
                 <div class="slider-container">
                     <label>Brightness</label>
-                    <input type="range" id="blueSlider" min="0" max="255" value="255" oninput="updateColorDisplay()">
-                    <span id="blueVal">255</span>
+                    <input type="range" id="brightnessSlider" min="1" max="16" value="16" oninput="updateColorDisplay()">
+                    <span id="brightnessVal">16</span>
                 </div>
                 <div style="text-align:center; margin-top:20px;">
                     <button onclick="sendLEDCommand()">Set Color</button>
@@ -356,10 +295,15 @@
     </div>
 
     <script>
+        // Global state variable for brightness
+        let brightnessValue = 16; 
+        
         // --- Sidebar Functions ---
         function openNav() {
             document.getElementById("mySidebar").style.width = "200px";
-            document.querySelector(".main-content").style.marginLeft = "200px";
+            if (window.innerWidth > 600) {
+                 document.querySelector(".main-content").style.marginLeft = "200px";
+            }
         }
 
         function closeNav() {
@@ -390,22 +334,24 @@
             const r = parseInt(document.getElementById('redSlider').value);
             const g = parseInt(document.getElementById('greenSlider').value);
             const b = parseInt(document.getElementById('blueSlider').value);
-            const br =parseInt(document.getElementById('brightnessSlider').value);
+            // FIX: Use the correct ID for brightness slider and span
+            const br = parseInt(document.getElementById('brightnessSlider').value);
 
             document.getElementById('redVal').textContent = r;
             document.getElementById('greenVal').textContent = g;
             document.getElementById('blueVal').textContent = b;
             document.getElementById('brightnessVal').textContent = br;
-            brightnessValue = br; // Update global variable used when sending command
 
-                    // Scale RGB values for VISUAL DISPLAY ONLY (color circle)
+            // Update the global state variable
+            brightnessValue = br; 
 
-        const scaledR = Math.round(r * (br / 16));
-        const scaledG = Math.round(g * (br / 16));
-        const scaledB = Math.round(b * (br / 16));
+            // Visual Display: Modulate color circle brightness/opacity for a visual cue (1/16 to 1)
+            const brightnessRatio = br / 16; 
             
             // Set the color circle background
             document.getElementById('colorDisplay').style.backgroundColor = `rgb(${r},${g},${b})`;
+            // Adjust opacity (0.2 minimum to 1 maximum)
+            document.getElementById('colorDisplay').style.opacity = brightnessRatio * 0.8 + 0.2; 
         }
 
         function updateConnectionStatusUI(connected) {
@@ -425,15 +371,9 @@
         function updatePowerStatusUI(on) {
             powerOn = on;
             document.getElementById("powerBtn").textContent = on ? "Turn OFF" : "Turn ON";
-            // Dim/restore the color circle border/shadow when power is off/on
-            const display = document.getElementById('colorDisplay');
-            if (on) {
-                display.style.opacity = 1;
-                display.style.boxShadow = '0 0 15px rgba(255, 255, 255, 0.8)';
-            } else {
-                display.style.opacity = 0.5;
-                display.style.boxShadow = 'none';
-            }
+            
+            // Re-call updateColorDisplay to visually dim/restore based on power state
+            updateColorDisplay();
         }
 
         // --- Terminal Logger ---
@@ -451,7 +391,7 @@
             }
             
             term.appendChild(line);
-            term.scrollTop = term.scrollHeight; 
+            term.scrollTop = term.scrollHeight;  
         }
 
         // --- Backend Communication ---
@@ -468,10 +408,10 @@
                 if (!data.success) {
                     logToTerminal(`Command failed: ${data.error || 'Unknown Error'}`, 'error');
                 } else {
-                    // Update connection/power state based on response if necessary
+                    logToTerminal(`Command successful: ${data.message || 'Sent.'}`, 'info');
                 }
             } catch (e) {
-                logToTerminal(`Network Error: ${e.message}`, 'error');
+                logToTerminal(`Network Error: Could not reach server (${e.message})`, 'error');
             }
         }
 
@@ -479,25 +419,23 @@
             const r = parseInt(document.getElementById('redSlider').value);
             const g = parseInt(document.getElementById('greenSlider').value);
             const b = parseInt(document.getElementById('blueSlider').value);
-                    // FIX: Send RAW R, G, B values along with the brightness byte (1-16)
-            // NOTE: The original code used brightnessValue, but it's removed now.
-            // Assuming the backend command format is now just R,G,B or you have a default brightness.
-            const cmd = `LED:${r},${g},${b},${brightnessValue}`; 
+            
+            // FIX: Use the global brightnessValue variable
+            const cmd = `LED:${r},${g},${b},${brightnessValue}`; 
+            
             await sendCommand(cmd);
             updatePowerStatusUI(true); // Always turn on power when color is set
         }
 
         async function toggleConnection() {
             const cmd = isConnected ? "DISCONNECT" : "CONNECT";
-            // We rely on pollStatus to get the actual state, just send the command
             await sendCommand(cmd); 
         }
 
         async function togglePower() {
             const cmd = powerOn ? "POWER:OFF" : "POWER:ON";
-            // Send command first, then update UI if successful or rely on status poll
             await sendCommand(cmd);
-            updatePowerStatusUI(!powerOn); 
+            updatePowerStatusUI(!powerOn);  
         }
 
         // --- Status Polling ---
@@ -506,11 +444,12 @@
                 const response = await fetch("/status");
                 if (!response.ok) throw new Error('Failed to fetch status');
                 const data = await response.json();
-                // Assumes /status returns { connected: bool, power_on: bool }
+                // Assumes /status returns { connected: bool }
                 updateConnectionStatusUI(data.connected);
-                // updatePowerStatusUI(data.power_on); // Commented out to prevent visual flicker if power state is polled too often
+                
             } catch (e) {
-                updateConnectionStatusUI(false);
+                // If status polling fails, assume disconnected
+                updateConnectionStatusUI(false); 
             }
         }
 
@@ -521,9 +460,13 @@
             document.body.setAttribute('data-theme', savedTheme);
             updateThemeIcon(savedTheme);
 
+            // Set initial state based on slider defaults
             updateColorDisplay();
             updatePowerStatusUI(false); // Initialize to OFF visually
+            
+            // Start polling status
             setInterval(pollStatus, 2000);
+            pollStatus(); // Run immediately
         });
     </script>
 </body>
