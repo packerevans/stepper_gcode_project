@@ -4,55 +4,58 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pi System Console</title>
-    <!-- Tailwind CSS for modern utility styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        /* * --- CONSOLIDATED STYLES BASED ON USER PREFERENCE --- 
+         * Khaki/Tan Colors, Modern/Simplistic Vibe, No Emojis in CSS
+         */
+
         /* --- Root Variables (Light Mode) --- */
         :root {
-            --color-primary: #3498db; /* Blue (Accent) */
-            --color-secondary: #2980b9; /* Darker Blue (Accent Hover) */
-            --color-background: #f4f7f6; /* Light Gray/Off-White */
+            --color-primary: #d2b48c; /* Khaki/Tan */
+            --color-secondary: #b08d5c; /* Darker Tan (Accent Hover) */
+            --color-background: #f0f0f0; /* Light Gray/Off-White */
             --color-surface: #ffffff; /* White Card/Container Background */
-            --color-text: #2c3e50; /* Dark Blue Text */
-            --color-shadow: rgba(0, 0, 0, 0.1);
-            
+            --color-text: #333333; /* Dark Text */
+            --color-shadow: rgba(0, 0, 0, 0.08);
+
             /* Terminal Colors (Light) */
-            --color-terminal-bg: #1e1e1e; 
-            --color-terminal-text: #e0e0e0; 
-            --color-terminal-prompt: #98fb98; 
+            --color-terminal-bg: #e9e9e9;
+            --color-terminal-text: #333333;
+            --color-terminal-prompt: #008080; /* Teal/Cyan */
 
             --border-radius: 12px;
         }
 
         /* --- Dark Mode Variables --- */
         body[data-theme='dark'] {
-            --color-background: #1e272e; /* Darker background */
-            --color-surface: #2c3e50; /* Dark surface */
-            --color-text: #ecf0f1; /* Light text */
-            --color-shadow: rgba(255, 255, 255, 0.1);
+            --color-background: #1e1e1e;
+            --color-surface: #2c2c2c;
+            --color-text: #e0e0e0;
+            --color-shadow: rgba(255, 255, 255, 0.08);
 
             /* Terminal Colors (Dark) */
-            --color-terminal-bg: #000000;
+            --color-terminal-bg: #1a1a1a;
             --color-terminal-text: #cccccc;
-            --color-terminal-prompt: #00ff00; 
+            --color-terminal-prompt: #98fb98; /* Pale Green */
         }
-        
+
         /* --- Base Styles --- */
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: var(--color-background);
             color: var(--color-text);
             transition: background 0.3s, color 0.3s;
             min-height: 100vh;
         }
-        
+
         /* --- Sidebar & Header --- */
         .sidebar {
             height: 100%; width: 0; position: fixed; top: 0; left: 0;
-            background-color: var(--color-surface); 
-            overflow-x: hidden; transition: 0.3s; padding-top: 60px; 
+            background-color: var(--color-surface); /* Sidebar matches the card surface */
+            overflow-x: hidden; transition: 0.3s; padding-top: 60px;
             z-index: 1000; box-shadow: 2px 0 5px var(--color-shadow);
-            border-right: 1px solid var(--color-text);
+            border-right: 1px solid var(--color-primary); /* Use primary color for a subtle border */
         }
 
         .sidebar a {
@@ -63,15 +66,16 @@
 
         .sidebar a:hover {
             background-color: var(--color-primary);
-            color: var(--color-surface);
+            color: var(--color-surface); /* Text becomes white/surface color for contrast */
         }
 
         .openbtn {
             font-size: 26px; cursor: pointer; background-color: var(--color-primary);
-            color: white; /* Changed button text to white for contrast */
+            color: var(--color-text); /* Matches text color for a sleek look */
             padding: 10px 20px; border: none;
             border-radius: 0 0 var(--border-radius) 0; position: fixed;
             top: 0; left: 0; z-index: 1100; box-shadow: 0 2px 5px var(--color-shadow);
+            transition: background 0.2s, color 0.2s;
         }
 
         .main-content {
@@ -81,17 +85,18 @@
 
         /* --- Custom Button Styles (Applying modern look) --- */
         .btn-action {
-            background-color: var(--color-primary); 
-            color: white;
-            border: none; padding: 10px 20px; border-radius: 8px; 
-            font-size: 16px; cursor: pointer; 
+            background-color: var(--color-primary);
+            color: var(--color-text);
+            border: none; padding: 10px 20px; border-radius: 8px;
+            font-size: 16px; cursor: pointer;
             transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
             font-weight: 600;
             box-shadow: 0 2px 5px var(--color-shadow);
         }
-        
+
         .btn-action:hover {
             background-color: var(--color-secondary);
+            color: var(--color-surface); /* Text becomes white/surface color on hover */
             transform: translateY(-1px);
             box-shadow: 0 4px 8px var(--color-shadow);
         }
@@ -99,7 +104,7 @@
             transform: translateY(0);
             box-shadow: 0 2px 5px var(--color-shadow);
         }
-        
+
         /* Special button color for destructive action */
         .btn-danger {
             background-color: #e74c3c; /* Red */
@@ -108,14 +113,14 @@
         .btn-danger:hover {
             background-color: #c0392b; /* Darker Red */
         }
-        
+
         /* --- Terminal Log Styling --- */
         #log {
             background: var(--color-terminal-bg);
             color: var(--color-terminal-text);
             padding: 20px;
             border-radius: var(--border-radius);
-            height: 70vh; 
+            height: 70vh;
             overflow-y: scroll;
             white-space: pre-wrap;
             font-family: 'Consolas', 'Courier New', monospace;
@@ -125,33 +130,40 @@
             margin-top: 20px;
         }
 
-        /* --- Password Screen Modernization --- */
+        /* --- Password Screen Modernization (Styled with Khaki/Tan) --- */
         #loginScreen {
-            position: fixed; top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.8); 
+            position: absolute; /* Changed from fixed to absolute for better flow */
+            top: 0; left: 0;
+            width: 100%; 
+            min-height: 100%; /* Use min-height to cover the whole content area */
+            background: var(--color-background); /* Matches main background */
             display: flex; flex-direction: column;
             justify-content: center; align-items: center;
-            z-index: 2000;
-            backdrop-filter: blur(5px);
+            z-index: 1500; /* Below sidebar, above content */
+            padding-top: 100px; /* Leave space for the header */
         }
+        
+        #loginScreen.hidden {
+            display: none !important;
+        }
+
 
         #loginBox {
             background: var(--color-surface);
             padding: 40px;
             border-radius: var(--border-radius);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 10px 30px var(--color-shadow);
             text-align: center;
             max-width: 350px;
             width: 90%;
-            border: 2px solid var(--color-primary); /* Use primary color for border */
+            border: 2px solid var(--color-primary);
             transition: background 0.3s, border-color 0.3s;
         }
 
         #loginBox h2 {
             margin-bottom: 25px;
             font-size: 1.8rem;
-            color: var(--color-primary);
+            color: var(--color-secondary);
         }
 
         #passwordInput {
@@ -169,7 +181,7 @@
         #passwordInput:focus {
             outline: none;
             border-color: var(--color-primary);
-            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.5); /* Blue shadow glow */
+            box-shadow: 0 0 0 3px rgba(210, 180, 140, 0.5); /* Khaki shadow glow */
         }
 
         #errorMsg {
@@ -188,6 +200,20 @@
             box-shadow: 0 2px 5px var(--color-shadow);
             cursor: pointer;
             font-size: 1.2rem;
+        }
+        
+        /* Utility styles for the content visibility */
+        .content-hidden {
+            opacity: 0.2;
+            pointer-events: none;
+            filter: blur(2px);
+            transition: opacity 0.5s, filter 0.5s;
+        }
+        .content-visible {
+            opacity: 1;
+            pointer-events: auto;
+            filter: blur(0);
+            transition: opacity 0.5s, filter 0.5s;
         }
 
         /* Responsive Adjustments */
@@ -209,19 +235,56 @@
             #log {
                 height: 50vh;
             }
+            /* Adjust login screen padding for mobile */
+            #loginScreen {
+                padding-top: 60px; 
+                justify-content: flex-start;
+            }
         }
     </style>
 </head>
 <body data-theme="light">
-    <!-- Theme Toggle Button -->
-    <button id="themeToggle" onclick="toggleTheme()">☀️</button>
+    <button id="themeToggle" onclick="toggleTheme()">Light</button>
 
-    <!-- Password screen (Now with modern look and keyboard support) -->
-    <div id="loginScreen">
+    <div id="mySidebar" class="sidebar">
+        <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
+        <a href="{{ url_for('index') }}">Manual Command</a>
+        <a href="{{ url_for('terminal') }}">Terminal</a>
+        <a href="{{ url_for('led_controls') }}">LED Controls</a>
+    </div>
+
+    <button class="openbtn" onclick="openNav()">☰</button>
+
+    <div class="main-content content-hidden" id="mainContent">
+        <div class="header-row flex flex-col md:flex-row items-center justify-between mb-5">
+            <h2 class="text-3xl font-light text-center mb-4 md:mb-0 text-secondary">System Console</h2>
+
+            <div class="system-actions flex gap-3 flex-wrap justify-center">
+                <button id="pullBtn" class="btn-action" onclick="sendCommand('/pull', 'Git Pull')">
+                    <span class="md:hidden">Pull</span>
+                    <span class="hidden md:inline">Git Pull</span>
+                </button>
+                <button id="rebootBtn" class="btn-action btn-danger" onclick="sendCommand('/reboot', 'Reboot')">
+                    <span class="md:hidden">Reboot</span>
+                    <span class="hidden md:inline">Reboot</span>
+                </button>
+                <button id="shutdownBtn" class="btn-action btn-danger" onclick="sendCommand('/shutdown', 'Shutdown')">
+                    <span class="md:hidden">Shutdown</span>
+                    <span class="hidden md:inline">Shutdown</span>
+                </button>
+            </div>
+        </div>
+
+        <div id="flashMessages" class="min-h-10">
+            </div>
+
+        <div id="log">Awaiting command line output...</div>
+    </div>
+
+    <div id="loginScreen" class="absolute">
         <div id="loginBox">
             <h2>System Access Required</h2>
-            <!-- Inline SVG for 'terminal.png' replacement -->
-            <svg class="mx-auto mb-5 text-gray-700 dark:text-gray-300" xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <svg class="mx-auto mb-5 text-primary dark:text-primary" xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M4 17l4-4-4-4"/>
                 <path d="M12 19h8"/>
                 <rect x="2" y="3" width="20" height="18" rx="2" ry="2"/>
@@ -233,59 +296,26 @@
         </div>
     </div>
 
-    <div id="mySidebar" class="sidebar">
-        <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
-        <a href="{{ url_for('index') }}">Manual Command</a>
-        <a href="{{ url_for('terminal') }}">Terminal</a>
-        <a href="{{ url_for('led_controls') }}">LED Controls</a>
-    </div>
-
-    <button class="openbtn" onclick="openNav()">☰</button>
-
-    <div class="main-content">
-        <div class="header-row flex flex-col md:flex-row items-center justify-between mb-5">
-            <h2 class="text-3xl font-light text-center mb-4 md:mb-0">System Console</h2>
-            
-            <div class="system-actions flex gap-3 flex-wrap justify-center">
-                <button id="pullBtn" class="btn-action" onclick="sendCommand('/pull', 'Git Pull')">
-                    <span class="md:hidden">Pull</span>
-                    <span class="hidden md:inline">🔄 Git Pull</span>
-                </button>
-                <button id="rebootBtn" class="btn-action btn-danger" onclick="sendCommand('/reboot', 'Reboot')">
-                    <span class="md:hidden">Reboot</span>
-                    <span class="hidden md:inline">↻ Reboot</span>
-                </button>
-                <button id="shutdownBtn" class="btn-action btn-danger" onclick="sendCommand('/shutdown', 'Shutdown')">
-                    <span class="md:hidden">Shutdown</span>
-                    <span class="hidden md:inline">🛑 Shutdown</span>
-                </button>
-            </div>
-        </div>
-
-        <div id="flashMessages" class="min-h-10">
-            <!-- Flash messages will appear here -->
-        </div>
-
-        <div id="log">Awaiting command line output...</div>
-    </div>
-
     <script>
         // Constants for localStorage keys
         const AUTH_KEY = 'pi_console_authenticated';
         const THEME_KEY = 'pi_console_theme';
-        const CORRECT_PASSWORD = "2025"; 
+        const CORRECT_PASSWORD = "2025";
+        const MAIN_CONTENT = document.getElementById("mainContent");
+        const LOGIN_SCREEN = document.getElementById("loginScreen");
+        const THEME_TOGGLE = document.getElementById('themeToggle');
 
         document.addEventListener('DOMContentLoaded', () => {
             initTheme();
-            checkAuthStatus();
-            setInterval(fetchLogs, 2000); 
+            checkAuthStatus(); // Now only controls content visibility
+            setInterval(fetchLogs, 2000);
             fetchLogs();
         });
 
         function initTheme() {
             const savedTheme = localStorage.getItem(THEME_KEY) || 'light';
             document.body.setAttribute('data-theme', savedTheme);
-            document.getElementById('themeToggle').textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+            THEME_TOGGLE.textContent = savedTheme === 'dark' ? 'Dark' : 'Light';
         }
 
         function toggleTheme() {
@@ -293,15 +323,21 @@
             const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
             document.body.setAttribute('data-theme', newTheme);
             localStorage.setItem(THEME_KEY, newTheme);
-            document.getElementById('themeToggle').textContent = newTheme === 'dark' ? '🌙' : '☀️';
+            THEME_TOGGLE.textContent = newTheme === 'dark' ? 'Dark' : 'Light';
         }
 
         function checkAuthStatus() {
             if (localStorage.getItem(AUTH_KEY) === 'true') {
-                document.getElementById("loginScreen").style.display = "none";
+                LOGIN_SCREEN.classList.add("hidden");
+                MAIN_CONTENT.classList.remove("content-hidden");
+                MAIN_CONTENT.classList.add("content-visible");
+            } else {
+                LOGIN_SCREEN.classList.remove("hidden");
+                MAIN_CONTENT.classList.remove("content-visible");
+                MAIN_CONTENT.classList.add("content-hidden");
             }
         }
-        
+
         function handleKey(event) {
             if (event.key === 'Enter') {
                 checkPassword();
@@ -311,13 +347,14 @@
         async function checkPassword() {
             const input = document.getElementById("passwordInput").value;
             const errorMsg = document.getElementById("errorMsg");
-            errorMsg.innerText = ''; 
+            errorMsg.innerText = '';
 
             if (input === CORRECT_PASSWORD) {
                 localStorage.setItem(AUTH_KEY, 'true');
-                document.getElementById("loginScreen").style.display = "none";
-                document.getElementById("passwordInput").value = ''; 
-                
+                LOGIN_SCREEN.classList.add("hidden");
+                MAIN_CONTENT.classList.remove("content-hidden");
+                MAIN_CONTENT.classList.add("content-visible");
+                document.getElementById("passwordInput").value = '';
             } else {
                 errorMsg.innerText = "Access Denied. Try again.";
                 document.getElementById("passwordInput").value = '';
@@ -339,7 +376,8 @@
 
         async function flashMessage(message, category = 'info') {
             const msgDiv = document.getElementById("flashMessages");
-            const colorClass = category === 'info' ? 'text-green-500 bg-green-50' : 'text-red-500 bg-red-50';
+            // Adjusted color classes to be consistent with the khaki/tan theme
+            const colorClass = category === 'info' ? 'text-green-700 bg-green-100 border-green-300' : 'text-red-700 bg-red-100 border-red-300';
             
             // Create a styled alert box
             msgDiv.innerHTML = `<p class="${colorClass} font-semibold p-3 rounded-lg shadow-md border">${message}</p>`;
@@ -351,12 +389,11 @@
         // --- Improved Command Sender for Robust Error Handling ---
         async function sendCommand(url, commandName) {
             if (localStorage.getItem(AUTH_KEY) !== 'true') {
-                 document.getElementById("loginScreen").style.display = "flex"; 
-                 flashMessage("Authentication required to run system commands.", "error");
-                 return;
+                LOGIN_SCREEN.classList.remove("hidden");
+                flashMessage("Authentication required to run system commands.", "error");
+                return;
             }
 
-            // Replacing alert() with a modal/confirm alternative if running outside of canvas environment
             if (!window.confirm(`Are you sure you want to run '${commandName}'? This action is IRREVERSIBLE.`)) {
                 return;
             }
@@ -372,13 +409,11 @@
                 
                 let data = { success: false, message: 'Server error: Could not parse response.' };
                 
-                // Check if the response is JSON before trying to parse it
                 const contentType = res.headers.get("content-type");
                 
                 if (contentType && contentType.includes("application/json")) {
                     data = await res.json();
                 } else {
-                    // This handles the "Unexpected token '<'" issue!
                     const text = await res.text();
                     data.message = `Command failed: Server returned an unexpected response (Status ${res.status}). Check Flask logs.`;
                     console.error("Non-JSON Server Response for command:", commandName, "\nResponse Text:", text);
