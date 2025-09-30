@@ -332,6 +332,11 @@
                     <input type="range" id="blueSlider" min="0" max="255" value="255" oninput="updateColorDisplay()">
                     <span id="blueVal">255</span>
                 </div>
+                <div class="slider-container">
+                    <label>Brightness</label>
+                    <input type="range" id="blueSlider" min="0" max="255" value="255" oninput="updateColorDisplay()">
+                    <span id="blueVal">255</span>
+                </div>
                 <div style="text-align:center; margin-top:20px;">
                     <button onclick="sendLEDCommand()">Set Color</button>
                 </div>
@@ -385,10 +390,19 @@
             const r = parseInt(document.getElementById('redSlider').value);
             const g = parseInt(document.getElementById('greenSlider').value);
             const b = parseInt(document.getElementById('blueSlider').value);
+            const br =parseInt(document.getElementById('brightnessSlider').value);
 
             document.getElementById('redVal').textContent = r;
             document.getElementById('greenVal').textContent = g;
             document.getElementById('blueVal').textContent = b;
+            document.getElementById('brightnessVal').textContent = br;
+            brightnessValue = br; // Update global variable used when sending command
+
+                    // Scale RGB values for VISUAL DISPLAY ONLY (color circle)
+
+        const scaledR = Math.round(r * (br / 16));
+        const scaledG = Math.round(g * (br / 16));
+        const scaledB = Math.round(b * (br / 16));
             
             // Set the color circle background
             document.getElementById('colorDisplay').style.backgroundColor = `rgb(${r},${g},${b})`;
@@ -465,10 +479,10 @@
             const r = parseInt(document.getElementById('redSlider').value);
             const g = parseInt(document.getElementById('greenSlider').value);
             const b = parseInt(document.getElementById('blueSlider').value);
-            
+                    // FIX: Send RAW R, G, B values along with the brightness byte (1-16)
             // NOTE: The original code used brightnessValue, but it's removed now.
             // Assuming the backend command format is now just R,G,B or you have a default brightness.
-            const cmd = `LED:${r},${g},${b}`; 
+            const cmd = `LED:${r},${g},${b},${brightnessValue}`; 
             await sendCommand(cmd);
             updatePowerStatusUI(true); // Always turn on power when color is set
         }
