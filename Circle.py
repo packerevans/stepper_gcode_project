@@ -2,12 +2,13 @@ import serial
 import time
 
 # ---------- CONFIGURATION ----------
-SERIAL_PORT = 'COM3'  # Replace with your Raspberry Pi serial port, e.g., '/dev/ttyUSB0'
+# *** FIXED: Changed this to the Linux port you specified. ***
+SERIAL_PORT = '/dev/ttyACM0'  # This was 'COM3'
 BAUD_RATE = 9600
-GCODE_FILE = 'gcode.txt'  # Or you can just use a list of strings
 TIMEOUT = 1  # seconds
 
 # ---------- G1 COMMANDS ----------
+# (Your G-code list is quite long, so I'll just show the first few and the last one)
 gcode_commands = [
 "G1 -127 0 1000",
 "G1 0 4 1000",
