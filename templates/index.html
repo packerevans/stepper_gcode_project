@@ -140,6 +140,11 @@
         gap: 15px;
     }
 
+    /* NEW: Override for sliders with no button */
+    .slider-container.no-button {
+        grid-template-columns: 80px 1fr 100px;
+    }
+
     .slider-container label {
         font-weight: 600; font-size: 15px;
     }
@@ -208,6 +213,14 @@
             padding: 10px 0;
             border-bottom: 1px dashed var(--color-shadow);
         }
+
+        /* NEW: Override for sliders with no button on mobile */
+        .slider-container.no-button {
+            grid-template-columns: 1fr;
+            /* Rows: Label, Input, Slider */
+            grid-template-rows: auto auto auto; 
+            gap: 5px;
+        }
         
         /* Label and Number Input on the top left */
         .slider-container label {
@@ -221,6 +234,12 @@
             grid-row: 2 / 3;
             text-align: left;
             padding: 8px;
+        }
+
+        /* NEW: Ensure label/input on no-button sliders take full width */
+        .slider-container.no-button label,
+        .slider-container.no-button .slider-input {
+            grid-column: 1 / 2;
         }
 
         /* Button on the top right */
@@ -244,6 +263,11 @@
             width: 100%;
             margin-top: 5px;
         }
+
+        /* NEW: Ensure range on no-button slider only spans its one column */
+        .slider-container.no-button input[type="range"] {
+            grid-column: 1 / 2;
+        }
         
         /* Ensure terminal looks good */
         .terminal {
@@ -262,7 +286,7 @@
         }
     }
 </style>
-     
+    
 </head>
 <body data-theme="light">
     <div id="mySidebar" class="sidebar">
@@ -286,25 +310,26 @@
             <div class="slider-section">
                 <h2>Absolute Position / Speed</h2>
                 
-                <div class="slider-container">
+                <div class="slider-container no-button">
                     <label for="armSlider">ARM POS</label>
                     <input type="range" id="armSlider" min="0" max="3200" value="500" oninput="updateInputValue('armSlider', 'armInput')">
                     <input type="number" id="armInput" class="slider-input" min="0" max="3200" value="500" oninput="updateSliderValue('armSlider', 'armInput')">
-                    <button onclick="sendSliderCommand('ARM', 'armInput')">Set</button>
-                </div>
+                    </div>
                 
-                <div class="slider-container">
+                <div class="slider-container no-button">
                     <label for="baseSlider">BASE POS</label>
-                    <input type="range" id="baseSlider" min="0" max="3200" value="1" oninput="updateInputValue('baseSlider', 'baseInput')">
-                    <input type="number" id="baseInput" class="slider-input" min="0" max="3200" value="1" oninput="updateSliderValue('baseSlider', 'baseInput')">
-                    <button onclick="sendSliderCommand('BASE', 'baseInput')">Set</button>
-                </div>
+                    <input type="range" id="baseSlider" min="-3200" max="3200" value="0" oninput="updateInputValue('baseSlider', 'baseInput')">
+                    <input type="number" id="baseInput" class="slider-input" min="-3200" max="3200" value="0" oninput="updateSliderValue('baseSlider', 'baseInput')">
+                    </div>
                 
-                <div class="slider-container">
+                <div class="slider-container no-button">
                     <label for="speedSlider">SPEED</label>
                     <input type="range" id="speedSlider" min="500" max="5000" value="1000" oninput="updateInputValue('speedSlider', 'speedInput')">
                     <input type="number" id="speedInput" class="slider-input" min="500" max="5000" value="1000" oninput="updateSliderValue('speedSlider', 'speedInput')">
-                    <button onclick="sendSliderCommand('SPEED', 'speedInput')">Set</button>
+                    </div>
+                
+                <div class="action-buttons" style="margin-top: 15px; margin-bottom: 25px;">
+                    <button onclick="sendG1Command()">Send G1 Move</button>
                 </div>
             </div>
 
@@ -428,9 +453,21 @@
             });
         }
         
+        // This function is still used by the "Incremental Steps" sliders
         function sendSliderCommand(commandType, inputId) {
             const value = document.getElementById(inputId).value;
             const cmd = `${commandType}:${value}`;
+            sendCommand(cmd);
+        }
+
+        // NEW: Function to send the combined G1 command
+        function sendG1Command() {
+            const arm = document.getElementById('armInput').value;
+            const base = document.getElementById('baseInput').value;
+            const speed = document.getElementById('speedInput').value;
+            
+            // Format: G1 <ARM> <BASE> <SPEED>
+            const cmd = `G1 ${arm} ${base} ${speed}`;
             sendCommand(cmd);
         }
 
@@ -442,8 +479,7 @@
             updateThemeIcon(savedTheme);
 
             // Ensure initial input values match sliders (and are clamped)
-            document.getElementById('armStepSlider').min = -3200;
-            document.getElementById('baseStepSlider').min = -3200;
+            // Note: min/max for baseSlider is now set in the HTML
             
             updateInputValue('armSlider', 'armInput');
             updateInputValue('baseSlider', 'baseInput');
