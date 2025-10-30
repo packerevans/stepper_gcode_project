@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify, Response, url_for
 import serial, threading, time, subprocess
+import os  # <-- NEWLY ADDED IMPORT
 import asyncio
 import ble_controller # Import the BLE handler
 
@@ -152,6 +153,159 @@ def terminal():
 def led_controls():
     return render_template("led_controls.html")
 
+# --- NEW DESIGNS FUNCTIONALITY (ADDED OCTOBER 2025) ---
+
+def send_gcode_lines_to_arduino(filepath):
+    """
+    (RUNS IN A THREAD)
+    Sends G-code lines from a file to the Arduino, one by one.
+    This function is designed to be run in a background thread
+    to avoid locking up the web server.
+    """
+    if not arduino_connected:
+        log_message(f"ERROR: Cannot run design. Arduino not connected.")
+        return False, "Arduino not connected."
+
+    try:
+        log_message(f"Starting G-code file: {os.path.basename(filepath)}")
+        with open(filepath, 'r') as f:
+            for line_num, line in enumerate(f):
+                clean_line = line.strip()
+                # Ignore empty lines and G-code comments (often ';')
+                if clean_line and not clean_line.startswith(';'): 
+                    log_message(f"Sending line {line_num + 1}: {clean_line}")
+                    
+                    # Write command to Arduino
+                    with lock: # Ensure write is thread-safe with serial logger
+                        arduino.write((clean_line + "\n").encode())
+                    
+                    # IMPORTANT: Wait for Arduino to process the command.
+                    # 0.05s is a starting guess. You may need to TUNE this
+                    # delay based on how
+                    # fast your Arduino processes each G1 command.
+                    # For a more robust solution, implement an "ok"
+                    # handshake from the Arduino.
+                    time.sleep(0.05) 
+
+        log_message(f"Finished sending G-code file: {os.path.basename(filepath)}")
+        return True, "G-code file sent successfully."
+    except FileNotFoundError:
+        log_message(f"ERROR: G-code file not found at {filepath}")
+        return False, "G-code file not found."
+    except Exception as e:
+        log_message(f"Error sending G-code from file {filepath}: {e}")
+        return False, f"Error sending G-code: {e}"
+
+
+@app.route("/designs")
+def designs():
+    """Renders the designs page by scanning folders."""
+    
+    # Path to G-code files (e.g., 'gcode/spiral/command.txt')
+    gcode_base_path = os.path.join(app.root_path, 'gcode')
+    # Path to image files (e.g., 'static/gcode/spiral/spiral.png')
+    static_gcode_path = os.path.join(app.root_path, 'static', 'gcode')
+    
+    designs_data = []
+
+    if not os.path.exists(gcode_base_path) or not os.path.isdir(gcode_base_path):
+        log_message(f"WARNING: 'gcode' directory not found at {gcode_base_path}")
+        return render_template("designs.html", designs=designs_data)
+    
+    if not os.path.exists(static_gcode_path):
+            log_message(f"WARNING: 'static/gcode' directory for images not found.")
+            # We can proceed, but will use default images
+
+    try:
+        # Loop through each folder in the 'gcode' directory
+        for design_folder in sorted(os.listdir(gcode_base_path)):
+            
+            # Path for .txt files
+            gcode_design_path = os.path.join(gcode_base_path, design_folder) 
+            
+            if os.path.isdir(gcode_design_path):
+                image_file = None
+                description_text = "No description available."
+                
+                # --- 1. Find Image ---
+                # Images must be in 'static/gcode/<design_folder>/<design_folder>.[ext]'
+                for ext in ['.png', '.jpg', '.jpeg', '.gif']:
+                    img_name = f"{design_folder}{ext}"
+                    # Path relative to 'static' folder (for url_for)
+                    static_rel_path = os.path.join('gcode', design_folder, img_name)
+                    # Full OS path to check if file actually exists
+                    full_static_path = os.path.join(app.root_path, 'static', static_rel_path)
+
+                    if os.path.exists(full_static_path):
+                        image_file = url_for('static', filename=static_rel_path)
+                        break
+                
+                if not image_file:
+                    # Fallback to a default image
+                    image_file = url_for('static', filename='default_design.png')
+
+                # --- 2. Read Description ---
+                description_file = os.path.join(gcode_design_path, 'description.txt')
+                if os.path.exists(description_file):
+                    try:
+                        with open(description_file, 'r') as f:
+                            description_text = f.readline().strip()
+                    except Exception as e:
+                        log_message(f"Error reading description for {design_folder}: {e}")
+                        description_text = "Error reading description."
+
+                # --- 3. Check for Command File ---
+                command_file = os.path.join(gcode_design_path, 'command.txt')
+                command_available = os.path.exists(command_file)
+
+                designs_data.append({
+                    'name': design_folder,
+                    'image': image_file,
+                    'description': description_text,
+                    'command_available': command_available
+                })
+    except Exception as e:
+        log_message(f"Error scanning 'gcode' directory: {e}")
+
+    return render_template("designs.html", designs=designs_data)
+
+
+@app.route("/run_design/<design_name>", methods=["POST"])
+def run_design(design_name):
+    """
+    API endpoint to run a specific design.
+    Starts the G-code sending in a background thread.
+    """
+    # Basic security check to prevent path traversal (e.g., '../')
+    if '..' in design_name or '/' in design_name or '\\' in design_name:
+        log_message(f"WARNING: Invalid design name attempted: {design_name}")
+        return jsonify(success=False, error="Invalid design name."), 400
+    
+    gcode_filepath = os.path.join(app.root_path, 'gcode', design_name, 'command.txt')
+    
+    if not os.path.exists(gcode_filepath):
+        log_message(f"ERROR: Cannot run design. File not found: {gcode_filepath}")
+        return jsonify(success=False, error="Command file not found."), 404
+
+    # --- CRITICAL ---
+    # Run the G-code sender in a background thread.
+    # This immediately frees up the web request, so the browser
+    # doesn't time out while waiting for a long G-code file to send.
+    def send_gcode_task():
+        send_gcode_lines_to_arduino(gcode_filepath)
+
+    # Start the background task
+    # 'daemon=True' means the thread will automatically exit when the main app exits
+    threading.Thread(target=send_gcode_task, daemon=True).start()
+
+    # Return an *immediate* success response to the frontend
+    log_message(f"Background task started for design: {design_name}")
+    return jsonify(success=True, message=f"Started sending design '{design_name}' to Arduino.")
+
+
+# --- END OF NEW DESIGNS FUNCTIONALITY ---
+
+
 @app.route("/send", methods=["POST"])
 def send_command():
     data = request.json
@@ -209,4 +363,4 @@ def get_logs():
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
     # The BLE loop starts automatically on import of ble_controller
-    app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False) 
+    app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False)
