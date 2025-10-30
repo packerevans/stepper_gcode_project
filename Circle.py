@@ -10,18 +10,18 @@ TIMEOUT = 1  # seconds
 # ---------- G1 COMMANDS ----------
 # (Your G-code list is quite long, so I'll just show the first few and the last one)
 gcode_commands = [
-   "G1 -151 0 1000, " 
-"G1 33 63 1000, " 
-"G1 -70 -12 1000, " 
-"G1 -49 51 1000, " 
-"G1 -10 -70 1000, " 
-"G1 -64 -31 1000, " 
-"G1 64 -31 1000, " 
-"G1 10 -70 1000, " 
-"G1 49 51 1000, " 
-"G1 70 -12 1000, " 
-"G1 -33 63 1000, " 
-"G1 -64 0 1000, " 
+"G1 -151 0 1000",
+"G1 33 63 1000", 
+"G1 -70 -12 1000", 
+"G1 -49 51 1000", 
+"G1 -10 -70 1000", 
+"G1 -64 -31 1000", 
+"G1 64 -31 1000", 
+"G1 10 -70 1000", 
+"G1 49 51 1000", 
+"G1 70 -12 1000", 
+"G1 -33 63 1000", 
+"G1 -64 0 1000" 
 ]
 
 # ---------- SERIAL CONNECTION ----------
@@ -59,27 +59,33 @@ for cmd in gcode_commands:
         ser.write((cmd + '\n').encode('utf-8'))
         print(f"Sent: {cmd}")
 
-        # Wait for the device to respond with "ok" or "Done"
-        # This is a simple handshake protocol.
+        # --- THIS IS THE ROBUST HANDSHAKE ---
+        response_buffer = ""  # Create a new, empty buffer for each command
         response_received = False
+        
         while not response_received:
+            # Read a line, with a 1-second timeout
             line = ser.readline().decode('utf-8').strip()
             
-            if not line:
-                # Timeout occurred, no response
-                print("Warning: No response from device, continuing to next command...")
-                break # Break inner loop and move to next command
-
-            print(f"Device: {line}")
-            
-            # *** IMPROVED: Check for 'ok' (common for GRBL/Marlin) or 'done' ***
-            if line.lower() == "ok" or line.lower() == "done":
-                response_received = True
-                break # Exit the while loop, move to next command
+            if line:  # We got some data!
+                print(f"Device: {line}")
+                response_buffer += line.lower()  # Add it to our buffer (lowercase)
+                
+                # Check if the magic word is *IN* our buffer
+                if "ok" in response_buffer or "done" in response_buffer:
+                    print("Received confirmation, moving to next command.")
+                    response_received = True
+                    break  # Got it! Exit the 'while' loop.
+            else:
+                # This 'else' block runs if `ser.readline()` times out (returns empty)
+                # This is OK. It just means the device is busy.
+                # We do *NOT* break; we just let the loop try again.
+                pass 
+        # --- END OF ROBUST HANDSHAKE ---
 
     except Exception as e:
         print(f"Error during serial communication: {e}")
-        break # Exit the for loop on error
+        break  # Exit the 'for' loop on error
 
 # ---------- FINISH ----------
 print("\nAll commands sent.")
