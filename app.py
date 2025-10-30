@@ -19,7 +19,7 @@ arduino_connected = False
 
 try:
     # Use a shorter timeout to avoid blocking if the port is busy
-    arduino = serial.Serial('/dev/ttyACM0', 9600, timeout=0.1) 
+    arduino = serial.Serial('/dev/ttyACM1', 9600, timeout=0.1) 
     time.sleep(2)
     arduino_connected = True
 except Exception as e:
