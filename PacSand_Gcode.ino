@@ -1,213 +1,154 @@
-// -------------------- MOTOR PIN DEFINITIONS --------------------
-const int dirBase = 9;
-const int stepBase = 8;
+// === Pin Definitions ===
+const int BASE_DIR_PIN = 9;
+const int BASE_STEP_PIN = 8;
+const int ARM_DIR_PIN = 11;
+const int ARM_STEP_PIN = 10;
 
-const int dirArm = 11;
-const int stepArm = 10;
+const int EN_PIN = 3;
+const int MS1_PIN = 4;
+const int MS2_PIN = 5;
+const int MS3_PIN = 6;
 
-const int enPin = 3;
+const int SAFETY_BUTTON_PIN = 12;
 
-const int ms1 = 4;
-const int ms2 = 5;
-const int ms3 = 6;
+// === Movement Settings ===
+const unsigned long STEP_DELAY_US = 4000;  // Speed
 
-// -------------------- STATE VARIABLES --------------------
-bool paused = true;
-int motorSpeed = 1000;  // default µs delay
+// === Motor State ===
+long basePos = 0;
+long armPos = 0;
+long targetBase = 0;  // steps per loop
+long targetArm = 0;   // steps per loop
 
-// -------------------- QUEUE CONFIG --------------------
-const int MAX_QUEUE_SIZE = 10;
+bool paused = true;   // start paused
+bool lastButtonState = HIGH;
 
-struct GCommand {
-  long armSteps;
-  long baseSteps;
-  int speed;
-};
-
-GCommand queue[MAX_QUEUE_SIZE];
-int queueHead = 0; // next to execute
-int queueTail = 0; // next to fill
-int queueCount = 0;
-
-// -------------------- SETUP --------------------
 void setup() {
   Serial.begin(9600);
 
-  pinMode(stepBase, OUTPUT);
-  pinMode(dirBase, OUTPUT);
-  pinMode(stepArm, OUTPUT);
-  pinMode(dirArm, OUTPUT);
-  pinMode(enPin, OUTPUT);
+  pinMode(BASE_DIR_PIN, OUTPUT);
+  pinMode(BASE_STEP_PIN, OUTPUT);
+  pinMode(ARM_DIR_PIN, OUTPUT);
+  pinMode(ARM_STEP_PIN, OUTPUT);
 
-  pinMode(ms1, OUTPUT);
-  pinMode(ms2, OUTPUT);
-  pinMode(ms3, OUTPUT);
-  digitalWrite(ms1, HIGH);
-  digitalWrite(ms2, HIGH);
-  digitalWrite(ms3, HIGH);
+  pinMode(EN_PIN, OUTPUT);
+  pinMode(MS1_PIN, OUTPUT);
+  pinMode(MS2_PIN, OUTPUT);
+  pinMode(MS3_PIN, OUTPUT);
+  pinMode(SAFETY_BUTTON_PIN, INPUT_PULLUP);
 
-  digitalWrite(dirBase, HIGH);
-  digitalWrite(dirArm, HIGH);
-  digitalWrite(enPin, HIGH);
+  digitalWrite(MS1_PIN, HIGH);  // 1/16 microstepping
+  digitalWrite(MS2_PIN, HIGH);
+  digitalWrite(MS3_PIN, HIGH);
 
-  Serial.println("System initialized. Waiting for G-code commands.");
+  disableMotors();
+  Serial.println("Ready. System starts PAUSED.");
 }
 
-// -------------------- MAIN LOOP --------------------
 void loop() {
+  handleSafetyButton();
   handleSerial();
 
-  if (!paused && queueCount > 0) {
-    executeNextCommand();
+  if (!paused) {
+    enableMotors();
+    runMotors();
+  } else {
+    disableMotors();
   }
 }
 
-// -------------------- SERIAL HANDLER --------------------
+void handleSafetyButton() {
+  bool buttonState = digitalRead(SAFETY_BUTTON_PIN);
+  if (buttonState == LOW && lastButtonState == HIGH) {
+    paused = !paused;
+    paused ? disableMotors() : enableMotors();
+    Serial.println(paused ? "Paused by button" : "Resumed by button");
+    delay(300);
+  }
+  lastButtonState = buttonState;
+}
+
 void handleSerial() {
-  if (!Serial.available()) return;
+  if (Serial.available()) {
+    String cmd = Serial.readStringUntil('\n');
+    cmd.trim();
 
-  String cmd = Serial.readStringUntil('\n');
-  cmd.trim();
-
-  if (cmd.equalsIgnoreCase("PAUSE")) {
-    paused = true;
-    digitalWrite(enPin, HIGH);
-    Serial.println("Paused. Motors OFF.");
-    return;
-  }
-
-  if (cmd.equalsIgnoreCase("RESUME")) {
-    paused = false;
-    digitalWrite(enPin, LOW);
-    Serial.println("Resumed. Motors ON.");
-    return;
-  }
-
-  if (cmd.equalsIgnoreCase("CLEAR")) {
-    queueHead = queueTail = queueCount = 0;
-    Serial.println("Command queue cleared.");
-    return;
-  }
-
-  // -------------------- G1 Command Parsing --------------------
-  if (cmd.startsWith("G1")) {
-    long armSteps = 0;
-    long baseSteps = 0;
-    int speed = 1000;
-
-    // Example: G1 -3200 3200 5000
-    int firstSpace = cmd.indexOf(' ');
-    if (firstSpace > 0) {
-      String params = cmd.substring(firstSpace + 1);
-      params.trim();
-
-      int space1 = params.indexOf(' ');
-      int space2 = params.indexOf(' ', space1 + 1);
-
-      if (space1 != -1 && space2 != -1) {
-        armSteps = params.substring(0, space1).toInt();
-        baseSteps = params.substring(space1 + 1, space2).toInt();
-        speed = params.substring(space2 + 1).toInt();
-      }
+    if (cmd.startsWith("BASE:")) {
+      targetBase = cmd.substring(5).toInt();
+      Serial.print("BASE steps per loop: "); Serial.println(targetBase);
+    } else if (cmd.startsWith("ARM:")) {
+      targetArm = cmd.substring(4).toInt();
+      Serial.print("ARM steps per loop: "); Serial.println(targetArm);
+    } else if (cmd == "PAUSE") {
+      paused = true;
+      disableMotors();
+      Serial.println("Paused");
+    } else if (cmd == "RESUME") {
+      paused = false;
+      enableMotors();
+      Serial.println("Resumed");
+    } else if (cmd == "GET") {
+      Serial.print("ARM="); Serial.print(armPos);
+      Serial.print(" BASE="); Serial.println(basePos);
+    } else {
+      Serial.print("Unknown: "); Serial.println(cmd);
     }
-
-    enqueueCommand(armSteps, baseSteps, speed);
   }
 }
 
-// -------------------- QUEUE FUNCTIONS --------------------
-void enqueueCommand(long arm, long base, int spd) {
-  if (queueCount >= MAX_QUEUE_SIZE) {
-    Serial.println("Queue full. Command ignored.");
-    return;
+void enableMotors() {
+  digitalWrite(EN_PIN, LOW);  // Enable drivers (active LOW for A4988/DRV8825)
+}
+
+void disableMotors() {
+  digitalWrite(EN_PIN, HIGH);  // Disable drivers
+}
+
+// === Run motors based on step counts per loop ===
+void runMotors() {
+  long baseSteps = 0;
+  long armSteps = 0;
+
+  // Compute steps per loop safely
+  if (armPos != 0) {
+    baseSteps = targetBase / armPos;
+  } else {
+    baseSteps = targetBase;  // fallback if armPos = 0
   }
 
-  queue[queueTail].armSteps = arm;
-  queue[queueTail].baseSteps = base;
-  queue[queueTail].speed = spd;
-
-  queueTail = (queueTail + 1) % MAX_QUEUE_SIZE;
-  queueCount++;
-
-  Serial.print("Queued G1 command: ");
-  Serial.print(arm);
-  Serial.print(" ");
-  Serial.print(base);
-  Serial.print(" ");
-  Serial.println(spd);
-
-  if (paused) {
-    Serial.println("(Paused — will execute later)");
+  if (basePos != 0) {
+    armSteps = targetArm / basePos;
+  } else {
+    armSteps = targetArm;  // fallback if basePos = 0
   }
-}
 
-bool dequeueCommand(GCommand &cmd) {
-  if (queueCount == 0) return false;
-
-  cmd = queue[queueHead];
-  queueHead = (queueHead + 1) % MAX_QUEUE_SIZE;
-  queueCount--;
-  return true;
-}
-
-// -------------------- EXECUTION --------------------
-void executeNextCommand() {
-  GCommand cmd;
-  if (!dequeueCommand(cmd)) return;
-
-  moveBothMotors(cmd.armSteps, cmd.baseSteps, cmd.speed);
-  Serial.println("Done");
-}
-
-// -------------------- MOVE BOTH MOTORS --------------------
-void moveBothMotors(long armSteps, long baseSteps, int delayUs) {
-  // Enable motors
-  digitalWrite(enPin, LOW);
-
-  // Direction setup
-  digitalWrite(dirArm, (armSteps >= 0) ? HIGH : LOW);
-  digitalWrite(dirBase, (baseSteps >= 0) ? HIGH : LOW);
-
-  armSteps = abs(armSteps);
-  baseSteps = abs(baseSteps);
-
-  long maxSteps = max(armSteps, baseSteps);
-  float armRatio = (float)armSteps / maxSteps;
-  float baseRatio = (float)baseSteps / maxSteps;
-
-  float armProgress = 0;
-  float baseProgress = 0;
-
-  for (long i = 0; i < maxSteps; i++) {
-    handleSerial(); // allow mid-move PAUSE commands
-
-    if (paused) {
-      digitalWrite(enPin, HIGH);
-      Serial.println("Movement paused mid-execution.");
-      return;
-    }
-
-    armProgress += armRatio;
-    baseProgress += baseRatio;
-
-    if (armProgress >= 1.0) {
-      pulsePin(stepArm, delayUs);
-      armProgress -= 1.0;
-    }
-
-    if (baseProgress >= 1.0) {
-      pulsePin(stepBase, delayUs);
-      baseProgress -= 1.0;
+  // Base motor
+  if (baseSteps != 0) {
+    int dirBase = baseSteps > 0 ? HIGH : LOW;
+    digitalWrite(BASE_DIR_PIN, dirBase);
+    for (int i = 0; i < abs(baseSteps); i++) {
+      stepMotor(BASE_STEP_PIN);
+      basePos += (dirBase == HIGH ? 1 : -1);
     }
   }
 
-  digitalWrite(enPin, HIGH); // disable motors after move
+  // Arm motor
+  if (armSteps != 0) {
+    int dirArm = armSteps > 0 ? HIGH : LOW;
+    digitalWrite(ARM_DIR_PIN, dirArm);
+    for (int i = 0; i < abs(armSteps); i++) {
+      stepMotor(ARM_STEP_PIN);
+      armPos += (dirArm == HIGH ? 1 : -1);
+    }
+  }
+
+  Serial.print("Loop complete. BASE="); Serial.print(basePos);
+  Serial.print(" ARM="); Serial.println(armPos);
 }
 
-// -------------------- STEP PULSE --------------------
-void pulsePin(int pin, int delayUs) {
-  digitalWrite(pin, HIGH);
-  delayMicroseconds(delayUs);
-  digitalWrite(pin, LOW);
-  delayMicroseconds(delayUs);
+void stepMotor(int stepPin) {
+  digitalWrite(stepPin, HIGH);
+  delayMicroseconds(STEP_DELAY_US / 2);
+  digitalWrite(stepPin, LOW);
+  delayMicroseconds(STEP_DELAY_US / 2);
 }
