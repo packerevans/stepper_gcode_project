@@ -109,7 +109,6 @@
 
     /* --- Buttons --- */
     button {
-        /* FIXED: Ensuring the color variables are used for background/text color */
         background-color: var(--color-primary); 
         color: var(--color-text);
         border: none; padding: 12px 25px; border-radius: 8px; font-size: 16px;
@@ -140,7 +139,7 @@
         gap: 15px;
     }
 
-    /* NEW: Override for sliders with no button */
+    /* Override for sliders with no button */
     .slider-container.no-button {
         grid-template-columns: 80px 1fr 100px;
     }
@@ -214,7 +213,7 @@
             border-bottom: 1px dashed var(--color-shadow);
         }
 
-        /* NEW: Override for sliders with no button on mobile */
+        /* Override for sliders with no button on mobile */
         .slider-container.no-button {
             grid-template-columns: 1fr;
             /* Rows: Label, Input, Slider */
@@ -236,7 +235,7 @@
             padding: 8px;
         }
 
-        /* NEW: Ensure label/input on no-button sliders take full width */
+        /* Ensure label/input on no-button sliders take full width */
         .slider-container.no-button label,
         .slider-container.no-button .slider-input {
             grid-column: 1 / 2;
@@ -251,7 +250,6 @@
             padding: 5px;
             font-size: 14px;
             
-            /* Ensure button color is maintained */
             background-color: var(--color-primary); 
             color: var(--color-text);
         }
@@ -264,7 +262,7 @@
             margin-top: 5px;
         }
 
-        /* NEW: Ensure range on no-button slider only spans its one column */
+        /* Ensure range on no-button slider only spans its one column */
         .slider-container.no-button input[type="range"] {
             grid-column: 1 / 2;
         }
@@ -312,42 +310,24 @@
                 
                 <div class="slider-container no-button">
                     <label for="armSlider">ARM POS</label>
-                    <input type="range" id="armSlider" min="0" max="3200" value="500" oninput="updateInputValue('armSlider', 'armInput')">
-                    <input type="number" id="armInput" class="slider-input" min="0" max="3200" value="500" oninput="updateSliderValue('armSlider', 'armInput')">
-                    </div>
+                    <input type="range" id="armSlider" min="-3200" max="3200" value="0" oninput="updateInputValue('armSlider', 'armInput')">
+                    <input type="number" id="armInput" class="slider-input" value="0" oninput="updateSliderValue('armSlider', 'armInput')">
+                </div>
                 
                 <div class="slider-container no-button">
                     <label for="baseSlider">BASE POS</label>
                     <input type="range" id="baseSlider" min="-3200" max="3200" value="0" oninput="updateInputValue('baseSlider', 'baseInput')">
-                    <input type="number" id="baseInput" class="slider-input" min="-3200" max="3200" value="0" oninput="updateSliderValue('baseSlider', 'baseInput')">
-                    </div>
+                    <input type="number" id="baseInput" class="slider-input" value="0" oninput="updateSliderValue('baseSlider', 'baseInput')">
+                </div>
                 
                 <div class="slider-container no-button">
                     <label for="speedSlider">SPEED</label>
                     <input type="range" id="speedSlider" min="500" max="5000" value="1000" oninput="updateInputValue('speedSlider', 'speedInput')">
-                    <input type="number" id="speedInput" class="slider-input" min="500" max="5000" value="1000" oninput="updateSliderValue('speedSlider', 'speedInput')">
-                    </div>
+                    <input type="number" id="speedInput" class="slider-input" value="1000" oninput="updateSliderValue('speedSlider', 'speedInput')">
+                </div>
                 
                 <div class="action-buttons" style="margin-top: 15px; margin-bottom: 25px;">
                     <button onclick="sendG1Command()">Send G1 Move</button>
-                </div>
-            </div>
-
-            <div class="slider-section">
-                <h2>Incremental Steps (Direction)</h2>
-
-                <div class="slider-container">
-                    <label for="armStepSlider">ARM</label>
-                    <input type="range" id="armStepSlider" min="-3200" max="3200" value="500" oninput="updateInputValue('armStepSlider', 'armStepInput')">
-                    <input type="number" id="armStepInput" class="slider-input" min="-3200" max="3200" value="500" oninput="updateSliderValue('armStepSlider', 'armStepInput')">
-                    <button onclick="sendSliderCommand('ARMSTEPS', 'armStepInput')">Move</button>
-                </div>
-
-                <div class="slider-container">
-                    <label for="baseStepSlider">BASE</label>
-                    <input type="range" id="baseStepSlider" min="-3200" max="3200" value="0" oninput="updateInputValue('baseStepSlider', 'baseStepInput')">
-                    <input type="number" id="baseStepInput" class="slider-input" min="-3200" max="3200" value="0" oninput="updateSliderValue('baseStepSlider', 'baseStepInput')">
-                    <button onclick="sendSliderCommand('BASESTEPS', 'baseStepInput')">Move</button>
                 </div>
             </div>
 
@@ -397,8 +377,9 @@
             input.value = slider.value;
         }
 
+        // MODIFIED: This function now clamps the slider but NOT the input box
         function updateSliderValue(sliderId, inputId) {
-            // Input field changes, update slider and clamp value
+            // Input field changes, update slider
             const slider = document.getElementById(sliderId);
             const input = document.getElementById(inputId);
             
@@ -406,14 +387,17 @@
             const min = parseInt(slider.min);
             const max = parseInt(slider.max);
 
-            if (isNaN(val)) val = min; 
+            let sliderVal;
+            if (isNaN(val)) {
+                // If input is empty or invalid, set slider to its minimum
+                sliderVal = min;
+            } else {
+                // Clamp the value *only for the slider*
+                sliderVal = Math.max(min, Math.min(max, val));
+            }
             
-            // Clamp the value to the slider's min/max limits
-            if (val < min) val = min;
-            if (val > max) val = max;
-            
-            input.value = val;
-            slider.value = val;
+            slider.value = sliderVal;
+            // We NO LONGER update input.value, so it keeps what the user typed
         }
 
         // --- Terminal Logger ---
@@ -453,15 +437,9 @@
             });
         }
         
-        // This function is still used by the "Incremental Steps" sliders
-        function sendSliderCommand(commandType, inputId) {
-            const value = document.getElementById(inputId).value;
-            const cmd = `${commandType}:${value}`;
-            sendCommand(cmd);
-        }
-
-        // NEW: Function to send the combined G1 command
+        // Function to send the combined G1 command
         function sendG1Command() {
+            // This reads from the input boxes, which have no limits
             const arm = document.getElementById('armInput').value;
             const base = document.getElementById('baseInput').value;
             const speed = document.getElementById('speedInput').value;
@@ -478,14 +456,10 @@
             document.body.setAttribute('data-theme', savedTheme);
             updateThemeIcon(savedTheme);
 
-            // Ensure initial input values match sliders (and are clamped)
-            // Note: min/max for baseSlider is now set in the HTML
-            
+            // Ensure initial input values match sliders
             updateInputValue('armSlider', 'armInput');
             updateInputValue('baseSlider', 'baseInput');
             updateInputValue('speedSlider', 'speedInput');
-            updateInputValue('armStepSlider', 'armStepInput');
-            updateInputValue('baseStepSlider', 'baseStepInput');
             
             appendToTerminal("System ready. Controls initialized.", false);
         });
