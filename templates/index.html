@@ -325,13 +325,10 @@
                     <input type="range" id="speedSlider" min="500" max="5000" value="1000" oninput="updateInputValue('speedSlider', 'speedInput')">
                     <input type="number" id="speedInput" class="slider-input" value="1000" oninput="updateSliderValue('speedSlider', 'speedInput')">
                 </div>
-                
-                <div class="action-buttons" style="margin-top: 15px; margin-bottom: 25px;">
-                    <button onclick="sendG1Command()">Send G1 Move</button>
-                </div>
             </div>
 
             <div class="action-buttons">
+                <button onclick="sendG1Command()"> Send Command </button>
                 <button onclick="sendCommand('PAUSE')">PAUSE</button>
                 <button onclick="sendCommand('RESUME')">RESUME</button>
             </div>
