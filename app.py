@@ -127,7 +127,7 @@ def reboot():
     
 # ---------------- APP ROUTES ----------------
 # ---------------- APP ROUTES ----------------
-@app.route("/")
+@app.route("/script")
 def script():
     if not arduino_connected:
         return render_template("connect.html")
