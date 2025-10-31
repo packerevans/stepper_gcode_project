@@ -128,7 +128,7 @@ def reboot():
 # ---------------- APP ROUTES ----------------
 # ---------------- APP ROUTES ----------------
 @app.route("/")
-def index():
+def script():
     if not arduino_connected:
         return render_template("connect.html")
     return render_template("script.html") # <-- This is the only line that needs to change
