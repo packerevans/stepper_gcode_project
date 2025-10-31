@@ -126,6 +126,13 @@ def reboot():
         return jsonify(success=False, message=f"Reboot command failed: {e}"), 500
     
 # ---------------- APP ROUTES ----------------
+# ---------------- APP ROUTES ----------------
+@app.route("/")
+def index():
+    if not arduino_connected:
+        return render_template("connect.html")
+    return render_template("script.html") # <-- This is the only line that needs to change
+    
 @app.route("/")
 def index():
     if not arduino_connected:
