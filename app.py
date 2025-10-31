@@ -126,12 +126,6 @@ def reboot():
         return jsonify(success=False, message=f"Reboot command failed: {e}"), 500
     
 # ---------------- APP ROUTES ----------------
-# ---------------- APP ROUTES ----------------
-@app.route("/script")
-def script():
-    if not arduino_connected:
-        return render_template("connect.html")
-    return render_template("script.html") # <-- This is the only line that needs to change
     
 @app.route("/")
 def index():
@@ -148,6 +142,10 @@ def terminal():
 @app.route("/led_controls")
 def led_controls():
     return render_template("led_controls.html")
+
+@app.route("/script")
+def script():
+    return render_template("script.html")
 
 # --- NEW G-CODE BLOCK FUNCTIONALITY ---
 
