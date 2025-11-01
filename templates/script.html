@@ -742,26 +742,38 @@ G1 X0 Y203.2
             let clampedY = y;
             let isClamped = false;
             
-            // --- Clamping Logic ---
-            if (d > MAX_REACH - EPSILON) {
-                isClamped = true;
-                const ratio = (MAX_REACH - EPSILON) / d; // Clamp slightly inside max
-                clampedX = x * ratio;
-                clampedY = y * ratio;
-                d = MAX_REACH - EPSILON;
-                dSq = d * d;
-            } else if (d < MIN_REACH + EPSILON) {
-                if (d < EPSILON) {
-                    // At origin (0,0)
-                } else {
-                    isClamped = true;
-                    const ratio = (MIN_REACH + EPSILON) / d; // Clamp slightly outside min
-                    clampedX = x * ratio;
-                    clampedY = y * ratio;
-                    d = MIN_REACH + EPSILON;
-                    dSq = d * d;
-                }
-            }
+// --- Clamping Logic ---
+            // Check if truly outside max reach (beyond float error)
+            if (d > MAX_REACH + EPSILON) { 
+                isClamped = true;
+                const ratio = MAX_REACH / d; // Clamp *to* max reach
+                clampedX = x * ratio;
+                clampedY = y * ratio;
+                d = MAX_REACH;
+                dSq = d * d;
+            } 
+            // Check if inside min reach (but not at origin)
+            else if (d < MIN_REACH - EPSILON) { 
+                if (d < EPSILON) {
+                    // At origin (0,0), d is effectively 0. Do nothing.
+                } else {
+                    isClamped = true;
+                    const ratio = MIN_REACH / d; // Clamp *to* min reach
+                    clampedX = x * ratio;
+                    clampedY = y * ratio;
+                    d = MIN_REACH;
+                    dSq = d * d;
+          _       }
+            }
+            // If d is on the boundary (or within EPSILON), just adjust d for the math
+            // This prevents Math.acos from getting NaN without triggering a warning
+            else if (d > MAX_REACH) {
+                d = MAX_REACH;
+                dSq = d * d;
+            } else if (d < MIN_REACH) {
+                d = MIN_REACH;
+                dSq = d * d;
+            }
 
             // --- IK Calculation (on potentially clamped values) ---
             const cosQ2 = (dSq - l1 * l1 - l2 * l2) / (2 * l1 * l2);
@@ -1125,7 +1137,7 @@ G1 X0 Y203.2
                     const cost_switch = getAngleCost(midAngles_other, endAngles_other);
 
                     // --- Decision ---
-                    if (cost_switch < cost_stay) {
+                    if (cost_switch <= cost_stay) {
                         console.log(`Lookahead: Prep move is cheaper. Adding.`);
                         // It's "cheaper" to switch. Add the prep move.
                         const prepGcode = calculateGcode(midAngles_current, midAngles_other);
