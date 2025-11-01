@@ -914,7 +914,7 @@ G1 X101.600 Y101.600
         });
     </script>
 
-    <script>
+<script>
         // --- Fixed Constants ---
         const L1_LENGTH = 101.6;
         const L2_LENGTH = 101.6;
@@ -1213,7 +1213,7 @@ G1 X101.600 Y101.600
             return { gcode, motor1_steps, motor2_steps };
         }
 
-        // --- *NEW* Main Conversion Logic (Smart Interpolation) ---
+        // --- *NEW* Main Conversion Logic (Smart Interpolation v3) ---
         function handleConversion() {
             const els = getCalculatorElements();
             if (!els.inputGcodeEl || !els.initialXInput || !els.initialYInput || !els.warningIndicator || !els.warningMessages || !els.outputGcodeEl || !els.stepSlider) {
@@ -1270,16 +1270,36 @@ G1 X101.600 Y101.600
 
                     if (distance < EPSILON) continue; // No move
 
-                    // --- NEW "SMART" LOGIC ---
-                    // Check if Start, End, and Origin (0,0) are collinear
-                    // We use the cross-product formula: area = |x1*y2 - x2*y1|
-                    // If area is ~0, they are collinear.
-                    const crossProduct = Math.abs(currentX * targetY - targetX * currentY);
-                    const isRadial = crossProduct < EPSILON;
+                    // --- NEW "SMART" LOGIC (v3) ---
+                    let isSimpleRadial = false;
+                    const startDist = Math.sqrt(currentX * currentX + currentY * currentY);
+                    const endDist = Math.sqrt(targetX * targetX + targetY * targetY);
 
-                    if (isRadial) {
+                    // A move is "simple" ONLY IF:
+                    // 1. It does NOT start at the origin (0,0)
+                    // 2. It does NOT end at the origin (0,0)
+                    // 3. Its angle relative to the origin does not change
+                    if (startDist > EPSILON && endDist > EPSILON) {
+                        const startAngle = Math.atan2(currentY, currentX);
+                        const endAngle = Math.atan2(targetY, targetX);
+                        
+                        // Check if angles are the same
+                        const angleDiff = Math.abs(startAngle - endAngle);
+                        
+                        // Also check if they are 180 deg apart (e.g. 100,0 to -100,0)
+                        const antiAngleDiff = Math.abs(angleDiff - Math.PI);
+
+                        if (angleDiff < EPSILON || antiAngleDiff < EPSILON) {
+                            isSimpleRadial = true;
+                        }
+                    }
+                    // ANY move starting at or ending at (0,0) will have
+                    // isSimpleRadial = false, and will be INTERPOLATED.
+                    // --- END NEW LOGIC ---
+
+                    if (isSimpleRadial) {
                         // --- TYPE 1: SIMPLE RADIAL MOVE ---
-                        console.log(`Line ${index + 1}: Radial move detected. Using 1 command.`);
+                        console.log(`Line ${index + 1}: Simple Radial move detected. Using 1 command.`);
 
                         const endResult = calculateIK(L1_LENGTH, L2_LENGTH, targetX, targetY);
                         
@@ -1311,7 +1331,8 @@ G1 X101.600 Y101.600
                     
                     } else {
                         // --- TYPE 2: COMPLEX ARC MOVE ---
-                        console.log(`Line ${index + 1}: Complex move detected. Interpolating ${distance.toFixed(1)}mm.`);
+                        // (Includes all moves to/from the origin)
+                        console.log(`Line ${index + 1}: Complex move detected (dist ${distance.toFixed(1)}mm). Interpolating...`);
                         
                         const numSegments = Math.ceil(distance / SEGMENT_LENGTH);
                         const stepX = deltaX / numSegments;
@@ -1328,7 +1349,10 @@ G1 X101.600 Y101.600
                             
                             let segmentClamped = segmentResult.isClamped;
                             if (segmentClamped) {
-                                warnings.push(`Line ${index + 1} ('${trimmedLine}'): Move segment clamped to (${segmentResult.clampedX.toFixed(2)}, ${segmentResult.clampedY.toFixed(2)}).`);
+                                // Only warn once per G1 line
+                                if (i === 1 || !warnings[warnings.length-1].startsWith(`Line ${index + 1}`)) {
+                                    warnings.push(`Line ${index + 1} ('${trimmedLine}'): Move segment clamped to (${segmentResult.clampedX.toFixed(2)}, ${segmentResult.clampedY.toFixed(2)}).`);
+                                }
                             }
                             
                             const newAngles = (preferredSolution === 'down') ? segmentResult.solution1 : segmentResult.solution2;
