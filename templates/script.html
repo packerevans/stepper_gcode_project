@@ -1,3 +1,57 @@
+This is an excellent idea, and I understand exactly what you want. You want to keep your "sand table" theme (with the sidebar, dark mode, and terminal) on the script.html page, but replace the simple text box with your new, powerful IK calculator.
+The best way to do this is to load your new calculator inside the script.html page using an <iframe>. This keeps the two projects separate but lets them work together.
+Here is a complete, step-by-step plan to make this work.
+Step 1: Create calculator.html
+Take the entire HTML file you just gave me (the one with Tailwind CSS and all the IK logic) and save it in your templates/ folder.
+ * File Name: calculator.html
+ * Location: templates/calculator.html
+(You don't need to change anything in this file. It's perfect as-is.)
+Step 2: Update app.py
+We need to tell Flask about this new calculator.html page so the <iframe> can load it.
+Add the new @app.route("/calculator") function to your APP ROUTES block. The final block should look like this:
+# ---------------- APP ROUTES ----------------
+@app.route("/")
+def index():
+    if not arduino_connected:
+        return render_template("connect.html")
+    # This is the main page for "Manual Command"
+    return render_template("index.html") 
+
+@app.route("/script")
+def script():
+    if not arduino_connected:
+        return render_template("connect.html")
+    # This is the page for "Bulk Commands"
+    return render_template("script.html")
+
+# --- NEW ROUTE FOR THE CALCULATOR ---
+@app.route("/calculator")
+def calculator():
+    # This page will be loaded *inside* the script.html iframe
+    return render_template("calculator.html")
+# --- END OF NEW ROUTE ---
+
+@app.route("/terminal")
+def terminal():
+    if not arduino_connected:
+        return render_template("connect.html")
+    return render_template("terminal.html")
+
+@app.route("/led_controls")
+def led_controls():
+    return render_template("led_controls.html")
+
+# --- NEW G-CODE BLOCK FUNCTIONALITY ---
+# (Your process_and_send_gcode and send_gcode_block_route functions go here...)
+# (No changes are needed for these functions. They will work perfectly.)
+
+Save app.py and restart your server (press Ctrl+C and run python3 app.py) for this change to take effect.
+Step 3: Replace script.html
+This is the final step. We will replace your entire script.html file with the code below.
+This new file does two things:
+ * It removes the old <textarea> and replaces it with an <iframe> that loads your calculator.html.
+ * It replaces the old sendGcode() JavaScript function with a new sendGcodeFromIframe() function that "reaches into" the iframe, grabs the G-code from the outputGcode box, and sends it to your (already existing) /send_gcode_block route.
+Complete script.html (Copy/Paste this)
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -87,6 +141,8 @@
     .main-content {
         margin-left: 0; transition: margin-left 0.3s; padding: 20px;
         max-width: 800px; margin: 0 auto;
+        /* --- CHANGED: Allow main content to be wider for the calculator --- */
+        max-width: 1200px;
     }
 
     h1 {
@@ -140,26 +196,16 @@
         font-weight: 400;
         border-bottom: none;
     }
-
-    #gcode-input {
+    
+    /* --- NEW IFRAME STYLES --- */
+    #calculator-iframe {
         width: 100%;
-        height: 200px; /* Taller text box */
-        font-family: 'Consolas', 'Courier New', monospace;
-        font-size: 14px;
-        padding: 10px;
+        /* The calculator is complex, so we give it a lot of space */
+        height: 800px; 
+        border: 1px solid var(--color-shadow);
         border-radius: 8px;
-        border: 1px solid #ccc;
-        background: var(--color-background);
-        color: var(--color-text);
-        transition: background 0.3s, color 0.3s, border-color 0.3s;
-        box-sizing: border-box; /* Ensures padding doesn't break width */
-        margin-bottom: 15px;
     }
-    
-    body[data-theme='dark'] #gcode-input {
-         border-color: #444;
-    }
-    
+
     /* --- Terminal --- */
     .terminal {
         background: var(--color-terminal-bg); color: var(--color-terminal-text);
@@ -193,9 +239,8 @@
             padding: 20px;
         }
         
-        #gcode-input {
-            height: 150px;
-            font-size: 12px;
+        #calculator-iframe {
+            height: 600px; /* Still needs a lot of space */
         }
 
         .terminal {
@@ -209,10 +254,11 @@
 <body data-theme="light">
     <div id="mySidebar" class="sidebar">
         <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
-        <a href="{{ url_for('index') }}">Controls</a>
-        <a href="{{ url_for('led_controls') }}">Led Controls</a>
+        <a href="{{ url_for('index') }}">Manual Command</a>
+        <a href="{{ url_for('led_controls') }}">LED Controls</a>
+        <a href="{{ url_for('script') }}">Bulk Commands</a>
         <a href="{{ url_for('terminal') }}">Terminal</a>
-        </div>
+    </div>
 
     <button class="openbtn" onclick="openNav()">☰</button>
     <button id="themeToggle" onclick="toggleDarkMode()">
@@ -226,14 +272,16 @@
         <div class="control-panel">
             
             <div class="gcode-entry-section">
-                <h2>G-code Entry</h2>
-                <textarea id="gcode-input" placeholder="Enter G-code commands here, one per line...
-G1 700 -37 1000
-G1 0 0 500"></textarea>
-                <button id="send-gcode-btn" onclick="sendGcode()">Send G-code</button>
+                <h2>Bulk G-Code (from IK Calculator)</h2>
+                
+                <iframe id="calculator-iframe" src="{{ url_for('calculator') }}"></iframe>
+                
+                <button id="send-gcode-btn" onclick="sendGcodeFromIframe()" style="margin-top: 15px; width: 100%;">
+                    Send G-Code from Calculator to Table
+                </button>
             </div>
             
-            </div>
+        </div>
         
         <h2>Live Terminal Log</h2>
         <div id="terminal" class="terminal"></div>
@@ -243,12 +291,15 @@ G1 0 0 500"></textarea>
         // --- Sidebar Functions ---
         function openNav() {
             document.getElementById("mySidebar").style.width = "200px";
-            document.querySelector(".main-content").style.marginLeft = "200px";
+            // Adjust margin for wider content
+            const main = document.querySelector(".main-content");
+            if (main) main.style.marginLeft = "200px";
         }
 
         function closeNav() {
             document.getElementById("mySidebar").style.width = "0";
-            document.querySelector(".main-content").style.marginLeft = "0";
+            const main = document.querySelector(".main-content");
+            if (main) main.style.marginLeft = "auto"; // Center again
         }
 
         // --- Dark Mode Toggle ---
@@ -266,13 +317,10 @@ G1 0 0 500"></textarea>
             updateThemeIcon(newTheme);
         }
         
-        // --- REMOVED Slider & Input Synchronization Functions ---
-
         // --- Terminal Logger ---
-        // This function is still useful for providing feedback
         function appendToTerminal(text, isCommand = false) {
             const term = document.getElementById("terminal");
-            if (!term) return; // Guard clause if terminal isn't on the page
+            if (!term) return; 
             
             const line = document.createElement("div");
             
@@ -286,13 +334,40 @@ G1 0 0 500"></textarea>
             term.scrollTop = term.scrollHeight; 
         }
 
-        // --- NEW: Function to send the G-code block ---
-        function sendGcode() {
-            const gcodeText = document.getElementById('gcode-input').value;
+        // --- NEW: Function to send the G-code block from the IFRAME ---
+        function sendGcodeFromIframe() {
             const sendButton = document.getElementById('send-gcode-btn');
-            
+            const iframe = document.getElementById('calculator-iframe');
+            let gcodeText = "";
+
+            try {
+                // Access the iframe's contentWindow
+                const iframeWindow = iframe.contentWindow;
+                if (!iframeWindow) {
+                    throw new Error("Could not access iframe window.");
+                }
+                
+                // Access the document inside the iframe
+                const iframeDoc = iframeWindow.document;
+                if (!iframeDoc) {
+                    throw new Error("Could not access iframe document.");
+                }
+
+                // Get the text from the calculator's output box
+                const outputBox = iframeDoc.getElementById('outputGcode');
+                if (!outputBox) {
+                    throw new Error("Could not find 'outputGcode' element in calculator.");
+                }
+                
+                gcodeText = outputBox.value;
+            } catch (e) {
+                appendToTerminal(`Error reading from calculator: ${e.message}`, false);
+                appendToTerminal("Make sure the calculator is fully loaded.", false);
+                return;
+            }
+
             if (!gcodeText.trim()) {
-                appendToTerminal("G-code text box is empty.", false);
+                appendToTerminal("Calculator output text box is empty.", false);
                 return;
             }
 
@@ -300,7 +375,6 @@ G1 0 0 500"></textarea>
             sendButton.disabled = true;
             sendButton.textContent = "Sending...";
             
-            // This is a command *we* are sending from the UI
             appendToTerminal("Sending G-code block to server...", true);
 
             fetch("/send_gcode_block", {
@@ -313,8 +387,6 @@ G1 0 0 500"></textarea>
                 if (data.success) {
                     // This message comes from app.py immediately
                     appendToTerminal(`Server response: ${data.message}`, false);
-                    // Clear the text box after successful *submission*
-                    document.getElementById('gcode-input').value = '';
                 } else {
                     appendToTerminal(`Error: ${data.error || 'Unknown Error'}`, false);
                 }
@@ -325,7 +397,7 @@ G1 0 0 500"></textarea>
             .finally(() => {
                 // Re-enable the button after the server responds
                 sendButton.disabled = false;
-                sendButton.textContent = "Send G-code";
+                sendButton.textContent = "Send G-Code from Calculator to Table";
             });
         }
 
@@ -335,11 +407,10 @@ G1 0 0 500"></textarea>
             const savedTheme = localStorage.getItem('theme') || 'light';
             document.body.setAttribute('data-theme', savedTheme);
             updateThemeIcon(savedTheme);
-
-            // Removed all slider/input update calls
             
-            appendToTerminal("System ready. Controls initialized.", false);
+            appendToTerminal("System ready. Bulk command page initialized.", false);
         });
     </script>
 </body>
 </html>
+
