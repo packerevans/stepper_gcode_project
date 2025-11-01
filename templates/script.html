@@ -229,6 +229,7 @@
         <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
         <a href="{{ url_for('index') }}">Manual Command</a>
         <a href="{{ url_for('led_controls') }}">LED Controls</a>
+        <a href="{{ url_for('script') }}">Bulk Commands</a>
         <a href="{{ url_for('terminal') }}">Terminal</a>
     </div>
 
@@ -249,17 +250,6 @@
                     <div class="flex flex-col gap-6">
                         <div>
                             <h1 class="text-2xl font-bold text-gray-800 mb-4">Interactive G-Code Converter</h1>
-                            
-                            <div class="p-3 bg-blue-50 border border-blue-200 rounded-md mb-4">
-                                <p class="text-sm font-medium text-blue-800">Fixed Arm Lengths</p>
-                                <p class="text-sm text-blue-700">Arm 1 (L1): <span class="font-bold">101.6</span>, Arm 2 (L2): <span class="font-bold">101.6</span></p>
-                                <p class="text-sm text-blue-700">Max Reach: <span class="font-bold">203.2</span></p>
-                            </div>
-
-                            <div class="p-3 bg-gray-100 border border-gray-200 rounded-md mb-4">
-                                <p class="text-xs text-gray-600"><span class="font-semibold">Note:</span> 'Home' `(0,0)` = `0°` (Arm 1 Up, Arm 2 Down).</p>
-                                <p class="text-xs text-yellow-600"><span class="font-semibold">Coupling:</span> 1:1 compensation (`M2=q1+q2`) is active.</p>
-                            </div>
                             
                             <div class="space-y-4">
                                 <fieldset class="border border-gray-300 p-3 rounded-md">
@@ -351,7 +341,7 @@ G1 X101.600 Y101.600
                     </div>
                 </div>
             </div> <button id="send-to-table-btn" onclick="sendGcodeFromCalculator()">
-                Send G-Code from Calculator to Table
+                Send Commands
             </button>
             
         </div> <h2>Live Terminal Log</h2>
@@ -451,9 +441,10 @@ G1 X101.600 Y101.600
                 appendToTerminal(`Network Error: ${error.message}`, false);
             })
             .finally(() => {
+                // === BUTTON TEXT CHANGED ===
                 // Re-enable the button after the server responds
                 sendButton.disabled = false;
-                sendButton.textContent = "Send G-Code from Calculator to Table";
+                sendButton.textContent = "Send Commands";
             });
         }
 
@@ -480,19 +471,25 @@ G1 X101.600 Y101.600
         const EPSILON = 1e-6; // Small value for float comparison
 
         // --- DOM Elements ---
-        const initialXInput = document.getElementById('initialX');
-        const initialYInput = document.getElementById('initialY');
-        const convertButton = document.getElementById('convertButton');
-        const inputGcodeEl = document.getElementById('inputGcode');
-        const outputGcodeEl = document.getElementById('outputGcode');
-        const copyButton = document.getElementById('copyButton');
-        const copySuccess = document.getElementById('copySuccess');
-        const canvas = document.getElementById('ikCanvas');
-        const ctx = canvas.getContext('2d');
-        const warningIndicator = document.getElementById('warningIndicator');
-        const warningMessages = document.getElementById('warningMessages');
-        const stepSlider = document.getElementById('stepSlider');
-        const stepLabel = document.getElementById('stepLabel');
+        // We use a function to get these to make sure they exist
+        // on this page before we try to use them.
+        function getCalculatorElements() {
+            return {
+                initialXInput: document.getElementById('initialX'),
+                initialYInput: document.getElementById('initialY'),
+                convertButton: document.getElementById('convertButton'),
+                inputGcodeEl: document.getElementById('inputGcode'),
+                outputGcodeEl: document.getElementById('outputGcode'),
+                copyButton: document.getElementById('copyButton'),
+                copySuccess: document.getElementById('copySuccess'),
+                canvas: document.getElementById('ikCanvas'),
+                ctx: document.getElementById('ikCanvas') ? document.getElementById('ikCanvas').getContext('2d') : null,
+                warningIndicator: document.getElementById('warningIndicator'),
+                warningMessages: document.getElementById('warningMessages'),
+                stepSlider: document.getElementById('stepSlider'),
+                stepLabel: document.getElementById('stepLabel')
+            };
+        }
         
         // --- State ---
         let canvasSize = 0;
@@ -578,12 +575,13 @@ G1 X101.600 Y101.600
 
         // --- Drawing Functions ---
         function resizeCanvas() {
-            // Need to check if canvas exists, otherwise this script block
-            // will throw an error when run on other pages.
-            if (!canvas) return; 
+            const { canvas, ctx, stepSlider } = getCalculatorElements();
+            if (!canvas || !ctx) return; 
             
             const dpr = window.devicePixelRatio || 1;
             const rect = canvas.getBoundingClientRect();
+            if (rect.width === 0) return; // Don't draw if canvas is hidden/not sized
+            
             canvas.width = rect.width * dpr;
             canvas.height = rect.height * dpr;
             ctx.scale(dpr, dpr);
@@ -594,7 +592,8 @@ G1 X101.600 Y101.600
         }
 
         function drawGrid() {
-            if (!canvas) return;
+            const { canvas, ctx } = getCalculatorElements();
+            if (!canvas || !ctx) return;
             scale = (canvasSize / 2) * 0.9 / MAX_REACH; // Use 90% of canvas for max reach
             
             ctx.clearRect(0, 0, canvasSize, canvasSize);
@@ -635,7 +634,8 @@ G1 X101.600 Y101.600
 
         // Draws just the path segments (lines)
         function drawPathSegments(segments) {
-            if (!canvas) return;
+            const { canvas, ctx } = getCalculatorElements();
+            if (!canvas || !ctx) return;
             ctx.save();
             ctx.translate(originX, originY);
             ctx.scale(1, -1); // Flip Y-axis
@@ -654,9 +654,10 @@ G1 X101.600 Y101.600
         
         // Draws the arm at a specific X, Y cartesian coordinate
         function drawArmAtPosition(x, y, color) {
-            if (!canvas) return;
+            const { canvas, ctx } = getCalculatorElements();
+            if (!canvas || !ctx) return;
             const result = calculateIK(L1_LENGTH, L2_LENGTH, x, y);
-            if (result.error) return; // Should not happen if logic is correct
+            if (result.error) return;
 
             const preferredSolution = document.querySelector('input[name="solution"]:checked').value;
             const angles = (preferredSolution === 'down') ? result.solution1 : result.solution2;
@@ -715,7 +716,9 @@ G1 X101.600 Y101.600
 
         // Main drawing function: draws grid, path, and arm
         function drawToStep(stepIndex) {
-            if (!canvas) return;
+            const { canvas, initialXInput, initialYInput } = getCalculatorElements();
+            if (!canvas || !initialXInput || !initialYInput) return;
+            
             stepIndex = parseInt(stepIndex, 10);
             drawGrid();
 
@@ -740,33 +743,34 @@ G1 X101.600 Y101.600
 
         // --- Main Conversion Logic ---
         function handleConversion() {
+            const els = getCalculatorElements();
             // Check if all elements exist before running
-            if (!inputGcodeEl || !initialXInput || !initialYInput || !warningIndicator || !warningMessages || !outputGcodeEl || !stepSlider) {
+            if (!els.inputGcodeEl || !els.initialXInput || !els.initialYInput || !els.warningIndicator || !els.warningMessages || !els.outputGcodeEl || !els.stepSlider) {
                 return;
             }
 
-            const inputGcode = inputGcodeEl.value;
+            const inputGcode = els.inputGcodeEl.value;
             const lines = inputGcode.split('\n');
             const preferredSolution = document.querySelector('input[name="solution"]:checked').value;
             
-            let currentX = parseFloat(initialXInput.value);
-            let currentY = parseFloat(initialYInput.value);
+            let currentX = parseFloat(els.initialXInput.value);
+            let currentY = parseFloat(els.initialYInput.value);
             
             // --- Reset state ---
-            warningIndicator.classList.add('hidden');
-            warningMessages.classList.add('hidden');
-            warningMessages.querySelector('ul').innerHTML = '';
+            els.warningIndicator.classList.add('hidden');
+            els.warningMessages.classList.add('hidden');
+            els.warningMessages.querySelector('ul').innerHTML = '';
             globalPathSegments = []; // Clear previous path
 
             if (isNaN(currentX) || isNaN(currentY)) {
-                warningMessages.querySelector('ul').innerHTML = '<li>Invalid Initial Start Position.</li>';
-                warningMessages.classList.remove('hidden');
-                warningIndicator.classList.remove('hidden');
-                outputGcodeEl.value = '';
+                els.warningMessages.querySelector('ul').innerHTML = '<li>Invalid Initial Start Position.</li>';
+                els.warningMessages.classList.remove('hidden');
+                els.warningIndicator.classList.remove('hidden');
+                els.outputGcodeEl.value = '';
                 // Reset slider
-                stepSlider.max = 0;
-                stepSlider.value = 0;
-                stepLabel.textContent = '0 / 0';
+                els.stepSlider.max = 0;
+                els.stepSlider.value = 0;
+                els.stepLabel.textContent = '0 / 0';
                 drawToStep(0); // Draw starting arm
                 return;
             }
@@ -840,34 +844,40 @@ G1 X101.600 Y101.600
             }
 
             // --- Finalize ---
-            outputGcodeEl.value = outputGcode.join('\n');
+            els.outputGcodeEl.value = outputGcode.join('\n');
 
             // --- Update Slider ---
             const totalSteps = globalPathSegments.length;
-            stepSlider.max = totalSteps;
-            stepSlider.value = totalSteps;
-            stepLabel.textContent = `${totalSteps} / ${totalSteps}`;
+            els.stepSlider.max = totalSteps;
+            els.stepSlider.value = totalSteps;
+            els.stepLabel.textContent = `${totalSteps} / ${totalSteps}`;
 
             // --- Draw final path ---
             drawToStep(totalSteps);
 
             // --- Show Warnings if any ---
             if (warnings.length > 0) {
-                warningIndicator.classList.remove('hidden');
-                warningMessages.classList.remove('hidden');
-                warningMessages.querySelector('ul').innerHTML = warnings.map(w => `<li>${w}</li>`).join('');
+                els.warningIndicator.classList.remove('hidden');
+                els.warningMessages.classList.remove('hidden');
+                els.warningMessages.querySelector('ul').innerHTML = warnings.map(w => `<li>${w}</li>`).join('');
             }
         }
         
         // --- Slider Event ---
         function handleSliderChange(event) {
+            const { stepLabel, stepSlider } = getCalculatorElements();
+            if (!stepLabel || !stepSlider) return;
+            
             const step = event.target.value;
             stepLabel.textContent = `${step} / ${stepSlider.max}`;
             drawToStep(step);
         }
 
         // --- Copy Button Logic ---
-        if (copyButton) {
+        function setupCopyButton() {
+            const { copyButton, outputGcodeEl, copySuccess } = getCalculatorElements();
+            if (!copyButton || !outputGcodeEl || !copySuccess) return;
+
             copyButton.addEventListener('click', () => {
                 const textToCopy = outputGcodeEl.value;
                 const textArea = document.createElement('textarea');
@@ -899,16 +909,23 @@ G1 X101.600 Y101.600
         // make sure we are on the /script page.
         document.addEventListener('DOMContentLoaded', () => {
             // The calculator script will only run if it finds the 'convertButton'
-            if (document.getElementById('convertButton')) {
+            const { convertButton, stepSlider } = getCalculatorElements();
+            
+            if (convertButton) {
                 convertButton.addEventListener('click', handleConversion);
                 stepSlider.addEventListener('input', handleSliderChange);
                 window.addEventListener('resize', resizeCanvas);
+                setupCopyButton();
                 
-                // Initial setup
-                resizeCanvas();
-                handleConversion(); // Run once on load
+                // === CANVAS FIX ===
+                // Wait a tiny moment for the CSS to paint the layout,
+                // then get the canvas size and do the first render.
+                setTimeout(() => {
+                    resizeCanvas();
+                    handleConversion(); // Run once on load
+                }, 100); // 100ms delay
             }
         });
-    </Gcode>
+    </script>
 </body>
 </html>
