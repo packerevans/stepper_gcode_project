@@ -43,7 +43,6 @@
         }
         
         /* --- Base Styles --- */
-        /* Tailwind's 'bg-gray-100' will be overridden by this, which is good */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: var(--color-background);
@@ -118,6 +117,50 @@
             margin-bottom: 30px;
         }
 
+        /* --- NEW Sandify Module --- */
+        .sandify-module {
+            display: flex;
+            align-items: center;
+            gap: 25px;
+            flex-wrap: wrap; /* Allows wrapping on small screens */
+        }
+        .sandify-module img {
+            width: 100px;
+            height: 100px;
+            border-radius: 12px;
+            object-fit: cover;
+            border: 2px solid var(--color-shadow);
+        }
+        .sandify-module-content {
+            flex: 1;
+            min-width: 250px;
+        }
+        .sandify-module-content h3 {
+            margin-top: 0;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 1.5rem;
+            color: var(--color-secondary);
+        }
+        .sandify-module-content p {
+            margin-bottom: 15px;
+            font-size: 1rem;
+        }
+        /* Style the link as a button */
+        .sandify-module a {
+            display: inline-block;
+            text-decoration: none;
+            background-color: var(--color-primary); 
+            color: var(--color-text);
+            border: none; padding: 12px 25px; border-radius: 8px; font-size: 16px;
+            cursor: pointer; transition: background-color 0.2s, box-shadow 0.2s;
+            font-weight: 600;
+        }
+        .sandify-module a:hover {
+            background-color: var(--color-secondary);
+            box-shadow: 0 2px 8px var(--color-shadow);
+        }
+        
         /* --- Buttons --- */
         /* This will style ALL buttons, including Tailwind ones, to match the theme */
         button {
@@ -240,7 +283,15 @@
 
     <div class="main-content">
         <img src="{{ url_for('static', filename='sand.png') }}" alt="Sand Table Header" class="header-image">
-        <h1>Sand Table Controls</h1>
+        
+        <div class="control-panel sandify-module">
+            <img src="{{ url_for('static', filename='sandify.png') }}" alt="Sandify Logo">
+            <div class="sandify-module-content">
+                <h3>Sandify</h3>
+                <p>Unleash intricate patterns with this powerful, web-based G-code creator!</p>
+                <a href="https://sandify.org/" target="_blank" rel="noopener noreferrer">Open Sandify</a>
+            </div>
+        </div>
         
         <div class="control-panel">
             
@@ -257,11 +308,11 @@
                                     <div class="flex gap-4">
                                         <div>
                                             <label for="initialX" class="block text-xs font-medium text-gray-600">Start X</label>
-                                            <input type="number" id="initialX" value="101.6" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                            <input type="number" id="initialX" value="203.6" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
                                         </div>
                                         <div>
                                             <label for="initialY" class="block text-xs font-medium text-gray-600">Start Y</label>
-                                            <input type="number" id="initialY" value="101.6" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                            <input type="number" id="initialY" value="0" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
                                         </div>
                                     </div>
                                 </fieldset>
@@ -395,7 +446,7 @@ G1 X101.600 Y101.600
             term.scrollTop = term.scrollHeight; 
         }
 
-        // --- NEW: Function to send the G-code block from the CALCULATOR ---
+        // --- Function to send the G-code block from the CALCULATOR ---
         function sendGcodeFromCalculator() {
             const sendButton = document.getElementById('send-to-table-btn');
             let gcodeText = "";
@@ -729,8 +780,10 @@ G1 X101.600 Y101.600
             // Find the position to draw the arm
             let finalX, finalY;
             if (stepIndex === 0) {
-                finalX = parseFloat(initialXInput.value);
-                finalY = parseFloat(initialYInput.value);
+                // === VALUE CHANGED ===
+                // Use the new default values
+                finalX = parseFloat(initialXInput.value || "203.6");
+                finalY = parseFloat(initialYInput.value || "0");
             } else {
                 const lastSegment = segmentsToDraw[stepIndex - 1];
                 finalX = lastSegment.endX;
@@ -753,8 +806,10 @@ G1 X101.600 Y101.600
             const lines = inputGcode.split('\n');
             const preferredSolution = document.querySelector('input[name="solution"]:checked').value;
             
-            let currentX = parseFloat(els.initialXInput.value);
-            let currentY = parseFloat(els.initialYInput.value);
+            // === VALUE CHANGED ===
+            // Use new defaults if boxes are empty
+            let currentX = parseFloat(els.initialXInput.value || "203.6");
+            let currentY = parseFloat(els.initialYInput.value || "0");
             
             // --- Reset state ---
             els.warningIndicator.classList.add('hidden');
