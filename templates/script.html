@@ -193,6 +193,63 @@
         #send-to-table-btn:hover {
             background-color: #2563eb; /* blue-600 */
         }
+        
+        /* --- NEW: Style for Manual Next Button --- */
+        #nextLineButton {
+             background-color: #16a34a; /* green-600 */
+             color: white;
+        }
+        #nextLineButton:hover {
+             background-color: #15803d; /* green-700 */
+        }
+        /* --- NEW: Style for Manual Controls Container --- */
+        .manual-controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 16px;
+            padding: 12px;
+            background-color: var(--color-background);
+            border-radius: var(--border-radius);
+        }
+        .manual-controls label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        /* Custom styled checkbox */
+        .manual-controls input[type="checkbox"] {
+            -webkit-appearance: none;
+            appearance: none;
+            background-color: #fff;
+            margin: 0;
+            font: inherit;
+            color: var(--color-text);
+            width: 1.15em;
+            height: 1.15em;
+            border: 0.1em solid var(--color-text);
+            border-radius: 0.15em;
+            transform: translateY(-0.075em);
+            display: grid;
+            place-content: center;
+            cursor: pointer;
+        }
+        .manual-controls input[type="checkbox"]::before {
+            content: "";
+            width: 0.65em;
+            height: 0.65em;
+            transform: scale(0);
+            transition: 120ms transform ease-in-out;
+            box-shadow: inset 1em 1em #2563eb; /* blue-600 */
+            transform-origin: bottom left;
+            clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+        }
+        .manual-controls input[type="checkbox"]:checked::before {
+            transform: scale(1);
+        }
 
 
         /* --- Terminal --- */
@@ -209,7 +266,7 @@
         .terminal .response { color: var(--color-terminal-text); }
         
         /* --- Calculator-specific Styles (from your file) --- */
-        /* We prefix them with .calculator-content to avoid breaking our theme */
+        /* ... (all .calculator-content styles remain unchanged) ... */
         .calculator-content {
             font-family: "Inter", sans-serif;
             background: var(--color-surface); /* Use theme surface color */
@@ -391,11 +448,22 @@ G1 X101.600 Y101.600
                         </div>
                     </div>
                 </div>
-            </div> <button id="send-to-table-btn" onclick="sendGcodeFromCalculator()">
+            </div> 
+            
+            <button id="send-to-table-btn" onclick="sendGcodeFromCalculator()">
                 Send Commands
             </button>
             
-        </div> <h2>Live Terminal Log</h2>
+            <div class="manual-controls">
+                <label for="manualModeCheckbox">
+                    <input type="checkbox" id="manualModeCheckbox">
+                    Manual Step-by-Step
+                </label>
+                <button id="nextLineButton" onclick="sendManualLine()" style="display:none;">
+                    Send Next Line
+                </button>
+            </div>
+            </div> <h2>Live Terminal Log</h2>
         <div id="terminal" class="terminal"></div>
     </div>
 
@@ -403,7 +471,6 @@ G1 X101.600 Y101.600
         // --- Sidebar Functions ---
         function openNav() {
             document.getElementById("mySidebar").style.width = "200px";
-            // Adjust margin for wider content
             const main = document.querySelector(".main-content");
             if (main) main.style.marginLeft = "200px";
         }
@@ -411,7 +478,7 @@ G1 X101.600 Y101.600
         function closeNav() {
             document.getElementById("mySidebar").style.width = "0";
             const main = document.querySelector(".main-content");
-            if (main) main.style.marginLeft = "auto"; // Center again
+            if (main) main.style.marginLeft = "auto";
         }
 
         // --- Dark Mode Toggle ---
@@ -445,18 +512,22 @@ G1 X101.600 Y101.600
             term.appendChild(line);
             term.scrollTop = term.scrollHeight; 
         }
+        
+        // --- NEW State for Manual G-code ---
+        let manualGcodeLines = [];
+        let manualCurrentLineIndex = 0;
+        let isManualJobActive = false;
 
-        // --- Function to send the G-code block from the CALCULATOR ---
+        // --- MODIFIED Function to send G-code ---
         function sendGcodeFromCalculator() {
             const sendButton = document.getElementById('send-to-table-btn');
+            const manualCheckbox = document.getElementById('manualModeCheckbox');
+            const nextButton = document.getElementById('nextLineButton');
+            
             let gcodeText = "";
-
             try {
-                // Get the text from the calculator's output box (it's on the same page now)
                 const outputBox = document.getElementById('outputGcode');
-                if (!outputBox) {
-                    throw new Error("Could not find 'outputGcode' element.");
-                }
+                if (!outputBox) throw new Error("Could not find 'outputGcode' element.");
                 gcodeText = outputBox.value;
             } catch (e) {
                 appendToTerminal(`Error reading from calculator: ${e.message}`, false);
@@ -468,36 +539,128 @@ G1 X101.600 Y101.600
                 return;
             }
 
-            // Disable button to prevent double-sending
-            sendButton.disabled = true;
-            sendButton.textContent = "Sending...";
-            
-            appendToTerminal("Sending G-code block to server...", true);
+            // --- Check Mode ---
+            if (manualCheckbox.checked) {
+                // --- MANUAL MODE ---
+                manualGcodeLines = gcodeText.split('\n')
+                                        .map(line => line.split(';')[0].trim()) // Clean comments
+                                        .filter(line => line.toUpperCase().startsWith('G1')); // Filter for G1
+                
+                if (manualGcodeLines.length === 0) {
+                    appendToTerminal("No valid G1 commands found for manual mode.", false);
+                    return;
+                }
 
-            // This fetch uses the SAME route as your old script.html, so app.py needs NO changes.
-            fetch("/send_gcode_block", {
+                manualCurrentLineIndex = 0;
+                isManualJobActive = true;
+
+                // Update UI for manual job
+                sendButton.disabled = true;
+                manualCheckbox.disabled = true;
+                nextButton.style.display = 'block'; // Show the 'Next' button
+                nextButton.disabled = false;
+                
+                appendToTerminal(`Starting manual job with ${manualGcodeLines.length} lines.`, true);
+                // Send the first line immediately
+                sendManualLine();
+
+            } else {
+                // --- AUTOMATIC (DRIP) MODE ---
+                sendButton.disabled = true;
+                sendButton.textContent = "Sending...";
+                appendToTerminal("Sending G-code block to server (auto-drip)...", true);
+
+                fetch("/send_gcode_block", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ gcode: gcodeText })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        appendToTerminal(`Server response: ${data.message}`, false);
+                    } else {
+                        appendToTerminal(`Error: ${data.error || 'Unknown Error'}`, false);
+                    }
+                })
+                .catch(error => {
+                    appendToTerminal(`Network Error: ${error.message}`, false);
+                })
+                .finally(() => {
+                    sendButton.disabled = false;
+                    sendButton.textContent = "Send Commands";
+                });
+            }
+        }
+
+        // --- NEW Function for sending one manual line ---
+        function sendManualLine() {
+            if (!isManualJobActive || manualCurrentLineIndex >= manualGcodeLines.length) {
+                if(isManualJobActive) appendToTerminal("Manual job finished.", false);
+                resetManualJobState();
+                return;
+            }
+            
+            const nextButton = document.getElementById('nextLineButton');
+            const line = manualGcodeLines[manualCurrentLineIndex];
+            
+            // Disable button while sending
+            nextButton.disabled = true;
+            nextButton.textContent = "Sending...";
+            
+            appendToTerminal(`Sending line ${manualCurrentLineIndex + 1}/${manualGcodeLines.length}: ${line}`, true);
+
+            fetch("/send_single_gcode_line", { // NEW ENDPOINT
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ gcode: gcodeText })
+                body: JSON.stringify({ gcode_line: line })
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    appendToTerminal(`Server response: ${data.message}`, false);
+                    appendToTerminal(`Server ACK: ${data.message}`, false);
+                    manualCurrentLineIndex++; // Only increment on success
+                    
+                    if (manualCurrentLineIndex >= manualGcodeLines.length) {
+                        appendToTerminal("Manual job finished.", false);
+                        resetManualJobState();
+                    }
                 } else {
-                    appendToTerminal(`Error: ${data.error || 'Unknown Error'}`, false);
+                    appendToTerminal(`Error on line ${manualCurrentLineIndex + 1}: ${data.error || 'Unknown Error'}`, false);
+                    appendToTerminal("Aborting manual job.", false);
+                    resetManualJobState(); // Abort on error
                 }
             })
             .catch(error => {
                 appendToTerminal(`Network Error: ${error.message}`, false);
+                appendToTerminal("Aborting manual job.", false);
+                resetManualJobState(); // Abort on error
             })
             .finally(() => {
-                // === BUTTON TEXT CHANGED ===
-                // Re-enable the button after the server responds
-                sendButton.disabled = false;
-                sendButton.textContent = "Send Commands";
+                if (isManualJobActive) { // Don't re-enable if job just finished
+                    nextButton.disabled = false;
+                    nextButton.textContent = `Send Next (${manualCurrentLineIndex + 1}/${manualGcodeLines.length})`;
+                }
             });
         }
+
+        // --- NEW Helper to reset UI ---
+        function resetManualJobState() {
+            isManualJobActive = false;
+            manualGcodeLines = [];
+            manualCurrentLineIndex = 0;
+            
+            const sendButton = document.getElementById('send-to-table-btn');
+            sendButton.disabled = false;
+            sendButton.textContent = document.getElementById('manualModeCheckbox').checked ? "Start Manual Job" : "Send Commands";
+            
+            document.getElementById('manualModeCheckbox').disabled = false;
+            
+            const nextButton = document.getElementById('nextLineButton');
+            nextButton.style.display = 'none';
+            nextButton.textContent = "Send Next Line";
+        }
+
 
         // --- Initialization ---
         document.addEventListener('DOMContentLoaded', () => {
@@ -507,10 +670,23 @@ G1 X101.600 Y101.600
             updateThemeIcon(savedTheme);
             
             appendToTerminal("System ready. Bulk command page initialized.", false);
+            
+            // --- NEW: Add listener to update button text ---
+            const manualCheckbox = document.getElementById('manualModeCheckbox');
+            const sendButton = document.getElementById('send-to-table-btn');
+            if (manualCheckbox && sendButton) {
+                manualCheckbox.addEventListener('change', (e) => {
+                    if (e.target.checked) {
+                        sendButton.textContent = "Start Manual Job";
+                    } else {
+                        sendButton.textContent = "Send Commands";
+                    }
+                });
+            }
         });
     </script>
 
-   <script>
+    <script>
         // --- Fixed Constants ---
         const L1_LENGTH = 101.6;
         const L2_LENGTH = 101.6;
@@ -521,6 +697,9 @@ G1 X101.600 Y101.600
         const Q2_OFFSET_DEG = 180; // Arm 2 "0" is 180deg (Folded)
         const EPSILON = 1e-6; // Small value for float comparison
         const SEGMENT_LENGTH = 5.0; // Max length (mm) of a sub-move for interpolation
+
+        // ... (The entire calculator script remains unchanged) ...
+        // ... (getCalculatorElements, toDegrees, calculateIK, etc.) ...
 
         // --- DOM Elements ---
         function getCalculatorElements() {
@@ -1004,6 +1183,7 @@ G1 X101.600 Y101.600
 
         // --- Initial Setup ---
         document.addEventListener('DOMContentLoaded', () => {
+            // The calculator script will only run if it finds the 'convertButton'
             const { convertButton, stepSlider } = getCalculatorElements();
             
             if (convertButton) {
@@ -1012,10 +1192,13 @@ G1 X101.600 Y101.600
                 window.addEventListener('resize', resizeCanvas);
                 setupCopyButton();
                 
+                // === CANVAS FIX ===
+                // Wait a tiny moment for the CSS to paint the layout,
+                // then get the canvas size and do the first render.
                 setTimeout(() => {
                     resizeCanvas();
                     handleConversion(); // Run once on load
-                }, 100);
+                }, 100); // 100ms delay
             }
         });
     </script>
