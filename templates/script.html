@@ -850,6 +850,10 @@ G1 X203.2 Y0
             els.warningMessages.classList.add('hidden');
             els.warningMessages.querySelector('ul').innerHTML = '';
             globalPathSegments = []; // Clear previous path
+            
+            // *** FIX: Moved these declarations up ***
+            let outputGcode = [];
+            let warnings = []; // Store warnings here
 
             if (isNaN(currentX) || isNaN(currentY)) {
                 els.warningMessages.querySelector('ul').innerHTML = '<li>Invalid Initial Start Position.</li>';
@@ -870,6 +874,7 @@ G1 X203.2 Y0
             if (initialIK.isClamped) {
                 currentX = initialIK.clampedX;
                 currentY = initialIK.clampedY;
+                // *** FIX: This line will now work ***
                 warnings.push(`Warning: Initial position was unreachable, clamped to (${currentX.toFixed(2)}, ${currentY.toFixed(2)}).`);
             }
             // Store the starting state for drawing step 0
@@ -880,8 +885,6 @@ G1 X203.2 Y0
                 endAngles: currentAngles
             };
 
-            let outputGcode = [];
-            let warnings = []; // Store warnings here
             
             for (const [index, line] of lines.entries()) {
                 const trimmedLine = line.trim();
