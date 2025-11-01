@@ -924,7 +924,7 @@ G1 X101.600 Y101.600
         const Q1_OFFSET_DEG = 90;  // Arm 1 "0" is 90deg (Up)
         const Q2_OFFSET_DEG = 180; // Arm 2 "0" is 180deg (Folded)
         const EPSILON = 1e-6; // Small value for float comparison
-        const SEGMENT_LENGTH = 5.0; // Max length (mm) of a sub-move for interpolation
+        // const SEGMENT_LENGTH = 5.0; // NO LONGER NEEDED
 
         // --- DOM Elements ---
         function getCalculatorElements() {
@@ -1092,14 +1092,22 @@ G1 X101.600 Y101.600
             ctx.scale(1, -1); // Flip Y-axis
 
             for (const segment of segments) {
+                // Do not draw "prep" moves, which have same start/end
+                if (segment.startX === segment.endX && segment.startY === segment.endY) {
+                    continue;
+                }
                 ctx.beginPath();
                 ctx.moveTo(segment.startX * scale, segment.startY * scale);
                 ctx.lineTo(segment.endX * scale, segment.endY * scale);
-                ctx.strokeStyle = segment.isClamped ? '#ef4444' : '#22c55e'; // red-500 or green-500
+                
+                // We're not interpolating, so all lines are "complex" arcs
+                // Let's color them differently
+                ctx.strokeStyle = segment.isClamped ? '#ef4444' : '#f97316'; // red-500 or orange-500
                 ctx.lineWidth = 2;
+                ctx.setLineDash([2, 4]); // Draw arcs as dashed lines
                 ctx.stroke();
             }
-            
+            ctx.setLineDash([]);
             ctx.restore();
         }
         
@@ -1177,17 +1185,16 @@ G1 X101.600 Y101.600
             drawPathSegments(segmentsToDraw);
 
             let finalX, finalY, finalSolution;
-            const preferredSolution = document.querySelector('input[name="solution"]:checked').value;
             
             if (stepIndex === 0) {
-                finalX = parseFloat(initialXInput.value || "203.6");
+                finalX = parseFloat(initialXInput.value || "203.2");
                 finalY = parseFloat(initialYInput.value || "0");
-                finalSolution = preferredSolution; // Use the radio button at the start
+                finalSolution = document.querySelector('input[name="solution"]:checked').value;
             } else {
                 const lastSegment = segmentsToDraw[stepIndex - 1];
                 finalX = lastSegment.endX;
                 finalY = lastSegment.endY;
-                finalSolution = lastSegment.endSolution; // Use the solution from that segment
+                finalSolution = lastSegment.endSolution; // Use the solution we ended up with
             }
             
             drawArmAtPosition(finalX, finalY, finalSolution);
@@ -1213,7 +1220,19 @@ G1 X101.600 Y101.600
             return { gcode, motor1_steps, motor2_steps };
         }
 
-        // --- *NEW* Main Conversion Logic (Smart Interpolation v3) ---
+        // --- HELPER: Calculates the "cost" (sum of squared motor change) ---
+        function getAngleCost(anglesA, anglesB) {
+            const delta_q1_deg = toDegrees(anglesB.q1 - anglesA.q1);
+            const delta_q2_deg = toDegrees(anglesB.q2 - anglesA.q2);
+            
+            const delta_motor1_deg = delta_q1_deg;
+            const delta_motor2_deg = delta_q1_deg + delta_q2_deg;
+            
+            // Return sum of squares
+            return (delta_motor1_deg * delta_motor1_deg) + (delta_motor2_deg * delta_motor2_deg);
+        }
+
+        // --- *NEW* Main Conversion Logic (Lookahead at (0,0) only) ---
         function handleConversion() {
             const els = getCalculatorElements();
             if (!els.inputGcodeEl || !els.initialXInput || !els.initialYInput || !els.warningIndicator || !els.warningMessages || !els.outputGcodeEl || !els.stepSlider) {
@@ -1222,9 +1241,11 @@ G1 X101.600 Y101.600
 
             const inputGcode = els.inputGcodeEl.value;
             const lines = inputGcode.split('\n');
-            const preferredSolution = document.querySelector('input[name="solution"]:checked').value;
             
-            let currentX = parseFloat(els.initialXInput.value || "203.6");
+            // Get the user's *initial* preferred solution
+            let currentSolution = document.querySelector('input[name="solution"]:checked').value;
+            
+            let currentX = parseFloat(els.initialXInput.value || "203.2");
             let currentY = parseFloat(els.initialYInput.value || "0");
             
             // --- Reset state ---
@@ -1241,154 +1262,120 @@ G1 X101.600 Y101.600
             let outputGcode = [];
             let warnings = [];
             
-            // --- Get Initial Angle State ---
-            let startResult = calculateIK(L1_LENGTH, L2_LENGTH, currentX, currentY);
-            if (startResult.isClamped) {
-                 warnings.push(`Initial position (${currentX}, ${currentY}) is unreachable, clamped to (${startResult.clampedX.toFixed(2)}, ${startResult.clampedY.toFixed(2)}).`);
-                 currentX = startResult.clampedX;
-                 currentY = startResult.clampedY;
-            }
-            let currentAngles = (preferredSolution === 'down') ? startResult.solution1 : startResult.solution2;
-            
-            // --- Iterate through G-code lines ---
+            // --- Step 1: Parse all valid G1 commands first ---
+            const g1Commands = [];
             for (const [index, line] of lines.entries()) {
                 const trimmedLine = line.trim();
                 const g1Match = trimmedLine.toUpperCase().match(/^G1\s+/);
-
                 if (g1Match) {
                     const xMatch = trimmedLine.match(/X\s*(-?[\d\.]+)/i);
                     const yMatch = trimmedLine.match(/Y\s*(-?[\d\.]+)/i);
-
-                    if (!xMatch && !yMatch) continue; // Skip G1 with no move
-
-                    const targetX = xMatch ? parseFloat(xMatch[1]) : currentX;
-                    const targetY = yMatch ? parseFloat(yMatch[1]) : currentY;
-
-                    const deltaX = targetX - currentX;
-                    const deltaY = targetY - currentY;
-                    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-
-                    if (distance < EPSILON) continue; // No move
-
-                    // --- NEW "SMART" LOGIC (v3) ---
-                    let isSimpleRadial = false;
-                    const startDist = Math.sqrt(currentX * currentX + currentY * currentY);
-                    const endDist = Math.sqrt(targetX * targetX + targetY * targetY);
-
-                    // A move is "simple" ONLY IF:
-                    // 1. It does NOT start at the origin (0,0)
-                    // 2. It does NOT end at the origin (0,0)
-                    // 3. Its angle relative to the origin does not change
-                    if (startDist > EPSILON && endDist > EPSILON) {
-                        const startAngle = Math.atan2(currentY, currentX);
-                        const endAngle = Math.atan2(targetY, targetX);
-                        
-                        // Check if angles are the same
-                        const angleDiff = Math.abs(startAngle - endAngle);
-                        
-                        // Also check if they are 180 deg apart (e.g. 100,0 to -100,0)
-                        const antiAngleDiff = Math.abs(angleDiff - Math.PI);
-
-                        if (angleDiff < EPSILON || antiAngleDiff < EPSILON) {
-                            isSimpleRadial = true;
-                        }
+                    if (xMatch || yMatch) {
+                        g1Commands.push({ line: trimmedLine, index: index + 1, xMatch, yMatch });
                     }
-                    // ANY move starting at or ending at (0,0) will have
-                    // isSimpleRadial = false, and will be INTERPOLATED.
-                    // --- END NEW LOGIC ---
+                }
+            }
 
-                    if (isSimpleRadial) {
-                        // --- TYPE 1: SIMPLE RADIAL MOVE ---
-                        console.log(`Line ${index + 1}: Simple Radial move detected. Using 1 command.`);
+            // --- Step 2: Iterate through the parsed commands with lookahead ---
+            for (let i = 0; i < g1Commands.length; i++) {
+                const command = g1Commands[i];
+                const nextCommand = (i + 1 < g1Commands.length) ? g1Commands[i+1] : null;
 
-                        const endResult = calculateIK(L1_LENGTH, L2_LENGTH, targetX, targetY);
-                        
-                        if (endResult.isClamped) {
-                            warnings.push(`Line ${index + 1} ('${trimmedLine}'): Target unreachable, clamped to (${endResult.clampedX.toFixed(2)}, ${endResult.clampedY.toFixed(2)}).`);
-                        }
-                        
-                        const endAngles = (preferredSolution === 'down') ? endResult.solution1 : endResult.solution2;
-                        const gcode = calculateGcode(currentAngles, endAngles);
-                        
-                        if (gcode.gcode) {
-                            outputGcode.push(gcode.gcode);
-                        }
+                const P_start = { x: currentX, y: currentY };
+                
+                // Determine target (P_mid)
+                const targetX = command.xMatch ? parseFloat(command.xMatch[1]) : currentX;
+                const targetY = command.yMatch ? parseFloat(command.yMatch[1]) : currentY;
+                const P_mid = { x: targetX, y: targetY };
 
-                        // Store one single segment for drawing
-                        globalPathSegments.push({
-                            startX: currentX,
-                            startY: currentY,
-                            endX: endResult.clampedX,
-                            endY: endResult.clampedY,
-                            isClamped: endResult.isClamped,
-                            endSolution: preferredSolution
-                        });
+                // --- Calculate IK for this move (A -> B) ---
+                const startResult = calculateIK(L1_LENGTH, L2_LENGTH, P_start.x, P_start.y);
+                const midResult = calculateIK(L1_LENGTH, L2_LENGTH, P_mid.x, P_mid.y);
 
-                        // Update state for next G1 line
-                        currentX = endResult.clampedX;
-                        currentY = endResult.clampedY;
-                        currentAngles = endAngles;
+                if (startResult.error || midResult.error) {
+                    warnings.push(`Line ${command.index} ('${command.line}'): Calculation failed.`);
+                    continue;
+                }
+                if (midResult.isClamped) {
+                    warnings.push(`Line ${command.index} ('${command.line}'): Target unreachable, clamped to (${midResult.clampedX.toFixed(2)}, ${midResult.clampedY.toFixed(2)}).`);
+                }
+
+                // Get angles based on the *current* solution
+                const startAngles = (currentSolution === 'down') ? startResult.solution1 : startResult.solution2;
+                const midAngles_current = (currentSolution === 'down') ? midResult.solution1 : midResult.solution2;
+                
+                // --- Add G-code for the A -> B move ---
+                const moveGcode = calculateGcode(startAngles, midAngles_current);
+                if(moveGcode.gcode) outputGcode.push(moveGcode.gcode);
+                
+                globalPathSegments.push({
+                    startX: P_start.x,
+                    startY: P_start.y,
+                    endX: midResult.clampedX,
+                    endY: midResult.clampedY,
+                    isClamped: midResult.isClamped,
+                    endSolution: currentSolution // Solution we *arrived* with
+                });
+
+                // Update current position to the (potentially clamped) midpoint
+                currentX = midResult.clampedX;
+                currentY = midResult.clampedY;
+
+                // --- Lookahead Logic: Decide if a "prep" move is needed at P_mid ---
+                
+                // Check if we are at the origin
+                const atOrigin = (currentX * currentX + currentY * currentY) < EPSILON;
+
+                if (nextCommand && atOrigin) {
+                    console.log(`Lookahead: At origin (0,0), checking for prep move.`);
+                    // Determine next target (P_end)
+                    const nextTargetX = nextCommand.xMatch ? parseFloat(nextCommand.xMatch[1]) : currentX; // Start from new currentX
+                    const nextTargetY = nextCommand.yMatch ? parseFloat(nextCommand.yMatch[1]) : currentY; // Start from new currentY
+                    const P_end = { x: nextTargetX, y: nextTargetY };
+
+                    const endResult = calculateIK(L1_LENGTH, L2_LENGTH, P_end.x, P_end.y);
+                    if (endResult.error) {
+                        warnings.push(`Lookahead for Line ${nextCommand.index} failed.`);
+                        continue;
+                    }
+
+                    // Get the *other* solution for P_mid
+                    const otherSolution = (currentSolution === 'up') ? 'down' : 'up';
+                    const midAngles_other = (otherSolution === 'down') ? midResult.solution1 : midResult.solution2;
                     
+                    // Get both potential solution angles for P_end
+                    const endAngles_current = (currentSolution === 'down') ? endResult.solution1 : endResult.solution2;
+                    const endAngles_other = (otherSolution === 'down') ? endResult.solution1 : endResult.solution2;
+
+                    // Calculate cost of B -> C (staying on current solution)
+                    const cost_stay = getAngleCost(midAngles_current, endAngles_current);
+                    
+                    // Calculate cost of B -> C (switching to other solution)
+                    const cost_switch = getAngleCost(midAngles_other, endAngles_other);
+
+                    // --- Decision ---
+                    if (cost_switch < cost_stay) {
+                        console.log(`Lookahead: Prep move is cheaper. Adding.`);
+                        // It's "cheaper" to switch. Add the prep move.
+                        const prepGcode = calculateGcode(midAngles_current, midAngles_other);
+                        if(prepGcode.gcode) outputGcode.push(prepGcode.gcode + ` ; Prep move at (0,0)`);
+
+                        // Add a "dummy" segment for the slider (no length, but holds new solution)
+                        globalPathSegments.push({
+                            startX: currentX, startY: currentY,
+                            endX: currentX, endY: currentY,
+                            isClamped: false,
+                            endSolution: otherSolution // Solution we are *switching* to
+                        });
+                        
+                        // CRITICAL: Update the current solution for the *next* loop iteration
+                        currentSolution = otherSolution;
                     } else {
-                        // --- TYPE 2: COMPLEX ARC MOVE ---
-                        // (Includes all moves to/from the origin)
-                        console.log(`Line ${index + 1}: Complex move detected (dist ${distance.toFixed(1)}mm). Interpolating...`);
-                        
-                        const numSegments = Math.ceil(distance / SEGMENT_LENGTH);
-                        const stepX = deltaX / numSegments;
-                        const stepY = deltaY / numSegments;
-
-                        let segmentStartX = currentX;
-                        let segmentStartY = currentY;
-
-                        for (let i = 1; i <= numSegments; i++) {
-                            const segmentTargetX = currentX + (stepX * i);
-                            const segmentTargetY = currentY + (stepY * i);
-
-                            const segmentResult = calculateIK(L1_LENGTH, L2_LENGTH, segmentTargetX, segmentTargetY);
-                            
-                            let segmentClamped = segmentResult.isClamped;
-                            if (segmentClamped) {
-                                // Only warn once per G1 line
-                                if (i === 1 || !warnings[warnings.length-1].startsWith(`Line ${index + 1}`)) {
-                                    warnings.push(`Line ${index + 1} ('${trimmedLine}'): Move segment clamped to (${segmentResult.clampedX.toFixed(2)}, ${segmentResult.clampedY.toFixed(2)}).`);
-                                }
-                            }
-                            
-                            const newAngles = (preferredSolution === 'down') ? segmentResult.solution1 : segmentResult.solution2;
-                            const gcode = calculateGcode(currentAngles, newAngles);
-                            
-                            if (gcode.gcode) {
-                                outputGcode.push(gcode.gcode);
-                            }
-
-                            // Store for drawing
-                            globalPathSegments.push({
-                                startX: segmentStartX,
-                                startY: segmentStartY,
-                                endX: segmentResult.clampedX,
-                                endY: segmentResult.clampedY,
-                                isClamped: segmentClamped,
-                                endSolution: preferredSolution
-                            });
-
-                            // Update state for next *segment*
-                            segmentStartX = segmentResult.clampedX;
-                            segmentStartY = segmentResult.clampedY;
-                            currentAngles = newAngles;
-                            
-                            if (segmentClamped) {
-                                break; // Stop interpolating this line if clamped
-                            }
-                        }
-                        
-                        // Update current position for next *G1 line*
-                        const finalResult = calculateIK(L1_LENGTH, L2_LENGTH, targetX, targetY);
-                        currentX = finalResult.clampedX;
-                        currentY = finalResult.clampedY;
-                        currentAngles = (preferredSolution === 'down') ? finalResult.solution1 : finalResult.solution2;
+                        console.log(`Lookahead: Staying with current solution is cheaper. No prep move.`);
                     }
-                } // end if(g1Match)
+                } else if (nextCommand) {
+                    console.log(`Lookahead: Not at origin. Prep move disabled.`);
+                }
             } // --- End of for loop ---
 
             // --- Finalize ---
