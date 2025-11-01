@@ -147,11 +147,11 @@ def led_controls():
 def script():
     return render_template("script.html")
 
-# --- NEW G-CODE BLOCK FUNCTIONALITY ---
+# --- G-CODE BLOCK FUNCTIONALITY ---
 
 def process_and_send_gcode(gcode_block):
     """
-    (RUNS IN A THREAD)
+    (RUNS IN A THREAD - FOR AUTO-DRIP MODE)
     Parses a block of text and sends valid G1 commands to Arduino
     one by one, with a delay.
     """
@@ -160,7 +160,7 @@ def process_and_send_gcode(gcode_block):
         return
     
     lines = gcode_block.split('\n')
-    log_message(f"Received G-code block with {len(lines)} lines. Starting to send...")
+    log_message(f"Received G-code block with {len(lines)} lines. Starting auto-drip...")
     
     for line_num, line in enumerate(lines):
         # Remove whitespace and comments
@@ -176,15 +176,13 @@ def process_and_send_gcode(gcode_block):
                 
                 # --- This is the "slow feed" ---
                 # Wait for the Arduino to process.
-                # You may need to TUNE this 0.05s value.
-                # Increase it if Arduino misses commands.
                 time.sleep(0.05) 
             except Exception as e:
                 log_message(f"SERIAL ERROR while sending line {line_num + 1}: {e}")
                 log_message("Aborting G-code block.")
                 break # Stop sending if there's an error
         elif clean_line:
-            # Log lines that are skipped (e.g., G28, M105, or empty)
+            # Log lines that are skipped
             log_message(f"Skipping line {line_num + 1}: {clean_line}")
     
     log_message("Finished sending G-code block.")
@@ -192,7 +190,7 @@ def process_and_send_gcode(gcode_block):
 @app.route("/send_gcode_block", methods=["POST"])
 def send_gcode_block_route():
     """
-    API endpoint to receive a block of G-code text from the browser.
+    API endpoint for AUTO-DRIP mode.
     Starts the sending process in a background thread.
     """
     data = request.json
@@ -205,13 +203,41 @@ def send_gcode_block_route():
          return jsonify(success=False, error="Arduino not connected."), 500
 
     # Run the sending process in a background thread
-    # This makes the web page responsive immediately.
     threading.Thread(target=process_and_send_gcode, args=(gcode_block,), daemon=True).start()
 
     # Return an immediate success message to the browser
-    return jsonify(success=True, message="G-code block received and is being sent to the Arduino.")
+    return jsonify(success=True, message="G-code block received and is being sent (auto-drip).")
 
-# --- END OF NEW G-CODE BLOCK FUNCTIONALITY ---
+# --- NEW: ENDPOINT FOR MANUAL STEP-BY-STEP ---
+@app.route("/send_single_gcode_line", methods=["POST"])
+def send_single_gcode_line_route():
+    """
+    API endpoint for MANUAL mode.
+    Sends one G-code line and returns.
+    """
+    data = request.json
+    gcode_line = data.get("gcode_line")
+
+    if not gcode_line:
+        return jsonify(success=False, error="No G-code line received."), 400
+    
+    if not arduino_connected:
+        return jsonify(success=False, error="Arduino not connected."), 500
+
+    # Validate it's a G1 command
+    clean_line = gcode_line.strip()
+    if not clean_line.upper().startswith('G1'):
+         return jsonify(success=False, error="Invalid line. Only G1 commands allowed."), 400
+
+    try:
+        with lock: # Use the lock for thread-safe writing
+            arduino.write((clean_line + "\n").encode())
+        log_message(f"Sent (Manual): {clean_line}")
+        return jsonify(success=True, message=f"Sent: {clean_line}")
+    except Exception as e:
+        log_message(f"SERIAL ERROR (Manual) while sending line: {e}")
+        return jsonify(success=False, error=str(e)), 500
+# --- END OF NEW ENDPOINT ---
 
 
 @app.route("/send", methods=["POST"])
@@ -244,7 +270,10 @@ def send_command():
                     future.result(timeout=5)
             elif arduino_connected:
                 # --- SERIAL COMMANDS (Single) ---
-                arduino.write((cmd + "\n").encode())
+                # NOTE: This is NOT used by the new manual G-code feature.
+                # This is for other single commands (e.g., from index.html)
+                with lock:
+                    arduino.write((cmd + "\n").encode())
             else:
                 log_message(f"Warning: Command '{cmd}' received but no device connected.")
                 return jsonify(success=False, error="No device connected to send command to."), 500
