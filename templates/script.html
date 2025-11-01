@@ -1,57 +1,3 @@
-This is an excellent idea, and I understand exactly what you want. You want to keep your "sand table" theme (with the sidebar, dark mode, and terminal) on the script.html page, but replace the simple text box with your new, powerful IK calculator.
-The best way to do this is to load your new calculator inside the script.html page using an <iframe>. This keeps the two projects separate but lets them work together.
-Here is a complete, step-by-step plan to make this work.
-Step 1: Create calculator.html
-Take the entire HTML file you just gave me (the one with Tailwind CSS and all the IK logic) and save it in your templates/ folder.
- * File Name: calculator.html
- * Location: templates/calculator.html
-(You don't need to change anything in this file. It's perfect as-is.)
-Step 2: Update app.py
-We need to tell Flask about this new calculator.html page so the <iframe> can load it.
-Add the new @app.route("/calculator") function to your APP ROUTES block. The final block should look like this:
-# ---------------- APP ROUTES ----------------
-@app.route("/")
-def index():
-    if not arduino_connected:
-        return render_template("connect.html")
-    # This is the main page for "Manual Command"
-    return render_template("index.html") 
-
-@app.route("/script")
-def script():
-    if not arduino_connected:
-        return render_template("connect.html")
-    # This is the page for "Bulk Commands"
-    return render_template("script.html")
-
-# --- NEW ROUTE FOR THE CALCULATOR ---
-@app.route("/calculator")
-def calculator():
-    # This page will be loaded *inside* the script.html iframe
-    return render_template("calculator.html")
-# --- END OF NEW ROUTE ---
-
-@app.route("/terminal")
-def terminal():
-    if not arduino_connected:
-        return render_template("connect.html")
-    return render_template("terminal.html")
-
-@app.route("/led_controls")
-def led_controls():
-    return render_template("led_controls.html")
-
-# --- NEW G-CODE BLOCK FUNCTIONALITY ---
-# (Your process_and_send_gcode and send_gcode_block_route functions go here...)
-# (No changes are needed for these functions. They will work perfectly.)
-
-Save app.py and restart your server (press Ctrl+C and run python3 app.py) for this change to take effect.
-Step 3: Replace script.html
-This is the final step. We will replace your entire script.html file with the code below.
-This new file does two things:
- * It removes the old <textarea> and replaces it with an <iframe> that loads your calculator.html.
- * It replaces the old sendGcode() JavaScript function with a new sendGcodeFromIframe() function that "reaches into" the iframe, grabs the G-code from the outputGcode box, and sends it to your (already existing) /send_gcode_block route.
-Complete script.html (Copy/Paste this)
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -61,202 +7,228 @@ Complete script.html (Copy/Paste this)
     <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
     <link rel="apple-touch-icon" sizes="512x512" href="{{ url_for('static', filename='icons/icon-512.png') }}">
     
-  <style>
-    /* --- Root Variables (Light Mode) --- */
-    :root {
-        --color-primary: #d2b48c; /* Khaki/Tan (Button/Sidebar Background) */
-        --color-secondary: #b08d5c; /* Darker Tan (Button Hover/Accent) */
-        --color-background: #f0f0f0; /* Light Gray Background */
-        --color-surface: #ffffff; /* White Card/Container Background */
-        --color-text: #333333;
-        --color-shadow: rgba(0, 0, 0, 0.08);
-        --color-icon: #000000;
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        /* --- Root Variables (Light Mode) --- */
+        :root {
+            --color-primary: #d2b48c; /* Khaki/Tan (Button/Sidebar Background) */
+            --color-secondary: #b08d5c; /* Darker Tan (Button Hover/Accent) */
+            --color-background: #f0f0f0; /* Light Gray Background */
+            --color-surface: #ffffff; /* White Card/Container Background */
+            --color-text: #333333;
+            --color-shadow: rgba(0, 0, 0, 0.08);
+            --color-icon: #000000;
+            
+            /* Terminal Colors (Light) */
+            --color-terminal-bg: #e9e9e9;
+            --color-terminal-text: #333333;
+            --color-terminal-prompt: #008080; /* Teal/Cyan */
+            
+            --border-radius: 12px;
+        }
+
+        /* --- Dark Mode Variables --- */
+        body[data-theme='dark'] {
+            --color-background: #1e1e1e;
+            --color-surface: #2c2c2c;
+            --color-text: #e0e0e0;
+            --color-shadow: rgba(255, 255, 255, 0.08);
+            --color-icon: #ffffff;
+            
+            /* Terminal Colors (Dark) */
+            --color-terminal-bg: #1a1a1a;
+            --color-terminal-text: #cccccc;
+            --color-terminal-prompt: #98fb98; /* Pale Green */
+        }
         
-        /* Terminal Colors (Light) */
-        --color-terminal-bg: #e9e9e9;
-        --color-terminal-text: #333333;
-        --color-terminal-prompt: #008080; /* Teal/Cyan */
+        /* --- Base Styles --- */
+        /* Tailwind's 'bg-gray-100' will be overridden by this, which is good */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--color-background);
+            color: var(--color-text);
+            padding: 0;
+            margin: 0;
+            transition: background 0.3s, color 0.3s;
+        }
+
+        /* --- Sidebar & Header --- */
+        .sidebar {
+            height: 100%; width: 0; position: fixed; top: 0; left: 0;
+            background-color: var(--color-primary); overflow-x: hidden;
+            transition: 0.3s; padding-top: 60px; z-index: 1000;
+            box-shadow: 2px 0 5px var(--color-shadow);
+        }
+
+        .sidebar a {
+            padding: 15px 24px; text-decoration: none; font-size: 18px;
+            color: var(--color-text); display: block; transition: 0.2s;
+            font-weight: 500;
+        }
+
+        .sidebar a:hover {
+            background-color: var(--color-secondary);
+            color: var(--color-surface);
+        }
+
+        .openbtn {
+            font-size: 26px; cursor: pointer; background-color: var(--color-primary);
+            color: var(--color-text); padding: 10px 20px; border: none;
+            border-radius: 0 0 var(--border-radius) 0; position: fixed;
+            top: 0; left: 0; z-index: 1100; box-shadow: 0 2px 5px var(--color-shadow);
+        }
         
-        --border-radius: 12px;
-    }
-
-    /* --- Dark Mode Variables --- */
-    body[data-theme='dark'] {
-        --color-background: #1e1e1e;
-        --color-surface: #2c2c2c;
-        --color-text: #e0e0e0;
-        --color-shadow: rgba(255, 255, 255, 0.08);
-        --color-icon: #ffffff;
+        /* --- Theme Toggle Button --- */
+        #themeToggle {
+            position: fixed; top: 15px; right: 15px; background: var(--color-surface);
+            color: var(--color-icon); border: 1px solid var(--color-icon);
+            padding: 8px 15px; border-radius: 20px; z-index: 1200;
+            transition: background 0.3s, color 0.3s, border-color 0.3s;
+        }
         
-        /* Terminal Colors (Dark) */
-        --color-terminal-bg: #1a1a1a;
-        --color-terminal-text: #cccccc;
-        --color-terminal-prompt: #98fb98; /* Pale Green */
-    }
-    
-    /* --- Base Styles --- */
-    body {
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        background: var(--color-background);
-        color: var(--color-text);
-        padding: 0;
-        margin: 0;
-        transition: background 0.3s, color 0.3s;
-    }
-
-    /* --- Sidebar & Header --- */
-    .sidebar {
-        height: 100%; width: 0; position: fixed; top: 0; left: 0;
-        background-color: var(--color-primary); overflow-x: hidden;
-        transition: 0.3s; padding-top: 60px; z-index: 1000;
-        box-shadow: 2px 0 5px var(--color-shadow);
-    }
-
-    .sidebar a {
-        padding: 15px 24px; text-decoration: none; font-size: 18px;
-        color: var(--color-text); display: block; transition: 0.2s;
-        font-weight: 500;
-    }
-
-    .sidebar a:hover {
-        background-color: var(--color-secondary);
-        color: var(--color-surface);
-    }
-
-    .openbtn {
-        font-size: 26px; cursor: pointer; background-color: var(--color-primary);
-        color: var(--color-text); padding: 10px 20px; border: none;
-        border-radius: 0 0 var(--border-radius) 0; position: fixed;
-        top: 0; left: 0; z-index: 1100; box-shadow: 0 2px 5px var(--color-shadow);
-    }
-    
-    /* --- Theme Toggle Button --- */
-    #themeToggle {
-        position: fixed; top: 15px; right: 15px; background: var(--color-surface);
-        color: var(--color-icon); border: 1px solid var(--color-icon);
-        padding: 8px 15px; border-radius: 20px; z-index: 1200;
-        transition: background 0.3s, color 0.3s, border-color 0.3s;
-    }
-    
-    .main-content {
-        margin-left: 0; transition: margin-left 0.3s; padding: 20px;
-        max-width: 800px; margin: 0 auto;
-        /* --- CHANGED: Allow main content to be wider for the calculator --- */
-        max-width: 1200px;
-    }
-
-    h1 {
-        text-align: center; margin-top: 20px; margin-bottom: 30px;
-        font-weight: 300; color: var(--color-secondary);
-    }
-    
-    h2 {
-        font-weight: 400;
-        margin-top: 30px;
-        border-bottom: 1px solid var(--color-shadow);
-        padding-bottom: 10px;
-    }
-
-    .header-image {
-        width: 100%; max-height: 250px; object-fit: cover;
-        border-radius: var(--border-radius); margin-bottom: 30px;
-        box-shadow: 0 4px 15px var(--color-shadow);
-    }
-    
-    /* --- Main Control Container --- */
-    .control-panel {
-        background-color: var(--color-surface); padding: 30px;
-        border-radius: var(--border-radius); box-shadow: 0 4px 10px var(--color-shadow);
-        margin-bottom: 30px;
-    }
-
-    /* --- Buttons --- */
-    button {
-        background-color: var(--color-primary); 
-        color: var(--color-text);
-        border: none; padding: 12px 25px; border-radius: 8px; font-size: 16px;
-        cursor: pointer; transition: background-color 0.2s, box-shadow 0.2s;
-        font-weight: 600;
-    }
-
-    button:hover {
-        background-color: var(--color-secondary); box-shadow: 0 2px 8px var(--color-shadow);
-    }
-    
-    button:disabled {
-        background-color: #ccc;
-        color: #777;
-        cursor: not-allowed;
-    }
-
-    /* --- NEW G-code Entry Section --- */
-    .gcode-entry-section h2 {
-        margin-top: 0;
-        padding-bottom: 15px;
-        font-weight: 400;
-        border-bottom: none;
-    }
-    
-    /* --- NEW IFRAME STYLES --- */
-    #calculator-iframe {
-        width: 100%;
-        /* The calculator is complex, so we give it a lot of space */
-        height: 800px; 
-        border: 1px solid var(--color-shadow);
-        border-radius: 8px;
-    }
-
-    /* --- Terminal --- */
-    .terminal {
-        background: var(--color-terminal-bg); color: var(--color-terminal-text);
-        font-family: 'Consolas', 'Courier New', monospace; padding: 15px;
-        border-radius: 8px; width: 100%; height: 200px; overflow-y: auto;
-        font-size: 14px; border: 1px solid var(--color-shadow);
-        white-space: pre-wrap; box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.2);
-        transition: background 0.3s, color 0.3s;
-        box-sizing: border-box;
-    }
-    
-    .terminal .prompt { color: var(--color-terminal-prompt); font-weight: bold; }
-    .terminal .response { color: var(--color-terminal-text); }
-
-
-    /* --- MOBILE RESPONSIVENESS --- */
-    @media (max-width: 600px) {
         .main-content {
-            padding: 10px;
-        }
-        .header-image {
-            max-height: 120px;
-            margin-bottom: 15px;
-        }
-        h1, h2 {
-            font-size: 1.5em;
-            margin-bottom: 15px;
-        }
-        
-        .control-panel {
-            padding: 20px;
-        }
-        
-        #calculator-iframe {
-            height: 600px; /* Still needs a lot of space */
+            margin-left: 0; transition: margin-left 0.3s; padding: 20px;
+            max-width: 1200px; /* Wide enough for calculator */
+            margin: 0 auto;
         }
 
-        .terminal {
-            height: 150px;
-            font-size: 12px;
+        h1 {
+            text-align: center; margin-top: 20px; margin-bottom: 30px;
+            font-weight: 300; color: var(--color-secondary);
         }
-    }
-</style>
-    
+        
+        h2 {
+            font-weight: 400;
+            margin-top: 30px;
+            border-bottom: 1px solid var(--color-shadow);
+            padding-bottom: 10px;
+        }
+
+        .header-image {
+            width: 100%; max-height: 250px; object-fit: cover;
+            border-radius: var(--border-radius); margin-bottom: 30px;
+            box-shadow: 0 4px 15px var(--color-shadow);
+        }
+        
+        /* --- Main Control Container --- */
+        .control-panel {
+            background-color: var(--color-surface); padding: 30px;
+            border-radius: var(--border-radius); box-shadow: 0 4px 10px var(--color-shadow);
+            margin-bottom: 30px;
+        }
+
+        /* --- Buttons --- */
+        /* This will style ALL buttons, including Tailwind ones, to match the theme */
+        button {
+            background-color: var(--color-primary); 
+            color: var(--color-text);
+            border: none; padding: 12px 25px; border-radius: 8px; font-size: 16px;
+            cursor: pointer; transition: background-color 0.2s, box-shadow 0.2s;
+            font-weight: 600;
+        }
+        button:hover {
+            background-color: var(--color-secondary);
+            box-shadow: 0 2px 8px var(--color-shadow);
+        }
+        button:disabled {
+            background-color: #ccc;
+            color: #777;
+            cursor: not-allowed;
+        }
+        
+        /* Specific button for sending to Arduino */
+        #send-to-table-btn {
+            margin-top: 25px;
+            width: 100%;
+            font-size: 1.2rem;
+            padding: 15px;
+            /* Make it stand out */
+            background-color: #3b82f6; /* blue-500 */
+            color: white;
+        }
+        #send-to-table-btn:hover {
+            background-color: #2563eb; /* blue-600 */
+        }
+
+
+        /* --- Terminal --- */
+        .terminal {
+            background: var(--color-terminal-bg); color: var(--color-terminal-text);
+            font-family: 'Consolas', 'Courier New', monospace; padding: 15px;
+            border-radius: 8px; width: 100%; height: 200px; overflow-y: auto;
+            font-size: 14px; border: 1px solid var(--color-shadow);
+            white-space: pre-wrap; box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.2);
+            transition: background 0.3s, color 0.3s;
+            box-sizing: border-box;
+        }
+        .terminal .prompt { color: var(--color-terminal-prompt); font-weight: bold; }
+        .terminal .response { color: var(--color-terminal-text); }
+        
+        /* --- Calculator-specific Styles (from your file) --- */
+        /* We prefix them with .calculator-content to avoid breaking our theme */
+        .calculator-content {
+            font-family: "Inter", sans-serif;
+            background: var(--color-surface); /* Use theme surface color */
+        }
+        .calculator-content canvas {
+            touch-action: none;
+            border: 1px solid #d1d5db; /* gray-300 */
+        }
+        .calculator-content textarea {
+            height: 300px;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 0.875rem; /* text-sm */
+            /* Make textareas match theme */
+            background: var(--color-background);
+            color: var(--color-text);
+            border: 1px solid var(--color-shadow);
+        }
+        .calculator-content input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #2563eb; /* blue-600 */
+            cursor: pointer;
+            margin-top: -6px; /* Center thumb on track */
+        }
+        .calculator-content input[type=range]::-moz-range-thumb {
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #2563eb; /* blue-600 */
+            cursor: pointer;
+        }
+        /* Override Tailwind colors to match theme */
+        body[data-theme='dark'] .calculator-content,
+        body[data-theme='dark'] .calculator-content .bg-white {
+            background: var(--color-surface) !important;
+        }
+        body[data-theme='dark'] .calculator-content .text-gray-800,
+        body[data-theme='dark'] .calculator-content .text-gray-700,
+        body[data-theme='dark'] .calculator-content .text-gray-600 {
+            color: var(--color-text) !important;
+        }
+        body[data-theme='dark'] .calculator-content .bg-gray-100,
+        body[data-theme='dark'] .calculator-content .bg-gray-50 {
+             background: var(--color-background) !important;
+        }
+        body[data-theme='dark'] .calculator-content .border,
+        body[data-theme='dark'] .calculator-content .border-gray-300,
+        body[data-theme='dark'] .calculator-content .border-gray-200 {
+            border-color: #555 !important;
+        }
+
+    </style>
 </head>
+
 <body data-theme="light">
+
     <div id="mySidebar" class="sidebar">
         <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
         <a href="{{ url_for('index') }}">Manual Command</a>
         <a href="{{ url_for('led_controls') }}">LED Controls</a>
-        <a href="{{ url_for('script') }}">Bulk Commands</a>
         <a href="{{ url_for('terminal') }}">Terminal</a>
     </div>
 
@@ -271,19 +243,118 @@ Complete script.html (Copy/Paste this)
         
         <div class="control-panel">
             
-            <div class="gcode-entry-section">
-                <h2>Bulk G-Code (from IK Calculator)</h2>
-                
-                <iframe id="calculator-iframe" src="{{ url_for('calculator') }}"></iframe>
-                
-                <button id="send-gcode-btn" onclick="sendGcodeFromIframe()" style="margin-top: 15px; width: 100%;">
-                    Send G-Code from Calculator to Table
-                </button>
-            </div>
+            <div class="calculator-content">
+                <div class="w-full max-w-7xl mx-auto bg-white rounded-lg p-6 md:p-8 grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
+
+                    <div class="flex flex-col gap-6">
+                        <div>
+                            <h1 class="text-2xl font-bold text-gray-800 mb-4">Interactive G-Code Converter</h1>
+                            
+                            <div class="p-3 bg-blue-50 border border-blue-200 rounded-md mb-4">
+                                <p class="text-sm font-medium text-blue-800">Fixed Arm Lengths</p>
+                                <p class="text-sm text-blue-700">Arm 1 (L1): <span class="font-bold">101.6</span>, Arm 2 (L2): <span class="font-bold">101.6</span></p>
+                                <p class="text-sm text-blue-700">Max Reach: <span class="font-bold">203.2</span></p>
+                            </div>
+
+                            <div class="p-3 bg-gray-100 border border-gray-200 rounded-md mb-4">
+                                <p class="text-xs text-gray-600"><span class="font-semibold">Note:</span> 'Home' `(0,0)` = `0°` (Arm 1 Up, Arm 2 Down).</p>
+                                <p class="text-xs text-yellow-600"><span class="font-semibold">Coupling:</span> 1:1 compensation (`M2=q1+q2`) is active.</p>
+                            </div>
+                            
+                            <div class="space-y-4">
+                                <fieldset class="border border-gray-300 p-3 rounded-md">
+                                    <legend class="text-sm font-medium text-gray-700 px-1">Initial Start Position</legend>
+                                    <div class="flex gap-4">
+                                        <div>
+                                            <label for="initialX" class="block text-xs font-medium text-gray-600">Start X</label>
+                                            <input type="number" id="initialX" value="101.6" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                        </div>
+                                        <div>
+                                            <label for="initialY" class="block text-xs font-medium text-gray-600">Start Y</label>
+                                            <input type="number" id="initialY" value="101.6" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                        </div>
+                                    </div>
+                                </fieldset>
+
+                                <fieldset class="border border-gray-300 p-3 rounded-md">
+                                    <legend class="text-sm font-medium text-gray-700 px-1">Preferred Solution (Constant)</legend>
+                                    <div class="flex justify-around mt-1">
+                                        <label class="flex items-center space-x-2">
+                                            <input type="radio" name="solution" value="up" class="focus:ring-green-500 h-4 w-4 text-green-600 border-gray-300" checked>
+                                            <span class="text-sm text-green-700 font-medium">Elbow Up</span>
+                                        </label>
+                                        <label class="flex items-center space-x-2">
+                                            <input type="radio" name="solution" value="down" class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300">
+                                            <span class="text-sm text-blue-700 font-medium">Elbow Down</span>
+                                        </label>
+                                    </div>
+                                </fieldset>
+                                
+                                <button id="convertButton" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md shadow transition duration-150 ease-in-out">
+                                    Convert G-Code
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="flex-grow w-full aspect-square rounded-lg overflow-hidden mt-4">
+                            <canvas id="ikCanvas" class="bg-white rounded-lg w-full h-full"></canvas>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <label for="stepSlider" class="block text-sm font-medium text-gray-700 mb-1">Step: <span id="stepLabel" class="font-bold">0 / 0</span></label>
+                            <input type="range" id="stepSlider" min="0" max="0" value="0" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col gap-6">
+                        <div>
+                            <label for="inputGcode" class="block text-sm font-medium text-gray-700 mb-1">Input G-Code (Cartesian)</label>
+                            <textarea id="inputGcode" class="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" spellcheck="false">; File name: 'sandify'
+;
+; BEGIN LAYER: 0 Polygon
+G1 X31.500 Y32.500
+G1 X-35.500 Y32.500
+G1 X-35.500 Y-34.500
+G1 X31.500 Y-34.500
+G1 X31.500 Y32.500
+; Test clamping
+G1 X100.000 Y200.000
+G1 X101.600 Y101.600
+; END LAYER: 0 Polygon
+                            </textarea>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <label for="outputGcode" class="block text-sm font-medium text-gray-700">Converted G-Code (Motor Steps)</label>
+                                <span id="warningIndicator" class="hidden text-sm font-medium text-yellow-600 flex items-center gap-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-yellow-500">
+                                      <path fill-rule="evenodd" d="M8.485 2.495c.646-1.136 2.376-1.136 3.022 0l7.25 12.72c.646 1.136-.192 2.53-1.51 2.53H2.744c-1.32 0-2.158-1.395-1.51-2.53l7.25-12.72zM9 12a1 1 0 1 1 2 0 1 1 0 0 1-2 0zm1-7a1 1 0 0 1 1 1v4a1 1 0 1 1-2 0V6a1 1 0 0 1 1-1z" clip-rule="evenodd" />
+                                    </svg>
+                                    Warnings
+                                </span>
+                            </div>
+                            <div class="relative">
+                                <textarea id="outputGcode" class="w-full p-3 border border-gray-300 bg-gray-50 rounded-md shadow-sm" readonly></textarea>
+                                <button id="copyButton" class="absolute right-3 top-3 bg-gray-700 hover:bg-gray-600 text-white text-xs font-medium py-1 px-2 rounded-md transition-all duration-150">
+                                    Copy
+                                </button>
+                                <span id="copySuccess" class="absolute right-3 top-3 text-green-500 text-xs font-medium hidden bg-gray-700 py-1 px-2 rounded-md">
+                                    Copied!
+                                </span>
+                            </div>
+                            <div id="warningMessages" class="hidden mt-2 p-3 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-md text-xs">
+                                <ul class="list-disc list-inside space-y-1">
+                                    </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div> <button id="send-to-table-btn" onclick="sendGcodeFromCalculator()">
+                Send G-Code from Calculator to Table
+            </button>
             
-        </div>
-        
-        <h2>Live Terminal Log</h2>
+        </div> <h2>Live Terminal Log</h2>
         <div id="terminal" class="terminal"></div>
     </div>
 
@@ -334,35 +405,20 @@ Complete script.html (Copy/Paste this)
             term.scrollTop = term.scrollHeight; 
         }
 
-        // --- NEW: Function to send the G-code block from the IFRAME ---
-        function sendGcodeFromIframe() {
-            const sendButton = document.getElementById('send-gcode-btn');
-            const iframe = document.getElementById('calculator-iframe');
+        // --- NEW: Function to send the G-code block from the CALCULATOR ---
+        function sendGcodeFromCalculator() {
+            const sendButton = document.getElementById('send-to-table-btn');
             let gcodeText = "";
 
             try {
-                // Access the iframe's contentWindow
-                const iframeWindow = iframe.contentWindow;
-                if (!iframeWindow) {
-                    throw new Error("Could not access iframe window.");
-                }
-                
-                // Access the document inside the iframe
-                const iframeDoc = iframeWindow.document;
-                if (!iframeDoc) {
-                    throw new Error("Could not access iframe document.");
-                }
-
-                // Get the text from the calculator's output box
-                const outputBox = iframeDoc.getElementById('outputGcode');
+                // Get the text from the calculator's output box (it's on the same page now)
+                const outputBox = document.getElementById('outputGcode');
                 if (!outputBox) {
-                    throw new Error("Could not find 'outputGcode' element in calculator.");
+                    throw new Error("Could not find 'outputGcode' element.");
                 }
-                
                 gcodeText = outputBox.value;
             } catch (e) {
                 appendToTerminal(`Error reading from calculator: ${e.message}`, false);
-                appendToTerminal("Make sure the calculator is fully loaded.", false);
                 return;
             }
 
@@ -377,6 +433,7 @@ Complete script.html (Copy/Paste this)
             
             appendToTerminal("Sending G-code block to server...", true);
 
+            // This fetch uses the SAME route as your old script.html, so app.py needs NO changes.
             fetch("/send_gcode_block", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -385,7 +442,6 @@ Complete script.html (Copy/Paste this)
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    // This message comes from app.py immediately
                     appendToTerminal(`Server response: ${data.message}`, false);
                 } else {
                     appendToTerminal(`Error: ${data.error || 'Unknown Error'}`, false);
@@ -411,6 +467,448 @@ Complete script.html (Copy/Paste this)
             appendToTerminal("System ready. Bulk command page initialized.", false);
         });
     </script>
+
+    <script>
+        // --- Fixed Constants ---
+        const L1_LENGTH = 101.6;
+        const L2_LENGTH = 101.6;
+        const MAX_REACH = L1_LENGTH + L2_LENGTH;
+        const MIN_REACH = Math.abs(L1_LENGTH - L2_LENGTH);
+        const DEG_TO_STEPS = 3200 / 360;
+        const Q1_OFFSET_DEG = 90;  // Arm 1 "0" is 90deg (Up)
+        const Q2_OFFSET_DEG = 180; // Arm 2 "0" is 180deg (Folded)
+        const EPSILON = 1e-6; // Small value for float comparison
+
+        // --- DOM Elements ---
+        const initialXInput = document.getElementById('initialX');
+        const initialYInput = document.getElementById('initialY');
+        const convertButton = document.getElementById('convertButton');
+        const inputGcodeEl = document.getElementById('inputGcode');
+        const outputGcodeEl = document.getElementById('outputGcode');
+        const copyButton = document.getElementById('copyButton');
+        const copySuccess = document.getElementById('copySuccess');
+        const canvas = document.getElementById('ikCanvas');
+        const ctx = canvas.getContext('2d');
+        const warningIndicator = document.getElementById('warningIndicator');
+        const warningMessages = document.getElementById('warningMessages');
+        const stepSlider = document.getElementById('stepSlider');
+        const stepLabel = document.getElementById('stepLabel');
+        
+        // --- State ---
+        let canvasSize = 0;
+        let scale = 1;
+        let originX = 0;
+        let originY = 0;
+        let globalPathSegments = []; // Stores the calculated path
+
+        // --- Utility Functions ---
+        function toDegrees(radians) {
+            return radians * (180 / Math.PI);
+        }
+        function toRadians(degrees) {
+            return degrees * (Math.PI / 180);
+        }
+
+        /**
+         * Calculates Inverse Kinematics for a given point.
+         * This function now also CLAMPS unreachable points.
+         * @returns {object} { solution1, solution2, clampedX, clampedY, isClamped, error }
+         */
+        function calculateIK(l1, l2, x, y) {
+            let dSq = x * x + y * y;
+            let d = Math.sqrt(dSq);
+            let clampedX = x;
+            let clampedY = y;
+            let isClamped = false;
+            
+            // --- Clamping Logic ---
+            if (d > MAX_REACH - EPSILON) {
+                isClamped = true;
+                const ratio = MAX_REACH / d;
+                clampedX = x * ratio;
+                clampedY = y * ratio;
+                d = MAX_REACH;
+                dSq = d * d;
+            } else if (d < MIN_REACH + EPSILON) {
+                if (d < EPSILON) {
+                    // At origin (0,0), which is a valid home pos.
+                } else {
+                    isClamped = true;
+                    const ratio = MIN_REACH / d;
+                    clampedX = x * ratio;
+                    clampedY = y * ratio;
+                    d = MIN_REACH;
+                    dSq = d * d;
+                }
+            }
+
+            // --- IK Calculation (on potentially clamped values) ---
+            const cosQ2 = (dSq - l1 * l1 - l2 * l2) / (2 * l1 * l2);
+            const clampedCosQ2 = Math.max(-1, Math.min(1, cosQ2));
+
+            // Handle (0,0) singularity for q1
+            if (d < EPSILON) {
+                const home_q1_rad = toRadians(Q1_OFFSET_DEG); // 90 deg
+                return {
+                    solution1: { q1: home_q1_rad, q2: Math.acos(clampedCosQ2) }, // q2 = pi
+                    solution2: { q1: home_q1_rad, q2: -Math.acos(clampedCosQ2) }, // q2 = -pi
+                    clampedX, clampedY, isClamped
+                };
+            }
+            
+            // sol1 = Elbow Down (positive q2)
+            const q2_rad_sol1 = Math.acos(clampedCosQ2);
+            // sol2 = Elbow Up (negative q2)
+            const q2_rad_sol2 = -Math.acos(clampedCosQ2);
+
+            const k1_sol1 = l1 + l2 * Math.cos(q2_rad_sol1);
+            const k2_sol1 = l2 * Math.sin(q2_rad_sol1);
+            const q1_rad_sol1 = Math.atan2(clampedY, clampedX) - Math.atan2(k2_sol1, k1_sol1);
+
+            const k1_sol2 = l1 + l2 * Math.cos(q2_rad_sol2);
+            const k2_sol2 = l2 * Math.sin(q2_rad_sol2);
+            const q1_rad_sol2 = Math.atan2(clampedY, clampedX) - Math.atan2(k2_sol2, k1_sol2);
+
+            return {
+                solution1: { q1: q1_rad_sol1, q2: q2_rad_sol1 }, // Elbow Down
+                solution2: { q1: q1_rad_sol2, q2: q2_rad_sol2 }, // Elbow Up
+                clampedX, clampedY, isClamped
+            };
+        }
+
+        // --- Drawing Functions ---
+        function resizeCanvas() {
+            // Need to check if canvas exists, otherwise this script block
+            // will throw an error when run on other pages.
+            if (!canvas) return; 
+            
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+            canvasSize = rect.width;
+            originX = canvasSize / 2;
+            originY = canvasSize / 2;
+            drawToStep(stepSlider.value); // Redraw at current step
+        }
+
+        function drawGrid() {
+            if (!canvas) return;
+            scale = (canvasSize / 2) * 0.9 / MAX_REACH; // Use 90% of canvas for max reach
+            
+            ctx.clearRect(0, 0, canvasSize, canvasSize);
+            ctx.save();
+            ctx.translate(originX, originY);
+            
+            // Draw grid
+            const gridSize = 50 * scale;
+            const steps = Math.ceil(originX / gridSize);
+            ctx.beginPath();
+            ctx.strokeStyle = '#e5e7eb'; // gray-200
+            ctx.lineWidth = 1;
+            for (let i = -steps; i <= steps; i++) {
+                ctx.moveTo(i * gridSize, -originY); ctx.lineTo(i * gridSize, originY);
+                ctx.moveTo(-originX, i * gridSize); ctx.lineTo(originX, i * gridSize);
+            }
+            ctx.stroke();
+            
+            // Draw axes
+            ctx.beginPath();
+            ctx.strokeStyle = '#9ca3af'; // gray-400
+            ctx.lineWidth = 2;
+            ctx.moveTo(-originX, 0); ctx.lineTo(originX, 0); // X Axis
+            ctx.moveTo(0, -originY); ctx.lineTo(0, originY); // Y Axis
+            ctx.stroke();
+
+            // Draw Max Reach Circle
+            ctx.beginPath();
+            ctx.arc(0, 0, MAX_REACH * scale, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#3b82f6'; // blue-500
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 5]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            ctx.restore();
+        }
+
+        // Draws just the path segments (lines)
+        function drawPathSegments(segments) {
+            if (!canvas) return;
+            ctx.save();
+            ctx.translate(originX, originY);
+            ctx.scale(1, -1); // Flip Y-axis
+
+            for (const segment of segments) {
+                ctx.beginPath();
+                ctx.moveTo(segment.startX * scale, segment.startY * scale);
+                ctx.lineTo(segment.endX * scale, segment.endY * scale);
+                ctx.strokeStyle = segment.isClamped ? '#ef4444' : '#22c55e'; // red-500 or green-500
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+            
+            ctx.restore();
+        }
+        
+        // Draws the arm at a specific X, Y cartesian coordinate
+        function drawArmAtPosition(x, y, color) {
+            if (!canvas) return;
+            const result = calculateIK(L1_LENGTH, L2_LENGTH, x, y);
+            if (result.error) return; // Should not happen if logic is correct
+
+            const preferredSolution = document.querySelector('input[name="solution"]:checked').value;
+            const angles = (preferredSolution === 'down') ? result.solution1 : result.solution2;
+            const { q1, q2 } = angles;
+
+            const joint1X = (L1_LENGTH * Math.cos(q1)) * scale;
+            const joint1Y = (L1_LENGTH * Math.sin(q1)) * scale;
+
+            const endEffectorX = (L1_LENGTH * Math.cos(q1) + L2_LENGTH * Math.cos(q1 + q2)) * scale;
+            const endEffectorY = (L1_LENGTH * Math.sin(q1) + L2_LENGTH * Math.sin(q1 + q2)) * scale;
+
+            ctx.save();
+            ctx.translate(originX, originY);
+            ctx.scale(1, -1); // Flip Y-axis
+
+            // Draw Arm 1
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(joint1X, joint1Y);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 8;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            // Draw Arm 2
+            ctx.beginPath();
+            ctx.moveTo(joint1X, joint1Y);
+            ctx.lineTo(endEffectorX, endEffectorY);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 8;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+            
+            // Draw Joints
+            ctx.beginPath();
+            ctx.arc(0, 0, 10, 0, 2 * Math.PI); // Base joint
+            ctx.fillStyle = '#4b5563'; // gray-600
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(joint1X, joint1Y, 8, 0, 2 * Math.PI); // Elbow joint
+            ctx.fillStyle = color;
+            ctx.fill();
+            
+            // Draw Target Point
+            ctx.beginPath();
+            ctx.arc(endEffectorX, endEffectorY, 10, 0, 2 * Math.PI);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            
+            ctx.restore();
+        }
+
+        // Main drawing function: draws grid, path, and arm
+        function drawToStep(stepIndex) {
+            if (!canvas) return;
+            stepIndex = parseInt(stepIndex, 10);
+            drawGrid();
+
+            // Get segments to draw (up to the current step)
+            const segmentsToDraw = globalPathSegments.slice(0, stepIndex);
+            drawPathSegments(segmentsToDraw);
+
+            // Find the position to draw the arm
+            let finalX, finalY;
+            if (stepIndex === 0) {
+                finalX = parseFloat(initialXInput.value);
+                finalY = parseFloat(initialYInput.value);
+            } else {
+                const lastSegment = segmentsToDraw[stepIndex - 1];
+                finalX = lastSegment.endX;
+                finalY = lastSegment.endY;
+            }
+            
+            // Draw the arm in its final position for this step
+            drawArmAtPosition(finalX, finalY, '#2563eb'); // blue-600
+        }
+
+        // --- Main Conversion Logic ---
+        function handleConversion() {
+            // Check if all elements exist before running
+            if (!inputGcodeEl || !initialXInput || !initialYInput || !warningIndicator || !warningMessages || !outputGcodeEl || !stepSlider) {
+                return;
+            }
+
+            const inputGcode = inputGcodeEl.value;
+            const lines = inputGcode.split('\n');
+            const preferredSolution = document.querySelector('input[name="solution"]:checked').value;
+            
+            let currentX = parseFloat(initialXInput.value);
+            let currentY = parseFloat(initialYInput.value);
+            
+            // --- Reset state ---
+            warningIndicator.classList.add('hidden');
+            warningMessages.classList.add('hidden');
+            warningMessages.querySelector('ul').innerHTML = '';
+            globalPathSegments = []; // Clear previous path
+
+            if (isNaN(currentX) || isNaN(currentY)) {
+                warningMessages.querySelector('ul').innerHTML = '<li>Invalid Initial Start Position.</li>';
+                warningMessages.classList.remove('hidden');
+                warningIndicator.classList.remove('hidden');
+                outputGcodeEl.value = '';
+                // Reset slider
+                stepSlider.max = 0;
+                stepSlider.value = 0;
+                stepLabel.textContent = '0 / 0';
+                drawToStep(0); // Draw starting arm
+                return;
+            }
+
+            let outputGcode = [];
+            let warnings = []; // Store warnings here
+            
+            for (const [index, line] of lines.entries()) {
+                const trimmedLine = line.trim();
+
+                // ONLY look for G1 commands
+                const g1Match = trimmedLine.toUpperCase().match(/^G1\s+/);
+                if (g1Match) {
+                    const xMatch = trimmedLine.match(/X\s*(-?[\d\.]+)/i);
+                    const yMatch = trimmedLine.match(/Y\s*(-?[\d\.]+)/i);
+
+                    // Skip if G1 has no X or Y
+                    if (!xMatch && !yMatch) {
+                        continue;
+                    }
+
+                    const targetX = xMatch ? parseFloat(xMatch[1]) : currentX;
+                    const targetY = yMatch ? parseFloat(yMatch[1]) : currentY;
+
+                    // --- Run IK for Start and End ---
+                    const startResult = calculateIK(L1_LENGTH, L2_LENGTH, currentX, currentY);
+                    const endResult = calculateIK(L1_LENGTH, L2_LENGTH, targetX, targetY);
+
+                    if (startResult.error || endResult.error) {
+                        const errorMsg = startResult.error || endResult.error;
+                        warnings.push(`Line ${index + 1} ('${trimmedLine}'): Calculation failed. ${errorMsg}`);
+                        continue; // Skip this line
+                    }
+
+                    // Add warning if clamping occurred
+                    if (endResult.isClamped) {
+                        warnings.push(`Line ${index + 1} ('${trimmedLine}'): Target unreachable, clamped to (${endResult.clampedX.toFixed(2)}, ${endResult.clampedY.toFixed(2)}).`);
+                    }
+
+                    // --- Get Deltas ---
+                    const startAngles = (preferredSolution === 'down') ? startResult.solution1 : startResult.solution2;
+                    const endAngles = (preferredSolution === 'down') ? endResult.solution1 : endResult.solution2;
+
+                    const delta_q1_deg = toDegrees(endAngles.q1 - startAngles.q1);
+                    const delta_q2_deg = toDegrees(endAngles.q2 - startAngles.q2);
+
+                    // --- Apply Coupling & Convert ---
+                    const delta_motor1_deg = delta_q1_deg;
+                    const delta_motor2_deg = delta_q1_deg + delta_q2_deg;
+                    const motor1_steps = Math.round(delta_motor1_deg * DEG_TO_STEPS);
+                    const motor2_steps = Math.round(delta_motor2_deg * DEG_TO_STEPS);
+
+                    // --- Format and Add G-Code ---
+                    const newGcodeLine = `G1 ${motor2_steps} ${motor1_steps} 1000`;
+                    outputGcode.push(newGcodeLine);
+
+                    // --- Store for drawing ---
+                    globalPathSegments.push({
+                        startX: currentX,
+                        startY: currentY,
+                        endX: endResult.clampedX,
+                        endY: endResult.clampedY,
+                        isClamped: endResult.isClamped
+                    });
+
+                    // --- Update current position for next loop ---
+                    currentX = endResult.clampedX;
+                    currentY = endResult.clampedY;
+
+                } // else: ignore comments, blanks, and other G-codes
+            }
+
+            // --- Finalize ---
+            outputGcodeEl.value = outputGcode.join('\n');
+
+            // --- Update Slider ---
+            const totalSteps = globalPathSegments.length;
+            stepSlider.max = totalSteps;
+            stepSlider.value = totalSteps;
+            stepLabel.textContent = `${totalSteps} / ${totalSteps}`;
+
+            // --- Draw final path ---
+            drawToStep(totalSteps);
+
+            // --- Show Warnings if any ---
+            if (warnings.length > 0) {
+                warningIndicator.classList.remove('hidden');
+                warningMessages.classList.remove('hidden');
+                warningMessages.querySelector('ul').innerHTML = warnings.map(w => `<li>${w}</li>`).join('');
+            }
+        }
+        
+        // --- Slider Event ---
+        function handleSliderChange(event) {
+            const step = event.target.value;
+            stepLabel.textContent = `${step} / ${stepSlider.max}`;
+            drawToStep(step);
+        }
+
+        // --- Copy Button Logic ---
+        if (copyButton) {
+            copyButton.addEventListener('click', () => {
+                const textToCopy = outputGcodeEl.value;
+                const textArea = document.createElement('textarea');
+                textArea.value = textToCopy;
+                textArea.style.position = 'fixed';
+                textArea.style.top = '0';
+                textArea.style.left = '0';
+                textArea.style.opacity = '0';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    copySuccess.classList.remove('hidden');
+                    copyButton.classList.add('hidden');
+                    setTimeout(() => {
+                        copySuccess.classList.add('hidden');
+                        copyButton.classList.remove('hidden');
+                    }, 2000);
+                } catch (err) {
+                    console.error('Fallback: Oops, unable to copy', err);
+                }
+                document.body.removeChild(textArea);
+            });
+        }
+
+        // --- Initial Setup ---
+        // We need to wait for the DOM to be loaded, AND we need to
+        // make sure we are on the /script page.
+        document.addEventListener('DOMContentLoaded', () => {
+            // The calculator script will only run if it finds the 'convertButton'
+            if (document.getElementById('convertButton')) {
+                convertButton.addEventListener('click', handleConversion);
+                stepSlider.addEventListener('input', handleSliderChange);
+                window.addEventListener('resize', resizeCanvas);
+                
+                // Initial setup
+                resizeCanvas();
+                handleConversion(); // Run once on load
+            }
+        });
+    </Gcode>
 </body>
 </html>
-
