@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -661,28 +661,6 @@ G1 X0 Y203.2
         }
 
 
-        // --- Initialization ---
-        document.addEventListener('DOMContentLoaded', () => {
-            // Load theme from local storage
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            document.body.setAttribute('data-theme', savedTheme);
-            updateThemeIcon(savedTheme);
-            
-            appendToTerminal("System ready. Bulk command page initialized.", false);
-            
-            // --- Add listener to update button text ---
-            const manualCheckbox = document.getElementById('manualModeCheckbox');
-            const sendButton = document.getElementById('send-to-table-btn');
-            if (manualCheckbox && sendButton) {
-                manualCheckbox.addEventListener('change', (e) => {
-                    if (e.target.checked) {
-                        sendButton.textContent = "Start Manual Job";
-                    } else {
-                        sendButton.textContent = "Send Commands";
-                    }
-                });
-            }
-        });
         // --- Fixed Constants ---
         const L1_LENGTH = 101.6;
         const L2_LENGTH = 101.6;
@@ -760,7 +738,7 @@ G1 X0 Y203.2
                     clampedY = y * ratio;
                     d = MIN_REACH;
                     dSq = d * d;
-          _       }
+                }
             }
             // If d is on the boundary (or within EPSILON), just adjust d for the math
             // This prevents Math.acos from getting NaN without triggering a warning
@@ -1150,7 +1128,7 @@ G1 X0 Y203.2
                     
                     // Option 3: ROTATE (q1 + 90deg). This is your preferred path.
                     const midAngles_rotate = { q1: midAngles_current.q1 + toRadians(90), q2: midAngles_current.q2 };
-                    const cost_prep_rotate = getAngleCost(midAngles_current, midAngles_rotate);
+                  .   const cost_prep_rotate = getAngleCost(midAngles_current, midAngles_rotate);
                     const cost_rotate_move = Math.min(
                         getAngleCost(midAngles_rotate, endAngles_sol1),
                         getAngleCost(midAngles_rotate, endAngles_sol2)
@@ -1198,12 +1176,12 @@ G1 X0 Y203.2
                             startX: currentX, startY: currentY,
                             endX: currentX, endY: currentY,
                             isClamped: false,
-            .                 endSolution: otherSolution // Solution we are *switching* to
+                            endSolution: otherSolution // Solution we are *switching* to
                         });
                     	
       	             // CRITICAL: Update the current solution for the *next* loop iteration
                         currentSolution = otherSolution;
-              .   	}
+                	}
                 } else if (nextCommand) {
                     console.log(`Lookahead: Not at origin. Prep move disabled.`);
                 }
@@ -1275,8 +1253,30 @@ G1 X0 Y203.2
             });
         }
 
-                                // --- Initial Setup ---
+        // --- Initial Setup ---
         document.addEventListener('DOMContentLoaded', () => {
+            // --- FROM YOUR FIRST LISTENER ---
+            // Load theme from local storage
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.body.setAttribute('data-theme', savedTheme);
+            updateThemeIcon(savedTheme);
+            
+            appendToTerminal("System ready. Bulk command page initialized.", false);
+            
+            // Add listener to update button text
+            const manualCheckbox = document.getElementById('manualModeCheckbox');
+            const sendButton = document.getElementById('send-to-table-btn');
+            if (manualCheckbox && sendButton) {
+                manualCheckbox.addEventListener('change', (e) => {
+                    if (e.target.checked) {
+                        sendButton.textContent = "Start Manual Job";
+                    } else {
+                        sendButton.textContent = "Send Commands";
+                    }
+                });
+            }
+            
+            // --- FROM YOUR SECOND LISTENER ---
             const { convertButton, stepSlider } = getCalculatorElements();
             
             if (convertButton) {
@@ -1290,9 +1290,7 @@ G1 X0 Y203.2
                 function attemptInitialLoad() {
                     const { canvas } = getCalculatorElements();
                     
-                    // Check if elements exist
                     if (!canvas) {
-                        // Elements not found yet, try again
                         console.log("DOM not ready, retrying...");
                         setTimeout(attemptInitialLoad, 100);
                         return;
@@ -1301,20 +1299,23 @@ G1 X0 Y203.2
                     const rect = canvas.getBoundingClientRect();
                     
                     if (rect.width === 0) {
-                        // Canvas layout not ready, poll again
                         console.log("Canvas layout not ready, retrying...");
                         setTimeout(attemptInitialLoad, 100);
                     } else {
                         // SUCCESS: Canvas has a size
                         console.log("Canvas ready, running initial conversion.");
                         resizeCanvas(); 
-                        handleConversion();
+                        handleConversion(); // This runs the calculation
                     }
                 }
                 
-                // Use window.onload as the *trigger* to start checking
-                // This ensures all assets are loaded before we even start polling
-                window.onload = attemptInitialLoad;
+                // **CHANGED:** Just call attemptInitialLoad directly.
+                // This removes the need for window.onload.
+                attemptInitialLoad();
+                
+            } else {
+                // This else block handles if the calculator isn't on the page
+                console.log("Calculator elements not found on this page.");
             }
         });
 
