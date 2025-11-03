@@ -1291,12 +1291,13 @@ G1 X0 Y203.2
                 
                 // Use window.onload to run the initial conversion.
                 // This waits for the *entire page* (including layout) to be ready.
-                window.onload = () => {
-                    // Run math/text update FIRST
-                    handleConversion(); 
-                    // Run drawing update SECOND (it will re-draw based on the conversion)
+                                window.onload = () => {
+                    // Run drawing update FIRST to set canvas size, scale, and draw step 0
                     resizeCanvas(); 
+                    // Run math/text update SECOND to populate text and re-draw the final path
+                    handleConversion(); 
                 };
+
             }
         });
 
