@@ -1007,6 +1007,7 @@ G1 X0 Y203.2
 // --- *UPDATED* Main Conversion Logic with Combined Prep at (0,0)
 // --- Ensures tangent alignment after elbow flip (if needed)
 // --- handleConversion() — single rotation prep at (0,0), no offset move ---
+// --- handleConversion() — single rotation prep at (0,0), and use aligned start angles for next move ---
 function handleConversion() {
     const els = getCalculatorElements();
     if (!els.inputGcodeEl || !els.initialXInput || !els.initialYInput ||
@@ -1028,6 +1029,10 @@ function handleConversion() {
 
     let outputGcode = [];
     let warnings = [];
+
+    // This holds an aligned start-angle override when we did a flip+align at origin.
+    // It should be used exactly once by the next produced move that actually leaves origin.
+    let overrideStartAngles = null;
 
     // --- Parse valid G1 commands ---
     const g1Commands = [];
@@ -1052,6 +1057,7 @@ function handleConversion() {
         const targetY = cmd.yMatch ? parseFloat(cmd.yMatch[1]) : currentY;
         const P_mid = { x: targetX, y: targetY };
 
+        // Compute IK for start & mid points (startIK used for getting raw/flipped solutions at origin)
         const startIK = calculateIK(L1_LENGTH, L2_LENGTH, P_start.x, P_start.y);
         const midIK   = calculateIK(L1_LENGTH, L2_LENGTH, P_mid.x,  P_mid.y);
         if (startIK.error || midIK.error) {
@@ -1062,9 +1068,20 @@ function handleConversion() {
         if (midIK.isClamped)
             warnings.push(`Line ${cmd.index}: Target clamped to (${midIK.clampedX.toFixed(2)}, ${midIK.clampedY.toFixed(2)}).`);
 
-        const startAngles = (currentSolution === 'down') ? startIK.solution1 : startIK.solution2;
-        const midAngles   = (currentSolution === 'down') ? midIK.solution1   : midIK.solution2;
+        // Determine startAngles: if an override exists (from previous flip+align at origin) and we're still at origin, use it.
+        let startAngles;
+        if (overrideStartAngles && Math.hypot(P_start.x, P_start.y) < EPSILON) {
+            startAngles = overrideStartAngles;
+            // Use it only once — clear after applying
+            overrideStartAngles = null;
+        } else {
+            startAngles = (currentSolution === 'down') ? startIK.solution1 : startIK.solution2;
+        }
 
+        // midAngles are computed based on the currentSolution (which may have been updated previously)
+        const midAngles = (currentSolution === 'down') ? midIK.solution1 : midIK.solution2;
+
+        // Generate G-code for the actual move from start -> mid
         const moveG = calculateGcode(startAngles, midAngles);
         if (moveG.gcode) outputGcode.push(moveG.gcode);
 
@@ -1092,17 +1109,17 @@ function handleConversion() {
             const dy = nextTargetY - currentY;
             const nextHeading = Math.atan2(dy, dx);
 
-            // Current angles & heading
-            const currentAngles = (currentSolution === 'down') ? startIK.solution1 : startIK.solution2;
-            const currentHeading = currentAngles.q1 + currentAngles.q2;
+            // Current angles & heading (raw based on currentSolution choice BEFORE flip)
+            const currentAnglesRaw = (currentSolution === 'down') ? startIK.solution1 : startIK.solution2;
+            const currentHeading = currentAnglesRaw.q1 + currentAnglesRaw.q2;
             let deltaHeading = nextHeading - currentHeading;
             while (deltaHeading > Math.PI) deltaHeading -= 2 * Math.PI;
             while (deltaHeading < -Math.PI) deltaHeading += 2 * Math.PI;
 
             if (Math.abs(deltaHeading) < toRadians(45)) {
                 // Small angle: rotate in place to align tangent (single rotation)
-                const aligned = { q1: currentAngles.q1 + deltaHeading, q2: currentAngles.q2 };
-                const prep = calculateGcode(currentAngles, aligned);
+                const aligned = { q1: currentAnglesRaw.q1 + deltaHeading, q2: currentAnglesRaw.q2 };
+                const prep = calculateGcode(currentAnglesRaw, aligned);
                 if (prep.gcode) {
                     outputGcode.push(prep.gcode + " ; Align tangent at (0,0)");
                     globalPathSegments.push({
@@ -1111,6 +1128,9 @@ function handleConversion() {
                         isClamped: false, endSolution: currentSolution
                     });
                 }
+                // Important: set override so the next generated move uses 'aligned' as the actual startAngles
+                overrideStartAngles = aligned;
+                // note: currentSolution stays the same
             } else {
                 // Large angle: flip elbow and align tangent for the flipped solution — single rotation
                 const otherSol = (currentSolution === 'up') ? 'down' : 'up';
@@ -1124,19 +1144,24 @@ function handleConversion() {
 
                 const alignedFlipped = { q1: aligned_q1, q2: rawFlipped.q2 };
 
-                // Perform single rotation: currentAngles -> alignedFlipped
-                const flipAndAlign = calculateGcode(currentAngles, alignedFlipped);
+                // Perform single rotation: currentAnglesRaw -> alignedFlipped
+                const flipAndAlign = calculateGcode(currentAnglesRaw, alignedFlipped);
                 if (flipAndAlign.gcode) {
                     outputGcode.push(flipAndAlign.gcode + " ; Elbow flip + align at (0,0)");
                 }
 
-                // Update simulation state: do NOT perform offset move — next loop will generate the actual move out of origin using the new solution
+                // Set overrideStartAngles so the NEXT move uses the alignedFlipped as its starting orientation.
+                overrideStartAngles = alignedFlipped;
+
+                // Update currentSolution to reflect the flipped solution for subsequent midAngle selection.
+                currentSolution = otherSol;
+
+                // Update path/simulation state (we remain at origin)
                 globalPathSegments.push({
                     startX: currentX, startY: currentY,
                     endX: currentX, endY: currentY,
-                    isClamped: false, endSolution: otherSol
+                    isClamped: false, endSolution: currentSolution
                 });
-                currentSolution = otherSol;
             }
         } // end origin prep
     } // end for
