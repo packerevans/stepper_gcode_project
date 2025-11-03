@@ -1126,36 +1126,87 @@ G1 X0 Y203.2
                     const otherSolution = (currentSolution === 'up') ? 'down' : 'up';
                     const midAngles_other = (otherSolution === 'down') ? midResult.solution1 : midResult.solution2;
                     
-                    // Get both potential solution angles for P_end
-                    const endAngles_current = (currentSolution === 'down') ? endResult.solution1 : endResult.solution2;
-                    const endAngles_other = (otherSolution === 'down') ? endResult.solution1 : endResult.solution2;
+                                        // Get both potential solution angles for P_end (the *next* destination)
+                    // Note: For a point on the max reach, sol1 and sol2 are identical.
+                    const endAngles_sol1 = endResult.solution1;
+                    const endAngles_sol2 = endResult.solution2;
 
-                    // Calculate cost of B -> C (staying on current solution)
-                    const cost_stay = getAngleCost(midAngles_current, endAngles_current);
-                    
-                    // Calculate cost of B -> C (switching to other solution)
-                    const cost_switch = getAngleCost(midAngles_other, endAngles_other);
+                    // --- Calculate total cost for 3 prep options ---
 
-                    // --- Decision ---
-                    if (cost_switch <= cost_stay) {
-                        console.log(`Lookahead: Prep move is cheaper. Adding.`);
-                        // It's "cheaper" to switch. Add the prep move.
-                        const prepGcode = calculateGcode(midAngles_current, midAngles_other);
-                        if(prepGcode.gcode) outputGcode.push(prepGcode.gcode + ` ; Prep move at (0,0)`);
+                    // Option 1: STAY. No prep move.
+                    // Cost is just the cost of the next move.
+                    const cost_stay_move = Math.min(
+                        getAngleCost(midAngles_current, endAngles_sol1),
+                        getAngleCost(midAngles_current, endAngles_sol2)
+                    );
+                    const total_cost_stay = cost_stay_move;
+                    console.log(`Lookahead: total_cost_stay = ${total_cost_stay}`);
 
-                        // Add a "dummy" segment for the slider (no length, but holds new solution)
-                        globalPathSegments.push({
-                            startX: currentX, startY: currentY,
-                            endX: currentX, endY: currentY,
-                            isClamped: false,
-                            endSolution: otherSolution // Solution we are *switching* to
-                        });
-                        
-                        // CRITICAL: Update the current solution for the *next* loop iteration
-                        currentSolution = otherSolution;
-                    } else {
-                        console.log(`Lookahead: Staying with current solution is cheaper. No prep move.`);
-                    }
+                    // Option 2: SWITCH (q2 flip).
+                    const cost_prep_switch = getAngleCost(midAngles_current, midAngles_other);
+                    const cost_switch_move = Math.min(
+                        getAngleCost(midAngles_other, endAngles_sol1),
+                        getAngleCost(midAngles_other, endAngles_sol2)
+                    );
+                    const total_cost_switch = cost_prep_switch + cost_switch_move;
+                    console.log(`Lookahead: total_cost_switch = ${total_cost_switch} (prep: ${cost_prep_switch} + move: ${cost_switch_move})`);
+                    
+                    // Option 3: ROTATE (q1 + 90deg). This is your preferred path.
+                    const midAngles_rotate = { q1: midAngles_current.q1 + toRadians(90), q2: midAngles_current.q2 };
+                    const cost_prep_rotate = getAngleCost(midAngles_current, midAngles_rotate);
+                    const cost_rotate_move = Math.min(
+                        getAngleCost(midAngles_rotate, endAngles_sol1),
+                        getAngleCost(midAngles_rotate, endAngles_sol2)
+                    );
+                    const total_cost_rotate = cost_prep_rotate + cost_rotate_move;
+                    console.log(`Lookahead: total_cost_rotate = ${total_cost_rotate} (prep: ${cost_prep_rotate} + move: ${cost_rotate_move})`);
+                    
+                    // --- Decision ---
+                    // Pick the best path. We'll prefer rotate, then stay, then switch.
+                    if (total_cost_rotate <= total_cost_stay && total_cost_rotate <= total_cost_switch) {
+                        // Path 3 (Rotate) is cheapest
+                        console.log(`Lookahead: Prep move is ROTATE (q1+90). Adding.`);
+                        const prepGcode = calculateGcode(midAngles_current, midAngles_rotate);
+                        if(prepGcode.gcode) outputGcode.push(prepGcode.gcode + ` ; Prep move at (0,0)`);
+                        
+                        globalPathSegments.push({
+                            startX: currentX, startY: currentY,
+                            endX: currentX, endY: currentY,
+                            isClamped: false,
+                            endSolution: currentSolution // Solution stays the same (e.g., "up")
+                        });
+                        // CRITICAL: We don't update currentSolution, but the *angles* for the next loop
+                        // are implicitly updated by updating currentX/Y.
+                        // We must override the *next* start angles. We can do this by faking the start position.
+                        // HACK: We can't update startAngles for next loop...
+                        // Instead, just update midResult for *this* loop.
+                        if (currentSolution === 'down') {
+                            midResult.solution1 = midAngles_rotate;
+                        } else {
+                            midResult.solution2 = midAngles_rotate;
+                        }
+                        
+                    } else if (total_cost_stay <= total_cost_switch) {
+                        // Path 1 (Stay) is cheapest (or tied with rotate)
+                        console.log(`Lookahead: Staying with current solution is cheapest. No prep move.`);
+                        // No prep move to add.
+                    
+                    } else {
+                        // Path 2 (Switch) is cheapest
+                        console.log(`Lookahead: Prep move is SWITCH (q2 flip). Adding.`);
+                        const prepGcode = calculateGcode(midAngles_current, midAngles_other);
+                        if(prepGcode.gcode) outputGcode.push(prepGcode.gcode + ` ; Prep move at (0,0)`);
+
+                        globalPathSegments.push({
+                            startX: currentX, startY: currentY,
+                            endX: currentX, endY: currentY,
+                            isClamped: false,
+            .                 endSolution: otherSolution // Solution we are *switching* to
+                        });
+                    	
+      	             // CRITICAL: Update the current solution for the *next* loop iteration
+                        currentSolution = otherSolution;
+              .   	}
                 } else if (nextCommand) {
                     console.log(`Lookahead: Not at origin. Prep move disabled.`);
                 }
