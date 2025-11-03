@@ -1278,22 +1278,28 @@ G1 X0 Y203.2
             });
         }
 
-        // --- Initial Setup ---
+                // --- Initial Setup ---
         document.addEventListener('DOMContentLoaded', () => {
             const { convertButton, stepSlider } = getCalculatorElements();
             
             if (convertButton) {
+                // Register all the click/change events immediately
                 convertButton.addEventListener('click', handleConversion);
                 stepSlider.addEventListener('input', handleSliderChange);
                 window.addEventListener('resize', resizeCanvas);
                 setupCopyButton();
                 
-                setTimeout(() => {
-                    resizeCanvas();
-                    handleConversion(); // Run once on load
-                }, 100);
+                // Use window.onload to run the initial conversion.
+                // This waits for the *entire page* (including layout) to be ready.
+                window.onload = () => {
+                    // Run math/text update FIRST
+                    handleConversion(); 
+                    // Run drawing update SECOND (it will re-draw based on the conversion)
+                    resizeCanvas(); 
+                };
             }
         });
+
     </script>
 </body>
 </html>
