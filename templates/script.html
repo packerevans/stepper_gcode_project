@@ -1278,7 +1278,7 @@ G1 X0 Y203.2
             });
         }
 
-                // --- Initial Setup ---
+                                // --- Initial Setup ---
         document.addEventListener('DOMContentLoaded', () => {
             const { convertButton, stepSlider } = getCalculatorElements();
             
@@ -1288,18 +1288,39 @@ G1 X0 Y203.2
                 stepSlider.addEventListener('input', handleSliderChange);
                 window.addEventListener('resize', resizeCanvas);
                 setupCopyButton();
-                
-                // Use window.onload to run the initial conversion.
-                // This waits for the *entire page* (including layout) to be ready.
-                                window.onload = () => {
-                    // Run drawing update FIRST to set canvas size, scale, and draw step 0
-                    resizeCanvas(); 
-                    // Run math/text update SECOND to populate text and re-draw the final path
-                    handleConversion(); 
-                };
 
+                // This function will poll until the canvas is ready
+                function attemptInitialLoad() {
+                    const { canvas } = getCalculatorElements();
+                    
+                    // Check if elements exist
+                    if (!canvas) {
+                        // Elements not found yet, try again
+                        console.log("DOM not ready, retrying...");
+                        setTimeout(attemptInitialLoad, 100);
+                        return;
+                    }
+                    
+                    const rect = canvas.getBoundingClientRect();
+                    
+                    if (rect.width === 0) {
+                        // Canvas layout not ready, poll again
+                        console.log("Canvas layout not ready, retrying...");
+                        setTimeout(attemptInitialLoad, 100);
+                    } else {
+                        // SUCCESS: Canvas has a size
+                        console.log("Canvas ready, running initial conversion.");
+                        resizeCanvas(); 
+                        handleConversion();
+                    }
+                }
+                
+                // Use window.onload as the *trigger* to start checking
+                // This ensures all assets are loaded before we even start polling
+                window.onload = attemptInitialLoad;
             }
         });
+
 
     </script>
 </body>
