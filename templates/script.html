@@ -1004,7 +1004,8 @@ G1 X0 Y203.2
             return (delta_motor1_deg * delta_motor1_deg) + (delta_motor2_deg * delta_motor2_deg);
         }
 
-        // --- *UPDATED* Main Conversion Logic with Combined Prep at (0,0) ---
+// --- *UPDATED* Main Conversion Logic with Combined Prep at (0,0)
+// --- Ensures tangent alignment after elbow flip (if needed)
 function handleConversion() {
     const els = getCalculatorElements();
     if (!els.inputGcodeEl || !els.initialXInput || !els.initialYInput ||
@@ -1052,7 +1053,10 @@ function handleConversion() {
 
         const startIK = calculateIK(L1_LENGTH, L2_LENGTH, P_start.x, P_start.y);
         const midIK   = calculateIK(L1_LENGTH, L2_LENGTH, P_mid.x,  P_mid.y);
-        if (startIK.error || midIK.error) continue;
+        if (startIK.error || midIK.error) {
+            warnings.push(`Line ${cmd.index}: IK failed.`);
+            continue;
+        }
 
         if (midIK.isClamped)
             warnings.push(`Line ${cmd.index}: Target clamped to (${midIK.clampedX.toFixed(2)}, ${midIK.clampedY.toFixed(2)}).`);
@@ -1072,6 +1076,7 @@ function handleConversion() {
             endSolution: currentSolution
         });
 
+        // Update current position to the (potentially clamped) midpoint
         currentX = midIK.clampedX;
         currentY = midIK.clampedY;
 
@@ -1079,14 +1084,14 @@ function handleConversion() {
         if (nextCmd && Math.hypot(currentX, currentY) < EPSILON) {
             console.log("Origin prep logic engaged.");
 
-            // Heading of next vector
+            // Next vector heading
             const nextTargetX = nextCmd.xMatch ? parseFloat(nextCmd.xMatch[1]) : currentX;
             const nextTargetY = nextCmd.yMatch ? parseFloat(nextCmd.yMatch[1]) : currentY;
             const dx = nextTargetX - currentX;
             const dy = nextTargetY - currentY;
             const nextHeading = Math.atan2(dy, dx);
 
-            // Current heading (sum of joint angles)
+            // Current angles & heading
             const currentAngles = (currentSolution === 'down') ? startIK.solution1 : startIK.solution2;
             const currentHeading = currentAngles.q1 + currentAngles.q2;
             let deltaHeading = nextHeading - currentHeading;
@@ -1094,7 +1099,7 @@ function handleConversion() {
             while (deltaHeading < -Math.PI) deltaHeading += 2 * Math.PI;
 
             if (Math.abs(deltaHeading) < toRadians(45)) {
-                // --- Small angle: rotate in place to align tangent ---
+                // --- Small angle: rotate in place to align tangent (no elbow flip) ---
                 const aligned = { q1: currentAngles.q1 + deltaHeading, q2: currentAngles.q2 };
                 const prep = calculateGcode(currentAngles, aligned);
                 if (prep.gcode) {
@@ -1106,22 +1111,43 @@ function handleConversion() {
                     });
                 }
             } else {
-                // --- Large angle: flip elbow + tiny offset ---
+                // --- Large angle: flip elbow, align tangent for flipped solution, then small offset ---
                 const otherSol = (currentSolution === 'up') ? 'down' : 'up';
-                const newAngles = (otherSol === 'down') ? startIK.solution1 : startIK.solution2;
-                const flipMove = calculateGcode(currentAngles, newAngles);
-                if (flipMove.gcode)
-                    outputGcode.push(flipMove.gcode + " ; Elbow flip at (0,0)");
+                // raw angles of the flipped solution at origin (before alignment)
+                const rawFlipped = (otherSol === 'down') ? startIK.solution1 : startIK.solution2;
 
-                // Small offset (2 mm) in new vector direction
-                const offsetX = currentX + Math.cos(nextHeading) * 2.0;
-                const offsetY = currentY + Math.sin(nextHeading) * 2.0;
+                // Compute aligned q1 so that (q1 + q2) == nextHeading (tangent)
+                const desired_q1 = nextHeading - rawFlipped.q2;
+                // Normalize desired_q1 to -PI..PI for stability (optional)
+                let aligned_q1 = desired_q1;
+                while (aligned_q1 > Math.PI) aligned_q1 -= 2 * Math.PI;
+                while (aligned_q1 < -Math.PI) aligned_q1 += 2 * Math.PI;
+
+                const alignedFlipped = { q1: aligned_q1, q2: rawFlipped.q2 };
+
+                // Move from currentAngles -> alignedFlipped (this performs the flip + align in one logical step)
+                const flipAndAlign = calculateGcode(currentAngles, alignedFlipped);
+                if (flipAndAlign.gcode) {
+                    outputGcode.push(flipAndAlign.gcode + " ; Elbow flip + align at (0,0)");
+                }
+
+                // Small offset along nextHeading so leaving origin is tangent.
+                const OFFSET_MM = 2.0; // small nudge outward
+                const offsetX = currentX + Math.cos(nextHeading) * OFFSET_MM;
+                const offsetY = currentY + Math.sin(nextHeading) * OFFSET_MM;
                 const offsetIK = calculateIK(L1_LENGTH, L2_LENGTH, offsetX, offsetY);
-                const offsetAngles = (otherSol === 'down') ? offsetIK.solution1 : offsetIK.solution2;
-                const offsetMove = calculateGcode(newAngles, offsetAngles);
-                if (offsetMove.gcode)
-                    outputGcode.push(offsetMove.gcode + " ; Offset prep after flip");
+                if (offsetIK.error) {
+                    warnings.push(`Lookahead offset IK failed for next line ${nextCmd.index}.`);
+                } else {
+                    // Use the same "otherSol" choice at the offset point
+                    const offsetAngles = (otherSol === 'down') ? offsetIK.solution1 : offsetIK.solution2;
+                    const offsetMove = calculateGcode(alignedFlipped, offsetAngles);
+                    if (offsetMove.gcode) {
+                        outputGcode.push(offsetMove.gcode + " ; Offset prep after flip (tangent exit)");
+                    }
+                }
 
+                // Update path/simulation state
                 globalPathSegments.push({
                     startX: currentX, startY: currentY,
                     endX: currentX, endY: currentY,
@@ -1129,8 +1155,8 @@ function handleConversion() {
                 });
                 currentSolution = otherSol;
             }
-        }
-    }
+        } // end origin prep
+    } // end for
 
     // --- Finalize ---
     els.outputGcodeEl.value = outputGcode.join('\n');
