@@ -742,37 +742,25 @@ G1 X0 Y203.2
             let clampedY = y;
             let isClamped = false;
             
-                        // --- Clamping Logic ---
-            // Check if truly outside max reach (beyond float error)
-            if (d > MAX_REACH + EPSILON) { 
+            // --- Clamping Logic ---
+            if (d > MAX_REACH - EPSILON) {
                 isClamped = true;
-                const ratio = MAX_REACH / d; // Clamp *to* max reach
+                const ratio = (MAX_REACH - EPSILON) / d; // Clamp slightly inside max
                 clampedX = x * ratio;
                 clampedY = y * ratio;
-                d = MAX_REACH;
+                d = MAX_REACH - EPSILON;
                 dSq = d * d;
-            } 
-            // Check if inside min reach (but not at origin)
-            else if (d < MIN_REACH - EPSILON) { 
+            } else if (d < MIN_REACH + EPSILON) {
                 if (d < EPSILON) {
-                    // At origin (0,0), d is effectively 0. Do nothing.
+                    // At origin (0,0)
                 } else {
                     isClamped = true;
-                    const ratio = MIN_REACH / d; // Clamp *to* min reach
+                    const ratio = (MIN_REACH + EPSILON) / d; // Clamp slightly outside min
                     clampedX = x * ratio;
                     clampedY = y * ratio;
-                    d = MIN_REACH;
+                    d = MIN_REACH + EPSILON;
                     dSq = d * d;
-          _       }
-            }
-            // If d is on the boundary (or within EPSILON), just adjust d for the math
-            // This prevents Math.acos from getting NaN without triggering a warning
-            else if (d > MAX_REACH) {
-                d = MAX_REACH;
-                dSq = d * d;
-            } else if (d < MIN_REACH) {
-                d = MIN_REACH;
-                dSq = d * d;
+                }
             }
 
             // --- IK Calculation (on potentially clamped values) ---
@@ -1015,181 +1003,167 @@ G1 X0 Y203.2
             return (delta_motor1_deg * delta_motor1_deg) + (delta_motor2_deg * delta_motor2_deg);
         }
 
-        // — Main Conversion Logic with Origin Reorientation —
-function handleConversion() {
-const els = getCalculatorElements();
-if (!els.inputGcodeEl || !els.initialXInput || !els.initialYInput || !els.warningIndicator || !els.warningMessages || !els.outputGcodeEl || !els.stepSlider) {
-return;
-}
+        // --- *NEW* Main Conversion Logic (Lookahead at (0,0) only) ---
+        function handleConversion() {
+            const els = getCalculatorElements();
+            if (!els.inputGcodeEl || !els.initialXInput || !els.initialYInput || !els.warningIndicator || !els.warningMessages || !els.outputGcodeEl || !els.stepSlider) {
+                return;
+            }
 
-```
-        const inputGcode = els.inputGcodeEl.value;
-        const lines = inputGcode.split('\n');
-        
-        // Get the user's *initial* preferred solution
-        let currentSolution = document.querySelector('input[name="solution"]:checked').value;
-        
-        let currentX = parseFloat(els.initialXInput.value || "203.2");
-        let currentY = parseFloat(els.initialYInput.value || "0");
-        
-        // --- Reset state ---
-        els.warningIndicator.classList.add('hidden');
-        els.warningMessages.classList.add('hidden');
-        els.warningMessages.querySelector('ul').innerHTML = '';
-        globalPathSegments = [];
+            const inputGcode = els.inputGcodeEl.value;
+            const lines = inputGcode.split('\n');
+            
+            // Get the user's *initial* preferred solution
+            let currentSolution = document.querySelector('input[name="solution"]:checked').value;
+            
+            let currentX = parseFloat(els.initialXInput.value || "203.2");
+            let currentY = parseFloat(els.initialYInput.value || "0");
+            
+            // --- Reset state ---
+            els.warningIndicator.classList.add('hidden');
+            els.warningMessages.classList.add('hidden');
+            els.warningMessages.querySelector('ul').innerHTML = '';
+            globalPathSegments = []; // Clear previous path
 
-        if (isNaN(currentX) || isNaN(currentY)) {
-            els.outputGcodeEl.value = "Error: Invalid initial position";
-            return;
-        }
+            if (isNaN(currentX) || isNaN(currentY)) {
+                // ... (error handling as before) ...
+                return;
+            }
 
-        let outputGcode = [];
-        let warnings = [];
-        
-        // --- Step 1: Parse all valid G1 commands ---
-        const g1Commands = [];
-        for (const [index, line] of lines.entries()) {
-            const trimmedLine = line.trim();
-            const g1Match = trimmedLine.toUpperCase().match(/^G1\s+/);
-            if (g1Match) {
-                const xMatch = trimmedLine.match(/X\s*(-?[\d\.]+)/i);
-                const yMatch = trimmedLine.match(/Y\s*(-?[\d\.]+)/i);
-                if (xMatch || yMatch) {
-                    const targetX = xMatch ? parseFloat(xMatch[1]) : null;
-                    const targetY = yMatch ? parseFloat(yMatch[1]) : null;
-                    g1Commands.push({ line: trimmedLine, index: index + 1, targetX, targetY });
-                }
-            }
-        }
+            let outputGcode = [];
+            let warnings = [];
+            
+            // --- Step 1: Parse all valid G1 commands first ---
+            const g1Commands = [];
+            for (const [index, line] of lines.entries()) {
+                const trimmedLine = line.trim();
+                const g1Match = trimmedLine.toUpperCase().match(/^G1\s+/);
+                if (g1Match) {
+                    const xMatch = trimmedLine.match(/X\s*(-?[\d\.]+)/i);
+                    const yMatch = trimmedLine.match(/Y\s*(-?[\d\.]+)/i);
+                    if (xMatch || yMatch) {
+                        g1Commands.push({ line: trimmedLine, index: index + 1, xMatch, yMatch });
+                    }
+                }
+            }
 
-        // --- Step 2: Process commands with lookahead ---
-        for (let i = 0; i < g1Commands.length; i++) {
-            const command = g1Commands[i];
-            
-            const P_start = { x: currentX, y: currentY };
-            const targetX = command.targetX !== null ? command.targetX : currentX;
-            const targetY = command.targetY !== null ? command.targetY : currentY;
-            const P_target = { x: targetX, y: targetY };
+            // --- Step 2: Iterate through the parsed commands with lookahead ---
+            for (let i = 0; i < g1Commands.length; i++) {
+                const command = g1Commands[i];
+                const nextCommand = (i + 1 < g1Commands.length) ? g1Commands[i+1] : null;
 
-            // Calculate IK for current position and target
-            const startResult = calculateIK(L1_LENGTH, L2_LENGTH, P_start.x, P_start.y);
-            const targetResult = calculateIK(L1_LENGTH, L2_LENGTH, P_target.x, P_target.y);
+                const P_start = { x: currentX, y: currentY };
+                
+                // Determine target (P_mid)
+                const targetX = command.xMatch ? parseFloat(command.xMatch[1]) : currentX;
+                const targetY = command.yMatch ? parseFloat(command.yMatch[1]) : currentY;
+                const P_mid = { x: targetX, y: targetY };
 
-            if (startResult.error || targetResult.error) {
-                warnings.push(`Line ${command.index}: IK calculation failed.`);
-                continue;
-            }
-            if (targetResult.isClamped) {
-                warnings.push(`Line ${command.index}: Target clamped to (${targetResult.clampedX.toFixed(2)}, ${targetResult.clampedY.toFixed(2)}).`);
-            }
+                // --- Calculate IK for this move (A -> B) ---
+                const startResult = calculateIK(L1_LENGTH, L2_LENGTH, P_start.x, P_start.y);
+                const midResult = calculateIK(L1_LENGTH, L2_LENGTH, P_mid.x, P_mid.y);
 
-            // Check if target is at origin
-            const targetAtOrigin = (targetResult.clampedX * targetResult.clampedX + targetResult.clampedY * targetResult.clampedY) < EPSILON;
+                if (startResult.error || midResult.error) {
+                    warnings.push(`Line ${command.index} ('${command.line}'): Calculation failed.`);
+                    continue;
+                }
+                if (midResult.isClamped) {
+                    warnings.push(`Line ${command.index} ('${command.line}'): Target unreachable, clamped to (${midResult.clampedX.toFixed(2)}, ${midResult.clampedY.toFixed(2)}).`);
+                }
 
-            // If we're going TO the origin and there's a next command, do lookahead
-            if (targetAtOrigin && (i + 1 < g1Commands.length)) {
-                console.log(`Moving to origin at line ${command.index}. Performing lookahead...`);
-                
-                const nextCommand = g1Commands[i + 1];
-                const nextTargetX = nextCommand.targetX !== null ? nextCommand.targetX : targetResult.clampedX;
-                const nextTargetY = nextCommand.targetY !== null ? nextCommand.targetY : targetResult.clampedY;
-                
-                const nextResult = calculateIK(L1_LENGTH, L2_LENGTH, nextTargetX, nextTargetY);
-                
-                if (!nextResult.error) {
-                    // Get current solution angles
-                    const startAngles = (currentSolution === 'down') ? startResult.solution1 : startResult.solution2;
-                    const targetAngles_current = (currentSolution === 'down') ? targetResult.solution1 : targetResult.solution2;
-                    
-                    // Get other solution angles
-                    const otherSolution = (currentSolution === 'up') ? 'down' : 'up';
-                    const targetAngles_other = (otherSolution === 'down') ? targetResult.solution1 : targetResult.solution2;
-                    
-                    // Get next target angles for both solutions
-                    const nextAngles_current = (currentSolution === 'down') ? nextResult.solution1 : nextResult.solution2;
-                    const nextAngles_other = (otherSolution === 'down') ? nextResult.solution1 : nextResult.solution2;
-                    
-                    // Calculate costs
-                    const cost_stay = getAngleCost(targetAngles_current, nextAngles_current);
-                    const cost_switch = getAngleCost(targetAngles_other, nextAngles_other);
-                    
-                    console.log(`Cost to stay on ${currentSolution}: ${cost_stay.toFixed(2)}`);
-                    console.log(`Cost to switch to ${otherSolution}: ${cost_switch.toFixed(2)}`);
-                    
-                    // Move to origin with current solution
-                    const moveGcode = calculateGcode(startAngles, targetAngles_current);
-                    if(moveGcode.gcode) outputGcode.push(moveGcode.gcode);
-                    
-                    globalPathSegments.push({
-                        startX: P_start.x,
-                        startY: P_start.y,
-                        endX: targetResult.clampedX,
-                        endY: targetResult.clampedY,
-                        isClamped: targetResult.isClamped,
-                        endSolution: currentSolution
-                    });
-                    
-                    // If switching is better, add reorientation move
-                    if (cost_switch < cost_stay) {
-                        console.log(`Switching solution from ${currentSolution} to ${otherSolution}`);
-                        const prepGcode = calculateGcode(targetAngles_current, targetAngles_other);
-                        if(prepGcode.gcode) {
-                            outputGcode.push(prepGcode.gcode + ` ; Reorient at origin`);
-                            
-                            globalPathSegments.push({
-                                startX: targetResult.clampedX,
-                                startY: targetResult.clampedY,
-                                endX: targetResult.clampedX,
-                                endY: targetResult.clampedY,
-                                isClamped: false,
-                                endSolution: otherSolution
-                            });
-                        }
-                        currentSolution = otherSolution;
-                    }
-                    
-                    // Update position
-                    currentX = targetResult.clampedX;
-                    currentY = targetResult.clampedY;
-                    continue; // Skip normal processing
-                }
-            }
+                // Get angles based on the *current* solution
+                const startAngles = (currentSolution === 'down') ? startResult.solution1 : startResult.solution2;
+                const midAngles_current = (currentSolution === 'down') ? midResult.solution1 : midResult.solution2;
+                
+                // --- Add G-code for the A -> B move ---
+                const moveGcode = calculateGcode(startAngles, midAngles_current);
+                if(moveGcode.gcode) outputGcode.push(moveGcode.gcode);
+                
+                globalPathSegments.push({
+                    startX: P_start.x,
+                    startY: P_start.y,
+                    endX: midResult.clampedX,
+                    endY: midResult.clampedY,
+                    isClamped: midResult.isClamped,
+                    endSolution: currentSolution // Solution we *arrived* with
+                });
 
-            // Normal move (not going to origin, or no lookahead needed)
-            const startAngles = (currentSolution === 'down') ? startResult.solution1 : startResult.solution2;
-            const targetAngles = (currentSolution === 'down') ? targetResult.solution1 : targetResult.solution2;
-            
-            const moveGcode = calculateGcode(startAngles, targetAngles);
-            if(moveGcode.gcode) outputGcode.push(moveGcode.gcode);
-            
-            globalPathSegments.push({
-                startX: P_start.x,
-                startY: P_start.y,
-                endX: targetResult.clampedX,
-                endY: targetResult.clampedY,
-                isClamped: targetResult.isClamped,
-                endSolution: currentSolution
-            });
+                // Update current position to the (potentially clamped) midpoint
+                currentX = midResult.clampedX;
+                currentY = midResult.clampedY;
 
-            currentX = targetResult.clampedX;
-            currentY = targetResult.clampedY;
-        }
+                // --- Lookahead Logic: Decide if a "prep" move is needed at P_mid ---
+                
+                // Check if we are at the origin
+                const atOrigin = (currentX * currentX + currentY * currentY) < EPSILON;
 
-        // --- Finalize ---
-        els.outputGcodeEl.value = outputGcode.join('\n');
-        els.stepSlider.max = globalPathSegments.length;
-        els.stepSlider.value = globalPathSegments.length;
-        els.stepLabel.textContent = `${globalPathSegments.length} / ${globalPathSegments.length}`;
-        drawToStep(globalPathSegments.length);
+                if (nextCommand && atOrigin) {
+                    console.log(`Lookahead: At origin (0,0), checking for prep move.`);
+                    // Determine next target (P_end)
+                    const nextTargetX = nextCommand.xMatch ? parseFloat(nextCommand.xMatch[1]) : currentX; // Start from new currentX
+                    const nextTargetY = nextCommand.yMatch ? parseFloat(nextCommand.yMatch[1]) : currentY; // Start from new currentY
+                    const P_end = { x: nextTargetX, y: nextTargetY };
 
-        // --- Show Warnings ---
-        if (warnings.length > 0) {
-            const uniqueWarnings = [...new Set(warnings)];
-            els.warningIndicator.classList.remove('hidden');
-            els.warningMessages.classList.remove('hidden');
-            els.warningMessages.querySelector('ul').innerHTML = uniqueWarnings.map(w => `<li>${w}</li>`).join('');
-        }
-    }
+                    const endResult = calculateIK(L1_LENGTH, L2_LENGTH, P_end.x, P_end.y);
+                    if (endResult.error) {
+                        warnings.push(`Lookahead for Line ${nextCommand.index} failed.`);
+                        continue;
+                    }
+
+                    // Get the *other* solution for P_mid
+                    const otherSolution = (currentSolution === 'up') ? 'down' : 'up';
+                    const midAngles_other = (otherSolution === 'down') ? midResult.solution1 : midResult.solution2;
+                    
+                    // Get both potential solution angles for P_end
+                    const endAngles_current = (currentSolution === 'down') ? endResult.solution1 : endResult.solution2;
+                    const endAngles_other = (otherSolution === 'down') ? endResult.solution1 : endResult.solution2;
+
+                    // Calculate cost of B -> C (staying on current solution)
+                    const cost_stay = getAngleCost(midAngles_current, endAngles_current);
+                    
+                    // Calculate cost of B -> C (switching to other solution)
+                    const cost_switch = getAngleCost(midAngles_other, endAngles_other);
+
+                    // --- Decision ---
+                    if (cost_switch < cost_stay) {
+                        console.log(`Lookahead: Prep move is cheaper. Adding.`);
+                        // It's "cheaper" to switch. Add the prep move.
+                        const prepGcode = calculateGcode(midAngles_current, midAngles_other);
+                        if(prepGcode.gcode) outputGcode.push(prepGcode.gcode + ` ; Prep move at (0,0)`);
+
+                        // Add a "dummy" segment for the slider (no length, but holds new solution)
+                        globalPathSegments.push({
+                            startX: currentX, startY: currentY,
+                            endX: currentX, endY: currentY,
+                            isClamped: false,
+                            endSolution: otherSolution // Solution we are *switching* to
+                        });
+                        
+                        // CRITICAL: Update the current solution for the *next* loop iteration
+                        currentSolution = otherSolution;
+                    } else {
+                        console.log(`Lookahead: Staying with current solution is cheaper. No prep move.`);
+                    }
+                } else if (nextCommand) {
+                    console.log(`Lookahead: Not at origin. Prep move disabled.`);
+                }
+            } // --- End of for loop ---
+
+            // --- Finalize ---
+            els.outputGcodeEl.value = outputGcode.join('\n');
+            els.stepSlider.max = globalPathSegments.length;
+            els.stepSlider.value = globalPathSegments.length;
+            els.stepLabel.textContent = `${globalPathSegments.length} / ${globalPathSegments.length}`;
+            drawToStep(globalPathSegments.length);
+
+            // --- Show Warnings if any ---
+            if (warnings.length > 0) {
+                const uniqueWarnings = [...new Set(warnings)];
+                els.warningIndicator.classList.remove('hidden');
+                els.warningMessages.classList.remove('hidden');
+                els.warningMessages.querySelector('ul').innerHTML = uniqueWarnings.map(w => `<li>${w}</li>`).join('');
+            }
+        }
         
         // --- Slider Event ---
         function handleSliderChange(event) {
