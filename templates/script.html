@@ -1083,13 +1083,23 @@ if (overrideStartAngles && Math.hypot(P_start.x, P_start.y) < EPSILON) {
 
 // midAngles are computed based on the currentSolution (which may have been updated previously)
 let midAngles;
-if (overrideStartAngles && Math.hypot(P_start.x, P_start.y) < EPSILON) {
-    // We just aligned at origin — use same tangent orientation
+if (Math.hypot(P_start.x, P_start.y) < EPSILON && overrideStartAngles) {
+    // We’re at origin and just performed a tangent alignment.
+    // Use the aligned orientation (overrideStartAngles) as our true start,
+    // and compute the new midAngles based on that tangent.
     const tangentIK = calculateIK(L1_LENGTH, L2_LENGTH, P_mid.x, P_mid.y);
-    midAngles = (pendingSolution === 'down') ? tangentIK.solution1 : tangentIK.solution2;
+    midAngles = (pendingSolution ?? currentSolution) === 'down'
+        ? tangentIK.solution1
+        : tangentIK.solution2;
+    // Commit this override as the new current orientation.
+    startAngles = overrideStartAngles;
+    overrideStartAngles = null;
+    currentSolution = pendingSolution ?? currentSolution;
+    pendingSolution = undefined;
 } else {
     midAngles = (currentSolution === 'down') ? midIK.solution1 : midIK.solution2;
 }
+
 
 
 
