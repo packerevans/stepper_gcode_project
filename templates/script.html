@@ -1081,9 +1081,8 @@ if (overrideStartAngles && Math.hypot(P_start.x, P_start.y) < EPSILON) {
 }
 
 
-        // midAngles are computed based on the currentSolution (which may have been updated previously)
-        const midAngles = (currentSolution === 'down') ? midIK.solution1 : midIK.solution2;
-        let midAngles;
+// midAngles are computed based on the currentSolution (which may have been updated previously)
+let midAngles;
 if (overrideStartAngles && Math.hypot(P_start.x, P_start.y) < EPSILON) {
     // We just aligned at origin — use same tangent orientation
     const tangentIK = calculateIK(L1_LENGTH, L2_LENGTH, P_mid.x, P_mid.y);
@@ -1091,6 +1090,7 @@ if (overrideStartAngles && Math.hypot(P_start.x, P_start.y) < EPSILON) {
 } else {
     midAngles = (currentSolution === 'down') ? midIK.solution1 : midIK.solution2;
 }
+
 
 
     // Generate G-code for the actual move from start -> mid
