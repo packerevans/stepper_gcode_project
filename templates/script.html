@@ -1175,19 +1175,20 @@ if (Math.hypot(P_mid.x, P_mid.y) < EPSILON && nextCmd) {
     let deltaHeading = nextHeading - currentHeading;
     while (deltaHeading > Math.PI) deltaHeading -= 2 * Math.PI;
     while (deltaHeading < -Math.PI) deltaHeading += 2 * Math.PI;
-logStep("Align tangent branch triggered", deltaHeading);
-// remove or move this next one — we can’t log otherSol yet
+
+    logStep("Align tangent branch triggered", deltaHeading);
 
     // --- Apply rotation or flip once ---
     if (Math.abs(deltaHeading) < toRadians(45)) {
+        // Small rotation — simple alignment
         const aligned = { q1: currentAnglesRaw.q1 + deltaHeading, q2: currentAnglesRaw.q2 };
         const prep = calculateGcode(currentAnglesRaw, aligned);
         if (prep.gcode) outputGcode.push(prep.gcode + " ; Align tangent at (0,0)");
         overrideStartAngles = aligned;
-        
     } else {
+        // Larger angle — flip elbow + align tangent
         const otherSol = (currentSolution === 'up') ? 'down' : 'up';
-        logStep("Elbow flip branch triggered", {deltaHeading, otherSol});
+        logStep("Elbow flip branch triggered", { deltaHeading, otherSol });
         const rawFlipped = (otherSol === 'down') ? midIK.solution1 : midIK.solution2;
         const desired_q1 = nextHeading - rawFlipped.q2;
         const aligned_q1 = ((desired_q1 + Math.PI) % (2 * Math.PI)) - Math.PI;
@@ -1197,84 +1198,22 @@ logStep("Align tangent branch triggered", deltaHeading);
             outputGcode.push(flipAndAlign.gcode + " ; Elbow flip + align at (0,0)");
         overrideStartAngles = alignedFlipped;
         pendingSolution = otherSol;
-    }
-logStep(`--- Processing segment ${i + 1} ---`, {currentX, currentY});
 
-    // --- Set 0,0 as next start position ---
-    currentX = 0;
-    currentY = 0;
-    
-}
-
-logStep(`--- Processing segment ${i + 1} ---`, {currentX, currentY});
-
-
-    // Current angles & heading
-    const currentAnglesRaw = (currentSolution === 'down') ? startIK.solution1 : startIK.solution2;
-    const currentHeading = currentAnglesRaw.q1 + currentAnglesRaw.q2;
-    let deltaHeading = nextHeading - currentHeading;
-    while (deltaHeading > Math.PI) deltaHeading -= 2 * Math.PI;
-    while (deltaHeading < -Math.PI) deltaHeading += 2 * Math.PI;
-
-    if (Math.abs(deltaHeading) < toRadians(45)) {
-        // Small angle: rotate in place to align tangent (single rotation)
-        const aligned = { q1: currentAnglesRaw.q1 + deltaHeading, q2: currentAnglesRaw.q2 };
-        const prep = calculateGcode(currentAnglesRaw, aligned);
-        if (prep.gcode) {
-            outputGcode.push(prep.gcode + " ; Align tangent at (0,0)");
-            globalPathSegments.push({
-                startX: currentX, startY: currentY,
-                endX: currentX,   endY: currentY,
-                isClamped: false, endSolution: currentSolution
-            });
-        }
-        overrideStartAngles = aligned;
-        lastHeadingAtOrigin = nextHeading;
-    } else {
-        // Large angle: flip elbow and align tangent for the flipped solution — single rotation
-        const otherSol = (currentSolution === 'up') ? 'down' : 'up';
-        const rawFlipped = (otherSol === 'down') ? startIK.solution1 : startIK.solution2;
-
-        // Choose q1 so q1 + q2 == nextHeading (tangent)
-        const desired_q1 = nextHeading - rawFlipped.q2;
-        const aligned_q1 = ((desired_q1 + Math.PI) % (2 * Math.PI)) - Math.PI;
-        const alignedFlipped = { q1: aligned_q1, q2: rawFlipped.q2 };
-
-        const flipAndAlign = calculateGcode(currentAnglesRaw, alignedFlipped);
-        if (flipAndAlign.gcode) {
-            outputGcode.push(flipAndAlign.gcode + " ; Elbow flip + align at (0,0)");
-        }
-
-        overrideStartAngles = alignedFlipped;
-        pendingSolution = otherSol;
-        lastHeadingAtOrigin = nextHeading;
-
+        // ✅ keep the global path segment here
         globalPathSegments.push({
             startX: currentX, startY: currentY,
             endX: currentX, endY: currentY,
             isClamped: false, endSolution: otherSol
         });
     }
+
+    // --- Set (0,0) as next start position ---
+    currentX = 0;
+    currentY = 0;
 }
 
-
-logStep("Final output length", outputGcode.length);
-
-    // --- Finalize ---
-    els.outputGcodeEl.value = outputGcode.join('\n');
-    els.stepSlider.max = globalPathSegments.length;
-    els.stepSlider.value = globalPathSegments.length;
-    els.stepLabel.textContent = `${globalPathSegments.length} / ${globalPathSegments.length}`;
-    drawToStep(globalPathSegments.length);
-
-    if (warnings.length) {
-        const unique = [...new Set(warnings)];
-        els.warningIndicator.classList.remove('hidden');
-        els.warningMessages.classList.remove('hidden');
-        els.warningMessages.querySelector('ul').innerHTML =
-            unique.map(w => `<li>${w}</li>`).join('');
-    }
-    } // end for        
+logStep(`--- Processing segment ${i + 1} ---`, { currentX, currentY });
+     
         // --- Slider Event ---
         function handleSliderChange(event) {
             const { stepLabel, stepSlider } = getCalculatorElements();
