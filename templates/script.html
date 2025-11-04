@@ -398,6 +398,7 @@
                             <canvas id="ikCanvas" class="bg-white rounded-lg w-full h-full"></canvas>
                         </div>
                         
+                        <!-- SLIDER IS BACK -->
                         <div class="mt-4">
                             <label for="stepSlider" class="block text-sm font-medium text-gray-700 mb-1">Step: <span id="stepLabel" class="font-bold">0 / 0</span></label>
                             <input type="range" id="stepSlider" min="0" max="0" value="0" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
@@ -415,6 +416,7 @@ G1 X203.2 Y0
                         </div>
 
                         <div>
+                            <!-- UPDATED LABEL -->
                             <div class="flex justify-between items-center mb-1">
                                 <label for="outputGcode" class="block text-sm font-medium text-gray-700">Converted G-Code (Motor Degrees)</label>
                                 <span id="warningIndicator" class="hidden text-sm font-medium text-yellow-600 flex items-center gap-1">
@@ -693,6 +695,7 @@ G1 X203.2 Y0
         });
     </script>
 
+    <!-- ### MODIFIED CALCULATOR SCRIPT ### -->
     <script>
         // --- Fixed Constants ---
         const L1_LENGTH = 101.6;
@@ -1130,7 +1133,7 @@ G1 X203.2 Y0
                     const yMatch = trimmed.match(/Y\s*(-?[\d\.]+)/i);
                     if (xMatch || yMatch) {
                         const targetX = xMatch ? parseFloat(xMatch[1]) : lastX;
-                        const targetY = yMatch ? parseFloat(xMatch[1]) : lastY;
+                        const targetY = yMatch ? parseFloat(yMatch[1]) : lastY;
                         points.push({ x: targetX, y: targetY, lineIndex: index + 1 });
                         lastX = targetX;
                         lastY = targetY;
@@ -1304,6 +1307,7 @@ G1 X203.2 Y0
             
             // --- NEW DURATION LOGIC ---
             const segmentDist = Math.hypot(toState.x - fromState.x, toState.y - fromState.y);
+            // A prep move is *only* a rotation if distance is also zero
             const isRotationOnly = (segmentDist < EPSILON && toState.isPrepMove);
             
             let duration;
@@ -1345,26 +1349,20 @@ G1 X203.2 Y0
                 interpTheta1_rad = lerp(fromTheta1_rad, toTheta1_rad, progress);
                 interpTheta2_rad = lerp(fromTheta2_rad, toTheta2_rad, progress);
                 
+                // Calculate joint angles (q1, q2) from interpolated motor angles (theta1, theta2)
+                interpQ1 = interpTheta1_rad;
+                interpQ2 = interpTheta2_rad - (1/8) * interpTheta1_rad;
+
                 if (isRotationOnly) {
-                    // We are only rotating at (0,0)
+                    // We are only rotating at (0,0), so use the state's (x,y)
                     interpX = fromState.x;
                     interpY = fromState.y;
-                    // Calculate joint angles from interpolated motor angles
-                    interpQ1 = interpTheta1_rad;
-                    interpQ2 = interpTheta2_rad - (1/8) * interpTheta1_rad;
                 } else {
-                    // We are moving along a line
-                    interpX = lerp(fromState.x, toState.x, progress);
-                    interpY = lerp(fromState.y, toState.y, progress);
-                    // We MUST re-calculate IK from (x,y) to follow the line
-                    const ik = calculateIK(L1_LENGTH, L2_LENGTH, interpX, interpY);
-                    const solutionAngles = (toState.solution === 'down') ? ik.solution1 : ik.solution2;
-                    interpQ1 = solutionAngles.q1;
-                    interpQ2 = solutionAngles.q2;
-                    
-                    // Now, find the resulting motor angles *for the text display*
-                    interpTheta1_rad = interpQ1;
-                    interpTheta2_rad = interpQ2 + (1/8) * interpQ1;
+                    // We are moving along a line.
+                    // We must calculate (x,y) from the interpolated joint angles (q1, q2)
+                    // This is FORWARD kinematics.
+                    interpX = L1_LENGTH * Math.cos(interpQ1) + L2_LENGTH * Math.cos(interpQ1 + interpQ2);
+                    interpY = L1_LENGTH * Math.sin(interpQ1) + L2_LENGTH * Math.sin(interpQ1 + interpQ2);
                 }
 
 
@@ -1397,7 +1395,13 @@ G1 X203.2 Y0
                 ctx.lineWidth = 2;
                 ctx.setLineDash([2, 4]);
                 ctx.moveTo(fromState.x * scale, fromState.y * scale);
-                ctx.lineTo(interpX * scale, interpY * scale);
+                
+                // If we are rotating, the trace is just a dot.
+                // If we are moving, draw the line segment.
+                if (!isRotationOnly) {
+                     ctx.lineTo(interpX * scale, interpY * scale);
+                }
+                
                 ctx.stroke();
                 ctx.restore();
 
@@ -1449,7 +1453,7 @@ G1 X203.2 Y0
                          console.error('Fallback copy failed: ', e);
                     }
                 });
-            });
+            }
         }
 
         // --- Initial Setup ---
