@@ -378,11 +378,11 @@
                                     <legend class="text-sm font-medium text-gray-700 px-1">Preferred Solution (Constant)</legend>
                                     <div class="flex justify-around mt-1">
                                         <label class="flex items-center space-x-2">
-                                            <input type="radio" name="solution" value="up" class="focus:ring-green-500 h-4 w-4 text-green-600 border-gray-300" checked>
+                                            <input type="radio" name="solution" value="up" class="focus:ring-green-500 h-4 w-4 text-green-600 border-gray-300">
                                             <span class="text-sm text-green-700 font-medium">Elbow Up</span>
                                         </label>
                                         <label class="flex items-center space-x-2">
-                                            <input type="radio" name="solution" value="down" class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300">
+                                            <input type="radio" name="solution" value="down" class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300" checked>
                                             <span class="text-sm text-blue-700 font-medium">Elbow Down</span>
                                         </label>
                                     </div>
@@ -399,7 +399,7 @@
                         </div>
                         
                         <div class="mt-4">
-                            <label for="stepSlider" class="block text-sm font-medium text-gray-700 mb-1">Step: <span id="stepLabel" class="font-bold">0 / 0</span></label>
+                            <label for="stepSlider" class="block text-sm font-medium text-gray-700 mb-1">Frame: <span id="stepLabel" class="font-bold">0 / 0</span></label>
                             <input type="range" id="stepSlider" min="0" max="0" value="0" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
                         </div>
                     </div>
@@ -409,7 +409,10 @@
                             <label for="inputGcode" class="block text-sm font-medium text-gray-700 mb-1">Input G-Code (Cartesian)</label>
                             <textarea id="inputGcode" class="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" spellcheck="false">G1 X0 Y0
 G1 X0 Y203.2
-                            </textarea>
+G1 X-203.2 Y0
+G1 X0 Y-203.2
+G1 X203.2 Y0
+</textarea>
                         </div>
 
                         <div>
@@ -685,7 +688,7 @@ G1 X0 Y203.2
         });
     </script>
 
-        <script>
+    <script>
     // --- Fixed Constants ---
     const L1_LENGTH = 101.6;
     const L2_LENGTH = 101.6;
@@ -720,7 +723,8 @@ G1 X0 Y203.2
     let scale = 1;
     let originX = 0;
     let originY = 0;
-    let globalPathSegments = []; // Stores the calculated path segments
+    // --- NEW: This will store {q1, q2, solution} for EVERY frame ---
+    let globalAnimationFrames = []; 
 
     // --- Utility Functions ---
     function toDegrees(radians) {
@@ -728,6 +732,14 @@ G1 X0 Y203.2
     }
     function toRadians(degrees) {
         return degrees * (Math.PI / 180);
+    }
+
+    // --- NEW: Forward Kinematics (Angles to X,Y) ---
+    // This is the opposite of calculateIK
+    function calculateFK(q1, q2) {
+        const x = L1_LENGTH * Math.cos(q1) + L2_LENGTH * Math.cos(q1 + q2);
+        const y = L1_LENGTH * Math.sin(q1) + L2_LENGTH * Math.sin(q1 + q2);
+        return { x, y };
     }
 
     /**
@@ -856,44 +868,41 @@ G1 X0 Y203.2
         ctx.restore();
     }
 
-    // Draws just the path segments (lines)
-    function drawPathSegments(segments) {
+    // --- MODIFIED: Draws the path from the animation frames ---
+    function drawPathSegments(frames) {
         const { canvas, ctx } = getCalculatorElements();
-        if (!canvas || !ctx) return;
+        if (!canvas || !ctx || frames.length < 2) return;
+        
         ctx.save();
         ctx.translate(originX, originY);
         ctx.scale(1, -1); // Flip Y-axis
 
-        for (const segment of segments) {
-            // Do not draw "prep" moves, which have same start/end
-            if (Math.abs(segment.startX - segment.endX) < EPSILON && Math.abs(segment.startY - segment.endY) < EPSILON) {
-                continue;
-            }
-            ctx.beginPath();
-            ctx.moveTo(segment.startX * scale, segment.startY * scale);
-            ctx.lineTo(segment.endX * scale, segment.endY * scale);
-            
-            // We're not interpolating, so all lines are "complex" arcs
-            // Let's color them differently
-            ctx.strokeStyle = segment.isClamped ? '#ef4444' : '#f97316'; // red-500 or orange-500
-            ctx.lineWidth = 2;
-            ctx.setLineDash([2, 4]); // Draw arcs as dashed lines
-            ctx.stroke();
+        ctx.beginPath();
+        // Move to the first point
+        let { x: startX, y: startY } = calculateFK(frames[0].q1, frames[0].q2);
+        ctx.moveTo(startX * scale, startY * scale);
+
+        // Draw lines to all subsequent points
+        for (let i = 1; i < frames.length; i++) {
+            const { x, y } = calculateFK(frames[i].q1, frames[i].q2);
+            ctx.lineTo(x * scale, y * scale);
         }
+
+        ctx.strokeStyle = '#f97316'; // orange-500
+        ctx.lineWidth = 2;
+        ctx.setLineDash([2, 4]); // Draw arcs as dashed lines
+        ctx.stroke();
+        
         ctx.setLineDash([]);
         ctx.restore();
     }
     
-    // --- THIS FUNCTION IS MODIFIED ---
-    // Draws the arm at a specific X, Y cartesian coordinate AND solution
-    function drawArmAtPosition(x, y, solution) {
+    // --- MODIFIED: Draws the arm and text readout ---
+    function drawArmAtPosition(x, y, solution, q1, q2) {
         const { canvas, ctx } = getCalculatorElements();
         if (!canvas || !ctx) return;
-        const result = calculateIK(L1_LENGTH, L2_LENGTH, x, y);
-        if (result.error) return;
-
-        const angles = (solution === 'down') ? result.solution1 : result.solution2;
-        const { q1, q2 } = angles;
+        
+        // We are passed the q1 and q2, so no need to call calculateIK again
         const color = (solution === 'down') ? '#0ea5e9' : '#2563eb'; // 'up' is blue-600, 'down' is cyan-500
 
         const joint1X = (L1_LENGTH * Math.cos(q1)) * scale;
@@ -947,53 +956,68 @@ G1 X0 Y203.2
         // --- NEW: Draw Angle Readout ---
         ctx.save();
         ctx.scale(1, -1); // Un-flip Y axis for text
-        ctx.fillStyle = '#1f2937'; // dark gray
+        // Use theme-aware color
+        const bodyStyles = getComputedStyle(document.body);
+        ctx.fillStyle = bodyStyles.getPropertyValue('--color-text') || '#1f2937';
         ctx.font = '16px Arial';
         ctx.textAlign = 'left';
-        // Draw text from the top-left corner (which is (-originX, -originY) in this context)
-        ctx.fillText(`q1: ${toDegrees(q1).toFixed(2)}°`, -originX + 10, -originY + 20);
-        ctx.fillText(`q2: ${toDegrees(q2).toFixed(2)}°`, -originX + 10, -originY + 45);
+        // Draw text from the top-left corner
+        ctx.fillText(`q1: ${toDegrees(q1).toFixed(2)}°`, -originX + 10, -originY + 25);
+        ctx.fillText(`q2: ${toDegrees(q2).toFixed(2)}°`, -originX + 10, -originY + 50);
         ctx.restore();
         // --- END NEW CODE ---
-
+        
         ctx.restore();
     }
 
-    // Main drawing function: draws grid, path, and arm
+    // --- MODIFIED: Main drawing function ---
     function drawToStep(stepIndex) {
         const { canvas, initialXInput, initialYInput } = getCalculatorElements();
         if (!canvas || !initialXInput || !initialYInput) return;
         
         stepIndex = parseInt(stepIndex, 10);
-        drawGrid();
+        drawGrid(); // Draw the background grid
 
-        const segmentsToDraw = globalPathSegments.slice(0, stepIndex);
-        drawPathSegments(segmentsToDraw);
-
-        let finalX, finalY, finalSolution;
+        // Get all animation frames up to the current slider position
+        const framesToDraw = globalAnimationFrames.slice(0, stepIndex + 1);
         
-        if (stepIndex === 0) {
+        // Draw the path the arm has taken
+        drawPathSegments(framesToDraw);
+
+        let finalX, finalY, finalSolution, finalQ1, finalQ2;
+        
+        if (stepIndex === 0 || globalAnimationFrames.length === 0) {
+            // Draw the initial starting position
             finalX = parseFloat(initialXInput.value || "203.2");
             finalY = parseFloat(initialYInput.value || "0");
             finalSolution = document.querySelector('input[name="solution"]:checked').value;
+            // Run IK to get the angles for the text display
+            const ik = calculateIK(L1_LENGTH, L2_LENGTH, finalX, finalY);
+            const startAngles = (finalSolution === 'down') ? ik.solution1 : ik.solution2;
+            finalQ1 = startAngles.q1;
+            finalQ2 = startAngles.q2;
         } else {
-            const lastSegment = segmentsToDraw[stepIndex - 1];
-            finalX = lastSegment.endX;
-            finalY = lastSegment.endY;
-            finalSolution = lastSegment.endSolution; // Use the solution we ended up with
+            // Get the very last frame from the array
+            const lastFrame = globalAnimationFrames[stepIndex];
+            // Use FK to find the (x, y) for this frame's angles
+            const { x, y } = calculateFK(lastFrame.q1, lastFrame.q2);
+            finalX = x;
+            finalY = y;
+            finalSolution = lastFrame.solution;
+            finalQ1 = lastFrame.q1;
+            finalQ2 = lastFrame.q2;
         }
         
-        drawArmAtPosition(finalX, finalY, finalSolution);
+        // Draw the arm at its final position
+        drawArmAtPosition(finalX, finalY, finalSolution, finalQ1, finalQ2);
     }
 
     // --- HELPER: Calculates motor steps from angle deltas ---
-    // --- UPDATED with delta_q1 - delta_q2 ---
     function calculateGcode(startAngles, endAngles) {
         const delta_q1_deg = toDegrees(endAngles.q1 - startAngles.q1);
         const delta_q2_deg = toDegrees(endAngles.q2 - startAngles.q2);
 
         const delta_motor1_deg = delta_q1_deg;
-        // --- YOUR CORRECT KINEMATICS ---
         const delta_motor2_deg = delta_q1_deg - delta_q2_deg;
         
         const motor1_steps = Math.round(delta_motor1_deg * DEG_TO_STEPS);
@@ -1009,26 +1033,20 @@ G1 X0 Y203.2
     }
 
     // --- HELPER: Calculates the "cost" (sum of squared motor change) ---
-    // --- UPDATED with delta_q1 - delta_q2 ---
     function getAngleCost(anglesA, anglesB) {
         const delta_q1_deg = toDegrees(anglesB.q1 - anglesA.q1);
         const delta_q2_deg = toDegrees(anglesB.q2 - anglesA.q2);
         
         const delta_motor1_deg = delta_q1_deg;
-        // --- YOUR CORRECT KINEMATICS ---
         const delta_motor2_deg = delta_q1_deg - delta_q2_deg;
         
-        // Calculate the *actual* motor steps (unrounded) to get the true cost,
-        // including the 0.125 coupling.
         const motor1_steps_raw = delta_motor1_deg * DEG_TO_STEPS;
         const motor2_steps_raw = (0.125 * motor1_steps_raw) + (delta_motor2_deg * DEG_TO_STEPS);
 
-        // Return sum of squares *of the final motor steps*
         return (motor1_steps_raw * motor1_steps_raw) + (motor2_steps_raw * motor2_steps_raw);
     }
 
-    // --- *** NEW: REWRITTEN Main Conversion Logic *** ---
-    // This version uses pair-wise iteration to solve the (0,0) alignment problem.
+    // --- *** HEAVILY MODIFIED Main Conversion Logic *** ---
     function handleConversion() {
         try { 
             const els = getCalculatorElements();
@@ -1047,12 +1065,14 @@ G1 X0 Y203.2
             els.warningIndicator.classList.add('hidden');
             els.warningMessages.classList.add('hidden');
             els.warningMessages.querySelector('ul').innerHTML = '';
-            globalPathSegments = [];
+            
+            // --- RESET Animation Array ---
+            globalAnimationFrames = [];
 
             let outputGcode = [];
             let warnings = [];
 
-            // --- NEW: Step 1: Collect all points ---
+            // --- Step 1: Collect all points ---
             const points = [];
             points.push({ x: initialX, y: initialY, lineIndex: 0 });
 
@@ -1074,12 +1094,19 @@ G1 X0 Y203.2
                 }
             }
 
-            // --- NEW: Step 2: Initialize state for loop ---
+            // --- Step 2: Initialize state for loop ---
             let ikResult = calculateIK(L1_LENGTH, L2_LENGTH, points[0].x, points[0].y);
             let currentAngles = (currentSolution === 'down') ? ikResult.solution1 : ikResult.solution2;
             let overrideStartAngles = null; 
 
-            // --- NEW: Step 3: Iterate over point pairs ---
+            // --- Add the very first frame (step 0) ---
+            globalAnimationFrames.push({
+                q1: currentAngles.q1,
+                q2: currentAngles.q2,
+                solution: currentSolution
+            });
+
+            // --- Step 3: Iterate over point pairs ---
             for (let i = 0; i < points.length - 1; i++) {
                 const P_start = points[i];
                 const P_end = points[i + 1]; 
@@ -1105,19 +1132,29 @@ G1 X0 Y203.2
 
                 const endAngles = (currentSolution === 'down') ? endIK.solution1 : endIK.solution2;
 
+                // --- Generate G-code (but don't interpolate yet) ---
                 const moveG = calculateGcode(startAngles, endAngles);
                 if (moveG.gcode) {
                     outputGcode.push(moveG.gcode);
                 }
 
-                globalPathSegments.push({
-                    startX: P_start.x,
-                    startY: P_start.y,
-                    endX: clampedEnd.x,
-                    endY: clampedEnd.y,
-                    isClamped: endIK.isClamped,
-                    endSolution: currentSolution
-                });
+                // --- NEW: Interpolate this move for animation ---
+                const delta_q1_deg = toDegrees(endAngles.q1 - startAngles.q1);
+                const delta_q2_deg = toDegrees(endAngles.q2 - startAngles.q2);
+                // Calculate steps based on 1-degree increments
+                const numSubSteps = Math.max(1, Math.ceil(Math.max(Math.abs(delta_q1_deg), Math.abs(delta_q2_deg))));
+
+                for (let j = 1; j <= numSubSteps; j++) {
+                    const t = j / numSubSteps; // t goes from (e.g.) 1/90 to 90/90
+                    const q1_interp = startAngles.q1 + (endAngles.q1 - startAngles.q1) * t;
+                    const q2_interp = startAngles.q2 + (endAngles.q2 - startAngles.q2) * t;
+                    globalAnimationFrames.push({
+                        q1: q1_interp,
+                        q2: q2_interp,
+                        solution: currentSolution
+                    });
+                }
+                // --- End Interpolation ---
 
                 currentAngles = endAngles;
 
@@ -1126,25 +1163,18 @@ G1 X0 Y203.2
 
                 if (isAtOrigin && hasNextMove) {
                     const P_next = points[i + 2]; 
-
                     const dx = P_next.x - clampedEnd.x;
                     const dy = P_next.y - clampedEnd.y;
                     
-                    if (Math.hypot(dx, dy) < EPSILON) {
-                        continue; 
-                    }
+                    if (Math.hypot(dx, dy) < EPSILON) continue; 
 
                     const nextHeading = Math.atan2(dy, dx);
-
                     const rawSol1 = endIK.solution1; 
                     const rawSol2 = endIK.solution2; 
-
                     const aligned_q1_sol1 = ((nextHeading - rawSol1.q2 + Math.PI) % (2 * Math.PI)) - Math.PI;
                     const aligned_q1_sol2 = ((nextHeading - rawSol2.q2 + Math.PI) % (2 * Math.PI)) - Math.PI;
-
                     const alignedAngles1 = { q1: aligned_q1_sol1, q2: rawSol1.q2 }; 
                     const alignedAngles2 = { q1: aligned_q1_sol2, q2: rawSol2.q2 }; 
-
                     const costFlip1 = getAngleCost(currentAngles, alignedAngles1); 
                     const costFlip2 = getAngleCost(currentAngles, alignedAngles2); 
 
@@ -1163,25 +1193,39 @@ G1 X0 Y203.2
                     if (prepG.gcode) {
                         outputGcode.push(prepG.gcode + " ; " + comment);
                     }
+                    
+                    // --- NEW: Interpolate the PREP move ---
+                    const delta_q1_prep = toDegrees(prepAngles.q1 - currentAngles.q1);
+                    const delta_q2_prep = toDegrees(prepAngles.q2 - currentAngles.q2);
+                    const prepSubSteps = Math.max(1, Math.ceil(Math.max(Math.abs(delta_q1_prep), Math.abs(delta_q2_prep))));
+                    
+                    for (let j = 1; j <= prepSubSteps; j++) {
+                        const t = j / prepSubSteps;
+                        const q1_interp = currentAngles.q1 + (prepAngles.q1 - currentAngles.q1) * t;
+                        const q2_interp = currentAngles.q2 + (prepAngles.q2 - currentAngles.q2) * t;
+                        globalAnimationFrames.push({
+                            q1: q1_interp,
+                            q2: q2_interp,
+                            solution: prepSolution // Use the solution we are *going to*
+                        });
+                    }
+                    // --- End Prep Interpolation ---
 
                     overrideStartAngles = prepAngles; 
                     currentSolution = prepSolution; 
                     currentAngles = prepAngles;     
-
-                    globalPathSegments.push({
-                        startX: clampedEnd.x, startY: clampedEnd.y,
-                        endX: clampedEnd.x,   endY: clampedEnd.y,
-                        isClamped: false, endSolution: currentSolution
-                    });
                 }
             } // --- End for loop ---
 
             // --- Finalize ---
             els.outputGcodeEl.value = outputGcode.join('\n');
-            els.stepSlider.max = globalPathSegments.length;
-            els.stepSlider.value = globalPathSegments.length;
-            els.stepLabel.textContent = `${globalPathSegments.length} / ${globalPathSegments.length}`;
-            drawToStep(globalPathSegments.length);
+            
+            // --- NEW: Update slider for frames ---
+            const totalFrames = Math.max(0, globalAnimationFrames.length - 1);
+            els.stepSlider.max = totalFrames;
+            els.stepSlider.value = totalFrames;
+            els.stepLabel.textContent = `${totalFrames} / ${totalFrames}`;
+            drawToStep(totalFrames);
 
             if (warnings.length) {
                 const unique = [...new Set(warnings)];
@@ -1196,17 +1240,18 @@ G1 X0 Y203.2
         }
     }
     
-    // --- Slider Event ---
+    // --- MODIFIED: Slider Event ---
     function handleSliderChange(event) {
         const { stepLabel, stepSlider } = getCalculatorElements();
         if (!stepLabel || !stepSlider) return;
         
         const step = event.target.value;
+        // Label is now "Frame"
         stepLabel.textContent = `${step} / ${stepSlider.max}`;
         drawToStep(step);
     }
 
-    // --- Copy Button Logic ---
+    // --- Copy Button Logic (unchanged) ---
     function setupCopyButton() {
         const { copyButton, outputGcodeEl, copySuccess } = getCalculatorElements();
         if (!copyButton || !outputGcodeEl || !copySuccess) return;
@@ -1246,7 +1291,7 @@ G1 X0 Y203.2
         });
     }
 
-    // --- Initial Setup ---
+    // --- Initial Setup (unchanged) ---
     document.addEventListener('DOMContentLoaded', () => {
         const { convertButton, stepSlider } = getCalculatorElements();
         
@@ -1265,4 +1310,3 @@ G1 X0 Y203.2
 </script>    
 </body>
 </html>
-
