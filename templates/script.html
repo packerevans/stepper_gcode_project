@@ -150,7 +150,7 @@
         .sandify-module a {
             display: inline-block;
             text-decoration: none;
-            background-color: var(--color-primary);  
+            background-color: var(--color-primary); 
             color: var(--color-text);
             border: none; padding: 12px 25px; border-radius: 8px; font-size: 16px;
             cursor: pointer; transition: background-color 0.2s, box-shadow 0.2s;
@@ -164,7 +164,7 @@
         /* --- Buttons --- */
         /* This will style ALL buttons, including Tailwind ones, to match the theme */
         button {
-            background-color: var(--color-primary);  
+            background-color: var(--color-primary); 
             color: var(--color-text);
             border: none; padding: 12px 25px; border-radius: 8px; font-size: 16px;
             cursor: pointer; transition: background-color 0.2s, box-shadow 0.2s;
@@ -378,11 +378,11 @@
                                     <legend class="text-sm font-medium text-gray-700 px-1">Preferred Solution (Constant)</legend>
                                     <div class="flex justify-around mt-1">
                                         <label class="flex items-center space-x-2">
-                                            <input type="radio" name="solution" value="up" class="focus:ring-green-500 h-4 w-4 text-green-600 border-gray-300">
+                                            <input type="radio" name="solution" value="up" class="focus:ring-green-500 h-4 w-4 text-green-600 border-gray-300" checked>
                                             <span class="text-sm text-green-700 font-medium">Elbow Up</span>
                                         </label>
                                         <label class="flex items-center space-x-2">
-                                            <input type="radio" name="solution" value="down" class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300" checked>
+                                            <input type="radio" name="solution" value="down" class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300">
                                             <span class="text-sm text-blue-700 font-medium">Elbow Down</span>
                                         </label>
                                     </div>
@@ -399,7 +399,7 @@
                         </div>
                         
                         <div class="mt-4">
-                            <label for="stepSlider" class="block text-sm font-medium text-gray-700 mb-1">Frame: <span id="stepLabel" class="font-bold">0 / 0</span></label>
+                            <label for="stepSlider" class="block text-sm font-medium text-gray-700 mb-1">Step: <span id="stepLabel" class="font-bold">0 / 0</span></label>
                             <input type="range" id="stepSlider" min="0" max="0" value="0" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
                         </div>
                     </div>
@@ -409,10 +409,9 @@
                             <label for="inputGcode" class="block text-sm font-medium text-gray-700 mb-1">Input G-Code (Cartesian)</label>
                             <textarea id="inputGcode" class="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" spellcheck="false">G1 X0 Y0
 G1 X0 Y203.2
-G1 X-203.2 Y0
-G1 X0 Y-203.2
+G1 X0 Y0
 G1 X203.2 Y0
-</textarea>
+                            </textarea>
                         </div>
 
                         <div>
@@ -420,7 +419,7 @@ G1 X203.2 Y0
                                 <label for="outputGcode" class="block text-sm font-medium text-gray-700">Converted G-Code (Motor Steps)</label>
                                 <span id="warningIndicator" class="hidden text-sm font-medium text-yellow-600 flex items-center gap-1">
                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-yellow-500">
-                                        <path fill-rule="evenodd" d="M8.485 2.495c.646-1.136 2.376-1.136 3.022 0l7.25 12.72c.646 1.136-.192 2.53-1.51 2.53H2.744c-1.32 0-2.158-1.395-1.51-2.53l7.25-12.72zM9 12a1 1 0 1 1 2 0 1 1 0 0 1-2 0zm1-7a1 1 0 0 1 1 1v4a1 1 0 1 1-2 0V6a1 1 0 0 1 1-1z" clip-rule="evenodd" />
+                                      <path fill-rule="evenodd" d="M8.485 2.495c.646-1.136 2.376-1.136 3.022 0l7.25 12.72c.646 1.136-.192 2.53-1.51 2.53H2.744c-1.32 0-2.158-1.395-1.51-2.53l7.25-12.72zM9 12a1 1 0 1 1 2 0 1 1 0 0 1-2 0zm1-7a1 1 0 0 1 1 1v4a1 1 0 1 1-2 0V6a1 1 0 0 1 1-1z" clip-rule="evenodd" />
                                     </svg>
                                     Warnings
                                 </span>
@@ -436,12 +435,12 @@ G1 X203.2 Y0
                             </div>
                             <div id="warningMessages" class="hidden mt-2 p-3 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-md text-xs">
                                 <ul class="list-disc list-inside space-y-1">
-                                    </ul>
+                                </ul>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>  
+            </div> 
             
             <button id="send-to-table-btn" onclick="sendGcodeFromCalculator()">
                 Send Commands
@@ -487,6 +486,12 @@ G1 X203.2 Y0
             body.setAttribute('data-theme', newTheme);
             localStorage.setItem('theme', newTheme);
             updateThemeIcon(newTheme);
+            
+            // --- NEW: Redraw canvas on theme change for text color ---
+            const { stepSlider } = getCalculatorElements();
+            if (stepSlider) {
+                drawToStep(stepSlider.value);
+            }
         }
         
         // --- Terminal Logger ---
@@ -512,7 +517,7 @@ G1 X203.2 Y0
             }
             
             term.appendChild(line);
-            term.scrollTop = term.scrollHeight;  
+            term.scrollTop = term.scrollHeight; 
         }
         
         // --- State for Manual G-code ---
@@ -689,351 +694,396 @@ G1 X203.2 Y0
     </script>
 
     <script>
-    // --- Fixed Constants ---
-    const L1_LENGTH = 101.6;
-    const L2_LENGTH = 101.6;
-    const MAX_REACH = L1_LENGTH + L2_LENGTH;
-    const MIN_REACH = Math.abs(L1_LENGTH - L2_LENGTH);
-    const DEG_TO_STEPS = 3200 / 360;
-    const Q1_OFFSET_DEG = 90;  // Arm 1 "0" is 90deg (Up)
-    const Q2_OFFSET_DEG = 180; // Arm 2 "0" is 180deg (Folded)
-    const EPSILON = 1e-6; // Small value for float comparison
-    // --- NEW: Define segment length for linear interpolation ---
-    const LINEAR_SEGMENT_MM = 1.0; // 1mm per micro-step
+        // --- Fixed Constants ---
+        const L1_LENGTH = 101.6;
+        const L2_LENGTH = 101.6;
+        const MAX_REACH = L1_LENGTH + L2_LENGTH;
+        const MIN_REACH = Math.abs(L1_LENGTH - L2_LENGTH);
+        const DEG_TO_STEPS = 3200 / 360;
+        const Q1_OFFSET_DEG = 90;  // Arm 1 "0" is 90deg (Up)
+        const Q2_OFFSET_DEG = 180; // Arm 2 "0" is 180deg (Folded)
+        const EPSILON = 1e-6; // Small value for float comparison
 
-    // --- DOM Elements ---
-    function getCalculatorElements() {
-        return {
-            initialXInput: document.getElementById('initialX'),
-            initialYInput: document.getElementById('initialY'),
-            convertButton: document.getElementById('convertButton'),
-            inputGcodeEl: document.getElementById('inputGcode'),
-            outputGcodeEl: document.getElementById('outputGcode'),
-            copyButton: document.getElementById('copyButton'),
-            copySuccess: document.getElementById('copySuccess'),
-            canvas: document.getElementById('ikCanvas'),
-            ctx: document.getElementById('ikCanvas') ? document.getElementById('ikCanvas').getContext('2d') : null,
-            warningIndicator: document.getElementById('warningIndicator'),
-            warningMessages: document.getElementById('warningMessages'),
-            stepSlider: document.getElementById('stepSlider'),
-            stepLabel: document.getElementById('stepLabel')
-        };
-    }
-    
-    // --- State ---
-    let canvasSize = 0;
-    let scale = 1;
-    let originX = 0;
-    let originY = 0;
-    // --- NEW: This will store {q1, q2, solution, motor1_cmd, motor2_cmd} for EVERY frame ---
-    let globalAnimationFrames = []; 
-
-    // --- Utility Functions ---
-    function toDegrees(radians) {
-        return radians * (180 / Math.PI);
-    }
-    function toRadians(degrees) {
-        return degrees * (Math.PI / 180);
-    }
-
-    // --- NEW: Forward Kinematics (Angles to X,Y) ---
-    function calculateFK(q1, q2) {
-        const x = L1_LENGTH * Math.cos(q1) + L2_LENGTH * Math.cos(q1 + q2);
-        const y = L1_LENGTH * Math.sin(q1) + L2_LENGTH * Math.sin(q1 + q2);
-        return { x, y };
-    }
-
-    /**
-     * Calculates Inverse Kinematics for a given point.
-     * (Unchanged from before)
-     */
-    function calculateIK(l1, l2, x, y) {
-        let dSq = x * x + y * y;
-        let d = Math.sqrt(dSq);
-        let clampedX = x;
-        let clampedY = y;
-        let isClamped = false;
-        
-        if (d > MAX_REACH - EPSILON) {
-            isClamped = true;
-            const ratio = (MAX_REACH - EPSILON) / d; 
-            clampedX = x * ratio;
-            clampedY = y * ratio;
-            d = MAX_REACH - EPSILON;
-            dSq = d * d;
-        } else if (d < MIN_REACH + EPSILON) {
-            if (d < EPSILON) {
-                // At origin (0,0)
-            } else {
-                isClamped = true;
-                const ratio = (MIN_REACH + EPSILON) / d; 
-                clampedX = x * ratio;
-                clampedY = y * ratio;
-                d = MIN_REACH + EPSILON;
-                dSq = d * d;
-            }
-        }
-
-        const cosQ2 = (dSq - l1 * l1 - l2 * l2) / (2 * l1 * l2);
-        const clampedCosQ2 = Math.max(-1, Math.min(1, cosQ2));
-
-        if (d < EPSILON) {
-            const home_q1_rad = toRadians(Q1_OFFSET_DEG); // 90 deg
+        // --- DOM Elements ---
+        function getCalculatorElements() {
             return {
-                solution1: { q1: home_q1_rad, q2: Math.acos(clampedCosQ2) }, // q2 = pi
-                solution2: { q1: home_q1_rad, q2: -Math.acos(clampedCosQ2) }, // q2 = -pi
-                clampedX, clampedY, isClamped
+                initialXInput: document.getElementById('initialX'),
+                initialYInput: document.getElementById('initialY'),
+                convertButton: document.getElementById('convertButton'),
+                inputGcodeEl: document.getElementById('inputGcode'),
+                outputGcodeEl: document.getElementById('outputGcode'),
+                copyButton: document.getElementById('copyButton'),
+                copySuccess: document.getElementById('copySuccess'),
+                canvas: document.getElementById('ikCanvas'),
+                ctx: document.getElementById('ikCanvas') ? document.getElementById('ikCanvas').getContext('2d') : null,
+                warningIndicator: document.getElementById('warningIndicator'),
+                warningMessages: document.getElementById('warningMessages'),
+                stepSlider: document.getElementById('stepSlider'),
+                stepLabel: document.getElementById('stepLabel')
             };
         }
         
-        const q2_rad_sol1 = Math.acos(clampedCosQ2);
-        const q2_rad_sol2 = -Math.acos(clampedCosQ2);
+        // --- State ---
+        let canvasSize = 0;
+        let scale = 1;
+        let originX = 0;
+        let originY = 0;
+        // --- NEW: This replaces globalPathSegments for animation ---
+        let globalAnimationSteps = []; // Stores {x, y, q1, q2, solution, motor1_delta_deg, motor2_delta_deg, isClamped}
 
-        const k1_sol1 = l1 + l2 * Math.cos(q2_rad_sol1);
-        const k2_sol1 = l2 * Math.sin(q2_rad_sol1);
-        const q1_rad_sol1 = Math.atan2(clampedY, clampedX) - Math.atan2(k2_sol1, k1_sol1);
-
-        const k1_sol2 = l1 + l2 * Math.cos(q2_rad_sol2);
-        const k2_sol2 = l2 * Math.sin(q2_rad_sol2);
-        const q1_rad_sol2 = Math.atan2(clampedY, clampedX) - Math.atan2(k2_sol2, k1_sol2);
-
-        return {
-            solution1: { q1: q1_rad_sol1, q2: q2_rad_sol1 }, // Elbow Down
-            solution2: { q1: q1_rad_sol2, q2: q2_rad_sol2 }, // Elbow Up
-            clampedX, clampedY, isClamped
-        };
-    }
-
-    // --- Drawing Functions ---
-    function resizeCanvas() {
-        const { canvas, ctx, stepSlider } = getCalculatorElements();
-        if (!canvas || !ctx) return; 
-        
-        const dpr = window.devicePixelRatio || 1;
-        const rect = canvas.getBoundingClientRect();
-        if (rect.width === 0) return; 
-        
-        canvas.width = rect.width * dpr;
-        canvas.height = rect.height * dpr;
-        ctx.scale(dpr, dpr);
-        canvasSize = rect.width;
-        originX = canvasSize / 2;
-        originY = canvasSize / 2;
-        drawToStep(stepSlider.value); 
-    }
-
-    function drawGrid() {
-        const { canvas, ctx } = getCalculatorElements();
-        if (!canvas || !ctx) return;
-        scale = (canvasSize / 2) * 0.9 / MAX_REACH; 
-        
-        ctx.clearRect(0, 0, canvasSize, canvasSize);
-        ctx.save();
-        ctx.translate(originX, originY);
-        
-        const gridSize = 50 * scale;
-        const steps = Math.ceil(originX / gridSize);
-        ctx.beginPath();
-        ctx.strokeStyle = '#e5e7eb'; // gray-200
-        ctx.lineWidth = 1;
-        for (let i = -steps; i <= steps; i++) {
-            ctx.moveTo(i * gridSize, -originY); ctx.lineTo(i * gridSize, originY);
-            ctx.moveTo(-originX, i * gridSize); ctx.lineTo(originX, i * gridSize);
+        // --- Utility Functions ---
+        function toDegrees(radians) {
+            return radians * (180 / Math.PI);
         }
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.strokeStyle = '#9ca3af'; // gray-400
-        ctx.lineWidth = 2;
-        ctx.moveTo(-originX, 0); ctx.lineTo(originX, 0); // X Axis
-        ctx.moveTo(0, -originY); ctx.lineTo(0, originY); // Y Axis
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(0, 0, MAX_REACH * scale, 0, 2 * Math.PI);
-        ctx.strokeStyle = '#3b82f6'; // blue-500
-        ctx.lineWidth = 1;
-        ctx.setLineDash([5, 5]);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        
-        ctx.restore();
-    }
-
-    // --- MODIFIED: Draws the path from the animation frames ---
-    function drawPathSegments(frames) {
-        const { canvas, ctx } = getCalculatorElements();
-        if (!canvas || !ctx || frames.length < 2) return;
-        
-        ctx.save();
-        ctx.translate(originX, originY);
-        ctx.scale(1, -1); // Flip Y-axis
-
-        ctx.beginPath();
-        // Move to the first point
-        let { x: startX, y: startY } = calculateFK(frames[0].q1, frames[0].q2);
-        ctx.moveTo(startX * scale, startY * scale);
-
-        // Draw lines to all subsequent points
-        for (let i = 1; i < frames.length; i++) {
-            const { x, y } = calculateFK(frames[i].q1, frames[i].q2);
-            ctx.lineTo(x * scale, y * scale);
+        function toRadians(degrees) {
+            return degrees * (Math.PI / 180);
         }
 
-        // --- NEW: Path is now solid, not dashed ---
-        ctx.strokeStyle = '#f97316'; // orange-500
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        
-        ctx.restore();
-    }
-    
-    // --- MODIFIED: Draws the arm and text readout ---
-    function drawArmAtPosition(frame) {
-        const { canvas, ctx } = getCalculatorElements();
-        if (!canvas || !ctx || !frame) return;
-        
-        const { q1, q2, solution, motor1_cmd, motor2_cmd } = frame;
-        const color = (solution === 'down') ? '#0ea5e9' : '#2563eb'; // 'up' is blue-600, 'down' is cyan-500
-
-        const joint1X = (L1_LENGTH * Math.cos(q1)) * scale;
-        const joint1Y = (L1_LENGTH * Math.sin(q1)) * scale;
-
-        const endEffectorX = (L1_LENGTH * Math.cos(q1) + L2_LENGTH * Math.cos(q1 + q2)) * scale;
-        const endEffectorY = (L1_LENGTH * Math.sin(q1) + L2_LENGTH * Math.sin(q1 + q2)) * scale;
-
-        ctx.save();
-        ctx.translate(originX, originY);
-        ctx.scale(1, -1); // Flip Y-axis
-
-        // Draw Arm 1
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(joint1X, joint1Y);
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 8;
-        ctx.lineCap = 'round';
-        ctx.stroke();
-
-        // Draw Arm 2
-        ctx.beginPath();
-        ctx.moveTo(joint1X, joint1Y);
-        ctx.lineTo(endEffectorX, endEffectorY);
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 8;
-        ctx.lineCap = 'round';
-        ctx.stroke();
-        
-        // Draw Joints
-        ctx.beginPath();
-        ctx.arc(0, 0, 10, 0, 2 * Math.PI); // Base joint
-        ctx.fillStyle = '#4b5563'; // gray-600
-        ctx.fill();
-        
-        ctx.beginPath();
-        ctx.arc(joint1X, joint1Y, 8, 0, 2 * Math.PI); // Elbow joint
-        ctx.fillStyle = color;
-        ctx.fill();
-        
-        // Draw Target Point
-        ctx.beginPath();
-        ctx.arc(endEffectorX, endEffectorY, 10, 0, 2 * Math.PI);
-        ctx.fillStyle = color;
-        ctx.fill();
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 3;
-        ctx.stroke();
-        
-        // --- NEW: Draw Motor Step Readout ---
-        ctx.save();
-        ctx.scale(1, -1); // Un-flip Y axis for text
-        // Use theme-aware color
-        const bodyStyles = getComputedStyle(document.body);
-        ctx.fillStyle = bodyStyles.getPropertyValue('--color-text') || '#1f2937';
-        ctx.font = 'bold 16px Arial';
-        ctx.textAlign = 'left';
-        // Draw text from the top-left corner
-        ctx.fillText(`M1 Steps: ${motor1_cmd}`, -originX + 10, -originY + 25);
-        ctx.fillText(`M2 Steps: ${motor2_cmd}`, -originX + 10, -originY + 50);
-        ctx.restore();
-        // --- END NEW CODE ---
-        
-        ctx.restore();
-    }
-
-    // --- MODIFIED: Main drawing function ---
-    function drawToStep(stepIndex) {
-        const { canvas, initialXInput, initialYInput } = getCalculatorElements();
-        if (!canvas || !initialXInput || !initialYInput) return;
-        
-        stepIndex = parseInt(stepIndex, 10);
-        drawGrid(); // Draw the background grid
-
-        if (globalAnimationFrames.length === 0) {
-             // Handle the case where no conversion has happened yet
-            const finalX = parseFloat(initialXInput.value || "203.2");
-            const finalY = parseFloat(initialYInput.value || "0");
-            const finalSolution = document.querySelector('input[name="solution"]:checked').value;
-            const ik = calculateIK(L1_LENGTH, L2_LENGTH, finalX, finalY);
-            const startAngles = (finalSolution === 'down') ? ik.solution1 : ik.solution2;
+        /**
+         * Calculates Inverse Kinematics for a given point.
+         * @returns {object} { solution1, solution2, clampedX, clampedY, isClamped, error }
+         */
+        function calculateIK(l1, l2, x, y) {
+            let dSq = x * x + y * y;
+            let d = Math.sqrt(dSq);
+            let clampedX = x;
+            let clampedY = y;
+            let isClamped = false;
             
-            // Draw the arm at its initial position
-            drawArmAtPosition({
-                q1: startAngles.q1,
-                q2: startAngles.q2,
-                solution: finalSolution,
-                motor1_cmd: 0,
-                motor2_cmd: 0
-            });
-            return;
+            // --- Clamping Logic ---
+            if (d > MAX_REACH - EPSILON) {
+                isClamped = true;
+                const ratio = (MAX_REACH - EPSILON) / d; // Clamp slightly inside max
+                clampedX = x * ratio;
+                clampedY = y * ratio;
+                d = MAX_REACH - EPSILON;
+                dSq = d * d;
+            } else if (d < MIN_REACH + EPSILON) {
+                if (d < EPSILON) {
+                    // At origin (0,0)
+                } else {
+                    isClamped = true;
+                    const ratio = (MIN_REACH + EPSILON) / d; // Clamp slightly outside min
+                    clampedX = x * ratio;
+                    clampedY = y * ratio;
+                    d = MIN_REACH + EPSILON;
+                    dSq = d * d;
+                }
+            }
+
+            // --- IK Calculation (on potentially clamped values) ---
+            const cosQ2 = (dSq - l1 * l1 - l2 * l2) / (2 * l1 * l2);
+            
+            // Handle precision errors at max/min reach
+            const clampedCosQ2 = Math.max(-1, Math.min(1, cosQ2));
+
+            // Handle (0,0) singularity for q1
+            if (d < EPSILON) {
+                // At (0,0), q1 is undefined, but we need *some* value.
+                // We'll calculate a "home" q1, but the (0,0) prep logic
+                // will later override this with a tangent-aligned q1.
+                const home_q1_rad = toRadians(Q1_OFFSET_DEG); // 90 deg
+                return {
+                    solution1: { q1: home_q1_rad, q2: Math.acos(clampedCosQ2) }, // q2 = pi (Elbow Down)
+                    solution2: { q1: home_q1_rad, q2: -Math.acos(clampedCosQ2) }, // q2 = -pi (Elbow Up)
+                    clampedX, clampedY, isClamped
+                };
+            }
+            
+            // sol1 = Elbow Down (positive q2)
+            const q2_rad_sol1 = Math.acos(clampedCosQ2);
+            // sol2 = Elbow Up (negative q2)
+            const q2_rad_sol2 = -Math.acos(clampedCosQ2);
+
+            const k1_sol1 = l1 + l2 * Math.cos(q2_rad_sol1);
+            const k2_sol1 = l2 * Math.sin(q2_rad_sol1);
+            const q1_rad_sol1 = Math.atan2(clampedY, clampedX) - Math.atan2(k2_sol1, k1_sol1);
+
+            const k1_sol2 = l1 + l2 * Math.cos(q2_rad_sol2);
+            const k2_sol2 = l2 * Math.sin(q2_rad_sol2);
+            const q1_rad_sol2 = Math.atan2(clampedY, clampedX) - Math.atan2(k2_sol2, k1_sol2);
+
+            return {
+                solution1: { q1: q1_rad_sol1, q2: q2_rad_sol1 }, // Elbow Down
+                solution2: { q1: q1_rad_sol2, q2: q2_rad_sol2 }, // Elbow Up
+                clampedX, clampedY, isClamped
+            };
         }
 
-        // Get all animation frames up to the current slider position
-        const framesToDraw = globalAnimationFrames.slice(0, stepIndex + 1);
-        
-        // Draw the path the arm has taken
-        drawPathSegments(framesToDraw);
-        
-        // Get the very last frame to draw the arm itself
-        const lastFrame = globalAnimationFrames[stepIndex];
-        drawArmAtPosition(lastFrame);
-    }
+        // --- Drawing Functions ---
+        function resizeCanvas() {
+            const { canvas, ctx, stepSlider } = getCalculatorElements();
+            if (!canvas || !ctx) return; 
+            
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            if (rect.width === 0) return; 
+            
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+            canvasSize = rect.width;
+            originX = canvasSize / 2;
+            originY = canvasSize / 2;
+            drawToStep(stepSlider.value); 
+        }
 
-    // --- HELPER: Calculates motor steps from angle deltas ---
-    function calculateGcode(startAngles, endAngles) {
-        const delta_q1_deg = toDegrees(endAngles.q1 - startAngles.q1);
-        const delta_q2_deg = toDegrees(endAngles.q2 - startAngles.q2);
+        function drawGrid() {
+            const { canvas, ctx } = getCalculatorElements();
+            if (!canvas || !ctx) return;
+            scale = (canvasSize / 2) * 0.9 / MAX_REACH; 
+            
+            ctx.clearRect(0, 0, canvasSize, canvasSize);
+            ctx.save();
+            ctx.translate(originX, originY);
+            
+            // Grid, Axes, Reach Circle... (as before, no changes)
+            const gridSize = 50 * scale;
+            const steps = Math.ceil(originX / gridSize);
+            ctx.beginPath();
+            ctx.strokeStyle = '#e5e7eb'; // gray-200
+            ctx.lineWidth = 1;
+            for (let i = -steps; i <= steps; i++) {
+                ctx.moveTo(i * gridSize, -originY); ctx.lineTo(i * gridSize, originY);
+                ctx.moveTo(-originX, i * gridSize); ctx.lineTo(originX, i * gridSize);
+            }
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.strokeStyle = '#9ca3af'; // gray-400
+            ctx.lineWidth = 2;
+            ctx.moveTo(-originX, 0); ctx.lineTo(originX, 0); // X Axis
+            ctx.moveTo(0, -originY); ctx.lineTo(0, originY); // Y Axis
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(0, 0, MAX_REACH * scale, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#3b82f6'; // blue-500
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 5]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            ctx.restore();
+        }
 
-        const delta_motor1_deg = delta_q1_deg;
-        const delta_motor2_deg = delta_q1_deg - delta_q2_deg;
-        
-        const motor1_steps = Math.round(delta_motor1_deg * DEG_TO_STEPS);
-        const motor2_steps = Math.round((0.125 * motor1_steps) + (delta_motor2_deg * DEG_TO_STEPS));
-        
-        // Avoid sending 0 0 commands
-        if (motor1_steps === 0 && motor2_steps === 0) {
-            return { gcode: null, motor1_steps: 0, motor2_steps: 0 };
+        // --- NEW: Draws a single path segment ---
+        function drawPathSegment(segment) {
+            const { canvas, ctx } = getCalculatorElements();
+            if (!canvas || !ctx) return;
+            ctx.save();
+            ctx.translate(originX, originY);
+            ctx.scale(1, -1); // Flip Y-axis
+
+            // Do not draw "prep" moves, which have same start/end
+            if (Math.abs(segment.startX - segment.endX) < EPSILON && Math.abs(segment.startY - segment.endY) < EPSILON) {
+                 ctx.restore();
+                 return;
+            }
+            
+            ctx.beginPath();
+            ctx.moveTo(segment.startX * scale, segment.startY * scale);
+            ctx.lineTo(segment.endX * scale, segment.endY * scale);
+            
+            // Draw the direct cartesian line
+            ctx.strokeStyle = segment.isClamped ? '#ef4444' : '#f97316'; // red-500 or orange-500
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.restore();
         }
         
-        const gcode = `G1 ${motor2_steps} ${motor1_steps} 1000`;
-        return { gcode, motor1_steps, motor2_steps };
-    }
+        // --- NEW: Draws the arm, with an option to fade it ---
+        function drawArmAtPosition(x, y, solution, isFaded = false) {
+            const { canvas, ctx } = getCalculatorElements();
+            if (!canvas || !ctx) return;
+            const result = calculateIK(L1_LENGTH, L2_LENGTH, x, y);
+            if (result.error) return;
 
-    // --- HELPER: Calculates the "cost" (sum of squared motor change) ---
-    function getAngleCost(anglesA, anglesB) {
-        const delta_q1_deg = toDegrees(anglesB.q1 - anglesA.q1);
-        const delta_q2_deg = toDegrees(anglesB.q2 - anglesA.q2);
-        
-        const delta_motor1_deg = delta_q1_deg;
-        const delta_motor2_deg = delta_q1_deg - delta_q2_deg;
-        
-        const motor1_steps_raw = delta_motor1_deg * DEG_TO_STEPS;
-        const motor2_steps_raw = (0.125 * motor1_steps_raw) + (delta_motor2_deg * DEG_TO_STEPS);
+            const angles = (solution === 'down') ? result.solution1 : result.solution2;
+            const { q1, q2 } = angles;
+            
+            // --- NEW: Fading logic ---
+            const baseColor = (solution === 'down') ? '#0ea5e9' : '#2563eb'; // 'up' is blue-600, 'down' is cyan-500
+            const color = isFaded ? '#9ca3af' : baseColor; // gray-400 if faded
+            const jointColor = isFaded ? '#6b7280' : '#4b5563'; // darker gray-500 if faded
 
-        return (motor1_steps_raw * motor1_steps_raw) + (motor2_steps_raw * motor2_steps_raw);
-    }
+            const joint1X = (L1_LENGTH * Math.cos(q1)) * scale;
+            const joint1Y = (L1_LENGTH * Math.sin(q1)) * scale;
 
-    // --- *** HEAVILY MODIFIED Main Conversion Logic *** ---
-    function handleConversion() {
-        try { 
+            const endEffectorX = (L1_LENGTH * Math.cos(q1) + L2_LENGTH * Math.cos(q1 + q2)) * scale;
+            const endEffectorY = (L1_LENGTH * Math.sin(q1) + L2_LENGTH * Math.sin(q1 + q2)) * scale;
+
+            ctx.save();
+            ctx.translate(originX, originY);
+            ctx.scale(1, -1); // Flip Y-axis
+
+            // Draw Arm 1
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(joint1X, joint1Y);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 8;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            // Draw Arm 2
+            ctx.beginPath();
+            ctx.moveTo(joint1X, joint1Y);
+            ctx.lineTo(endEffectorX, endEffectorY);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 8;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+            
+            // Draw Joints
+            ctx.beginPath();
+            ctx.arc(0, 0, 10, 0, 2 * Math.PI); // Base joint
+            ctx.fillStyle = jointColor; // Use faded color
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(joint1X, joint1Y, 8, 0, 2 * Math.PI); // Elbow joint
+            ctx.fillStyle = color;
+            ctx.fill();
+            
+            // Draw Target Point
+            ctx.beginPath();
+            ctx.arc(endEffectorX, endEffectorY, 10, 0, 2 * Math.PI);
+            ctx.fillStyle = color;
+            ctx.fill();
+            
+            if (!isFaded) { // Only draw white ring on active point
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+            }
+            
+            ctx.restore();
+        }
+
+        // --- NEW: Draws the angle information text ---
+        function drawAngleText(title, delta1, delta2, q1_rad, q2_rad) {
+            const { ctx } = getCalculatorElements();
+            if (!ctx) return;
+            
+            const color = document.body.getAttribute('data-theme') === 'dark' ? '#e0e0e0' : '#333333';
+            
+            ctx.save();
+            ctx.fillStyle = color;
+            ctx.font = 'bold 14px "Segoe UI"';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            
+            ctx.fillText(title, 10, 10);
+            
+            ctx.font = '14px "Segoe UI"';
+            ctx.fillText(`M1 (Base) Delta: ${delta1.toFixed(2)}°`, 10, 35);
+            ctx.fillText(`M2 (Elbow) Delta: ${delta2.toFixed(2)}°`, 10, 55);
+            
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 0.5;
+            ctx.beginPath();
+            ctx.moveTo(10, 78);
+            ctx.lineTo(180, 78);
+            ctx.stroke();
+            
+            ctx.font = '12px "Segoe UI"';
+            ctx.fillText(`Arm 1 (q1) Abs: ${toDegrees(q1_rad).toFixed(2)}°`, 10, 88);
+            ctx.fillText(`Arm 2 (q2) Abs: ${toDegrees(q2_rad).toFixed(2)}°`, 10, 108);
+            
+            ctx.restore();
+        }
+
+        // --- NEW: Main drawing function, completely rewritten ---
+        function drawToStep(stepIndex) {
+            const { canvas } = getCalculatorElements();
+            if (!canvas) return;
+            
+            stepIndex = parseInt(stepIndex, 10);
+            drawGrid(); // Clear canvas and draw grid
+
+            if (globalAnimationSteps.length === 0) {
+                return; // Nothing to draw
+            }
+
+            if (stepIndex === 0) {
+                // --- Draw only the initial state ---
+                const state = globalAnimationSteps[0];
+                drawArmAtPosition(state.x, state.y, state.solution, false);
+                drawAngleText(
+                    "Initial Position",
+                    0, 0, // No deltas for initial state
+                    state.q1, state.q2
+                );
+            } else {
+                // --- Draw a move (start and end) ---
+                const startState = globalAnimationSteps[stepIndex - 1];
+                const endState = globalAnimationSteps[stepIndex];
+                
+                // Draw the cartesian line
+                drawPathSegment({
+                    startX: startState.x,
+                    startY: startState.y,
+                    endX: endState.x,
+                    endY: endState.y,
+                    isClamped: endState.isClamped
+                });
+
+                // Draw faded start arm
+                drawArmAtPosition(startState.x, startState.y, startState.solution, true);
+                
+                // Draw solid end arm
+                drawArmAtPosition(endState.x, endState.y, endState.solution, false);
+
+                // Draw the text for this move
+                let title = `Move ${stepIndex}`;
+                if (endState.isPrepMove) {
+                    title += " (Align at 0,0)";
+                }
+
+                drawAngleText(
+                    title,
+                    endState.motor1_delta_deg,
+                    endState.motor2_delta_deg,
+                    endState.q1, endState.q2
+                );
+            }
+        }
+
+        // --- HELPER: Calculates motor steps from angle deltas ---
+        function calculateGcode(startAngles, endAngles) {
+            const delta_q1_deg = toDegrees(endAngles.q1 - startAngles.q1);
+            const delta_q2_deg = toDegrees(endAngles.q2 - startAngles.q2);
+
+            const delta_motor1_deg = delta_q1_deg;
+            const delta_motor2_deg = delta_q1_deg + delta_q2_deg;
+            
+            const motor1_steps = Math.round(delta_motor1_deg * DEG_TO_STEPS);
+            const motor2_steps = Math.round((0.125 * motor1_steps) + (delta_motor2_deg * DEG_TO_STEPS));
+            
+            // Avoid sending 0 0 commands
+            if (motor1_steps === 0 && motor2_steps === 0) {
+                return { gcode: null, motor1_steps: 0, motor2_steps: 0, delta_motor1_deg, delta_motor2_deg };
+            }
+            
+            const gcode = `G1 ${motor2_steps} ${motor1_steps} 1000`;
+            return { gcode, motor1_steps, motor2_steps, delta_motor1_deg, delta_motor2_deg };
+        }
+
+        // --- HELPER: Calculates the "cost" (sum of squared motor change) ---
+        function getAngleCost(anglesA, anglesB) {
+            const delta_q1_deg = toDegrees(anglesB.q1 - anglesA.q1);
+            const delta_q2_deg = toDegrees(anglesB.q2 - anglesA.q2);
+            
+            const delta_motor1_deg = delta_q1_deg;
+            const delta_motor2_deg = delta_q1_deg + delta_q2_deg;
+            
+            // Return sum of squares
+            return (delta_motor1_deg * delta_motor1_deg) + (delta_motor2_deg * delta_motor2_deg);
+        }
+
+        // --- *** NEW: REWRITTEN Main Conversion Logic *** ---
+        // This version builds the globalAnimationSteps array
+        function handleConversion() {
             const els = getCalculatorElements();
             if (!els.inputGcodeEl || !els.initialXInput || !els.initialYInput ||
                 !els.warningIndicator || !els.warningMessages || !els.outputGcodeEl || !els.stepSlider) {
@@ -1051,8 +1101,8 @@ G1 X203.2 Y0
             els.warningMessages.classList.add('hidden');
             els.warningMessages.querySelector('ul').innerHTML = '';
             
-            // --- RESET Animation Array ---
-            globalAnimationFrames = [];
+            // --- RESET Animation State ---
+            globalAnimationSteps = [];
 
             let outputGcode = [];
             let warnings = [];
@@ -1080,25 +1130,34 @@ G1 X203.2 Y0
             }
 
             // --- Step 2: Initialize state for loop ---
+            if (points.length === 0) return; // No points
+            
             let ikResult = calculateIK(L1_LENGTH, L2_LENGTH, points[0].x, points[0].y);
             let currentAngles = (currentSolution === 'down') ? ikResult.solution1 : ikResult.solution2;
-            let overrideStartAngles = null; 
+            let overrideStartAngles = null;
 
-            // --- Add the very first frame (step 0) ---
-            globalAnimationFrames.push({
+            // --- ADD INITIAL STATE for animation ---
+            globalAnimationSteps.push({
+                x: points[0].x,
+                y: points[0].y,
                 q1: currentAngles.q1,
                 q2: currentAngles.q2,
                 solution: currentSolution,
-                motor1_cmd: 0,
-                motor2_cmd: 0
+                motor1_delta_deg: 0,
+                motor2_delta_deg: 0,
+                isClamped: ikResult.isClamped,
+                isPrepMove: false
             });
+            if (ikResult.isClamped) {
+                warnings.push(`Line 0 (Initial): Start clamped to (${ikResult.clampedX.toFixed(2)}, ${ikResult.clampedY.toFixed(2)}).`);
+            }
 
-            // --- Step 3: Iterate over point pairs ---
+
+            // --- Step 3: Iterate over point pairs (moves) ---
             for (let i = 0; i < points.length - 1; i++) {
                 const P_start = points[i];
                 const P_end = points[i + 1]; 
                 
-                // Get IK for the *final* destination (for clamping)
                 const endIK = calculateIK(L1_LENGTH, L2_LENGTH, P_end.x, P_end.y);
                 if (endIK.error) {
                     warnings.push(`Line ${P_end.lineIndex}: IK failed for end point.`);
@@ -1109,9 +1168,8 @@ G1 X203.2 Y0
                 }
                 
                 const clampedEnd = { x: endIK.clampedX, y: endIK.clampedY };
-                // We use the *start* point from our list, which is the *previous* clamped point
-                const clampedStart = { x: points[i].x, y: points[i].y };
 
+                // --- Determine Start Angles ---
                 let startAngles;
                 if (overrideStartAngles) {
                     startAngles = overrideStartAngles;
@@ -1119,70 +1177,57 @@ G1 X203.2 Y0
                 } else {
                     startAngles = currentAngles;
                 }
-                
-                // --- NEW: Linear Interpolation for G-code and Animation ---
-                const dist = Math.hypot(clampedEnd.x - clampedStart.x, clampedEnd.y - clampedStart.y);
-                const num_sub_steps = Math.max(1, Math.ceil(dist / LINEAR_SEGMENT_MM));
 
-                let last_sub_step_angles = startAngles;
-                
-                for (let j = 1; j <= num_sub_steps; j++) {
-                    const t = j / num_sub_steps;
-                    const x_interp = clampedStart.x + (clampedEnd.x - clampedStart.x) * t;
-                    const y_interp = clampedStart.y + (clampedEnd.y - clampedStart.y) * t;
+                // --- Determine End Angles (Preserve the user's chosen solution) ---
+                const endAngles = (currentSolution === 'down') ? endIK.solution1 : endIK.solution2;
 
-                    const interp_ik = calculateIK(L1_LENGTH, L2_LENGTH, x_interp, y_interp);
-                    // Use the *chosen* solution, not the one with least cost
-                    const next_sub_step_angles = (currentSolution === 'down') ? interp_ik.solution1 : interp_ik.solution2;
-
-                    // Generate G-code for this *micro-step*
-                    const moveG = calculateGcode(last_sub_step_angles, next_sub_step_angles);
-                    if (moveG.gcode) {
-                        outputGcode.push(moveG.gcode);
-                    }
-                    
-                    // Store frame for animation
-                    globalAnimationFrames.push({
-                        q1: next_sub_step_angles.q1,
-                        q2: next_sub_step_angles.q2,
-                        solution: currentSolution,
-                        motor1_cmd: moveG.motor1_steps,
-                        motor2_cmd: moveG.motor2_steps
-                    });
-
-                    last_sub_step_angles = next_sub_step_angles;
+                // --- Generate G-code for the move (Start -> End) ---
+                const moveG = calculateGcode(startAngles, endAngles);
+                if (moveG.gcode) {
+                    outputGcode.push(moveG.gcode);
                 }
-                // --- End Linear Interpolation ---
 
-                // The new "current" angle is the end of the last micro-step
-                currentAngles = last_sub_step_angles;
+                // --- Store visualization step ---
+                globalAnimationSteps.push({
+                    x: clampedEnd.x,
+                    y: clampedEnd.y,
+                    q1: endAngles.q1,
+                    q2: endAngles.q2,
+                    solution: currentSolution,
+                    motor1_delta_deg: moveG.delta_motor1_deg,
+                    motor2_delta_deg: moveG.delta_motor2_deg,
+                    isClamped: endIK.isClamped,
+                    isPrepMove: false
+                });
 
-                // --- (0,0) PREP LOGIC (Interpolated) ---
+                // --- Update state for next iteration ---
+                currentAngles = endAngles;
+
+                // --- *** (0,0) PREP LOGIC *** ---
                 const isAtOrigin = Math.hypot(clampedEnd.x, clampedEnd.y) < EPSILON;
                 const hasNextMove = (i + 2) < points.length;
 
                 if (isAtOrigin && hasNextMove) {
-                    const P_next = points[i + 2]; 
-
-                    const dx = P_next.x - clampedEnd.x;
+                    const P_next = points[i + 2];
+                    const dx = P_next.x - clampedEnd.x; 
                     const dy = P_next.y - clampedEnd.y;
                     
-                    if (Math.hypot(dx, dy) < EPSILON) continue; 
+                    if (Math.hypot(dx, dy) < EPSILON) {
+                        continue; 
+                    }
 
                     const nextHeading = Math.atan2(dy, dx);
-                    // Get IK at (0,0) - we just arrived there
-                    const originIK = calculateIK(L1_LENGTH, L2_LENGTH, 0, 0); 
-                    const rawSol1 = originIK.solution1; 
-                    const rawSol2 = originIK.solution2; 
+                    const rawSol1 = endIK.solution1; // Elbow Down (q2 ≈ pi)
+                    const rawSol2 = endIK.solution2; // Elbow Up (q2 ≈ -pi)
 
                     const aligned_q1_sol1 = ((nextHeading - rawSol1.q2 + Math.PI) % (2 * Math.PI)) - Math.PI;
                     const aligned_q1_sol2 = ((nextHeading - rawSol2.q2 + Math.PI) % (2 * Math.PI)) - Math.PI;
-                    const alignedAngles1 = { q1: aligned_q1_sol1, q2: rawSol1.q2 }; 
-                    const alignedAngles2 = { q1: aligned_q1_sol2, q2: rawSol2.q2 }; 
 
-                    // Choose cheapest move from where we just landed
-                    const costFlip1 = getAngleCost(currentAngles, alignedAngles1); 
-                    const costFlip2 = getAngleCost(currentAngles, alignedAngles2); 
+                    const alignedAngles1 = { q1: aligned_q1_sol1, q2: rawSol1.q2 }; // Aligned, Elbow Down
+                    const alignedAngles2 = { q1: aligned_q1_sol2, q2: rawSol2.q2 }; // Aligned, Elbow Up
+
+                    const costFlip1 = getAngleCost(currentAngles, alignedAngles1);
+                    const costFlip2 = getAngleCost(currentAngles, alignedAngles2);
 
                     let prepAngles, prepSolution, comment;
                     if (costFlip1 < costFlip2) {
@@ -1195,54 +1240,41 @@ G1 X203.2 Y0
                         comment = (currentSolution === 'up') ? "Align tangent at (0,0)" : "Elbow flip + align at (0,0)";
                     }
 
-                    // Generate the *single* G-code command for the prep move
+                    // Generate the prep G-code
                     const prepG = calculateGcode(currentAngles, prepAngles);
                     if (prepG.gcode) {
                         outputGcode.push(prepG.gcode + " ; " + comment);
                     }
-                    
-                    // --- NEW: Interpolate the PREP move (Angular) ---
-                    const delta_q1_prep = toDegrees(prepAngles.q1 - currentAngles.q1);
-                    const delta_q2_prep = toDegrees(prepAngles.q2 - currentAngles.q2);
-                    // Use 1-degree steps
-                    const prepSubSteps = Math.max(1, Math.ceil(Math.max(Math.abs(delta_q1_prep), Math.abs(delta_q2_prep))));
-                    
-                    const gcodePerStep = {
-                        motor1_steps: Math.round(prepG.motor1_steps / prepSubSteps),
-                        motor2_steps: Math.round(prepG.motor2_steps / prepSubSteps)
-                    };
 
-                    for (let j = 1; j <= prepSubSteps; j++) {
-                        const t = j / prepSubSteps;
-                        const q1_interp = currentAngles.q1 + (prepAngles.q1 - currentAngles.q1) * t;
-                        const q2_interp = currentAngles.q2 + (prepAngles.q2 - currentAngles.q2) * t;
-                        
-                        // Show the "total" command for the whole prep move, not the micro-step
-                        globalAnimationFrames.push({
-                            q1: q1_interp,
-                            q2: q2_interp,
-                            solution: prepSolution, // Use the solution we are *going to*
-                            motor1_cmd: prepG.motor1_steps,
-                            motor2_cmd: prepG.motor2_steps
-                        });
-                    }
-                    // --- End Prep Interpolation ---
+                    // --- Add the prep move as its own animation step ---
+                    globalAnimationSteps.push({
+                        x: clampedEnd.x, // Still at (0,0)
+                        y: clampedEnd.y,
+                        q1: prepAngles.q1, // New angles
+                        q2: prepAngles.q2,
+                        solution: prepSolution,
+                        motor1_delta_deg: prepG.delta_motor1_deg,
+                        motor2_delta_deg: prepG.delta_motor2_deg,
+                        isClamped: false,
+                        isPrepMove: true // Mark as prep move
+                    });
 
+                    // Set overrides for the *next* loop iteration
                     overrideStartAngles = prepAngles; 
                     currentSolution = prepSolution; 
-                    currentAngles = prepAngles;     
+                    currentAngles = prepAngles;   
                 }
             } // --- End for loop ---
 
             // --- Finalize ---
             els.outputGcodeEl.value = outputGcode.join('\n');
             
-            // --- NEW: Update slider for frames ---
-            const totalFrames = Math.max(0, globalAnimationFrames.length - 1);
-            els.stepSlider.max = totalFrames;
-            els.stepSlider.value = totalFrames;
-            els.stepLabel.textContent = `${totalFrames} / ${totalFrames}`;
-            drawToStep(totalFrames);
+            // --- NEW: Update slider based on animation steps ---
+            const numSteps = globalAnimationSteps.length > 0 ? globalAnimationSteps.length - 1 : 0;
+            els.stepSlider.max = numSteps;
+            els.stepSlider.value = numSteps;
+            els.stepLabel.textContent = `${numSteps} / ${numSteps}`;
+            drawToStep(numSteps); // Draw the final state
 
             if (warnings.length) {
                 const unique = [...new Set(warnings)];
@@ -1251,79 +1283,79 @@ G1 X203.2 Y0
                 els.warningMessages.querySelector('ul').innerHTML =
                     unique.map(w => `<li>${w}</li>`).join('');
             }
-        } catch (e) {
-            console.error("Conversion failed:", e);
-            els.outputGcodeEl.value = `SCRIPT ERROR: ${e.message}\n\nSee console for details.`;
         }
-    }
-    
-    // --- MODIFIED: Slider Event ---
-    function handleSliderChange(event) {
-        const { stepLabel, stepSlider } = getCalculatorElements();
-        if (!stepLabel || !stepSlider) return;
         
-        const step = event.target.value;
-        // Label is now "Frame"
-        stepLabel.textContent = `${step} / ${stepSlider.max}`;
-        drawToStep(step);
-    }
+        // --- Slider Event ---
+        function handleSliderChange(event) {
+            const { stepLabel, stepSlider } = getCalculatorElements();
+            if (!stepLabel || !stepSlider) return;
+            
+            const step = event.target.value;
+            stepLabel.textContent = `${step} / ${stepSlider.max}`;
+            drawToStep(step);
+        }
 
-    // --- Copy Button Logic (unchanged) ---
-    function setupCopyButton() {
-        const { copyButton, outputGcodeEl, copySuccess } = getCalculatorElements();
-        if (!copyButton || !outputGcodeEl || !copySuccess) return;
+        // --- Copy Button Logic ---
+        function setupCopyButton() {
+            const { copyButton, outputGcodeEl, copySuccess } = getCalculatorElements();
+            if (!copyButton || !outputGcodeEl || !copySuccess) return;
 
-        copyButton.addEventListener('click', () => {
-            const textToCopy = outputGcodeEl.value;
-            navigator.clipboard.writeText(textToCopy).then(() => {
-                copySuccess.classList.remove('hidden');
-                copyButton.classList.add('hidden');
-                setTimeout(() => {
-                    copySuccess.classList.add('hidden');
-                    copyButton.classList.remove('hidden');
-                }, 2000);
-            }).catch(err => {
-                // Fallback for http or other issues
-                try {
-                    const textArea = document.createElement('textarea');
-                    textArea.value = textToCopy;
-                    textArea.style.position = 'fixed'; 
-                    textArea.style.opacity = '0';
-                    document.body.appendChild(textArea);
-                    textArea.focus();
-                    textArea.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(textArea);
-                    
+            copyButton.addEventListener('click', () => {
+                const textToCopy = outputGcodeEl.value;
+                navigator.clipboard.writeText(textToCopy).then(() => {
                     copySuccess.classList.remove('hidden');
                     copyButton.classList.add('hidden');
                     setTimeout(() => {
                         copySuccess.classList.add('hidden');
                         copyButton.classList.remove('hidden');
                     }, 2000);
-                } catch (e) {
-                     console.error('Fallback copy failed: ', e);
-                }
+                }).catch(err => {
+                    // Fallback for http or other issues
+                    try {
+                        const textArea = document.createElement('textarea');
+                        textArea.value = textToCopy;
+                        textArea.style.position = 'fixed'; 
+                        textArea.style.opacity = '0';
+                        document.body.appendChild(textArea);
+                        textArea.focus();
+                        textArea.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(textArea);
+                        
+                        copySuccess.classList.remove('hidden');
+                        copyButton.classList.add('hidden');
+                        setTimeout(() => {
+                            copySuccess.classList.add('hidden');
+                            copyButton.classList.remove('hidden');
+                        }, 2000);
+                    } catch (e) {
+                         console.error('Fallback copy failed: ', e);
+                    }
+                });
             });
-        });
-    }
-
-    // --- Initial Setup (unchanged) ---
-    document.addEventListener('DOMContentLoaded', () => {
-        const { convertButton, stepSlider } = getCalculatorElements();
-        
-        if (convertButton) {
-            convertButton.addEventListener('click', handleConversion);
-            stepSlider.addEventListener('input', handleSliderChange);
-            window.addEventListener('resize', resizeCanvas);
-            setupCopyButton();
-            
-            setTimeout(() => {
-                resizeCanvas();
-                handleConversion(); // Run once on load
-            }, 100);
         }
-    });
-</script>    
+
+        // --- Initial Setup ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const { convertButton, stepSlider } = getCalculatorElements();
+            
+            if (convertButton) {
+                convertButton.addEventListener('click', handleConversion);
+                stepSlider.addEventListener('input', handleSliderChange);
+                window.addEventListener('resize', resizeCanvas);
+                setupCopyButton();
+                
+                // Redraw on radio button change
+                document.querySelectorAll('input[name="solution"]').forEach(radio => {
+                    radio.addEventListener('change', handleConversion);
+                });
+                
+                setTimeout(() => {
+                    resizeCanvas();
+                    handleConversion(); // Run once on load
+                }, 100);
+            }
+        });
+    </script>      
 </body>
 </html>
