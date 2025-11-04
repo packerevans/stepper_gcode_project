@@ -686,7 +686,7 @@ G1 X0 Y203.2
         });
     </script>
 
-        <script>
+      <script>
     // --- Fixed Constants ---
     const L1_LENGTH = 101.6;
     const L2_LENGTH = 101.6;
@@ -708,7 +708,8 @@ G1 X0 Y203.2
             copyButton: document.getElementById('copyButton'),
             copySuccess: document.getElementById('copySuccess'),
             canvas: document.getElementById('ikCanvas'),
-            ctx: document.getElementById('ikCanvas') ? document.getElementById('ikCanvas').getContext('d') : null,
+            // --- FIX 1 ---
+            ctx: document.getElementById('ikCanvas') ? document.getElementById('ikCanvas').getContext('2d') : null,
             warningIndicator: document.getElementById('warningIndicator'),
             warningMessages: document.getElementById('warningMessages'),
             stepSlider: document.getElementById('stepSlider'),
@@ -1016,194 +1017,170 @@ G1 X0 Y203.2
     // --- *** NEW: REWRITTEN Main Conversion Logic *** ---
     // This version uses pair-wise iteration to solve the (0,0) alignment problem.
     function handleConversion() {
-        const els = getCalculatorElements();
-        if (!els.inputGcodeEl || !els.initialXInput || !els.initialYInput ||
-            !els.warningIndicator || !els.warningMessages || !els.outputGcodeEl || !els.stepSlider) {
-            return;
-        }
+        try { // Added try/catch to help debug
+            const els = getCalculatorElements();
+            if (!els.inputGcodeEl || !els.initialXInput || !els.initialYInput ||
+                !els.warningIndicator || !els.warningMessages || !els.outputGcodeEl || !els.stepSlider) {
+                return;
+            }
 
-        const inputGcode = els.inputGcodeEl.value;
-        const lines = inputGcode.split('\n');
+            const inputGcode = els.inputGcodeEl.value;
+            const lines = inputGcode.split('\n');
 
-        let currentSolution = document.querySelector('input[name="solution"]:checked').value;
-        let initialX = parseFloat(els.initialXInput.value || "203.2");
-        let initialY = parseFloat(els.initialYInput.value || "0");
+            let currentSolution = document.querySelector('input[name="solution"]:checked').value;
+            let initialX = parseFloat(els.initialXInput.value || "203.2");
+            let initialY = parseFloat(els.initialYInput.value || "0");
 
-        els.warningIndicator.classList.add('hidden');
-        els.warningMessages.classList.add('hidden');
-        els.warningMessages.querySelector('ul').innerHTML = '';
-        globalPathSegments = [];
+            els.warningIndicator.classList.add('hidden');
+            els.warningMessages.classList.add('hidden');
+            els.warningMessages.querySelector('ul').innerHTML = '';
+            globalPathSegments = [];
 
-        let outputGcode = [];
-        let warnings = [];
+            let outputGcode = [];
+            let warnings = [];
 
-        // --- NEW: Step 1: Collect all points ---
-        // Create a list of all coordinates, starting with the initial position.
-        const points = [];
-        points.push({ x: initialX, y: initialY, lineIndex: 0 });
+            // --- NEW: Step 1: Collect all points ---
+            const points = [];
+            points.push({ x: initialX, y: initialY, lineIndex: 0 });
 
-        let lastX = initialX;
-        let lastY = initialY;
+            let lastX = initialX;
+            let lastY = initialY;
 
-        for (const [index, line] of lines.entries()) {
-            const trimmed = line.trim();
-            if (/^G1\s+/i.test(trimmed)) {
-                const xMatch = trimmed.match(/X\s*(-?[\d\.]+)/i);
-                const yMatch = trimmed.match(/Y\s*(-?[\d\.]+)/i);
-                if (xMatch || yMatch) {
-                    // Use the last known coordinate for any missing axis
-                    const targetX = xMatch ? parseFloat(xMatch[1]) : lastX;
-                    const targetY = yMatch ? parseFloat(yMatch[1]) : lastY;
-                    points.push({ x: targetX, y: targetY, lineIndex: index + 1 });
-                    lastX = targetX;
-                    lastY = targetY;
+            for (const [index, line] of lines.entries()) {
+                const trimmed = line.trim();
+                if (/^G1\s+/i.test(trimmed)) {
+                    const xMatch = trimmed.match(/X\s*(-?[\d\.]+)/i);
+                    const yMatch = trimmed.match(/Y\s*(-?[\d\.]+)/i);
+                    if (xMatch || yMatch) {
+                        const targetX = xMatch ? parseFloat(xMatch[1]) : lastX;
+                        const targetY = yMatch ? parseFloat(yMatch[1]) : lastY;
+                        points.push({ x: targetX, y: targetY, lineIndex: index + 1 });
+                        lastX = targetX;
+                        lastY = targetY;
+                    }
                 }
             }
-        }
 
-        // --- NEW: Step 2: Initialize state for loop ---
-        // Get the IK for the *first* point to establish the starting angles.
-        let ikResult = calculateIK(L1_LENGTH, L2_LENGTH, points[0].x, points[0].y);
-        let currentAngles = (currentSolution === 'down') ? ikResult.solution1 : ikResult.solution2;
-        let overrideStartAngles = null; // This will hold aligned angles from a (0,0) prep move
+            // --- NEW: Step 2: Initialize state for loop ---
+            let ikResult = calculateIK(L1_LENGTH, L2_LENGTH, points[0].x, points[0].y);
+            let currentAngles = (currentSolution === 'down') ? ikResult.solution1 : ikResult.solution2;
+            let overrideStartAngles = null; 
 
-        // --- NEW: Step 3: Iterate over point pairs ---
-        // Loop from the first point to the second-to-last point.
-        for (let i = 0; i < points.length - 1; i++) {
-            const P_start = points[i];
-            const P_end = points[i + 1]; // The destination for *this* move
-            
-            // Get IK for the destination
-            const endIK = calculateIK(L1_LENGTH, L2_LENGTH, P_end.x, P_end.y);
-            if (endIK.error) {
-                warnings.push(`Line ${P_end.lineIndex}: IK failed for end point.`);
-                continue; // Skip this move
-            }
-            if (endIK.isClamped) {
-                warnings.push(`Line ${P_end.lineIndex}: Target clamped to (${endIK.clampedX.toFixed(2)}, ${endKE.clampedY.toFixed(2)}).`);
-            }
-            
-            // Use clamped values for all calculations
-            const clampedEnd = { x: endIK.clampedX, y: endIK.clampedY };
-
-            // --- Determine Start Angles ---
-            let startAngles;
-            if (overrideStartAngles) {
-                // A prep move at (0,0) just happened. Use its resulting angles.
-                startAngles = overrideStartAngles;
-                overrideStartAngles = null; // Consume the override
-            } else {
-                // Use the angles from the end of the last move
-                startAngles = currentAngles;
-            }
-
-            // --- Determine End Angles (Preserve the user's chosen solution) ---
-            const endAngles = (currentSolution === 'down') ? endIK.solution1 : endIK.solution2;
-
-            // --- Generate G-code for the move (Start -> End) ---
-            const moveG = calculateGcode(startAngles, endAngles);
-            if (moveG.gcode) {
-                outputGcode.push(moveG.gcode);
-            }
-
-            // --- Store visualization segment ---
-            globalPathSegments.push({
-                startX: P_start.x,
-                startY: P_start.y,
-                endX: clampedEnd.x,
-                endY: clampedEnd.y,
-                isClamped: endIK.isClamped,
-                endSolution: currentSolution
-            });
-
-            // --- Update state for next iteration ---
-            // The end of this move is the start of the next
-            currentAngles = endAngles;
-
-            // --- *** NEW (0,0) PREP LOGIC *** ---
-            // This is the logic you confirmed.
-            // Check if we just *arrived* at the origin.
-            const isAtOrigin = Math.hypot(clampedEnd.x, clampedEnd.y) < EPSILON;
-            // Check if there is a *next* move after this one.
-            const hasNextMove = (i + 2) < points.length;
-
-            if (isAtOrigin && hasNextMove) {
-                const P_next = points[i + 2]; // Look ahead to the *next* destination
-
-                // Get heading for the *next* vector (origin -> P_next)
-                const dx = P_next.x - clampedEnd.x; // P_next.x - 0
-                const dy = P_next.y - clampedEnd.y; // P_next.y - 0
+            // --- NEW: Step 3: Iterate over point pairs ---
+            for (let i = 0; i < points.length - 1; i++) {
+                const P_start = points[i];
+                const P_end = points[i + 1]; 
                 
-                // If the next move is *also* to (0,0), do nothing.
-                if (Math.hypot(dx, dy) < EPSILON) {
+                const endIK = calculateIK(L1_LENGTH, L2_LENGTH, P_end.x, P_end.y);
+                if (endIK.error) {
+                    warnings.push(`Line ${P_end.lineIndex}: IK failed for end point.`);
                     continue; 
                 }
+                if (endIK.isClamped) {
+                    // --- FIX 2 ---
+                    warnings.push(`Line ${P_end.lineIndex}: Target clamped to (${endIK.clampedX.toFixed(2)}, ${endIK.clampedY.toFixed(2)}).`);
+                }
+                
+                const clampedEnd = { x: endIK.clampedX, y: endIK.clampedY };
 
-                const nextHeading = Math.atan2(dy, dx);
-
-                // Get the two possible solutions at (0,0) (which endIK already has)
-                const rawSol1 = endIK.solution1; // Elbow Down (q2 ≈ pi)
-                const rawSol2 = endIK.solution2; // Elbow Up (q2 ≈ -pi)
-
-                // Find the q1 that aligns each solution's tangent (q1+q2) to the nextHeading
-                // We want: q1 + q2 = nextHeading  =>  q1 = nextHeading - q2
-                // Normalize angles to [-pi, pi]
-                const aligned_q1_sol1 = ((nextHeading - rawSol1.q2 + Math.PI) % (2 * Math.PI)) - Math.PI;
-                const aligned_q1_sol2 = ((nextHeading - rawSol2.q2 + Math.PI) % (2 * Math.PI)) - Math.PI;
-
-                const alignedAngles1 = { q1: aligned_q1_sol1, q2: rawSol1.q2 }; // Aligned, Elbow Down
-                const alignedAngles2 = { q1: aligned_q1_sol2, q2: rawSol2.q2 }; // Aligned, Elbow Up
-
-                // Choose the prep move (flip or just rotate) that is "cheapest" from where we just landed
-                const costFlip1 = getAngleCost(currentAngles, alignedAngles1); // Cost to get to Aligned Down
-                const costFlip2 = getAngleCost(currentAngles, alignedAngles2); // Cost to get to Aligned Up
-
-                let prepAngles, prepSolution, comment;
-                if (costFlip1 < costFlip2) {
-                    // Cheaper to go/stay "Elbow Down"
-                    prepAngles = alignedAngles1;
-                    prepSolution = 'down';
-                    comment = (currentSolution === 'down') ? "Align tangent at (0,0)" : "Elbow flip + align at (0,0)";
+                let startAngles;
+                if (overrideStartAngles) {
+                    startAngles = overrideStartAngles;
+                    overrideStartAngles = null; 
                 } else {
-                    // Cheaper to go/stay "Elbow Up"
-                    prepAngles = alignedAngles2;
-                    prepSolution = 'up';
-                    comment = (currentSolution === 'up') ? "Align tangent at (0,0)" : "Elbow flip + align at (0,0)";
+                    startAngles = currentAngles;
                 }
 
-                // Generate the prep G-code (from current angles to aligned prep-angles)
-                const prepG = calculateGcode(currentAngles, prepAngles);
-                if (prepG.gcode) {
-                    outputGcode.push(prepG.gcode + " ; " + comment);
+                const endAngles = (currentSolution === 'down') ? endIK.solution1 : endIK.solution2;
+
+                const moveG = calculateGcode(startAngles, endAngles);
+                if (moveG.gcode) {
+                    outputGcode.push(moveG.gcode);
                 }
 
-                // --- Set the override for the *next* loop iteration ---
-                overrideStartAngles = prepAngles; // The *next* move will start from here
-                currentSolution = prepSolution; // Commit the flip
-                currentAngles = prepAngles;     // This is our new "current" state
-
-                // Add a "dot" segment for the visualization (a move from 0,0 to 0,0)
                 globalPathSegments.push({
-                    startX: clampedEnd.x, startY: clampedEnd.y,
-                    endX: clampedEnd.x,   endY: clampedEnd.y,
-                    isClamped: false, endSolution: currentSolution
+                    startX: P_start.x,
+                    startY: P_start.y,
+                    endX: clampedEnd.x,
+                    endY: clampedEnd.y,
+                    isClamped: endIK.isClamped,
+                    endSolution: currentSolution
                 });
+
+                currentAngles = endAngles;
+
+                const isAtOrigin = Math.hypot(clampedEnd.x, clampedEnd.y) < EPSILON;
+                const hasNextMove = (i + 2) < points.length;
+
+                if (isAtOrigin && hasNextMove) {
+                    const P_next = points[i + 2]; 
+
+                    const dx = P_next.x - clampedEnd.x;
+                    const dy = P_next.y - clampedEnd.y;
+                    
+                    if (Math.hypot(dx, dy) < EPSILON) {
+                        continue; 
+                    }
+
+                    const nextHeading = Math.atan2(dy, dx);
+
+                    const rawSol1 = endIK.solution1; 
+                    const rawSol2 = endIK.solution2; 
+
+                    const aligned_q1_sol1 = ((nextHeading - rawSol1.q2 + Math.PI) % (2 * Math.PI)) - Math.PI;
+                    const aligned_q1_sol2 = ((nextHeading - rawSol2.q2 + Math.PI) % (2 * Math.PI)) - Math.PI;
+
+                    const alignedAngles1 = { q1: aligned_q1_sol1, q2: rawSol1.q2 }; 
+                    const alignedAngles2 = { q1: aligned_q1_sol2, q2: rawSol2.q2 }; 
+
+                    const costFlip1 = getAngleCost(currentAngles, alignedAngles1); 
+                    const costFlip2 = getAngleCost(currentAngles, alignedAngles2); 
+
+                    let prepAngles, prepSolution, comment;
+                    if (costFlip1 < costFlip2) {
+                        prepAngles = alignedAngles1;
+                        prepSolution = 'down';
+                        comment = (currentSolution === 'down') ? "Align tangent at (0,0)" : "Elbow flip + align at (0,0)";
+                    } else {
+                        prepAngles = alignedAngles2;
+                        prepSolution = 'up';
+                        comment = (currentSolution === 'up') ? "Align tangent at (0,0)" : "Elbow flip + align at (0,0)";
+                    }
+
+                    const prepG = calculateGcode(currentAngles, prepAngles);
+                    if (prepG.gcode) {
+                        outputGcode.push(prepG.gcode + " ; " + comment);
+                    }
+
+                    overrideStartAngles = prepAngles; 
+                    currentSolution = prepSolution; 
+                    currentAngles = prepAngles;     
+
+                    globalPathSegments.push({
+                        startX: clampedEnd.x, startY: clampedEnd.y,
+                        endX: clampedEnd.x,   endY: clampedEnd.y,
+                        isClamped: false, endSolution: currentSolution
+                    });
+                }
+            } // --- End for loop ---
+
+            // --- Finalize ---
+            els.outputGcodeEl.value = outputGcode.join('\n');
+            els.stepSlider.max = globalPathSegments.length;
+            els.stepSlider.value = globalPathSegments.length;
+            els.stepLabel.textContent = `${globalPathSegments.length} / ${globalPathSegments.length}`;
+            drawToStep(globalPathSegments.length);
+
+            if (warnings.length) {
+                const unique = [...new Set(warnings)];
+                els.warningIndicator.classList.remove('hidden');
+                els.warningMessages.classList.remove('hidden');
+                els.warningMessages.querySelector('ul').innerHTML =
+                    unique.map(w => `<li>${w}</li>`).join('');
             }
-        } // --- End for loop ---
-
-        // --- Finalize ---
-        els.outputGcodeEl.value = outputGcode.join('\n');
-        els.stepSlider.max = globalPathSegments.length;
-        els.stepSlider.value = globalPathSegments.length;
-        els.stepLabel.textContent = `${globalPathSegments.length} / ${globalPathSegments.length}`;
-        drawToStep(globalPathSegments.length);
-
-        if (warnings.length) {
-            const unique = [...new Set(warnings)];
-            els.warningIndicator.classList.remove('hidden');
-            els.warningMessages.classList.remove('hidden');
-            els.warningMessages.querySelector('ul').innerHTML =
-                unique.map(w => `<li>${w}</li>`).join('');
+        } catch (e) {
+            console.error("Conversion failed:", e);
+            els.outputGcodeEl.value = `SCRIPT ERROR: ${e.message}\n\nSee console for details.`;
         }
     }
     
@@ -1273,7 +1250,7 @@ G1 X0 Y203.2
             }, 100);
         }
     });
-</script>  
+</script> 
 </body>
 </html>
 
