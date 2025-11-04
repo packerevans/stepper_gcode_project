@@ -1000,7 +1000,7 @@ G1 X0 Y203.2
             const delta_q2_deg = toDegrees(anglesB.q2 - anglesA.q2);
             
             const delta_motor1_deg = delta_q1_deg;
-            const delta_motor2_deg = delta_q1_deg + delta_q2_deg;
+            const delta_motor2_deg = delta_q1_deg - delta_q2_deg;
             
             // Return sum of squares
             return (delta_motor1_deg * delta_motor1_deg) + (delta_motor2_deg * delta_motor2_deg);
