@@ -1081,11 +1081,15 @@ if (overrideStartAngles && Math.hypot(P_start.x, P_start.y) < EPSILON) {
         // midAngles are computed based on the currentSolution (which may have been updated previously)
         const midAngles = (currentSolution === 'down') ? midIK.solution1 : midIK.solution2;
 
-        // Generate G-code for the actual move from start -> mid
-        const moveG = calculateGcode(startAngles, midAngles);
-        if (moveG.gcode) outputGcode.push(moveG.gcode);
-        // Now that we've used the override once, clear it
-overrideStartAngles = null;
+    // Generate G-code for the actual move from start -> mid
+const moveG = calculateGcode(startAngles, midAngles);
+if (moveG.gcode) outputGcode.push(moveG.gcode);
+
+// ✅ Only clear override if we’re no longer at (0,0)
+if (Math.hypot(P_start.x, P_start.y) > EPSILON) {
+    overrideStartAngles = null;
+}
+
 
 
         globalPathSegments.push({
