@@ -1176,7 +1176,7 @@ if (Math.hypot(P_mid.x, P_mid.y) < EPSILON && nextCmd) {
     while (deltaHeading > Math.PI) deltaHeading -= 2 * Math.PI;
     while (deltaHeading < -Math.PI) deltaHeading += 2 * Math.PI;
 logStep("Align tangent branch triggered", deltaHeading);
-logStep("Elbow flip branch triggered", {deltaHeading, otherSol});
+// remove or move this next one — we can’t log otherSol yet
 
     // --- Apply rotation or flip once ---
     if (Math.abs(deltaHeading) < toRadians(45)) {
@@ -1187,6 +1187,7 @@ logStep("Elbow flip branch triggered", {deltaHeading, otherSol});
         
     } else {
         const otherSol = (currentSolution === 'up') ? 'down' : 'up';
+        logStep("Elbow flip branch triggered", {deltaHeading, otherSol});
         const rawFlipped = (otherSol === 'down') ? midIK.solution1 : midIK.solution2;
         const desired_q1 = nextHeading - rawFlipped.q2;
         const aligned_q1 = ((desired_q1 + Math.PI) % (2 * Math.PI)) - Math.PI;
