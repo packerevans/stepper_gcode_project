@@ -980,7 +980,7 @@ G1 X0 Y203.2
             const delta_q2_deg = toDegrees(endAngles.q2 - startAngles.q2);
 
             const delta_motor1_deg = delta_q1_deg;
-            const delta_motor2_deg = delta_q2_deg;
+            const delta_motor2_deg = delta_q2_deg - delta_q1_deg;
             
             const motor1_steps = Math.round(delta_motor1_deg * DEG_TO_STEPS);
             const motor2_steps = Math.round((0.125 * motor1_steps) + (delta_motor2_deg * DEG_TO_STEPS));
