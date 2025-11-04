@@ -1070,13 +1070,13 @@ function handleConversion() {
 
         // Determine startAngles: if an override exists (from previous flip+align at origin) and we're still at origin, use it.
         let startAngles;
-        if (overrideStartAngles && Math.hypot(P_start.x, P_start.y) < EPSILON) {
-            startAngles = overrideStartAngles;
-            // Use it only once — clear after applying
-            overrideStartAngles = null;
-        } else {
-            startAngles = (currentSolution === 'down') ? startIK.solution1 : startIK.solution2;
-        }
+if (overrideStartAngles && Math.hypot(P_start.x, P_start.y) < EPSILON) {
+    startAngles = overrideStartAngles;
+    // ⚠️ Do NOT clear here — wait until after we generate the move so the next segment uses it.
+} else {
+    startAngles = (currentSolution === 'down') ? startIK.solution1 : startIK.solution2;
+}
+
 
         // midAngles are computed based on the currentSolution (which may have been updated previously)
         const midAngles = (currentSolution === 'down') ? midIK.solution1 : midIK.solution2;
@@ -1084,6 +1084,9 @@ function handleConversion() {
         // Generate G-code for the actual move from start -> mid
         const moveG = calculateGcode(startAngles, midAngles);
         if (moveG.gcode) outputGcode.push(moveG.gcode);
+        // Now that we've used the override once, clear it
+overrideStartAngles = null;
+
 
         globalPathSegments.push({
             startX: P_start.x,
