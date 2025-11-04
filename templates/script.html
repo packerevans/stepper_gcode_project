@@ -1256,7 +1256,7 @@ logStep(`--- Processing segment ${i + 1} ---`, {currentX, currentY});
     }
 }
 
-    } // end for
+
 logStep("Final output length", outputGcode.length);
 
     // --- Finalize ---
@@ -1273,7 +1273,7 @@ logStep("Final output length", outputGcode.length);
         els.warningMessages.querySelector('ul').innerHTML =
             unique.map(w => `<li>${w}</li>`).join('');
     }
-        
+    } // end for        
         // --- Slider Event ---
         function handleSliderChange(event) {
             const { stepLabel, stepSlider } = getCalculatorElements();
