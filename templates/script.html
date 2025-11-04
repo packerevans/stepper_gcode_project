@@ -1,1272 +1,588 @@
+<script>
+    // --- Fixed Constants ---
+    const L1_LENGTH = 101.6;
+    const L2_LENGTH = 101.6;
+    const MAX_REACH = L1_LENGTH + L2_LENGTH;
+    const MIN_REACH = Math.abs(L1_LENGTH - L2_LENGTH);
+    const DEG_TO_STEPS = 3200 / 360;
+    const Q1_OFFSET_DEG = 90;  // Arm 1 "0" is 90deg (Up)
+    const Q2_OFFSET_DEG = 180; // Arm 2 "0" is 180deg (Folded)
+    const EPSILON = 1e-6; // Small value for float comparison
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Packers Sand Table Control</title>
-    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
-    <link rel="apple-touch-icon" sizes="512x512" href="{{ url_for('static', filename='icons/icon-512.png') }}">
+    // --- DOM Elements ---
+    function getCalculatorElements() {
+        return {
+            initialXInput: document.getElementById('initialX'),
+            initialYInput: document.getElementById('initialY'),
+            convertButton: document.getElementById('convertButton'),
+            inputGcodeEl: document.getElementById('inputGcode'),
+            outputGcodeEl: document.getElementById('outputGcode'),
+            copyButton: document.getElementById('copyButton'),
+            copySuccess: document.getElementById('copySuccess'),
+            canvas: document.getElementById('ikCanvas'),
+            ctx: document.getElementById('ikCanvas') ? document.getElementById('ikCanvas').getContext('d') : null,
+            warningIndicator: document.getElementById('warningIndicator'),
+            warningMessages: document.getElementById('warningMessages'),
+            stepSlider: document.getElementById('stepSlider'),
+            stepLabel: document.getElementById('stepLabel')
+        };
+    }
     
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <style>
-        /* --- Root Variables (Light Mode) --- */
-        :root {
-            --color-primary: #d2b48c; /* Khaki/Tan (Button/Sidebar Background) */
-            --color-secondary: #b08d5c; /* Darker Tan (Button Hover/Accent) */
-            --color-background: #f0f0f0; /* Light Gray Background */
-            --color-surface: #ffffff; /* White Card/Container Background */
-            --color-text: #333333;
-            --color-shadow: rgba(0, 0, 0, 0.08);
-            --color-icon: #000000;
-            
-            /* Terminal Colors (Light) */
-            --color-terminal-bg: #e9e9e9;
-            --color-terminal-text: #333333;
-            --color-terminal-prompt: #008080; /* Teal/Cyan */
-            
-            --border-radius: 12px;
-        }
+    // --- State ---
+    let canvasSize = 0;
+    let scale = 1;
+    let originX = 0;
+    let originY = 0;
+    let globalPathSegments = []; // Stores the calculated path segments
 
-        /* --- Dark Mode Variables --- */
-        body[data-theme='dark'] {
-            --color-background: #1e1e1e;
-            --color-surface: #2c2c2c;
-            --color-text: #e0e0e0;
-            --color-shadow: rgba(255, 255, 255, 0.08);
-            --color-icon: #ffffff;
-            
-            /* Terminal Colors (Dark) */
-            --color-terminal-bg: #1a1a1a;
-            --color-terminal-text: #cccccc;
-            --color-terminal-prompt: #98fb98; /* Pale Green */
-        }
+    // --- Utility Functions ---
+    function toDegrees(radians) {
+        return radians * (180 / Math.PI);
+    }
+    function toRadians(degrees) {
+        return degrees * (Math.PI / 180);
+    }
+
+    /**
+     * Calculates Inverse Kinematics for a given point.
+     * @returns {object} { solution1, solution2, clampedX, clampedY, isClamped, error }
+     */
+    function calculateIK(l1, l2, x, y) {
+        let dSq = x * x + y * y;
+        let d = Math.sqrt(dSq);
+        let clampedX = x;
+        let clampedY = y;
+        let isClamped = false;
         
-        /* --- Base Styles --- */
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: var(--color-background);
-            color: var(--color-text);
-            padding: 0;
-            margin: 0;
-            transition: background 0.3s, color 0.3s;
-        }
-
-        /* --- Sidebar & Header --- */
-        .sidebar {
-            height: 100%; width: 0; position: fixed; top: 0; left: 0;
-            background-color: var(--color-primary); overflow-x: hidden;
-            transition: 0.3s; padding-top: 60px; z-index: 1000;
-            box-shadow: 2px 0 5px var(--color-shadow);
-        }
-
-        .sidebar a {
-            padding: 15px 24px; text-decoration: none; font-size: 18px;
-            color: var(--color-text); display: block; transition: 0.2s;
-            font-weight: 500;
-        }
-
-        .sidebar a:hover {
-            background-color: var(--color-secondary);
-            color: var(--color-surface);
-        }
-
-        .openbtn {
-            font-size: 26px; cursor: pointer; background-color: var(--color-primary);
-            color: var(--color-text); padding: 10px 20px; border: none;
-            border-radius: 0 0 var(--border-radius) 0; position: fixed;
-            top: 0; left: 0; z-index: 1100; box-shadow: 0 2px 5px var(--color-shadow);
-        }
-        
-        /* --- Theme Toggle Button --- */
-        #themeToggle {
-            position: fixed; top: 15px; right: 15px; background: var(--color-surface);
-            color: var(--color-icon); border: 1px solid var(--color-icon);
-            padding: 8px 15px; border-radius: 20px; z-index: 1200;
-            transition: background 0.3s, color 0.3s, border-color 0.3s;
-        }
-        
-        .main-content {
-            margin-left: 0; transition: margin-left 0.3s; padding: 20px;
-            max-width: 1200px; /* Wide enough for calculator */
-            margin: 0 auto;
-        }
-
-        h1 {
-            text-align: center; margin-top: 20px; margin-bottom: 30px;
-            font-weight: 300; color: var(--color-secondary);
-        }
-        
-        h2 {
-            font-weight: 400;
-            margin-top: 30px;
-            border-bottom: 1px solid var(--color-shadow);
-            padding-bottom: 10px;
-        }
-
-        .header-image {
-            width: 100%; max-height: 250px; object-fit: cover;
-            border-radius: var(--border-radius); margin-bottom: 30px;
-            box-shadow: 0 4px 15px var(--color-shadow);
-        }
-        
-        /* --- Main Control Container --- */
-        .control-panel {
-            background-color: var(--color-surface); padding: 30px;
-            border-radius: var(--border-radius); box-shadow: 0 4px 10px var(--color-shadow);
-            margin-bottom: 30px;
-        }
-
-        /* --- NEW Sandify Module --- */
-        .sandify-module {
-            display: flex;
-            align-items: center;
-            gap: 25px;
-            flex-wrap: wrap; /* Allows wrapping on small screens */
-        }
-        .sandify-module img {
-            width: 100px;
-            height: 100px;
-            border-radius: 12px;
-            object-fit: cover;
-            border: 2px solid var(--color-shadow);
-        }
-        .sandify-module-content {
-            flex: 1;
-            min-width: 250px;
-        }
-        .sandify-module-content h3 {
-            margin-top: 0;
-            margin-bottom: 8px;
-            font-weight: 600;
-            font-size: 1.5rem;
-            color: var(--color-secondary);
-        }
-        .sandify-module-content p {
-            margin-bottom: 15px;
-            font-size: 1rem;
-        }
-        /* Style the link as a button */
-        .sandify-module a {
-            display: inline-block;
-            text-decoration: none;
-            background-color: var(--color-primary); 
-            color: var(--color-text);
-            border: none; padding: 12px 25px; border-radius: 8px; font-size: 16px;
-            cursor: pointer; transition: background-color 0.2s, box-shadow 0.2s;
-            font-weight: 600;
-        }
-        .sandify-module a:hover {
-            background-color: var(--color-secondary);
-            box-shadow: 0 2px 8px var(--color-shadow);
-        }
-        
-        /* --- Buttons --- */
-        /* This will style ALL buttons, including Tailwind ones, to match the theme */
-        button {
-            background-color: var(--color-primary); 
-            color: var(--color-text);
-            border: none; padding: 12px 25px; border-radius: 8px; font-size: 16px;
-            cursor: pointer; transition: background-color 0.2s, box-shadow 0.2s;
-            font-weight: 600;
-        }
-        button:hover {
-            background-color: var(--color-secondary);
-            box-shadow: 0 2px 8px var(--color-shadow);
-        }
-        button:disabled {
-            background-color: #ccc;
-            color: #777;
-            cursor: not-allowed;
-        }
-        
-        /* Specific button for sending to Arduino */
-        #send-to-table-btn {
-            margin-top: 25px;
-            width: 100%;
-            font-size: 1.2rem;
-            padding: 15px;
-            /* Make it stand out */
-            background-color: #3b82f6; /* blue-500 */
-            color: white;
-        }
-        #send-to-table-btn:hover {
-            background-color: #2563eb; /* blue-600 */
-        }
-        
-        /* --- NEW: Style for Manual Next Button --- */
-        #nextLineButton {
-             background-color: #16a34a; /* green-600 */
-             color: white;
-        }
-        #nextLineButton:hover {
-             background-color: #15803d; /* green-700 */
-        }
-        /* --- NEW: Style for Manual Controls Container --- */
-        .manual-controls {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-top: 16px;
-            padding: 12px;
-            background-color: var(--color-background);
-            border-radius: var(--border-radius);
-        }
-        .manual-controls label {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 1rem;
-            font-weight: 500;
-            cursor: pointer;
-        }
-        /* Custom styled checkbox */
-        .manual-controls input[type="checkbox"] {
-            -webkit-appearance: none;
-            appearance: none;
-            background-color: #fff;
-            margin: 0;
-            font: inherit;
-            color: var(--color-text);
-            width: 1.15em;
-            height: 1.15em;
-            border: 0.1em solid var(--color-text);
-            border-radius: 0.15em;
-            transform: translateY(-0.075em);
-            display: grid;
-            place-content: center;
-            cursor: pointer;
-        }
-        .manual-controls input[type="checkbox"]::before {
-            content: "";
-            width: 0.65em;
-            height: 0.65em;
-            transform: scale(0);
-            transition: 120ms transform ease-in-out;
-            box-shadow: inset 1em 1em #2563eb; /* blue-600 */
-            transform-origin: bottom left;
-            clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
-        }
-        .manual-controls input[type="checkbox"]:checked::before {
-            transform: scale(1);
-        }
-
-
-        /* --- Terminal --- */
-        .terminal {
-            background: var(--color-terminal-bg); color: var(--color-terminal-text);
-            font-family: 'Consolas', 'Courier New', monospace; padding: 15px;
-            border-radius: 8px; width: 100%; height: 200px; overflow-y: auto;
-            font-size: 14px; border: 1px solid var(--color-shadow);
-            white-space: pre-wrap; box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.2);
-            transition: background 0.3s, color 0.3s;
-            box-sizing: border-box;
-        }
-        .terminal .prompt { color: var(--color-terminal-prompt); font-weight: bold; }
-        .terminal .response { color: var(--color-terminal-text); }
-        
-        /* --- Calculator-specific Styles (from your file) --- */
-        /* We prefix them with .calculator-content to avoid breaking our theme */
-        .calculator-content {
-            font-family: "Inter", sans-serif;
-            background: var(--color-surface); /* Use theme surface color */
-        }
-        .calculator-content canvas {
-            touch-action: none;
-            border: 1px solid #d1d5db; /* gray-300 */
-        }
-        .calculator-content textarea {
-            height: 300px;
-            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-            font-size: 0.875rem; /* text-sm */
-            /* Make textareas match theme */
-            background: var(--color-background);
-            color: var(--color-text);
-            border: 1px solid var(--color-shadow);
-        }
-        .calculator-content input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            height: 20px;
-            width: 20px;
-            border-radius: 50%;
-            background: #2563eb; /* blue-600 */
-            cursor: pointer;
-            margin-top: -6px; /* Center thumb on track */
-        }
-        .calculator-content input[type=range]::-moz-range-thumb {
-            height: 20px;
-            width: 20px;
-            border-radius: 50%;
-            background: #2563eb; /* blue-600 */
-            cursor: pointer;
-        }
-        /* Override Tailwind colors to match theme */
-        body[data-theme='dark'] .calculator-content,
-        body[data-theme='dark'] .calculator-content .bg-white {
-            background: var(--color-surface) !important;
-        }
-        body[data-theme='dark'] .calculator-content .text-gray-800,
-        body[data-theme='dark'] .calculator-content .text-gray-700,
-        body[data-theme='dark'] .calculator-content .text-gray-600 {
-            color: var(--color-text) !important;
-        }
-        body[data-theme='dark'] .calculator-content .bg-gray-100,
-        body[data-theme='dark'] .calculator-content .bg-gray-50 {
-             background: var(--color-background) !important;
-        }
-        body[data-theme='dark'] .calculator-content .border,
-        body[data-theme='dark'] .calculator-content .border-gray-300,
-        body[data-theme='dark'] .calculator-content .border-gray-200 {
-            border-color: #555 !important;
-        }
-
-    </style>
-</head>
-
-<body data-theme="light">
-
-    <div id="mySidebar" class="sidebar">
-        <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
-        <a href="{{ url_for('index') }}">Manual Command</a>
-        <a href="{{ url_for('led_controls') }}">LED Controls</a>
-        <a href="{{ url_for('script') }}">Bulk Commands</a>
-        <a href="{{ url_for('terminal') }}">Terminal</a>
-    </div>
-
-    <button class="openbtn" onclick="openNav()">☰</button>
-    <button id="themeToggle" onclick="toggleDarkMode()">
-        <span id="themeIcon">☀️</span>
-    </button>
-
-    <div class="main-content">
-        <img src="{{ url_for('static', filename='sand.png') }}" alt="Sand Table Header" class="header-image">
-        
-        <div class="control-panel sandify-module">
-            <img src="{{ url_for('static', filename='sandify.png') }}" alt="Sandify Logo">
-            <div class="sandify-module-content">
-                <h3>Sandify</h3>
-                <p>Unleash intricate patterns with this powerful, web-based G-code creator!</p>
-                <a href="https://sandify.org/" target="_blank" rel="noopener noreferrer">Open Sandify</a>
-            </div>
-        </div>
-        
-        <div class="control-panel">
-            
-            <div class="calculator-content">
-                <div class="w-full max-w-7xl mx-auto bg-white rounded-lg p-6 md:p-8 grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-
-                    <div class="flex flex-col gap-6">
-                        <div>
-                            <h1 class="text-2xl font-bold text-gray-800 mb-4">Interactive G-Code Converter</h1>
-                            
-                            <div class="space-y-4">
-                                <fieldset class="border border-gray-300 p-3 rounded-md">
-                                    <legend class="text-sm font-medium text-gray-700 px-1">Initial Start Position</legend>
-                                    <div class="flex gap-4">
-                                        <div>
-                                            <label for="initialX" class="block text-xs font-medium text-gray-600">Start X</label>
-                                            <input type="number" id="initialX" value="203.2" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                                        </div>
-                                        <div>
-                                            <label for="initialY" class="block text-xs font-medium text-gray-600">Start Y</label>
-                                            <input type="number" id="initialY" value="0" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                                        </div>
-                                    </div>
-                                </fieldset>
-
-                                <fieldset class="border border-gray-300 p-3 rounded-md">
-                                    <legend class="text-sm font-medium text-gray-700 px-1">Preferred Solution (Constant)</legend>
-                                    <div class="flex justify-around mt-1">
-                                        <label class="flex items-center space-x-2">
-                                            <input type="radio" name="solution" value="up" class="focus:ring-green-500 h-4 w-4 text-green-600 border-gray-300" checked>
-                                            <span class="text-sm text-green-700 font-medium">Elbow Up</span>
-                                        </label>
-                                        <label class="flex items-center space-x-2">
-                                            <input type="radio" name="solution" value="down" class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300">
-                                            <span class="text-sm text-blue-700 font-medium">Elbow Down</span>
-                                        </label>
-                                    </div>
-                                </fieldset>
-                                
-                                <button id="convertButton" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md shadow transition duration-150 ease-in-out">
-                                    Convert G-Code
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div class="flex-grow w-full aspect-square rounded-lg overflow-hidden mt-4">
-                            <canvas id="ikCanvas" class="bg-white rounded-lg w-full h-full"></canvas>
-                        </div>
-                        
-                        <div class="mt-4">
-                            <label for="stepSlider" class="block text-sm font-medium text-gray-700 mb-1">Step: <span id="stepLabel" class="font-bold">0 / 0</span></label>
-                            <input type="range" id="stepSlider" min="0" max="0" value="0" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
-                        </div>
-                    </div>
-
-                    <div class="flex flex-col gap-6">
-                        <div>
-                            <label for="inputGcode" class="block text-sm font-medium text-gray-700 mb-1">Input G-Code (Cartesian)</label>
-                            <textarea id="inputGcode" class="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" spellcheck="false">G1 X0 Y0
-G1 X0 Y203.2
-                            </textarea>
-                        </div>
-
-                        <div>
-                            <div class="flex justify-between items-center mb-1">
-                                <label for="outputGcode" class="block text-sm font-medium text-gray-700">Converted G-Code (Motor Steps)</label>
-                                <span id="warningIndicator" class="hidden text-sm font-medium text-yellow-600 flex items-center gap-1">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-yellow-500">
-                                      <path fill-rule="evenodd" d="M8.485 2.495c.646-1.136 2.376-1.136 3.022 0l7.25 12.72c.646 1.136-.192 2.53-1.51 2.53H2.744c-1.32 0-2.158-1.395-1.51-2.53l7.25-12.72zM9 12a1 1 0 1 1 2 0 1 1 0 0 1-2 0zm1-7a1 1 0 0 1 1 1v4a1 1 0 1 1-2 0V6a1 1 0 0 1 1-1z" clip-rule="evenodd" />
-                                    </svg>
-                                    Warnings
-                                </span>
-                            </div>
-                            <div class="relative">
-                                <textarea id="outputGcode" class="w-full p-3 border border-gray-300 bg-gray-50 rounded-md shadow-sm" readonly></textarea>
-                                <button id="copyButton" class="absolute right-3 top-3 bg-gray-700 hover:bg-gray-600 text-white text-xs font-medium py-1 px-2 rounded-md transition-all duration-150">
-                                    Copy
-                                </button>
-                                <span id="copySuccess" class="absolute right-3 top-3 text-green-500 text-xs font-medium hidden bg-gray-700 py-1 px-2 rounded-md">
-                                    Copied!
-                                </span>
-                            </div>
-                            <div id="warningMessages" class="hidden mt-2 p-3 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-md text-xs">
-                                <ul class="list-disc list-inside space-y-1">
-                                    </ul>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div> 
-            
-            <button id="send-to-table-btn" onclick="sendGcodeFromCalculator()">
-                Send Commands
-            </button>
-            
-            <div class="manual-controls">
-                <label for="manualModeCheckbox">
-                    <input type="checkbox" id="manualModeCheckbox">
-                    Manual Step-by-Step
-                </label>
-                <button id="nextLineButton" onclick="sendManualLine()" style="display:none;">
-                    Send Next Line
-                </button>
-            </div>
-            </div> <h2>Live Terminal Log</h2>
-        <div id="terminal" class="terminal"></div>
-    </div>
-
-    <script>
-        // --- Sidebar Functions ---
-        function openNav() {
-            document.getElementById("mySidebar").style.width = "200px";
-            const main = document.querySelector(".main-content");
-            if (main) main.style.marginLeft = "200px";
-        }
-
-        function closeNav() {
-            document.getElementById("mySidebar").style.width = "0";
-            const main = document.querySelector(".main-content");
-            if (main) main.style.marginLeft = "auto";
-        }
-
-        // --- Dark Mode Toggle ---
-        function updateThemeIcon(theme) {
-            document.getElementById('themeIcon').textContent = theme === 'dark' ? '🌙' : '☀️';
-        }
-
-        function toggleDarkMode() {
-            const body = document.body;
-            const currentTheme = body.getAttribute('data-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            
-            body.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
-            updateThemeIcon(newTheme);
-        }
-        
-        // --- Terminal Logger ---
-        // (Also logs to browser console for easier debugging)
-        function appendToTerminal(text, isCommand = false) {
-            const term = document.getElementById("terminal");
-            
-            // Log to console first
-            if (isCommand) {
-                console.log(`> ${text}`);
+        // --- Clamping Logic ---
+        if (d > MAX_REACH - EPSILON) {
+            isClamped = true;
+            const ratio = (MAX_REACH - EPSILON) / d; // Clamp slightly inside max
+            clampedX = x * ratio;
+            clampedY = y * ratio;
+            d = MAX_REACH - EPSILON;
+            dSq = d * d;
+        } else if (d < MIN_REACH + EPSILON) {
+            if (d < EPSILON) {
+                // At origin (0,0)
             } else {
-                console.log(`[Response] ${text}`);
-            }
-            
-            if (!term) return; // Don't fail if terminal isn't on the page
-            
-            const line = document.createElement("div");
-            
-            if (isCommand) {
-                line.innerHTML = `<span class="prompt">[${new Date().toLocaleTimeString()}] > </span><span class="response">${text}</span>`;
-            } else {
-                line.innerHTML = `<span class="response">[${new Date().toLocaleTimeString()}] ${text}</span>`;
-            }
-            
-            term.appendChild(line);
-            term.scrollTop = term.scrollHeight; 
-        }
-        
-        // --- State for Manual G-code ---
-        let manualGcodeLines = [];
-        let manualCurrentLineIndex = 0;
-        let isManualJobActive = false;
-
-        // --- MODIFIED Function to send G-code ---
-        function sendGcodeFromCalculator() {
-            const sendButton = document.getElementById('send-to-table-btn');
-            const manualCheckbox = document.getElementById('manualModeCheckbox');
-            const nextButton = document.getElementById('nextLineButton');
-            
-            let gcodeText = "";
-            try {
-                const outputBox = document.getElementById('outputGcode');
-                if (!outputBox) throw new Error("Could not find 'outputGcode' element.");
-                gcodeText = outputBox.value;
-            } catch (e) {
-                appendToTerminal(`Error reading from calculator: ${e.message}`, false);
-                return;
-            }
-
-            if (!gcodeText.trim()) {
-                appendToTerminal("Calculator output text box is empty.", false);
-                return;
-            }
-
-            // --- Check Mode ---
-            if (manualCheckbox.checked) {
-                // --- MANUAL MODE ---
-                manualGcodeLines = gcodeText.split('\n')
-                                        .map(line => line.split(';')[0].trim()) // Clean comments
-                                        .filter(line => line.toUpperCase().startsWith('G1')); // Filter for G1
-                
-                if (manualGcodeLines.length === 0) {
-                    appendToTerminal("No valid G1 commands found for manual mode.", false);
-                    return;
-                }
-
-                manualCurrentLineIndex = 0;
-                isManualJobActive = true;
-
-                // Update UI for manual job
-                sendButton.disabled = true;
-                manualCheckbox.disabled = true;
-                nextButton.style.display = 'block'; // Show the 'Next' button
-                nextButton.disabled = false;
-                
-                appendToTerminal(`Starting manual job with ${manualGcodeLines.length} lines.`, true);
-                // Send the first line immediately
-                sendManualLine();
-
-            } else {
-                // --- AUTOMATIC (DRIP) MODE ---
-                sendButton.disabled = true;
-                sendButton.textContent = "Sending...";
-                appendToTerminal("Sending G-code block to server (auto-drip)...", true);
-
-                fetch("/send_gcode_block", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ gcode: gcodeText })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        appendToTerminal(`Server response: ${data.message}`, false);
-                    } else {
-                        appendToTerminal(`Error: ${data.error || 'Unknown Error'}`, false);
-                    }
-                })
-                .catch(error => {
-                    appendToTerminal(`Network Error: ${error.message}`, false);
-                })
-                .finally(() => {
-                    sendButton.disabled = false;
-                    sendButton.textContent = "Send Commands";
-                });
-            }
-        }
-
-        // --- Function for sending one manual line ---
-        function sendManualLine() {
-            if (!isManualJobActive || manualCurrentLineIndex >= manualGcodeLines.length) {
-                if(isManualJobActive) appendToTerminal("Manual job finished.", false);
-                resetManualJobState();
-                return;
-            }
-            
-            const nextButton = document.getElementById('nextLineButton');
-            const line = manualGcodeLines[manualCurrentLineIndex];
-            
-            // Disable button while sending
-            nextButton.disabled = true;
-            nextButton.textContent = "Sending...";
-            
-            appendToTerminal(`Sending line ${manualCurrentLineIndex + 1}/${manualGcodeLines.length}: ${line}`, true);
-
-            fetch("/send_single_gcode_line", { // NEW ENDPOINT
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ gcode_line: line })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    appendToTerminal(`Server ACK: ${data.message}`, false);
-                    manualCurrentLineIndex++; // Only increment on success
-                    
-                    if (manualCurrentLineIndex >= manualGcodeLines.length) {
-                        appendToTerminal("Manual job finished.", false);
-                        resetManualJobState();
-                    }
-                } else {
-                    appendToTerminal(`Error on line ${manualCurrentLineIndex + 1}: ${data.error || 'Unknown Error'}`, false);
-                    appendToTerminal("Aborting manual job.", false);
-                    resetManualJobState(); // Abort on error
-                }
-            })
-            .catch(error => {
-                appendToTerminal(`Network Error: ${error.message}`, false);
-                appendToTerminal("Aborting manual job.", false);
-                resetManualJobState(); // Abort on error
-            })
-            .finally(() => {
-                if (isManualJobActive) { // Don't re-enable if job just finished
-                    nextButton.disabled = false;
-                    nextButton.textContent = `Send Next (${manualCurrentLineIndex + 1}/${manualGcodeLines.length})`;
-                }
-            });
-        }
-
-        // --- Helper to reset UI ---
-        function resetManualJobState() {
-            isManualJobActive = false;
-            manualGcodeLines = [];
-            manualCurrentLineIndex = 0;
-            
-            const sendButton = document.getElementById('send-to-table-btn');
-            sendButton.disabled = false;
-            sendButton.textContent = document.getElementById('manualModeCheckbox').checked ? "Start Manual Job" : "Send Commands";
-            
-            document.getElementById('manualModeCheckbox').disabled = false;
-            
-            const nextButton = document.getElementById('nextLineButton');
-            nextButton.style.display = 'none';
-            nextButton.textContent = "Send Next Line";
-        }
-
-
-        // --- Initialization ---
-        document.addEventListener('DOMContentLoaded', () => {
-            // Load theme from local storage
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            document.body.setAttribute('data-theme', savedTheme);
-            updateThemeIcon(savedTheme);
-            
-            appendToTerminal("System ready. Bulk command page initialized.", false);
-            
-            // --- Add listener to update button text ---
-            const manualCheckbox = document.getElementById('manualModeCheckbox');
-            const sendButton = document.getElementById('send-to-table-btn');
-            if (manualCheckbox && sendButton) {
-                manualCheckbox.addEventListener('change', (e) => {
-                    if (e.target.checked) {
-                        sendButton.textContent = "Start Manual Job";
-                    } else {
-                        sendButton.textContent = "Send Commands";
-                    }
-                });
-            }
-        });
-    </script>
-
-        <script>
-        // --- Fixed Constants ---
-        const L1_LENGTH = 101.6;
-        const L2_LENGTH = 101.6;
-        const MAX_REACH = L1_LENGTH + L2_LENGTH;
-        const MIN_REACH = Math.abs(L1_LENGTH - L2_LENGTH);
-        const DEG_TO_STEPS = 3200 / 360;
-        const Q1_OFFSET_DEG = 90;  // Arm 1 "0" is 90deg (Up)
-        const Q2_OFFSET_DEG = 180; // Arm 2 "0" is 180deg (Folded)
-        const EPSILON = 1e-6; // Small value for float comparison
-
-        // --- DOM Elements ---
-        function getCalculatorElements() {
-            return {
-                initialXInput: document.getElementById('initialX'),
-                initialYInput: document.getElementById('initialY'),
-                convertButton: document.getElementById('convertButton'),
-                inputGcodeEl: document.getElementById('inputGcode'),
-                outputGcodeEl: document.getElementById('outputGcode'),
-                copyButton: document.getElementById('copyButton'),
-                copySuccess: document.getElementById('copySuccess'),
-                canvas: document.getElementById('ikCanvas'),
-                ctx: document.getElementById('ikCanvas') ? document.getElementById('ikCanvas').getContext('2d') : null,
-                warningIndicator: document.getElementById('warningIndicator'),
-                warningMessages: document.getElementById('warningMessages'),
-                stepSlider: document.getElementById('stepSlider'),
-                stepLabel: document.getElementById('stepLabel')
-            };
-        }
-        
-        // --- State ---
-        let canvasSize = 0;
-        let scale = 1;
-        let originX = 0;
-        let originY = 0;
-        let globalPathSegments = []; // Stores the calculated path segments
-
-        // --- Utility Functions ---
-        function toDegrees(radians) {
-            return radians * (180 / Math.PI);
-        }
-        function toRadians(degrees) {
-            return degrees * (Math.PI / 180);
-        }
-
-        /**
-         * Calculates Inverse Kinematics for a given point.
-         * @returns {object} { solution1, solution2, clampedX, clampedY, isClamped, error }
-         */
-        function calculateIK(l1, l2, x, y) {
-            let dSq = x * x + y * y;
-            let d = Math.sqrt(dSq);
-            let clampedX = x;
-            let clampedY = y;
-            let isClamped = false;
-            
-            // --- Clamping Logic ---
-            if (d > MAX_REACH - EPSILON) {
                 isClamped = true;
-                const ratio = (MAX_REACH - EPSILON) / d; // Clamp slightly inside max
+                const ratio = (MIN_REACH + EPSILON) / d; // Clamp slightly outside min
                 clampedX = x * ratio;
                 clampedY = y * ratio;
-                d = MAX_REACH - EPSILON;
+                d = MIN_REACH + EPSILON;
                 dSq = d * d;
-            } else if (d < MIN_REACH + EPSILON) {
-                if (d < EPSILON) {
-                    // At origin (0,0)
-                } else {
-                    isClamped = true;
-                    const ratio = (MIN_REACH + EPSILON) / d; // Clamp slightly outside min
-                    clampedX = x * ratio;
-                    clampedY = y * ratio;
-                    d = MIN_REACH + EPSILON;
-                    dSq = d * d;
-                }
             }
+        }
 
-            // --- IK Calculation (on potentially clamped values) ---
-            const cosQ2 = (dSq - l1 * l1 - l2 * l2) / (2 * l1 * l2);
-            
-            // Handle precision errors at max/min reach
-            const clampedCosQ2 = Math.max(-1, Math.min(1, cosQ2));
+        // --- IK Calculation (on potentially clamped values) ---
+        const cosQ2 = (dSq - l1 * l1 - l2 * l2) / (2 * l1 * l2);
+        
+        // Handle precision errors at max/min reach
+        const clampedCosQ2 = Math.max(-1, Math.min(1, cosQ2));
 
-            // Handle (0,0) singularity for q1
-            if (d < EPSILON) {
-                // At (0,0), q1 is undefined, but we need *some* value.
-                // We'll calculate a "home" q1, but the (0,0) prep logic
-                // will later override this with a tangent-aligned q1.
-                const home_q1_rad = toRadians(Q1_OFFSET_DEG); // 90 deg
-                return {
-                    solution1: { q1: home_q1_rad, q2: Math.acos(clampedCosQ2) }, // q2 = pi (Elbow Down)
-                    solution2: { q1: home_q1_rad, q2: -Math.acos(clampedCosQ2) }, // q2 = -pi (Elbow Up)
-                    clampedX, clampedY, isClamped
-                };
-            }
-            
-            // sol1 = Elbow Down (positive q2)
-            const q2_rad_sol1 = Math.acos(clampedCosQ2);
-            // sol2 = Elbow Up (negative q2)
-            const q2_rad_sol2 = -Math.acos(clampedCosQ2);
-
-            const k1_sol1 = l1 + l2 * Math.cos(q2_rad_sol1);
-            const k2_sol1 = l2 * Math.sin(q2_rad_sol1);
-            const q1_rad_sol1 = Math.atan2(clampedY, clampedX) - Math.atan2(k2_sol1, k1_sol1);
-
-            const k1_sol2 = l1 + l2 * Math.cos(q2_rad_sol2);
-            const k2_sol2 = l2 * Math.sin(q2_rad_sol2);
-            const q1_rad_sol2 = Math.atan2(clampedY, clampedX) - Math.atan2(k2_sol2, k1_sol2);
-
+        // Handle (0,0) singularity for q1
+        if (d < EPSILON) {
+            // At (0,0), q1 is undefined, but we need *some* value.
+            // We'll calculate a "home" q1, but the (0,0) prep logic
+            // will later override this with a tangent-aligned q1.
+            const home_q1_rad = toRadians(Q1_OFFSET_DEG); // 90 deg
             return {
-                solution1: { q1: q1_rad_sol1, q2: q2_rad_sol1 }, // Elbow Down
-                solution2: { q1: q1_rad_sol2, q2: q2_rad_sol2 }, // Elbow Up
+                solution1: { q1: home_q1_rad, q2: Math.acos(clampedCosQ2) }, // q2 = pi (Elbow Down)
+                solution2: { q1: home_q1_rad, q2: -Math.acos(clampedCosQ2) }, // q2 = -pi (Elbow Up)
                 clampedX, clampedY, isClamped
             };
         }
+        
+        // sol1 = Elbow Down (positive q2)
+        const q2_rad_sol1 = Math.acos(clampedCosQ2);
+        // sol2 = Elbow Up (negative q2)
+        const q2_rad_sol2 = -Math.acos(clampedCosQ2);
 
-        // --- Drawing Functions ---
-        function resizeCanvas() {
-            const { canvas, ctx, stepSlider } = getCalculatorElements();
-            if (!canvas || !ctx) return; 
-            
-            const dpr = window.devicePixelRatio || 1;
-            const rect = canvas.getBoundingClientRect();
-            if (rect.width === 0) return; 
-            
-            canvas.width = rect.width * dpr;
-            canvas.height = rect.height * dpr;
-            ctx.scale(dpr, dpr);
-            canvasSize = rect.width;
-            originX = canvasSize / 2;
-            originY = canvasSize / 2;
-            drawToStep(stepSlider.value); 
+        const k1_sol1 = l1 + l2 * Math.cos(q2_rad_sol1);
+        const k2_sol1 = l2 * Math.sin(q2_rad_sol1);
+        const q1_rad_sol1 = Math.atan2(clampedY, clampedX) - Math.atan2(k2_sol1, k1_sol1);
+
+        const k1_sol2 = l1 + l2 * Math.cos(q2_rad_sol2);
+        const k2_sol2 = l2 * Math.sin(q2_rad_sol2);
+        const q1_rad_sol2 = Math.atan2(clampedY, clampedX) - Math.atan2(k2_sol2, k1_sol2);
+
+        return {
+            solution1: { q1: q1_rad_sol1, q2: q2_rad_sol1 }, // Elbow Down
+            solution2: { q1: q1_rad_sol2, q2: q2_rad_sol2 }, // Elbow Up
+            clampedX, clampedY, isClamped
+        };
+    }
+
+    // --- Drawing Functions ---
+    function resizeCanvas() {
+        const { canvas, ctx, stepSlider } = getCalculatorElements();
+        if (!canvas || !ctx) return; 
+        
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        if (rect.width === 0) return; 
+        
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        ctx.scale(dpr, dpr);
+        canvasSize = rect.width;
+        originX = canvasSize / 2;
+        originY = canvasSize / 2;
+        drawToStep(stepSlider.value); 
+    }
+
+    function drawGrid() {
+        const { canvas, ctx } = getCalculatorElements();
+        if (!canvas || !ctx) return;
+        scale = (canvasSize / 2) * 0.9 / MAX_REACH; 
+        
+        ctx.clearRect(0, 0, canvasSize, canvasSize);
+        ctx.save();
+        ctx.translate(originX, originY);
+        
+        // Grid, Axes, Reach Circle... (as before, no changes)
+        const gridSize = 50 * scale;
+        const steps = Math.ceil(originX / gridSize);
+        ctx.beginPath();
+        ctx.strokeStyle = '#e5e7eb'; // gray-200
+        ctx.lineWidth = 1;
+        for (let i = -steps; i <= steps; i++) {
+            ctx.moveTo(i * gridSize, -originY); ctx.lineTo(i * gridSize, originY);
+            ctx.moveTo(-originX, i * gridSize); ctx.lineTo(originX, i * gridSize);
         }
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.strokeStyle = '#9ca3af'; // gray-400
+        ctx.lineWidth = 2;
+        ctx.moveTo(-originX, 0); ctx.lineTo(originX, 0); // X Axis
+        ctx.moveTo(0, -originY); ctx.lineTo(0, originY); // Y Axis
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(0, 0, MAX_REACH * scale, 0, 2 * Math.PI);
+        ctx.strokeStyle = '#3b82f6'; // blue-500
+        ctx.lineWidth = 1;
+        ctx.setLineDash([5, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        ctx.restore();
+    }
 
-        function drawGrid() {
-            const { canvas, ctx } = getCalculatorElements();
-            if (!canvas || !ctx) return;
-            scale = (canvasSize / 2) * 0.9 / MAX_REACH; 
-            
-            ctx.clearRect(0, 0, canvasSize, canvasSize);
-            ctx.save();
-            ctx.translate(originX, originY);
-            
-            // Grid, Axes, Reach Circle... (as before, no changes)
-            const gridSize = 50 * scale;
-            const steps = Math.ceil(originX / gridSize);
-            ctx.beginPath();
-            ctx.strokeStyle = '#e5e7eb'; // gray-200
-            ctx.lineWidth = 1;
-            for (let i = -steps; i <= steps; i++) {
-                ctx.moveTo(i * gridSize, -originY); ctx.lineTo(i * gridSize, originY);
-                ctx.moveTo(-originX, i * gridSize); ctx.lineTo(originX, i * gridSize);
+    // Draws just the path segments (lines)
+    function drawPathSegments(segments) {
+        const { canvas, ctx } = getCalculatorElements();
+        if (!canvas || !ctx) return;
+        ctx.save();
+        ctx.translate(originX, originY);
+        ctx.scale(1, -1); // Flip Y-axis
+
+        for (const segment of segments) {
+            // Do not draw "prep" moves, which have same start/end
+            if (Math.abs(segment.startX - segment.endX) < EPSILON && Math.abs(segment.startY - segment.endY) < EPSILON) {
+                continue;
             }
-            ctx.stroke();
             ctx.beginPath();
-            ctx.strokeStyle = '#9ca3af'; // gray-400
+            ctx.moveTo(segment.startX * scale, segment.startY * scale);
+            ctx.lineTo(segment.endX * scale, segment.endY * scale);
+            
+            // We're not interpolating, so all lines are "complex" arcs
+            // Let's color them differently
+            ctx.strokeStyle = segment.isClamped ? '#ef4444' : '#f97316'; // red-500 or orange-500
             ctx.lineWidth = 2;
-            ctx.moveTo(-originX, 0); ctx.lineTo(originX, 0); // X Axis
-            ctx.moveTo(0, -originY); ctx.lineTo(0, originY); // Y Axis
+            ctx.setLineDash([2, 4]); // Draw arcs as dashed lines
             ctx.stroke();
-            ctx.beginPath();
-            ctx.arc(0, 0, MAX_REACH * scale, 0, 2 * Math.PI);
-            ctx.strokeStyle = '#3b82f6'; // blue-500
-            ctx.lineWidth = 1;
-            ctx.setLineDash([5, 5]);
-            ctx.stroke();
-            ctx.setLineDash([]);
-            
-            ctx.restore();
         }
+        ctx.setLineDash([]);
+        ctx.restore();
+    }
+    
+    // Draws the arm at a specific X, Y cartesian coordinate AND solution
+    function drawArmAtPosition(x, y, solution) {
+        const { canvas, ctx } = getCalculatorElements();
+        if (!canvas || !ctx) return;
+        const result = calculateIK(L1_LENGTH, L2_LENGTH, x, y);
+        if (result.error) return;
 
-        // Draws just the path segments (lines)
-        function drawPathSegments(segments) {
-            const { canvas, ctx } = getCalculatorElements();
-            if (!canvas || !ctx) return;
-            ctx.save();
-            ctx.translate(originX, originY);
-            ctx.scale(1, -1); // Flip Y-axis
+        const angles = (solution === 'down') ? result.solution1 : result.solution2;
+        const { q1, q2 } = angles;
+        const color = (solution === 'down') ? '#0ea5e9' : '#2563eb'; // 'up' is blue-600, 'down' is cyan-500
 
-            for (const segment of segments) {
-                // Do not draw "prep" moves, which have same start/end
-                if (Math.abs(segment.startX - segment.endX) < EPSILON && Math.abs(segment.startY - segment.endY) < EPSILON) {
-                    continue;
-                }
-                ctx.beginPath();
-                ctx.moveTo(segment.startX * scale, segment.startY * scale);
-                ctx.lineTo(segment.endX * scale, segment.endY * scale);
-                
-                // We're not interpolating, so all lines are "complex" arcs
-                // Let's color them differently
-                ctx.strokeStyle = segment.isClamped ? '#ef4444' : '#f97316'; // red-500 or orange-500
-                ctx.lineWidth = 2;
-                ctx.setLineDash([2, 4]); // Draw arcs as dashed lines
-                ctx.stroke();
-            }
-            ctx.setLineDash([]);
-            ctx.restore();
+        const joint1X = (L1_LENGTH * Math.cos(q1)) * scale;
+        const joint1Y = (L1_LENGTH * Math.sin(q1)) * scale;
+
+        const endEffectorX = (L1_LENGTH * Math.cos(q1) + L2_LENGTH * Math.cos(q1 + q2)) * scale;
+        const endEffectorY = (L1_LENGTH * Math.sin(q1) + L2_LENGTH * Math.sin(q1 + q2)) * scale;
+
+        ctx.save();
+        ctx.translate(originX, originY);
+        ctx.scale(1, -1); // Flip Y-axis
+
+        // Draw Arm 1
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(joint1X, joint1Y);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 8;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+
+        // Draw Arm 2
+        ctx.beginPath();
+        ctx.moveTo(joint1X, joint1Y);
+        ctx.lineTo(endEffectorX, endEffectorY);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 8;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+        
+        // Draw Joints
+        ctx.beginPath();
+        ctx.arc(0, 0, 10, 0, 2 * Math.PI); // Base joint
+        ctx.fillStyle = '#4b5563'; // gray-600
+        ctx.fill();
+        
+        ctx.beginPath();
+        ctx.arc(joint1X, joint1Y, 8, 0, 2 * Math.PI); // Elbow joint
+        ctx.fillStyle = color;
+        ctx.fill();
+        
+        // Draw Target Point
+        ctx.beginPath();
+        ctx.arc(endEffectorX, endEffectorY, 10, 0, 2 * Math.PI);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        
+        ctx.restore();
+    }
+
+    // Main drawing function: draws grid, path, and arm
+    function drawToStep(stepIndex) {
+        const { canvas, initialXInput, initialYInput } = getCalculatorElements();
+        if (!canvas || !initialXInput || !initialYInput) return;
+        
+        stepIndex = parseInt(stepIndex, 10);
+        drawGrid();
+
+        const segmentsToDraw = globalPathSegments.slice(0, stepIndex);
+        drawPathSegments(segmentsToDraw);
+
+        let finalX, finalY, finalSolution;
+        
+        if (stepIndex === 0) {
+            finalX = parseFloat(initialXInput.value || "203.2");
+            finalY = parseFloat(initialYInput.value || "0");
+            finalSolution = document.querySelector('input[name="solution"]:checked').value;
+        } else {
+            const lastSegment = segmentsToDraw[stepIndex - 1];
+            finalX = lastSegment.endX;
+            finalY = lastSegment.endY;
+            finalSolution = lastSegment.endSolution; // Use the solution we ended up with
         }
         
-        // Draws the arm at a specific X, Y cartesian coordinate AND solution
-        function drawArmAtPosition(x, y, solution) {
-            const { canvas, ctx } = getCalculatorElements();
-            if (!canvas || !ctx) return;
-            const result = calculateIK(L1_LENGTH, L2_LENGTH, x, y);
-            if (result.error) return;
+        drawArmAtPosition(finalX, finalY, finalSolution);
+    }
 
-            const angles = (solution === 'down') ? result.solution1 : result.solution2;
-            const { q1, q2 } = angles;
-            const color = (solution === 'down') ? '#0ea5e9' : '#2563eb'; // 'up' is blue-600, 'down' is cyan-500
+    // --- HELPER: Calculates motor steps from angle deltas ---
+    function calculateGcode(startAngles, endAngles) {
+        const delta_q1_deg = toDegrees(endAngles.q1 - startAngles.q1);
+        const delta_q2_deg = toDegrees(endAngles.q2 - startAngles.q2);
 
-            const joint1X = (L1_LENGTH * Math.cos(q1)) * scale;
-            const joint1Y = (L1_LENGTH * Math.sin(q1)) * scale;
+        const delta_motor1_deg = delta_q1_deg;
+        const delta_motor2_deg = delta_q1_deg + delta_q2_deg;
+        
+        const motor1_steps = Math.round(delta_motor1_deg * DEG_TO_STEPS);
+        const motor2_steps = Math.round((0.125 * motor1_steps) + (delta_motor2_deg * DEG_TO_STEPS));
+        
+        // Avoid sending 0 0 commands
+        if (motor1_steps === 0 && motor2_steps === 0) {
+            return { gcode: null, motor1_steps: 0, motor2_steps: 0 };
+        }
+        
+        const gcode = `G1 ${motor2_steps} ${motor1_steps} 1000`;
+        return { gcode, motor1_steps, motor2_steps };
+    }
 
-            const endEffectorX = (L1_LENGTH * Math.cos(q1) + L2_LENGTH * Math.cos(q1 + q2)) * scale;
-            const endEffectorY = (L1_LENGTH * Math.sin(q1) + L2_LENGTH * Math.sin(q1 + q2)) * scale;
+    // --- THIS IS THE CORRECTED FUNCTION ---
+    // --- HELPER: Calculates the "cost" (sum of squared motor change) ---
+    function getAngleCost(anglesA, anglesB) {
+        const delta_q1_deg = toDegrees(anglesB.q1 - anglesA.q1);
+        const delta_q2_deg = toDegrees(anglesB.q2 - anglesA.q2);
+        
+        const delta_motor1_deg = delta_q1_deg;
+        const delta_motor2_deg = delta_q1_deg + delta_q2_deg;
+        
+        // --- FIX ---
+        // Calculate the *actual* motor steps (unrounded) to get the true cost,
+        // including the 0.125 coupling.
+        const motor1_steps_raw = delta_motor1_deg * DEG_TO_STEPS;
+        const motor2_steps_raw = (0.125 * motor1_steps_raw) + (delta_motor2_deg * DEG_TO_STEPS);
 
-            ctx.save();
-            ctx.translate(originX, originY);
-            ctx.scale(1, -1); // Flip Y-axis
+        // Return sum of squares *of the final motor steps*
+        return (motor1_steps_raw * motor1_steps_raw) + (motor2_steps_raw * motor2_steps_raw);
+    }
 
-            // Draw Arm 1
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.lineTo(joint1X, joint1Y);
-            ctx.strokeStyle = color;
-            ctx.lineWidth = 8;
-            ctx.lineCap = 'round';
-            ctx.stroke();
-
-            // Draw Arm 2
-            ctx.beginPath();
-            ctx.moveTo(joint1X, joint1Y);
-            ctx.lineTo(endEffectorX, endEffectorY);
-            ctx.strokeStyle = color;
-            ctx.lineWidth = 8;
-            ctx.lineCap = 'round';
-            ctx.stroke();
-            
-            // Draw Joints
-            ctx.beginPath();
-            ctx.arc(0, 0, 10, 0, 2 * Math.PI); // Base joint
-            ctx.fillStyle = '#4b5563'; // gray-600
-            ctx.fill();
-            
-            ctx.beginPath();
-            ctx.arc(joint1X, joint1Y, 8, 0, 2 * Math.PI); // Elbow joint
-            ctx.fillStyle = color;
-            ctx.fill();
-            
-            // Draw Target Point
-            ctx.beginPath();
-            ctx.arc(endEffectorX, endEffectorY, 10, 0, 2 * Math.PI);
-            ctx.fillStyle = color;
-            ctx.fill();
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 3;
-            ctx.stroke();
-            
-            ctx.restore();
+    // --- *** NEW: REWRITTEN Main Conversion Logic *** ---
+    // This version uses pair-wise iteration to solve the (0,0) alignment problem.
+    function handleConversion() {
+        const els = getCalculatorElements();
+        if (!els.inputGcodeEl || !els.initialXInput || !els.initialYInput ||
+            !els.warningIndicator || !els.warningMessages || !els.outputGcodeEl || !els.stepSlider) {
+            return;
         }
 
-        // Main drawing function: draws grid, path, and arm
-        function drawToStep(stepIndex) {
-            const { canvas, initialXInput, initialYInput } = getCalculatorElements();
-            if (!canvas || !initialXInput || !initialYInput) return;
-            
-            stepIndex = parseInt(stepIndex, 10);
-            drawGrid();
+        const inputGcode = els.inputGcodeEl.value;
+        const lines = inputGcode.split('\n');
 
-            const segmentsToDraw = globalPathSegments.slice(0, stepIndex);
-            drawPathSegments(segmentsToDraw);
+        let currentSolution = document.querySelector('input[name="solution"]:checked').value;
+        let initialX = parseFloat(els.initialXInput.value || "203.2");
+        let initialY = parseFloat(els.initialYInput.value || "0");
 
-            let finalX, finalY, finalSolution;
+        els.warningIndicator.classList.add('hidden');
+        els.warningMessages.classList.add('hidden');
+        els.warningMessages.querySelector('ul').innerHTML = '';
+        globalPathSegments = [];
+
+        let outputGcode = [];
+        let warnings = [];
+
+        // --- NEW: Step 1: Collect all points ---
+        // Create a list of all coordinates, starting with the initial position.
+        const points = [];
+        points.push({ x: initialX, y: initialY, lineIndex: 0 });
+
+        let lastX = initialX;
+        let lastY = initialY;
+
+        for (const [index, line] of lines.entries()) {
+            const trimmed = line.trim();
+            if (/^G1\s+/i.test(trimmed)) {
+                const xMatch = trimmed.match(/X\s*(-?[\d\.]+)/i);
+                const yMatch = trimmed.match(/Y\s*(-?[\d\.]+)/i);
+                if (xMatch || yMatch) {
+                    // Use the last known coordinate for any missing axis
+                    const targetX = xMatch ? parseFloat(xMatch[1]) : lastX;
+                    const targetY = yMatch ? parseFloat(yMatch[1]) : lastY;
+                    points.push({ x: targetX, y: targetY, lineIndex: index + 1 });
+                    lastX = targetX;
+                    lastY = targetY;
+                }
+            }
+        }
+
+        // --- NEW: Step 2: Initialize state for loop ---
+        // Get the IK for the *first* point to establish the starting angles.
+        let ikResult = calculateIK(L1_LENGTH, L2_LENGTH, points[0].x, points[0].y);
+        let currentAngles = (currentSolution === 'down') ? ikResult.solution1 : ikResult.solution2;
+        let overrideStartAngles = null; // This will hold aligned angles from a (0,0) prep move
+
+        // --- NEW: Step 3: Iterate over point pairs ---
+        // Loop from the first point to the second-to-last point.
+        for (let i = 0; i < points.length - 1; i++) {
+            const P_start = points[i];
+            const P_end = points[i + 1]; // The destination for *this* move
             
-            if (stepIndex === 0) {
-                finalX = parseFloat(initialXInput.value || "203.2");
-                finalY = parseFloat(initialYInput.value || "0");
-                finalSolution = document.querySelector('input[name="solution"]:checked').value;
+            // Get IK for the destination
+            const endIK = calculateIK(L1_LENGTH, L2_LENGTH, P_end.x, P_end.y);
+            if (endIK.error) {
+                warnings.push(`Line ${P_end.lineIndex}: IK failed for end point.`);
+                continue; // Skip this move
+            }
+            if (endIK.isClamped) {
+                warnings.push(`Line ${P_end.lineIndex}: Target clamped to (${endIK.clampedX.toFixed(2)}, ${endKE.clampedY.toFixed(2)}).`);
+            }
+            
+            // Use clamped values for all calculations
+            const clampedEnd = { x: endIK.clampedX, y: endIK.clampedY };
+
+            // --- Determine Start Angles ---
+            let startAngles;
+            if (overrideStartAngles) {
+                // A prep move at (0,0) just happened. Use its resulting angles.
+                startAngles = overrideStartAngles;
+                overrideStartAngles = null; // Consume the override
             } else {
-                const lastSegment = segmentsToDraw[stepIndex - 1];
-                finalX = lastSegment.endX;
-                finalY = lastSegment.endY;
-                finalSolution = lastSegment.endSolution; // Use the solution we ended up with
-            }
-            
-            drawArmAtPosition(finalX, finalY, finalSolution);
-        }
-
-        // --- HELPER: Calculates motor steps from angle deltas ---
-        function calculateGcode(startAngles, endAngles) {
-            const delta_q1_deg = toDegrees(endAngles.q1 - startAngles.q1);
-            const delta_q2_deg = toDegrees(endAngles.q2 - startAngles.q2);
-
-            const delta_motor1_deg = delta_q1_deg;
-            const delta_motor2_deg = delta_q1_deg + delta_q2_deg;
-            
-            const motor1_steps = Math.round(delta_motor1_deg * DEG_TO_STEPS);
-            const motor2_steps = Math.round((0.125 * motor1_steps) + (delta_motor2_deg * DEG_TO_STEPS));
-            
-            // Avoid sending 0 0 commands
-            if (motor1_steps === 0 && motor2_steps === 0) {
-                return { gcode: null, motor1_steps: 0, motor2_steps: 0 };
-            }
-            
-            const gcode = `G1 ${motor2_steps} ${motor1_steps} 1000`;
-            return { gcode, motor1_steps, motor2_steps };
-        }
-
-        // --- HELPER: Calculates the "cost" (sum of squared motor change) ---
-        function getAngleCost(anglesA, anglesB) {
-            const delta_q1_deg = toDegrees(anglesB.q1 - anglesA.q1);
-            const delta_q2_deg = toDegrees(anglesB.q2 - anglesA.q2);
-            
-            const delta_motor1_deg = delta_q1_deg;
-            const delta_motor2_deg = delta_q1_deg + delta_q2_deg;
-            
-            // Return sum of squares
-            return (delta_motor1_deg * delta_motor1_deg) + (delta_motor2_deg * delta_motor2_deg);
-        }
-
-        // --- *** NEW: REWRITTEN Main Conversion Logic *** ---
-        // This version uses pair-wise iteration to solve the (0,0) alignment problem.
-        function handleConversion() {
-            const els = getCalculatorElements();
-            if (!els.inputGcodeEl || !els.initialXInput || !els.initialYInput ||
-                !els.warningIndicator || !els.warningMessages || !els.outputGcodeEl || !els.stepSlider) {
-                return;
+                // Use the angles from the end of the last move
+                startAngles = currentAngles;
             }
 
-            const inputGcode = els.inputGcodeEl.value;
-            const lines = inputGcode.split('\n');
+            // --- Determine End Angles (Preserve the user's chosen solution) ---
+            const endAngles = (currentSolution === 'down') ? endIK.solution1 : endIK.solution2;
 
-            let currentSolution = document.querySelector('input[name="solution"]:checked').value;
-            let initialX = parseFloat(els.initialXInput.value || "203.2");
-            let initialY = parseFloat(els.initialYInput.value || "0");
-
-            els.warningIndicator.classList.add('hidden');
-            els.warningMessages.classList.add('hidden');
-            els.warningMessages.querySelector('ul').innerHTML = '';
-            globalPathSegments = [];
-
-            let outputGcode = [];
-            let warnings = [];
-
-            // --- NEW: Step 1: Collect all points ---
-            // Create a list of all coordinates, starting with the initial position.
-            const points = [];
-            points.push({ x: initialX, y: initialY, lineIndex: 0 });
-
-            let lastX = initialX;
-            let lastY = initialY;
-
-            for (const [index, line] of lines.entries()) {
-                const trimmed = line.trim();
-                if (/^G1\s+/i.test(trimmed)) {
-                    const xMatch = trimmed.match(/X\s*(-?[\d\.]+)/i);
-                    const yMatch = trimmed.match(/Y\s*(-?[\d\.]+)/i);
-                    if (xMatch || yMatch) {
-                        // Use the last known coordinate for any missing axis
-                        const targetX = xMatch ? parseFloat(xMatch[1]) : lastX;
-                        const targetY = yMatch ? parseFloat(yMatch[1]) : lastY;
-                        points.push({ x: targetX, y: targetY, lineIndex: index + 1 });
-                        lastX = targetX;
-                        lastY = targetY;
-                    }
-                }
+            // --- Generate G-code for the move (Start -> End) ---
+            const moveG = calculateGcode(startAngles, endAngles);
+            if (moveG.gcode) {
+                outputGcode.push(moveG.gcode);
             }
 
-            // --- NEW: Step 2: Initialize state for loop ---
-            // Get the IK for the *first* point to establish the starting angles.
-            let ikResult = calculateIK(L1_LENGTH, L2_LENGTH, points[0].x, points[0].y);
-            let currentAngles = (currentSolution === 'down') ? ikResult.solution1 : ikResult.solution2;
-            let overrideStartAngles = null; // This will hold aligned angles from a (0,0) prep move
+            // --- Store visualization segment ---
+            globalPathSegments.push({
+                startX: P_start.x,
+                startY: P_start.y,
+                endX: clampedEnd.x,
+                endY: clampedEnd.y,
+                isClamped: endIK.isClamped,
+                endSolution: currentSolution
+            });
 
-            // --- NEW: Step 3: Iterate over point pairs ---
-            // Loop from the first point to the second-to-last point.
-            for (let i = 0; i < points.length - 1; i++) {
-                const P_start = points[i];
-                const P_end = points[i + 1]; // The destination for *this* move
+            // --- Update state for next iteration ---
+            // The end of this move is the start of the next
+            currentAngles = endAngles;
+
+            // --- *** NEW (0,0) PREP LOGIC *** ---
+            // This is the logic you confirmed.
+            // Check if we just *arrived* at the origin.
+            const isAtOrigin = Math.hypot(clampedEnd.x, clampedEnd.y) < EPSILON;
+            // Check if there is a *next* move after this one.
+            const hasNextMove = (i + 2) < points.length;
+
+            if (isAtOrigin && hasNextMove) {
+                const P_next = points[i + 2]; // Look ahead to the *next* destination
+
+                // Get heading for the *next* vector (origin -> P_next)
+                const dx = P_next.x - clampedEnd.x; // P_next.x - 0
+                const dy = P_next.y - clampedEnd.y; // P_next.y - 0
                 
-                // Get IK for the destination
-                const endIK = calculateIK(L1_LENGTH, L2_LENGTH, P_end.x, P_end.y);
-                if (endIK.error) {
-                    warnings.push(`Line ${P_end.lineIndex}: IK failed for end point.`);
-                    continue; // Skip this move
+                // If the next move is *also* to (0,0), do nothing.
+                if (Math.hypot(dx, dy) < EPSILON) {
+                    continue; 
                 }
-                if (endIK.isClamped) {
-                    warnings.push(`Line ${P_end.lineIndex}: Target clamped to (${endIK.clampedX.toFixed(2)}, ${endIK.clampedY.toFixed(2)}).`);
-                }
-                
-                // Use clamped values for all calculations
-                const clampedEnd = { x: endIK.clampedX, y: endIK.clampedY };
 
-                // --- Determine Start Angles ---
-                let startAngles;
-                if (overrideStartAngles) {
-                    // A prep move at (0,0) just happened. Use its resulting angles.
-                    startAngles = overrideStartAngles;
-                    overrideStartAngles = null; // Consume the override
+                const nextHeading = Math.atan2(dy, dx);
+
+                // Get the two possible solutions at (0,0) (which endIK already has)
+                const rawSol1 = endIK.solution1; // Elbow Down (q2 ≈ pi)
+                const rawSol2 = endIK.solution2; // Elbow Up (q2 ≈ -pi)
+
+                // Find the q1 that aligns each solution's tangent (q1+q2) to the nextHeading
+                // We want: q1 + q2 = nextHeading  =>  q1 = nextHeading - q2
+                // Normalize angles to [-pi, pi]
+                const aligned_q1_sol1 = ((nextHeading - rawSol1.q2 + Math.PI) % (2 * Math.PI)) - Math.PI;
+                const aligned_q1_sol2 = ((nextHeading - rawSol2.q2 + Math.PI) % (2 * Math.PI)) - Math.PI;
+
+                const alignedAngles1 = { q1: aligned_q1_sol1, q2: rawSol1.q2 }; // Aligned, Elbow Down
+                const alignedAngles2 = { q1: aligned_q1_sol2, q2: rawSol2.q2 }; // Aligned, Elbow Up
+
+                // Choose the prep move (flip or just rotate) that is "cheapest" from where we just landed
+                const costFlip1 = getAngleCost(currentAngles, alignedAngles1); // Cost to get to Aligned Down
+                const costFlip2 = getAngleCost(currentAngles, alignedAngles2); // Cost to get to Aligned Up
+
+                let prepAngles, prepSolution, comment;
+                if (costFlip1 < costFlip2) {
+                    // Cheaper to go/stay "Elbow Down"
+                    prepAngles = alignedAngles1;
+                    prepSolution = 'down';
+                    comment = (currentSolution === 'down') ? "Align tangent at (0,0)" : "Elbow flip + align at (0,0)";
                 } else {
-                    // Use the angles from the end of the last move
-                    startAngles = currentAngles;
+                    // Cheaper to go/stay "Elbow Up"
+                    prepAngles = alignedAngles2;
+                    prepSolution = 'up';
+                    comment = (currentSolution === 'up') ? "Align tangent at (0,0)" : "Elbow flip + align at (0,0)";
                 }
 
-                // --- Determine End Angles (Preserve the user's chosen solution) ---
-                const endAngles = (currentSolution === 'down') ? endIK.solution1 : endIK.solution2;
-
-                // --- Generate G-code for the move (Start -> End) ---
-                const moveG = calculateGcode(startAngles, endAngles);
-                if (moveG.gcode) {
-                    outputGcode.push(moveG.gcode);
+                // Generate the prep G-code (from current angles to aligned prep-angles)
+                const prepG = calculateGcode(currentAngles, prepAngles);
+                if (prepG.gcode) {
+                    outputGcode.push(prepG.gcode + " ; " + comment);
                 }
 
-                // --- Store visualization segment ---
+                // --- Set the override for the *next* loop iteration ---
+                overrideStartAngles = prepAngles; // The *next* move will start from here
+                currentSolution = prepSolution; // Commit the flip
+                currentAngles = prepAngles;     // This is our new "current" state
+
+                // Add a "dot" segment for the visualization (a move from 0,0 to 0,0)
                 globalPathSegments.push({
-                    startX: P_start.x,
-                    startY: P_start.y,
-                    endX: clampedEnd.x,
-                    endY: clampedEnd.y,
-                    isClamped: endIK.isClamped,
-                    endSolution: currentSolution
+                    startX: clampedEnd.x, startY: clampedEnd.y,
+                    endX: clampedEnd.x,   endY: clampedEnd.y,
+                    isClamped: false, endSolution: currentSolution
                 });
-
-                // --- Update state for next iteration ---
-                // The end of this move is the start of the next
-                currentAngles = endAngles;
-
-                // --- *** NEW (0,0) PREP LOGIC *** ---
-                // This is the logic you confirmed.
-                // Check if we just *arrived* at the origin.
-                const isAtOrigin = Math.hypot(clampedEnd.x, clampedEnd.y) < EPSILON;
-                // Check if there is a *next* move after this one.
-                const hasNextMove = (i + 2) < points.length;
-
-                if (isAtOrigin && hasNextMove) {
-                    const P_next = points[i + 2]; // Look ahead to the *next* destination
-
-                    // Get heading for the *next* vector (origin -> P_next)
-                    const dx = P_next.x - clampedEnd.x; // P_next.x - 0
-                    const dy = P_next.y - clampedEnd.y; // P_next.y - 0
-                    
-                    // If the next move is *also* to (0,0), do nothing.
-                    if (Math.hypot(dx, dy) < EPSILON) {
-                        continue; 
-                    }
-
-                    const nextHeading = Math.atan2(dy, dx);
-
-                    // Get the two possible solutions at (0,0) (which endIK already has)
-                    const rawSol1 = endIK.solution1; // Elbow Down (q2 ≈ pi)
-                    const rawSol2 = endIK.solution2; // Elbow Up (q2 ≈ -pi)
-
-                    // Find the q1 that aligns each solution's tangent (q1+q2) to the nextHeading
-                    // We want: q1 + q2 = nextHeading  =>  q1 = nextHeading - q2
-                    // Normalize angles to [-pi, pi]
-                    const aligned_q1_sol1 = ((nextHeading - rawSol1.q2 + Math.PI) % (2 * Math.PI)) - Math.PI;
-                    const aligned_q1_sol2 = ((nextHeading - rawSol2.q2 + Math.PI) % (2 * Math.PI)) - Math.PI;
-
-                    const alignedAngles1 = { q1: aligned_q1_sol1, q2: rawSol1.q2 }; // Aligned, Elbow Down
-                    const alignedAngles2 = { q1: aligned_q1_sol2, q2: rawSol2.q2 }; // Aligned, Elbow Up
-
-                    // Choose the prep move (flip or just rotate) that is "cheapest" from where we just landed
-                    const costFlip1 = getAngleCost(currentAngles, alignedAngles1); // Cost to get to Aligned Down
-                    const costFlip2 = getAngleCost(currentAngles, alignedAngles2); // Cost to get to Aligned Up
-
-                    let prepAngles, prepSolution, comment;
-                    if (costFlip1 < costFlip2) {
-                        // Cheaper to go/stay "Elbow Down"
-                        prepAngles = alignedAngles1;
-                        prepSolution = 'down';
-                        comment = (currentSolution === 'down') ? "Align tangent at (0,0)" : "Elbow flip + align at (0,0)";
-                    } else {
-                        // Cheaper to go/stay "Elbow Up"
-                        prepAngles = alignedAngles2;
-                        prepSolution = 'up';
-                        comment = (currentSolution === 'up') ? "Align tangent at (0,0)" : "Elbow flip + align at (0,0)";
-                    }
-
-                    // Generate the prep G-code (from current angles to aligned prep-angles)
-                    const prepG = calculateGcode(currentAngles, prepAngles);
-                    if (prepG.gcode) {
-                        outputGcode.push(prepG.gcode + " ; " + comment);
-                    }
-
-                    // --- Set the override for the *next* loop iteration ---
-                    overrideStartAngles = prepAngles; // The *next* move will start from here
-                    currentSolution = prepSolution; // Commit the flip
-                    currentAngles = prepAngles;     // This is our new "current" state
-
-                    // Add a "dot" segment for the visualization (a move from 0,0 to 0,0)
-                    globalPathSegments.push({
-                        startX: clampedEnd.x, startY: clampedEnd.y,
-                        endX: clampedEnd.x,   endY: clampedEnd.y,
-                        isClamped: false, endSolution: currentSolution
-                    });
-                }
-            } // --- End for loop ---
-
-            // --- Finalize ---
-            els.outputGcodeEl.value = outputGcode.join('\n');
-            els.stepSlider.max = globalPathSegments.length;
-            els.stepSlider.value = globalPathSegments.length;
-            els.stepLabel.textContent = `${globalPathSegments.length} / ${globalPathSegments.length}`;
-            drawToStep(globalPathSegments.length);
-
-            if (warnings.length) {
-                const unique = [...new Set(warnings)];
-                els.warningIndicator.classList.remove('hidden');
-                els.warningMessages.classList.remove('hidden');
-                els.warningMessages.querySelector('ul').innerHTML =
-                    unique.map(w => `<li>${w}</li>`).join('');
             }
+        } // --- End for loop ---
+
+        // --- Finalize ---
+        els.outputGcodeEl.value = outputGcode.join('\n');
+        els.stepSlider.max = globalPathSegments.length;
+        els.stepSlider.value = globalPathSegments.length;
+        els.stepLabel.textContent = `${globalPathSegments.length} / ${globalPathSegments.length}`;
+        drawToStep(globalPathSegments.length);
+
+        if (warnings.length) {
+            const unique = [...new Set(warnings)];
+            els.warningIndicator.classList.remove('hidden');
+            els.warningMessages.classList.remove('hidden');
+            els.warningMessages.querySelector('ul').innerHTML =
+                unique.map(w => `<li>${w}</li>`).join('');
         }
+    }
+    
+    // --- Slider Event ---
+    function handleSliderChange(event) {
+        const { stepLabel, stepSlider } = getCalculatorElements();
+        if (!stepLabel || !stepSlider) return;
         
-        // --- Slider Event ---
-        function handleSliderChange(event) {
-            const { stepLabel, stepSlider } = getCalculatorElements();
-            if (!stepLabel || !stepSlider) return;
-            
-            const step = event.target.value;
-            stepLabel.textContent = `${step} / ${stepSlider.max}`;
-            drawToStep(step);
-        }
+        const step = event.target.value;
+        stepLabel.textContent = `${step} / ${stepSlider.max}`;
+        drawToStep(step);
+    }
 
-        // --- Copy Button Logic ---
-        function setupCopyButton() {
-            const { copyButton, outputGcodeEl, copySuccess } = getCalculatorElements();
-            if (!copyButton || !outputGcodeEl || !copySuccess) return;
+    // --- Copy Button Logic ---
+    function setupCopyButton() {
+        const { copyButton, outputGcodeEl, copySuccess } = getCalculatorElements();
+        if (!copyButton || !outputGcodeEl || !copySuccess) return;
 
-            copyButton.addEventListener('click', () => {
-                const textToCopy = outputGcodeEl.value;
-                navigator.clipboard.writeText(textToCopy).then(() => {
+        copyButton.addEventListener('click', () => {
+            const textToCopy = outputGcodeEl.value;
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                copySuccess.classList.remove('hidden');
+                copyButton.classList.add('hidden');
+                setTimeout(() => {
+                    copySuccess.classList.add('hidden');
+                    copyButton.classList.remove('hidden');
+                }, 2000);
+            }).catch(err => {
+                // Fallback for http or other issues
+                try {
+                    const textArea = document.createElement('textarea');
+                    textArea.value = textToCopy;
+                    textArea.style.position = 'fixed'; 
+                    textArea.style.opacity = '0';
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    
                     copySuccess.classList.remove('hidden');
                     copyButton.classList.add('hidden');
                     setTimeout(() => {
                         copySuccess.classList.add('hidden');
                         copyButton.classList.remove('hidden');
                     }, 2000);
-                }).catch(err => {
-                    // Fallback for http or other issues
-                    try {
-                        const textArea = document.createElement('textarea');
-                        textArea.value = textToCopy;
-                        textArea.style.position = 'fixed'; 
-                        textArea.style.opacity = '0';
-                        document.body.appendChild(textArea);
-                        textArea.focus();
-                        textArea.select();
-                        document.execCommand('copy');
-                        document.body.removeChild(textArea);
-                        
-                        copySuccess.classList.remove('hidden');
-                        copyButton.classList.add('hidden');
-                        setTimeout(() => {
-                            copySuccess.classList.add('hidden');
-                            copyButton.classList.remove('hidden');
-                        }, 2000);
-                    } catch (e) {
-                         console.error('Fallback copy failed: ', e);
-                    }
-                });
+                } catch (e) {
+                     console.error('Fallback copy failed: ', e);
+                }
             });
-        }
-
-        // --- Initial Setup ---
-        document.addEventListener('DOMContentLoaded', () => {
-            const { convertButton, stepSlider } = getCalculatorElements();
-            
-            if (convertButton) {
-                convertButton.addEventListener('click', handleConversion);
-                stepSlider.addEventListener('input', handleSliderChange);
-                window.addEventListener('resize', resizeCanvas);
-                setupCopyButton();
-                
-                setTimeout(() => {
-                    resizeCanvas();
-                    handleConversion(); // Run once on load
-                }, 100);
-            }
         });
-    </script>        
-</body>
-</html>
+    }
 
+    // --- Initial Setup ---
+    document.addEventListener('DOMContentLoaded', () => {
+        const { convertButton, stepSlider } = getCalculatorElements();
+        
+        if (convertButton) {
+            convertButton.addEventListener('click', handleConversion);
+            stepSlider.addEventListener('input', handleSliderChange);
+            window.addEventListener('resize', resizeCanvas);
+            setupCopyButton();
+            
+            setTimeout(() => {
+                resizeCanvas();
+                handleConversion(); // Run once on load
+            }, 100);
+        }
+    });
+</script>
