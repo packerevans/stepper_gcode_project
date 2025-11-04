@@ -698,6 +698,8 @@ G1 X203.2 Y0
     const Q1_OFFSET_DEG = 90;  // Arm 1 "0" is 90deg (Up)
     const Q2_OFFSET_DEG = 180; // Arm 2 "0" is 180deg (Folded)
     const EPSILON = 1e-6; // Small value for float comparison
+    // --- NEW: Define segment length for linear interpolation ---
+    const LINEAR_SEGMENT_MM = 1.0; // 1mm per micro-step
 
     // --- DOM Elements ---
     function getCalculatorElements() {
@@ -723,7 +725,7 @@ G1 X203.2 Y0
     let scale = 1;
     let originX = 0;
     let originY = 0;
-    // --- NEW: This will store {q1, q2, solution} for EVERY frame ---
+    // --- NEW: This will store {q1, q2, solution, motor1_cmd, motor2_cmd} for EVERY frame ---
     let globalAnimationFrames = []; 
 
     // --- Utility Functions ---
@@ -735,7 +737,6 @@ G1 X203.2 Y0
     }
 
     // --- NEW: Forward Kinematics (Angles to X,Y) ---
-    // This is the opposite of calculateIK
     function calculateFK(q1, q2) {
         const x = L1_LENGTH * Math.cos(q1) + L2_LENGTH * Math.cos(q1 + q2);
         const y = L1_LENGTH * Math.sin(q1) + L2_LENGTH * Math.sin(q1 + q2);
@@ -744,7 +745,7 @@ G1 X203.2 Y0
 
     /**
      * Calculates Inverse Kinematics for a given point.
-     * @returns {object} { solution1, solution2, clampedX, clampedY, isClamped, error }
+     * (Unchanged from before)
      */
     function calculateIK(l1, l2, x, y) {
         let dSq = x * x + y * y;
@@ -753,10 +754,9 @@ G1 X203.2 Y0
         let clampedY = y;
         let isClamped = false;
         
-        // --- Clamping Logic ---
         if (d > MAX_REACH - EPSILON) {
             isClamped = true;
-            const ratio = (MAX_REACH - EPSILON) / d; // Clamp slightly inside max
+            const ratio = (MAX_REACH - EPSILON) / d; 
             clampedX = x * ratio;
             clampedY = y * ratio;
             d = MAX_REACH - EPSILON;
@@ -766,7 +766,7 @@ G1 X203.2 Y0
                 // At origin (0,0)
             } else {
                 isClamped = true;
-                const ratio = (MIN_REACH + EPSILON) / d; // Clamp slightly outside min
+                const ratio = (MIN_REACH + EPSILON) / d; 
                 clampedX = x * ratio;
                 clampedY = y * ratio;
                 d = MIN_REACH + EPSILON;
@@ -774,28 +774,19 @@ G1 X203.2 Y0
             }
         }
 
-        // --- IK Calculation (on potentially clamped values) ---
         const cosQ2 = (dSq - l1 * l1 - l2 * l2) / (2 * l1 * l2);
-        
-        // Handle precision errors at max/min reach
         const clampedCosQ2 = Math.max(-1, Math.min(1, cosQ2));
 
-        // Handle (0,0) singularity for q1
         if (d < EPSILON) {
-            // At (0,0), q1 is undefined, but we need *some* value.
-            // We'll calculate a "home" q1, but the (0,0) prep logic
-            // will later override this with a tangent-aligned q1.
             const home_q1_rad = toRadians(Q1_OFFSET_DEG); // 90 deg
             return {
-                solution1: { q1: home_q1_rad, q2: Math.acos(clampedCosQ2) }, // q2 = pi (Elbow Down)
-                solution2: { q1: home_q1_rad, q2: -Math.acos(clampedCosQ2) }, // q2 = -pi (Elbow Up)
+                solution1: { q1: home_q1_rad, q2: Math.acos(clampedCosQ2) }, // q2 = pi
+                solution2: { q1: home_q1_rad, q2: -Math.acos(clampedCosQ2) }, // q2 = -pi
                 clampedX, clampedY, isClamped
             };
         }
         
-        // sol1 = Elbow Down (positive q2)
         const q2_rad_sol1 = Math.acos(clampedCosQ2);
-        // sol2 = Elbow Up (negative q2)
         const q2_rad_sol2 = -Math.acos(clampedCosQ2);
 
         const k1_sol1 = l1 + l2 * Math.cos(q2_rad_sol1);
@@ -840,7 +831,6 @@ G1 X203.2 Y0
         ctx.save();
         ctx.translate(originX, originY);
         
-        // Grid, Axes, Reach Circle... (as before, no changes)
         const gridSize = 50 * scale;
         const steps = Math.ceil(originX / gridSize);
         ctx.beginPath();
@@ -888,21 +878,20 @@ G1 X203.2 Y0
             ctx.lineTo(x * scale, y * scale);
         }
 
+        // --- NEW: Path is now solid, not dashed ---
         ctx.strokeStyle = '#f97316'; // orange-500
         ctx.lineWidth = 2;
-        ctx.setLineDash([2, 4]); // Draw arcs as dashed lines
         ctx.stroke();
         
-        ctx.setLineDash([]);
         ctx.restore();
     }
     
     // --- MODIFIED: Draws the arm and text readout ---
-    function drawArmAtPosition(x, y, solution, q1, q2) {
+    function drawArmAtPosition(frame) {
         const { canvas, ctx } = getCalculatorElements();
-        if (!canvas || !ctx) return;
+        if (!canvas || !ctx || !frame) return;
         
-        // We are passed the q1 and q2, so no need to call calculateIK again
+        const { q1, q2, solution, motor1_cmd, motor2_cmd } = frame;
         const color = (solution === 'down') ? '#0ea5e9' : '#2563eb'; // 'up' is blue-600, 'down' is cyan-500
 
         const joint1X = (L1_LENGTH * Math.cos(q1)) * scale;
@@ -953,17 +942,17 @@ G1 X203.2 Y0
         ctx.lineWidth = 3;
         ctx.stroke();
         
-        // --- NEW: Draw Angle Readout ---
+        // --- NEW: Draw Motor Step Readout ---
         ctx.save();
         ctx.scale(1, -1); // Un-flip Y axis for text
         // Use theme-aware color
         const bodyStyles = getComputedStyle(document.body);
         ctx.fillStyle = bodyStyles.getPropertyValue('--color-text') || '#1f2937';
-        ctx.font = '16px Arial';
+        ctx.font = 'bold 16px Arial';
         ctx.textAlign = 'left';
         // Draw text from the top-left corner
-        ctx.fillText(`q1: ${toDegrees(q1).toFixed(2)}°`, -originX + 10, -originY + 25);
-        ctx.fillText(`q2: ${toDegrees(q2).toFixed(2)}°`, -originX + 10, -originY + 50);
+        ctx.fillText(`M1 Steps: ${motor1_cmd}`, -originX + 10, -originY + 25);
+        ctx.fillText(`M2 Steps: ${motor2_cmd}`, -originX + 10, -originY + 50);
         ctx.restore();
         // --- END NEW CODE ---
         
@@ -978,38 +967,34 @@ G1 X203.2 Y0
         stepIndex = parseInt(stepIndex, 10);
         drawGrid(); // Draw the background grid
 
+        if (globalAnimationFrames.length === 0) {
+             // Handle the case where no conversion has happened yet
+            const finalX = parseFloat(initialXInput.value || "203.2");
+            const finalY = parseFloat(initialYInput.value || "0");
+            const finalSolution = document.querySelector('input[name="solution"]:checked').value;
+            const ik = calculateIK(L1_LENGTH, L2_LENGTH, finalX, finalY);
+            const startAngles = (finalSolution === 'down') ? ik.solution1 : ik.solution2;
+            
+            // Draw the arm at its initial position
+            drawArmAtPosition({
+                q1: startAngles.q1,
+                q2: startAngles.q2,
+                solution: finalSolution,
+                motor1_cmd: 0,
+                motor2_cmd: 0
+            });
+            return;
+        }
+
         // Get all animation frames up to the current slider position
         const framesToDraw = globalAnimationFrames.slice(0, stepIndex + 1);
         
         // Draw the path the arm has taken
         drawPathSegments(framesToDraw);
-
-        let finalX, finalY, finalSolution, finalQ1, finalQ2;
         
-        if (stepIndex === 0 || globalAnimationFrames.length === 0) {
-            // Draw the initial starting position
-            finalX = parseFloat(initialXInput.value || "203.2");
-            finalY = parseFloat(initialYInput.value || "0");
-            finalSolution = document.querySelector('input[name="solution"]:checked').value;
-            // Run IK to get the angles for the text display
-            const ik = calculateIK(L1_LENGTH, L2_LENGTH, finalX, finalY);
-            const startAngles = (finalSolution === 'down') ? ik.solution1 : ik.solution2;
-            finalQ1 = startAngles.q1;
-            finalQ2 = startAngles.q2;
-        } else {
-            // Get the very last frame from the array
-            const lastFrame = globalAnimationFrames[stepIndex];
-            // Use FK to find the (x, y) for this frame's angles
-            const { x, y } = calculateFK(lastFrame.q1, lastFrame.q2);
-            finalX = x;
-            finalY = y;
-            finalSolution = lastFrame.solution;
-            finalQ1 = lastFrame.q1;
-            finalQ2 = lastFrame.q2;
-        }
-        
-        // Draw the arm at its final position
-        drawArmAtPosition(finalX, finalY, finalSolution, finalQ1, finalQ2);
+        // Get the very last frame to draw the arm itself
+        const lastFrame = globalAnimationFrames[stepIndex];
+        drawArmAtPosition(lastFrame);
     }
 
     // --- HELPER: Calculates motor steps from angle deltas ---
@@ -1103,7 +1088,9 @@ G1 X203.2 Y0
             globalAnimationFrames.push({
                 q1: currentAngles.q1,
                 q2: currentAngles.q2,
-                solution: currentSolution
+                solution: currentSolution,
+                motor1_cmd: 0,
+                motor2_cmd: 0
             });
 
             // --- Step 3: Iterate over point pairs ---
@@ -1111,6 +1098,7 @@ G1 X203.2 Y0
                 const P_start = points[i];
                 const P_end = points[i + 1]; 
                 
+                // Get IK for the *final* destination (for clamping)
                 const endIK = calculateIK(L1_LENGTH, L2_LENGTH, P_end.x, P_end.y);
                 if (endIK.error) {
                     warnings.push(`Line ${P_end.lineIndex}: IK failed for end point.`);
@@ -1121,6 +1109,8 @@ G1 X203.2 Y0
                 }
                 
                 const clampedEnd = { x: endIK.clampedX, y: endIK.clampedY };
+                // We use the *start* point from our list, which is the *previous* clamped point
+                const clampedStart = { x: points[i].x, y: points[i].y };
 
                 let startAngles;
                 if (overrideStartAngles) {
@@ -1129,52 +1119,68 @@ G1 X203.2 Y0
                 } else {
                     startAngles = currentAngles;
                 }
+                
+                // --- NEW: Linear Interpolation for G-code and Animation ---
+                const dist = Math.hypot(clampedEnd.x - clampedStart.x, clampedEnd.y - clampedStart.y);
+                const num_sub_steps = Math.max(1, Math.ceil(dist / LINEAR_SEGMENT_MM));
 
-                const endAngles = (currentSolution === 'down') ? endIK.solution1 : endIK.solution2;
+                let last_sub_step_angles = startAngles;
+                
+                for (let j = 1; j <= num_sub_steps; j++) {
+                    const t = j / num_sub_steps;
+                    const x_interp = clampedStart.x + (clampedEnd.x - clampedStart.x) * t;
+                    const y_interp = clampedStart.y + (clampedEnd.y - clampedStart.y) * t;
 
-                // --- Generate G-code (but don't interpolate yet) ---
-                const moveG = calculateGcode(startAngles, endAngles);
-                if (moveG.gcode) {
-                    outputGcode.push(moveG.gcode);
-                }
+                    const interp_ik = calculateIK(L1_LENGTH, L2_LENGTH, x_interp, y_interp);
+                    // Use the *chosen* solution, not the one with least cost
+                    const next_sub_step_angles = (currentSolution === 'down') ? interp_ik.solution1 : interp_ik.solution2;
 
-                // --- NEW: Interpolate this move for animation ---
-                const delta_q1_deg = toDegrees(endAngles.q1 - startAngles.q1);
-                const delta_q2_deg = toDegrees(endAngles.q2 - startAngles.q2);
-                // Calculate steps based on 1-degree increments
-                const numSubSteps = Math.max(1, Math.ceil(Math.max(Math.abs(delta_q1_deg), Math.abs(delta_q2_deg))));
-
-                for (let j = 1; j <= numSubSteps; j++) {
-                    const t = j / numSubSteps; // t goes from (e.g.) 1/90 to 90/90
-                    const q1_interp = startAngles.q1 + (endAngles.q1 - startAngles.q1) * t;
-                    const q2_interp = startAngles.q2 + (endAngles.q2 - startAngles.q2) * t;
+                    // Generate G-code for this *micro-step*
+                    const moveG = calculateGcode(last_sub_step_angles, next_sub_step_angles);
+                    if (moveG.gcode) {
+                        outputGcode.push(moveG.gcode);
+                    }
+                    
+                    // Store frame for animation
                     globalAnimationFrames.push({
-                        q1: q1_interp,
-                        q2: q2_interp,
-                        solution: currentSolution
+                        q1: next_sub_step_angles.q1,
+                        q2: next_sub_step_angles.q2,
+                        solution: currentSolution,
+                        motor1_cmd: moveG.motor1_steps,
+                        motor2_cmd: moveG.motor2_steps
                     });
+
+                    last_sub_step_angles = next_sub_step_angles;
                 }
-                // --- End Interpolation ---
+                // --- End Linear Interpolation ---
 
-                currentAngles = endAngles;
+                // The new "current" angle is the end of the last micro-step
+                currentAngles = last_sub_step_angles;
 
+                // --- (0,0) PREP LOGIC (Interpolated) ---
                 const isAtOrigin = Math.hypot(clampedEnd.x, clampedEnd.y) < EPSILON;
                 const hasNextMove = (i + 2) < points.length;
 
                 if (isAtOrigin && hasNextMove) {
                     const P_next = points[i + 2]; 
+
                     const dx = P_next.x - clampedEnd.x;
                     const dy = P_next.y - clampedEnd.y;
                     
                     if (Math.hypot(dx, dy) < EPSILON) continue; 
 
                     const nextHeading = Math.atan2(dy, dx);
-                    const rawSol1 = endIK.solution1; 
-                    const rawSol2 = endIK.solution2; 
+                    // Get IK at (0,0) - we just arrived there
+                    const originIK = calculateIK(L1_LENGTH, L2_LENGTH, 0, 0); 
+                    const rawSol1 = originIK.solution1; 
+                    const rawSol2 = originIK.solution2; 
+
                     const aligned_q1_sol1 = ((nextHeading - rawSol1.q2 + Math.PI) % (2 * Math.PI)) - Math.PI;
                     const aligned_q1_sol2 = ((nextHeading - rawSol2.q2 + Math.PI) % (2 * Math.PI)) - Math.PI;
                     const alignedAngles1 = { q1: aligned_q1_sol1, q2: rawSol1.q2 }; 
                     const alignedAngles2 = { q1: aligned_q1_sol2, q2: rawSol2.q2 }; 
+
+                    // Choose cheapest move from where we just landed
                     const costFlip1 = getAngleCost(currentAngles, alignedAngles1); 
                     const costFlip2 = getAngleCost(currentAngles, alignedAngles2); 
 
@@ -1189,24 +1195,35 @@ G1 X203.2 Y0
                         comment = (currentSolution === 'up') ? "Align tangent at (0,0)" : "Elbow flip + align at (0,0)";
                     }
 
+                    // Generate the *single* G-code command for the prep move
                     const prepG = calculateGcode(currentAngles, prepAngles);
                     if (prepG.gcode) {
                         outputGcode.push(prepG.gcode + " ; " + comment);
                     }
                     
-                    // --- NEW: Interpolate the PREP move ---
+                    // --- NEW: Interpolate the PREP move (Angular) ---
                     const delta_q1_prep = toDegrees(prepAngles.q1 - currentAngles.q1);
                     const delta_q2_prep = toDegrees(prepAngles.q2 - currentAngles.q2);
+                    // Use 1-degree steps
                     const prepSubSteps = Math.max(1, Math.ceil(Math.max(Math.abs(delta_q1_prep), Math.abs(delta_q2_prep))));
                     
+                    const gcodePerStep = {
+                        motor1_steps: Math.round(prepG.motor1_steps / prepSubSteps),
+                        motor2_steps: Math.round(prepG.motor2_steps / prepSubSteps)
+                    };
+
                     for (let j = 1; j <= prepSubSteps; j++) {
                         const t = j / prepSubSteps;
                         const q1_interp = currentAngles.q1 + (prepAngles.q1 - currentAngles.q1) * t;
                         const q2_interp = currentAngles.q2 + (prepAngles.q2 - currentAngles.q2) * t;
+                        
+                        // Show the "total" command for the whole prep move, not the micro-step
                         globalAnimationFrames.push({
                             q1: q1_interp,
                             q2: q2_interp,
-                            solution: prepSolution // Use the solution we are *going to*
+                            solution: prepSolution, // Use the solution we are *going to*
+                            motor1_cmd: prepG.motor1_steps,
+                            motor2_cmd: prepG.motor2_steps
                         });
                     }
                     // --- End Prep Interpolation ---
