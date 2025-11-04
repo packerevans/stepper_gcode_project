@@ -1033,6 +1033,9 @@ function handleConversion() {
     // This holds an aligned start-angle override when we did a flip+align at origin.
     // It should be used exactly once by the next produced move that actually leaves origin.
     let overrideStartAngles = null;
+let pendingSolution = undefined;
+let lastHeadingAtOrigin = null; // to track last tangent direction
+
 
     // --- Parse valid G1 commands ---
     const g1Commands = [];
@@ -1110,78 +1113,71 @@ if (Math.hypot(P_start.x, P_start.y) > EPSILON) {
         currentX = midIK.clampedX;
         currentY = midIK.clampedY;
 
-        // --- PREP LOGIC: only at (0,0) and only one rotation (no offset) ---
-        if (nextCmd && Math.hypot(currentX, currentY) < EPSILON) {
-            console.log("Origin prep logic engaged (single rotation only).");
+// --- PREP LOGIC: only at (0,0) and only one rotation (no offset) ---
+if (nextCmd && Math.hypot(currentX, currentY) < EPSILON) {
+    console.log("Origin prep logic engaged (single rotation only).");
 
-            // Next vector heading
-            const nextTargetX = nextCmd.xMatch ? parseFloat(nextCmd.xMatch[1]) : currentX;
-            const nextTargetY = nextCmd.yMatch ? parseFloat(nextCmd.yMatch[1]) : currentY;
-            const dx = nextTargetX - currentX;
-            const dy = nextTargetY - currentY;
-            const nextHeading = Math.atan2(dy, dx);
+    // Next vector heading
+    const nextTargetX = nextCmd.xMatch ? parseFloat(nextCmd.xMatch[1]) : currentX;
+    const nextTargetY = nextCmd.yMatch ? parseFloat(nextCmd.yMatch[1]) : currentY;
+    const dx = nextTargetX - currentX;
+    const dy = nextTargetY - currentY;
+    const nextHeading = Math.atan2(dy, dx);
 
-            // Current angles & heading (raw based on currentSolution choice BEFORE flip)
-            const currentAnglesRaw = (currentSolution === 'down') ? startIK.solution1 : startIK.solution2;
-            const currentHeading = currentAnglesRaw.q1 + currentAnglesRaw.q2;
-            let deltaHeading = nextHeading - currentHeading;
-            while (deltaHeading > Math.PI) deltaHeading -= 2 * Math.PI;
-            while (deltaHeading < -Math.PI) deltaHeading += 2 * Math.PI;
+    // --- Skip redundant alignment if we're already tangent ---
+    if (lastHeadingAtOrigin !== null && Math.abs(nextHeading - lastHeadingAtOrigin) < toRadians(5)) {
+        console.log("Skipping redundant alignment at origin (same heading).");
+        continue;
+    }
 
-            if (Math.abs(deltaHeading) < toRadians(45)) {
-                // Small angle: rotate in place to align tangent (single rotation)
-                const aligned = { q1: currentAnglesRaw.q1 + deltaHeading, q2: currentAnglesRaw.q2 };
-                const prep = calculateGcode(currentAnglesRaw, aligned);
-                if (prep.gcode) {
-                    outputGcode.push(prep.gcode + " ; Align tangent at (0,0)");
-                    globalPathSegments.push({
-                        startX: currentX, startY: currentY,
-                        endX: currentX,   endY: currentY,
-                        isClamped: false, endSolution: currentSolution
-                    });
-                }
-                // Important: set override so the next generated move uses 'aligned' as the actual startAngles
-                overrideStartAngles = aligned;
-                // note: currentSolution stays the same
-            } else {
-                // Large angle: flip elbow and align tangent for the flipped solution — single rotation
-                const otherSol = (currentSolution === 'up') ? 'down' : 'up';
-                const rawFlipped = (otherSol === 'down') ? startIK.solution1 : startIK.solution2;
+    // Current angles & heading
+    const currentAnglesRaw = (currentSolution === 'down') ? startIK.solution1 : startIK.solution2;
+    const currentHeading = currentAnglesRaw.q1 + currentAnglesRaw.q2;
+    let deltaHeading = nextHeading - currentHeading;
+    while (deltaHeading > Math.PI) deltaHeading -= 2 * Math.PI;
+    while (deltaHeading < -Math.PI) deltaHeading += 2 * Math.PI;
 
-                // Choose q1 so q1 + q2 == nextHeading (tangent)
-                const desired_q1 = nextHeading - rawFlipped.q2;
-                let aligned_q1 = desired_q1;
-                while (aligned_q1 > Math.PI) aligned_q1 -= 2 * Math.PI;
-                while (aligned_q1 < -Math.PI) aligned_q1 += 2 * Math.PI;
+    if (Math.abs(deltaHeading) < toRadians(45)) {
+        // Small angle: rotate in place to align tangent (single rotation)
+        const aligned = { q1: currentAnglesRaw.q1 + deltaHeading, q2: currentAnglesRaw.q2 };
+        const prep = calculateGcode(currentAnglesRaw, aligned);
+        if (prep.gcode) {
+            outputGcode.push(prep.gcode + " ; Align tangent at (0,0)");
+            globalPathSegments.push({
+                startX: currentX, startY: currentY,
+                endX: currentX,   endY: currentY,
+                isClamped: false, endSolution: currentSolution
+            });
+        }
+        overrideStartAngles = aligned;
+        lastHeadingAtOrigin = nextHeading;
+    } else {
+        // Large angle: flip elbow and align tangent for the flipped solution — single rotation
+        const otherSol = (currentSolution === 'up') ? 'down' : 'up';
+        const rawFlipped = (otherSol === 'down') ? startIK.solution1 : startIK.solution2;
 
-                const alignedFlipped = { q1: aligned_q1, q2: rawFlipped.q2 };
+        // Choose q1 so q1 + q2 == nextHeading (tangent)
+        const desired_q1 = nextHeading - rawFlipped.q2;
+        const aligned_q1 = ((desired_q1 + Math.PI) % (2 * Math.PI)) - Math.PI;
+        const alignedFlipped = { q1: aligned_q1, q2: rawFlipped.q2 };
 
-                // Perform single rotation: currentAnglesRaw -> alignedFlipped
-                const flipAndAlign = calculateGcode(currentAnglesRaw, alignedFlipped);
-                if (flipAndAlign.gcode) {
-                    outputGcode.push(flipAndAlign.gcode + " ; Elbow flip + align at (0,0)");
-                }
+        const flipAndAlign = calculateGcode(currentAnglesRaw, alignedFlipped);
+        if (flipAndAlign.gcode) {
+            outputGcode.push(flipAndAlign.gcode + " ; Elbow flip + align at (0,0)");
+        }
 
-// Store the alignedFlipped so next move *leaving* origin uses it
-overrideStartAngles = alignedFlipped;
+        overrideStartAngles = alignedFlipped;
+        pendingSolution = otherSol;
+        lastHeadingAtOrigin = nextHeading;
 
-// IMPORTANT: do not immediately change solution type before leaving (0,0)
-// That happens once we actually start moving from origin
-// So defer updating currentSolution until after that next move
-// (We'll mark intended next state in a temp variable)
-let pendingSolution = otherSol;
+        globalPathSegments.push({
+            startX: currentX, startY: currentY,
+            endX: currentX, endY: currentY,
+            isClamped: false, endSolution: otherSol
+        });
+    }
+}
 
-// Update path/simulation state (still at origin, so just visualize)
-globalPathSegments.push({
-    startX: currentX, startY: currentY,
-    endX: currentX, endY: currentY,
-    isClamped: false, endSolution: otherSol
-});
-
-// We'll assign currentSolution = pendingSolution once the next non-zero move occurs
-
-            }
-        } // end origin prep
     } // end for
 
     // --- Finalize ---
