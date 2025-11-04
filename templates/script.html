@@ -1084,6 +1084,11 @@ if (overrideStartAngles && Math.hypot(P_start.x, P_start.y) < EPSILON) {
     // Generate G-code for the actual move from start -> mid
 const moveG = calculateGcode(startAngles, midAngles);
 if (moveG.gcode) outputGcode.push(moveG.gcode);
+// If we had a pending solution change (from last flip+align), commit it now once we leave origin
+if (typeof pendingSolution !== 'undefined' && Math.hypot(P_start.x, P_start.y) > EPSILON) {
+    currentSolution = pendingSolution;
+    pendingSolution = undefined;
+}
 
 // ✅ Only clear override if we’re no longer at (0,0)
 if (Math.hypot(P_start.x, P_start.y) > EPSILON) {
@@ -1157,18 +1162,24 @@ if (Math.hypot(P_start.x, P_start.y) > EPSILON) {
                     outputGcode.push(flipAndAlign.gcode + " ; Elbow flip + align at (0,0)");
                 }
 
-                // Set overrideStartAngles so the NEXT move uses the alignedFlipped as its starting orientation.
-                overrideStartAngles = alignedFlipped;
+// Store the alignedFlipped so next move *leaving* origin uses it
+overrideStartAngles = alignedFlipped;
 
-                // Update currentSolution to reflect the flipped solution for subsequent midAngle selection.
-                currentSolution = otherSol;
+// IMPORTANT: do not immediately change solution type before leaving (0,0)
+// That happens once we actually start moving from origin
+// So defer updating currentSolution until after that next move
+// (We'll mark intended next state in a temp variable)
+let pendingSolution = otherSol;
 
-                // Update path/simulation state (we remain at origin)
-                globalPathSegments.push({
-                    startX: currentX, startY: currentY,
-                    endX: currentX, endY: currentY,
-                    isClamped: false, endSolution: currentSolution
-                });
+// Update path/simulation state (still at origin, so just visualize)
+globalPathSegments.push({
+    startX: currentX, startY: currentY,
+    endX: currentX, endY: currentY,
+    isClamped: false, endSolution: otherSol
+});
+
+// We'll assign currentSolution = pendingSolution once the next non-zero move occurs
+
             }
         } // end origin prep
     } // end for
