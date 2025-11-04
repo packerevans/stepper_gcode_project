@@ -1083,20 +1083,31 @@ if (overrideStartAngles && Math.hypot(P_start.x, P_start.y) < EPSILON) {
 
         // midAngles are computed based on the currentSolution (which may have been updated previously)
         const midAngles = (currentSolution === 'down') ? midIK.solution1 : midIK.solution2;
+        let midAngles;
+if (overrideStartAngles && Math.hypot(P_start.x, P_start.y) < EPSILON) {
+    // We just aligned at origin — use same tangent orientation
+    const tangentIK = calculateIK(L1_LENGTH, L2_LENGTH, P_mid.x, P_mid.y);
+    midAngles = (pendingSolution === 'down') ? tangentIK.solution1 : tangentIK.solution2;
+} else {
+    midAngles = (currentSolution === 'down') ? midIK.solution1 : midIK.solution2;
+}
+
 
     // Generate G-code for the actual move from start -> mid
 const moveG = calculateGcode(startAngles, midAngles);
 if (moveG.gcode) outputGcode.push(moveG.gcode);
 // If we had a pending solution change (from last flip+align), commit it now once we leave origin
+// ✅ Commit flip *and* keep override until we’ve moved away from origin
 if (typeof pendingSolution !== 'undefined' && Math.hypot(P_start.x, P_start.y) > EPSILON) {
     currentSolution = pendingSolution;
     pendingSolution = undefined;
 }
 
-// ✅ Only clear override if we’re no longer at (0,0)
-if (Math.hypot(P_start.x, P_start.y) > EPSILON) {
+// ✅ Only clear override once we've started a real move
+if (Math.hypot(P_start.x - currentX, P_start.y - currentY) > EPSILON) {
     overrideStartAngles = null;
 }
+
 
 
 
