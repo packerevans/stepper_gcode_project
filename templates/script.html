@@ -1134,22 +1134,54 @@ if (Math.hypot(P_start.x - currentX, P_start.y - currentY) > EPSILON) {
         currentX = midIK.clampedX;
         currentY = midIK.clampedY;
 
-// --- PREP LOGIC: only at (0,0) and only one rotation (no offset) ---
-if (nextCmd && Math.hypot(currentX, currentY) < EPSILON) {
-    console.log("Origin prep logic engaged (single rotation only).");
+// --- PREP LOGIC: only when the destination (P_mid) is (0,0) ---
+if (Math.hypot(P_mid.x, P_mid.y) < EPSILON) {
+    console.log("Origin tangent calibration triggered — destination is (0,0).");
 
-    // Next vector heading
-    const nextTargetX = nextCmd.xMatch ? parseFloat(nextCmd.xMatch[1]) : currentX;
-    const nextTargetY = nextCmd.yMatch ? parseFloat(nextCmd.yMatch[1]) : currentY;
-    const dx = nextTargetX - currentX;
-    const dy = nextTargetY - currentY;
-    const nextHeading = Math.atan2(dy, dx);
+    // Look ahead to the *next* move after this one to get its heading
+    if (nextCmd) {
+        const nextTargetX = nextCmd.xMatch ? parseFloat(nextCmd.xMatch[1]) : P_mid.x;
+        const nextTargetY = nextCmd.yMatch ? parseFloat(nextCmd.yMatch[1]) : P_mid.y;
+        const dx = nextTargetX - P_mid.x;
+        const dy = nextTargetY - P_mid.y;
+        const nextHeading = Math.atan2(dy, dx);
 
-    // --- Skip redundant alignment if we're already tangent ---
-    if (lastHeadingAtOrigin !== null && Math.abs(nextHeading - lastHeadingAtOrigin) < toRadians(5)) {
-        console.log("Skipping redundant alignment at origin (same heading).");
-        continue;
+        // Current angles and heading
+        const currentAnglesRaw = (currentSolution === 'down') ? midIK.solution1 : midIK.solution2;
+        const currentHeading = currentAnglesRaw.q1 + currentAnglesRaw.q2;
+        let deltaHeading = nextHeading - currentHeading;
+        while (deltaHeading > Math.PI) deltaHeading -= 2 * Math.PI;
+        while (deltaHeading < -Math.PI) deltaHeading += 2 * Math.PI;
+
+        if (Math.abs(deltaHeading) < toRadians(45)) {
+            // Small rotation to align tangent
+            const aligned = { q1: currentAnglesRaw.q1 + deltaHeading, q2: currentAnglesRaw.q2 };
+            const prep = calculateGcode(currentAnglesRaw, aligned);
+            if (prep.gcode) {
+                outputGcode.push(prep.gcode + " ; Align tangent at (0,0)");
+            }
+            overrideStartAngles = aligned;
+        } else {
+            // Large rotation: elbow flip + align tangent
+            const otherSol = (currentSolution === 'up') ? 'down' : 'up';
+            const rawFlipped = (otherSol === 'down') ? midIK.solution1 : midIK.solution2;
+            const desired_q1 = nextHeading - rawFlipped.q2;
+            const aligned_q1 = ((desired_q1 + Math.PI) % (2 * Math.PI)) - Math.PI;
+            const alignedFlipped = { q1: aligned_q1, q2: rawFlipped.q2 };
+            const flipAndAlign = calculateGcode(currentAnglesRaw, alignedFlipped);
+            if (flipAndAlign.gcode) {
+                outputGcode.push(flipAndAlign.gcode + " ; Elbow flip + align at (0,0)");
+            }
+            overrideStartAngles = alignedFlipped;
+            pendingSolution = otherSol;
+        }
     }
+
+    // Store (0,0) as the new starting coordinate for next vector
+    currentX = 0;
+    currentY = 0;
+}
+
 
     // Current angles & heading
     const currentAnglesRaw = (currentSolution === 'down') ? startIK.solution1 : startIK.solution2;
