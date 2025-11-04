@@ -697,6 +697,13 @@ G1 X0 Y203.2
         const Q2_OFFSET_DEG = 180; // Arm 2 "0" is 180deg (Folded)
         const EPSILON = 1e-6; // Small value for float comparison
         // const SEGMENT_LENGTH = 5.0; // NO LONGER NEEDED
+// --- DEBUG LOGGER (GLOBAL, always available) ---
+const DEBUG = true; // set false later to disable
+function logStep(label, data) {
+    if (DEBUG) {
+        console.log(`[DEBUG] ${label}`, data ?? '');
+    }
+}
 
         // --- DOM Elements ---
         function getCalculatorElements() {
@@ -1015,8 +1022,10 @@ function handleConversion() {
         return;
     }
 
+
     const inputGcode = els.inputGcodeEl.value;
     const lines = inputGcode.split('\n');
+logStep("Lines parsed", lines.length);
 
     let currentSolution = document.querySelector('input[name="solution"]:checked').value;
     let currentX = parseFloat(els.initialXInput.value || "203.2");
@@ -1049,20 +1058,30 @@ let lastHeadingAtOrigin = null; // to track last tangent direction
             }
         }
     }
+logStep("Parsed G1 commands", g1Commands.length);
 
     // --- Iterate commands ---
     for (let i = 0; i < g1Commands.length; i++) {
         const cmd = g1Commands[i];
         const nextCmd = (i + 1 < g1Commands.length) ? g1Commands[i + 1] : null;
+logStep(`--- Processing segment ${i + 1} ---`, {currentX, currentY});
 
         const P_start = { x: currentX, y: currentY };
+        logStep(`--- Processing segment ${i + 1} ---`, {currentX, currentY});
+
         const targetX = cmd.xMatch ? parseFloat(cmd.xMatch[1]) : currentX;
+        logStep(`--- Processing segment ${i + 1} ---`, {currentX, currentY});
+
         const targetY = cmd.yMatch ? parseFloat(cmd.yMatch[1]) : currentY;
+        logStep(`--- Processing segment ${i + 1} ---`, {currentX, currentY});
+
         const P_mid = { x: targetX, y: targetY };
 
         // Compute IK for start & mid points (startIK used for getting raw/flipped solutions at origin)
         const startIK = calculateIK(L1_LENGTH, L2_LENGTH, P_start.x, P_start.y);
         const midIK   = calculateIK(L1_LENGTH, L2_LENGTH, P_mid.x,  P_mid.y);
+        logStep("IK results", {startIK, midIK});
+
         if (startIK.error || midIK.error) {
             warnings.push(`Line ${cmd.index}: IK failed.`);
             continue;
@@ -1105,6 +1124,8 @@ if (Math.hypot(P_start.x, P_start.y) < EPSILON && overrideStartAngles) {
 
     // Generate G-code for the actual move from start -> mid
 const moveG = calculateGcode(startAngles, midAngles);
+        logStep("Generated move", moveG);
+
 if (moveG.gcode) outputGcode.push(moveG.gcode);
 // If we had a pending solution change (from last flip+align), commit it now once we leave origin
 // ✅ Commit flip *and* keep override until we’ve moved away from origin
@@ -1133,6 +1154,7 @@ if (Math.hypot(P_start.x - currentX, P_start.y - currentY) > EPSILON) {
         // Update current position to the (potentially clamped) midpoint
         currentX = midIK.clampedX;
         currentY = midIK.clampedY;
+logStep("Before prep logic", {P_mid, currentX, currentY});
 
 // --- PREP LOGIC: trigger only when destination (P_mid) is (0,0) ---
 if (Math.hypot(P_mid.x, P_mid.y) < EPSILON && nextCmd) {
@@ -1153,6 +1175,8 @@ if (Math.hypot(P_mid.x, P_mid.y) < EPSILON && nextCmd) {
     let deltaHeading = nextHeading - currentHeading;
     while (deltaHeading > Math.PI) deltaHeading -= 2 * Math.PI;
     while (deltaHeading < -Math.PI) deltaHeading += 2 * Math.PI;
+logStep("Align tangent branch triggered", deltaHeading);
+logStep("Elbow flip branch triggered", {deltaHeading, otherSol});
 
     // --- Apply rotation or flip once ---
     if (Math.abs(deltaHeading) < toRadians(45)) {
@@ -1160,6 +1184,7 @@ if (Math.hypot(P_mid.x, P_mid.y) < EPSILON && nextCmd) {
         const prep = calculateGcode(currentAnglesRaw, aligned);
         if (prep.gcode) outputGcode.push(prep.gcode + " ; Align tangent at (0,0)");
         overrideStartAngles = aligned;
+        
     } else {
         const otherSol = (currentSolution === 'up') ? 'down' : 'up';
         const rawFlipped = (otherSol === 'down') ? midIK.solution1 : midIK.solution2;
@@ -1172,12 +1197,15 @@ if (Math.hypot(P_mid.x, P_mid.y) < EPSILON && nextCmd) {
         overrideStartAngles = alignedFlipped;
         pendingSolution = otherSol;
     }
+logStep(`--- Processing segment ${i + 1} ---`, {currentX, currentY});
 
     // --- Set 0,0 as next start position ---
     currentX = 0;
     currentY = 0;
+    
 }
 
+logStep(`--- Processing segment ${i + 1} ---`, {currentX, currentY});
 
 
     // Current angles & heading
@@ -1229,6 +1257,7 @@ if (Math.hypot(P_mid.x, P_mid.y) < EPSILON && nextCmd) {
 }
 
     } // end for
+logStep("Final output length", outputGcode.length);
 
     // --- Finalize ---
     els.outputGcodeEl.value = outputGcode.join('\n');
@@ -1312,6 +1341,11 @@ if (Math.hypot(P_mid.x, P_mid.y) < EPSILON && nextCmd) {
                 }, 100);
             }
         });
+
+        window.addEventListener("error", (event) => {
+    console.error("[GLOBAL ERROR]", event.message, "at", event.filename, ":", event.lineno);
+});
+
     </script>
 </body>
 </html>
