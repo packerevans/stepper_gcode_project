@@ -140,14 +140,11 @@
                 </div>
 
                 <div>
-                    <h2 class="text-xl font-semibold mb-3 text-blue-300">6. G-Code Output</h2>
+                    <h2 class="text-xl font-semibold mb-3 text-blue-300">6. Full G-Code Program</h2>
                     <div class="bg-gray-900/50 p-4 rounded-lg border border-gray-700 space-y-3">
-                        <div class="flex justify-between items-center text-lg">
-                            <span class="text-gray-300 font-medium">Command:</span>
-                            <span id="gcode-output" class="font-mono text-indigo-300 text-lg font-bold">G1 0.000 0.000 1000</span>
-                        </div>
-                        <button id="send-gcode-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all duration-200">
-                            Send Command
+                        <textarea id="full-gcode-output" rows="8" readonly class="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg shadow-inner focus:outline-none text-gray-200 resize-y font-mono text-sm" placeholder="G-Code program will appear here..."></textarea>
+                        <button id="copy-gcode-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all duration-200">
+                            Copy G-Code
                         </button>
                     </div>
                 </div>
@@ -166,13 +163,12 @@
         const L1 = 101.3;
         const L2 = 101.3;
         const MAX_REACH = L1 + L2; // This is 202.6
-        const GCODE_FACTOR = 360 / 3200; // NEW: G-Code conversion factor
-        // [MODIFIED] Set canvas size to the max reach
+        const GCODE_FACTOR = 360 / 3200; // G-Code conversion factor
         const CANVAS_WORLD_SIZE = MAX_REACH * 2; // 405.2, so it shows +/- 202.6
         const HOME_POINT = { x: 0, y: 150 }; // Default "ready" position
         const SLIDER_MAX = 1000;
         let DYNAMIC_ANIMATION_SPEED = 4; // Will be updated based on command count
-        const STEPS_PER_SEGMENT_INTERPOLATION = 50; // New: How many interpolation steps per G-code segment
+        const STEPS_PER_SEGMENT_INTERPOLATION = 50; // How many interpolation steps per G-code segment
 
         // == DOM ELEMENTS ==
         const canvas = document.getElementById('ik-canvas');
@@ -184,7 +180,8 @@
         const commandListContainer = document.getElementById('command-list-container');
         const m1Out = document.getElementById('m1-output');
         const m2Out = document.getElementById('m2-output');
-        const gcodeOut = document.getElementById('gcode-output'); // NEW: G-Code output element
+        const gcodeTextArea = document.getElementById('full-gcode-output'); // NEW: G-Code text area
+        const copyGcodeBtn = document.getElementById('copy-gcode-btn'); // NEW: Copy button
 
         // == STATE ==
         let path = []; // Array of {x, y} objects from user input
@@ -221,25 +218,20 @@
             const D_sq = x * x + y * y;
             let D = Math.sqrt(D_sq);
 
-            // Check if it's *just* over the max reach (floating point errors)
             if (D > MAX_REACH && D < MAX_REACH + 0.001) {
                 D = MAX_REACH;
             }
 
-            // This is the "out of boundary" logic you asked for.
             if (D > MAX_REACH) {
                 clamped = true;
-                const ratio = MAX_REACH / D; // Get ratio
-                x *= ratio; // Scale x along the same vector
-                y *= ratio; // Scale y along the same vector
+                const ratio = MAX_REACH / D; 
+                x *= ratio; 
+                y *= ratio; 
                 D = MAX_REACH;
             }
             
-            // [SINGULARITY FIX]
-            // If at or very near origin, just fold the elbow and hold the base
             if (D < 0.1) { 
                 const stableA1 = previousA1;
-                // Fold the elbow completely
                 const stableA2 = previousA2 + shortestAngleDist(previousA2, Math.PI);
                 return { a1: stableA1, a2: stableA2, clamped: false };
             }
@@ -259,7 +251,6 @@
             const k2_down = L2 * Math.sin(a2_rad_down);
             const a1_rad_down_raw = Math.atan2(y, x) - Math.atan2(k2_down, k1_down);
             
-            // [CONTINUITY FIX]
             const a1_up_cont = previousA1 + shortestAngleDist(previousA1, a1_rad_up_raw);
             const a2_up_cont = previousA2 + shortestAngleDist(previousA2, a2_rad_up);
             
@@ -278,7 +269,6 @@
         
         /**
          * [SOLVER LOGIC - Corrected]
-         * Physics: A2_Joint = M2_Motor + (M1_Motor / 8)
          * Solver: M2_Motor = A2_Joint - (M1_Motor / 8)
          */
         function solveMotorCommands(a1, a2) {
@@ -298,10 +288,8 @@
             origin.y = canvasSize / 2;
             scale = canvasSize / CANVAS_WORLD_SIZE;
             
-            // Calculate and store home joint angles
             homeJointAngles = solveIK(HOME_POINT.x, HOME_POINT.y, Math.PI/2, 0);
             
-            // Draw home pose
             const homeMotorCommands = solveMotorCommands(homeJointAngles.a1, homeJointAngles.a2);
             precalculatedPath = [
                 { 
@@ -321,13 +309,9 @@
          * Draws the entire scene (grid, path, arm).
          */
         function draw() {
-            // Check if canvas is ready
             if (!ctx) return;
 
             const globalT_val = parseInt(slider.value);
-            
-            // Get the pre-calculated state. 
-            // If scrubbing past the end, hold the last frame.
             const state = precalculatedPath[Math.min(globalT_val, precalculatedPath.length - 1)];
 
             let a1, a2, clamped, endX, endY;
@@ -340,43 +324,32 @@
                 clamped = state.clamped;
                 currentSegment = state.segment;
                 t_in_segment = state.t_in_segment;
-                endX = state.endX; // End effector X
-                endY = state.endY; // End effector Y
+                endX = state.endX; 
+                endY = state.endY; 
             } else {
-                // No path, just draw arm in home pose
                 a1 = homeJointAngles.a1;
                 a2 = homeJointAngles.a2;
                 clamped = false;
-                // Calculate end effector position for home pose
                 const j1_x_home = L1 * Math.cos(homeJointAngles.a1);
                 const j1_y_home = L1 * Math.sin(homeJointAngles.a1);
                 endX = j1_x_home + L2 * Math.cos(homeJointAngles.a1 + homeJointAngles.a2);
                 endY = j1_y_home + L2 * Math.sin(homeJointAngles.a1 + homeJointAngles.a2);
             }
             
-            // Update UI based on this segment
+            // Update UI (Live Status)
             if (currentSegment !== -1 && commandList.length > currentSegment) {
                 const command = commandList[currentSegment];
                 const remainingT = 1.0 - t_in_segment;
                 
-                // [MOTOR COMMAND LOGIC]
                 const m1Remaining = command.m1_delta_deg * remainingT; // Base
                 const m2Remaining = command.m2_delta_deg * remainingT; // Elbow
 
                 m1Out.textContent = m1Remaining.toFixed(2) + '°';
                 m2Out.textContent = m2Remaining.toFixed(2) + '°';
 
-                // [NEW G-CODE LOGIC]
-                const base_gcode = m1Remaining * GCODE_FACTOR;
-                const elbow_gcode = m2Remaining * GCODE_FACTOR;
-                gcodeOut.textContent = `G1 ${elbow_gcode.toFixed(3)} ${base_gcode.toFixed(3)} 1000`;
-
             } else {
                 m1Out.textContent = '0.00°';
                 m2Out.textContent = '0.00°';
-                
-                // [NEW G-CODE LOGIC]
-                gcodeOut.textContent = 'G1 0.000 0.000 1000';
             }
             
             highlightCommand(currentSegment); // Update highlight
@@ -392,11 +365,10 @@
             const end_effector_radius_scaled = 6 / scale;
 
             // --- Draw Grid ---
-            ctx.strokeStyle = "#4b5563"; // gray-600
+            ctx.strokeStyle = "#4b5563"; 
             ctx.lineWidth = 1 / scale;
             ctx.beginPath();
-            // Use CANVAS_WORLD_SIZE / 2 for grid lines
-            const gridMax = CANVAS_WORLD_SIZE / 2; // This is 202.6
+            const gridMax = CANVAS_WORLD_SIZE / 2;
             for (let i = -gridMax; i <= gridMax; i += 50) {
                 ctx.moveTo(i, -gridMax); ctx.lineTo(i, gridMax);
                 ctx.moveTo(-gridMax, i); ctx.lineTo(gridMax, i);
@@ -404,25 +376,24 @@
             ctx.stroke();
 
             // --- Draw Axes ---
-            ctx.strokeStyle = "#9ca3af"; // gray-400
+            ctx.strokeStyle = "#9ca3af";
             ctx.lineWidth = line_width_scaled;
             ctx.beginPath();
             ctx.moveTo(-gridMax, 0); ctx.lineTo(gridMax, 0);
             ctx.moveTo(0, -gridMax); ctx.lineTo(0, gridMax);
             ctx.stroke();
             
-            // --- Draw Target Path (the straight lines) ---
+            // --- Draw Target Path (Dashed) ---
             if (path.length > 0) {
-                ctx.strokeStyle = "#3b82f6"; // blue-500
+                ctx.strokeStyle = "#3b82f6"; 
                 ctx.lineWidth = line_width_scaled;
-                ctx.setLineDash([5 / scale, 5 / scale]); // Dashed line
+                ctx.setLineDash([5 / scale, 5 / scale]);
                 ctx.beginPath();
                 ctx.moveTo(HOME_POINT.x, HOME_POINT.y);
                 path.forEach(p => ctx.lineTo(p.x, p.y)); 
                 ctx.stroke();
                 ctx.setLineDash([]);
                 
-                // Draw path vertices
                 ctx.fillStyle = "#3b82f6";
                 [HOME_POINT, ...path].forEach(p => {
                     ctx.beginPath();
@@ -431,31 +402,26 @@
                 });
             }
             
-            // --- Draw Arm ---
             const j1_x = L1 * Math.cos(a1);
             const j1_y = L1 * Math.sin(a1);
-            // End effector position is now directly from state.endX/endY
             const j2_x = endX;
             const j2_y = endY;
 
-            // --- Draw Actual Path (Straight lines via Cartesian Interpolation) ---
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.5)"; // Faded white
+            // --- Draw Actual Path (Solid) ---
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.5)"; 
             ctx.lineWidth = line_width_scaled;
             ctx.beginPath();
             if (precalculatedPath.length > 0) {
-                // Ensure we draw up to the current slider position
                 for(let i=0; i <= globalT_val; i++) {
                     if (!precalculatedPath[i]) continue;
                     const p = precalculatedPath[i];
-                    
-                    // [MODIFIED] Draw using the actual end effector coordinates (p.endX, p.endY)
                     if (i === 0) ctx.moveTo(p.endX, p.endY);
                     else ctx.lineTo(p.endX, p.endY);
                 }
             }
             ctx.stroke();
 
-            // Arm 1
+            // --- Draw Arm ---
             ctx.strokeStyle = "white";
             ctx.lineWidth = 6 / scale;
             ctx.beginPath();
@@ -463,15 +429,14 @@
             ctx.lineTo(j1_x, j1_y);
             ctx.stroke();
             
-            // Arm 2
-            ctx.strokeStyle = "#2dd4bf"; // teal-400
+            ctx.strokeStyle = "#2dd4bf";
             ctx.lineWidth = 6 / scale;
             ctx.beginPath();
             ctx.moveTo(j1_x, j1_y);
             ctx.lineTo(j2_x, j2_y);
             ctx.stroke();
             
-            // Joints
+            // --- Draw Joints ---
             ctx.fillStyle = "white";
             ctx.beginPath();
             ctx.arc(0, 0, joint_radius_scaled * 1.5, 0, 2 * Math.PI); // Base
@@ -480,9 +445,7 @@
             ctx.arc(j1_x, j1_y, joint_radius_scaled, 0, 2 * Math.PI); // Elbow
             ctx.fill();
             
-            // End Effector
             ctx.fillStyle = "#2dd4bf";
-            // This is the "out of boundary" visualization
             if (clamped) { 
                 ctx.fillStyle = "#ef4444"; // red-500
             }
@@ -490,7 +453,6 @@
             ctx.arc(j2_x, j2_y, end_effector_radius_scaled, 0, 2 * Math.PI);
             ctx.fill();
 
-            // --- Restore Context ---
             ctx.restore();
         }
 
@@ -498,46 +460,37 @@
          * [NEW G-CODE PARSER and CARTESIAN INTERPOLATION LOGIC]
          */
         function parseCoordinates() {
-            // Show loading state
             addCoordsBtn.textContent = "Calculating...";
             addCoordsBtn.disabled = true;
 
-            // Run calculation asynchronously to allow UI to update
             setTimeout(() => {
                 const text = coordsInput.value;
                 
-                // 1. Parse all points first
-                path = text.split('\n') // 'path' is now the raw user path
+                path = text.split('\n')
                     .filter(line => line.trim() !== '')
                     .map(line => {
                         line = line.trim();
-                
-                        // [ROBUST REGEX]
                         const gcodeMatch = line.match(/X\s*(-?[\d.]+)\s+Y\s*(-?[\d.]+)/i);
                         if (gcodeMatch && gcodeMatch[1] != null && gcodeMatch[2] != null) {
                             const x = parseFloat(gcodeMatch[1]);
                             const y = parseFloat(gcodeMatch[2]);
                             if (!isNaN(x) && !isNaN(y)) return { x, y };
                         }
-
-                        // Try comma-separated format
                         const commaMatch = line.match(/^(-?[\d.]+)\s*,\s*(-?[\d.]+)$/);
                         if (commaMatch && commaMatch[1] != null && commaMatch[2] != null) {
                             const x = parseFloat(commaMatch[1]);
                             const y = parseFloat(commaMatch[2]);
                             if (!isNaN(x) && !isNaN(y)) return { x, y };
                         }
-
-                        return null; // Failed to parse
+                        return null;
                     })
                     .filter(p => p !== null);
 
                 
-                // 2. Build Command List (No Nudge, Just Solve)
                 commandList = [];
                 if (path.length === 0) {
-                    // ... (reset logic)
                     updateCommandListUI();
+                    updateFullGcodeOutput(); // NEW: Clear G-Code box
                     stopAnimation();
                     slider.value = "0";
                     slider.max = 1;
@@ -552,13 +505,11 @@
                     return;
                 }
                 
-                // Create a full list of points including HOME
                 const pointList = [HOME_POINT, ...path];
                 
                 let previousA1 = homeJointAngles.a1;
                 let previousA2 = homeJointAngles.a2;
 
-                // --- 3. Pre-calculate the entire animation path (Cartesian Interpolation) ---
                 precalculatedPath = [];
                 
                 for (let i = 0; i < pointList.length - 1; i++) {
@@ -566,22 +517,19 @@
                     const p_end = pointList[i+1];
                     let segmentName = (i === 0) ? `HOME -> P0` : `P${i-1} -> P${i}`;
 
-                    let segmentStartM1 = 0; // Temp, will calculate from first point
-                    let segmentStartM2 = 0; // Temp
+                    let segmentStartM1 = 0; 
+                    let segmentStartM2 = 0;
 
                     for (let step = 0; step <= STEPS_PER_SEGMENT_INTERPOLATION; step++) {
                         const t_in_segment = step / STEPS_PER_SEGMENT_INTERPOLATION;
                         
-                        // Linear interpolation in Cartesian space
                         const interpolatedX = p_start.x + (p_end.x - p_start.x) * t_in_segment;
                         const interpolatedY = p_start.y + (p_end.y - p_start.y) * t_in_segment;
                         
-                        // Solve IK for each interpolated point
-                        // [MODIFIED] store endX, endY from IK to trace the actual path
                         const { a1, a2, clamped, endX, endY } = solveIK(interpolatedX, interpolatedY, previousA1, previousA2);
                         const { m1, m2 } = solveMotorCommands(a1, a2);
 
-                        if (step === 0) { // Store starting motor positions for this segment
+                        if (step === 0) {
                              segmentStartM1 = m1;
                              segmentStartM2 = m2;
                         }
@@ -593,15 +541,13 @@
                             clamped, 
                             segment: i, 
                             t_in_segment,
-                            endX, endY // Store actual end effector position
+                            endX, endY
                         });
                         
                         previousA1 = a1;
                         previousA2 = a2;
                     }
                     
-                    // After the segment, we have the final motor angles for this segment.
-                    // Use these to calculate the *total* motor deltas for the command list.
                     const finalSegmentPoint = precalculatedPath[precalculatedPath.length - 1];
                     const m1_delta = finalSegmentPoint.m1 - segmentStartM1;
                     const m2_delta = finalSegmentPoint.m2 - segmentStartM2;
@@ -620,23 +566,19 @@
                     });
                 }
                 
-                // Update slider max based on the new, longer precalculatedPath
                 slider.max = precalculatedPath.length - 1;
-                DYNAMIC_ANIMATION_SPEED = Math.max(1, Math.ceil((precalculatedPath.length -1) / 250)); // Re-calculate speed for ~4-5 sec animation
+                DYNAMIC_ANIMATION_SPEED = Math.max(1, Math.ceil((precalculatedPath.length -1) / 250)); 
 
-                // Update UI
                 updateCommandListUI();
-
-                // Reset animation
+                updateFullGcodeOutput(); // NEW: Populate G-Code box
                 stopAnimation();
                 slider.value = "0";
-                lastHighlightedSegment = -1; // Reset highlight
+                lastHighlightedSegment = -1;
                 draw();
 
-                // Restore button
                 addCoordsBtn.textContent = "Set Path & Pre-Calculate Motor Commands";
                 addCoordsBtn.disabled = false;
-            }, 10); // 10ms timeout
+            }, 10);
         }
 
         /**
@@ -669,18 +611,36 @@
         }
 
         /**
+         * NEW: Updates the G-Code text area with the full program.
+         */
+        function updateFullGcodeOutput() {
+            if (commandList.length === 0) {
+                gcodeTextArea.value = 'G-Code program will appear here...';
+                return;
+            }
+
+            const gcodeCommands = commandList.map(cmd => {
+                const base_gcode = cmd.m1_delta_deg * GCODE_FACTOR;
+                const elbow_gcode = cmd.m2_delta_deg * GCODE_FACTOR;
+                // Format: G1 <elbow> <base> 1000
+                return `G1 ${elbow_gcode.toFixed(3)} ${base_gcode.toFixed(3)} 1000`;
+            }).join('\n');
+
+            gcodeTextArea.value = gcodeCommands;
+        }
+
+
+        /**
          * Highlights a command in the list.
          */
         function highlightCommand(segmentIndex) {
-            if (segmentIndex === lastHighlightedSegment) return; // No change
+            if (segmentIndex === lastHighlightedSegment) return; 
 
-            // Remove old highlight
             if (lastHighlightedSegment !== -1) {
                 const oldEl = document.getElementById(`command-segment-${lastHighlightedSegment}`);
                 if (oldEl) oldEl.classList.remove('highlight');
             }
 
-            // Add new highlight
             if (segmentIndex !== -1 && commandList.length > segmentIndex) {
                 const newEl = document.getElementById(`command-segment-${segmentIndex}`);
                 if (newEl) newEl.classList.add('highlight');
@@ -696,9 +656,9 @@
             if (!isPlaying) return;
 
             let currentVal = parseInt(slider.value);
-            currentVal += DYNAMIC_ANIMATION_SPEED; // Use dynamic speed
+            currentVal += DYNAMIC_ANIMATION_SPEED; 
 
-            if (currentVal >= slider.max) { // Use slider.max here
+            if (currentVal >= slider.max) { 
                 currentVal = slider.max;
                 stopAnimation();
             }
@@ -717,7 +677,6 @@
                 cancelAnimationFrame(animationFrameId);
                 animationFrameId = null;
             }
-            // Ensure the final state is drawn correctly
             draw();
         }
         
@@ -725,15 +684,14 @@
          * Toggles the play/pause state.
          */
         function togglePlay() {
-            if (commandList.length === 0) return; // Don't play if no commands
+            if (commandList.length === 0) return; 
 
             if (isPlaying) {
                 stopAnimation();
             } else {
-                // If at the end, restart
-                if (parseInt(slider.value) >= slider.max) { // Use slider.max
+                if (parseInt(slider.value) >= slider.max) { 
                     slider.value = "0";
-                    lastHighlightedSegment = -1; // Reset highlight
+                    lastHighlightedSegment = -1; 
                 }
                 
                 isPlaying = true;
@@ -746,7 +704,6 @@
 
         // == EVENT LISTENERS ==
         window.addEventListener('load', () => {
-            // [NEW] Set the text area to the user's new G-code path
             coordsInput.value = `G1 X-202.600 Y-202.600
 G1 X-192.247 Y-202.600
 G1 X-202.600 Y-163.963
@@ -854,18 +811,41 @@ G1 X196.112 Y202.600`;
         addCoordsBtn.addEventListener('click', parseCoordinates);
         
         slider.addEventListener('input', () => {
-            draw(); // Just draw the pre-calculated frame
+            draw();
         });
         
         playBtn.addEventListener('click', togglePlay);
 
-        // You can add an event listener for the new send button if needed
-        // const sendBtn = document.getElementById('send-gcode-btn');
-        // sendBtn.addEventListener('click', () => {
-        //     const gcodeCommand = gcodeOut.textContent;
-        //     console.log("Sending command:", gcodeCommand);
-        //     // Add your send logic here (e.g., fetch, WebSocket)
-        // });
+        // NEW: Copy G-Code button listener
+        copyGcodeBtn.addEventListener('click', () => {
+            gcodeTextArea.select();
+            // Use modern clipboard API
+            navigator.clipboard.writeText(gcodeTextArea.value).then(() => {
+                // Success feedback
+                const originalText = copyGcodeBtn.textContent;
+                copyGcodeBtn.textContent = 'Copied!';
+                copyGcodeBtn.disabled = true;
+                setTimeout(() => {
+                    copyGcodeBtn.textContent = originalText;
+                    copyGcodeBtn.disabled = false;
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy G-Code: ', err);
+                // Fallback for older browsers
+                try {
+                    document.execCommand('copy');
+                    const originalText = copyGcodeBtn.textContent;
+                    copyGcodeBtn.textContent = 'Copied!';
+                    copyGcodeBtn.disabled = true;
+                    setTimeout(() => {
+                        copyGcodeBtn.textContent = originalText;
+                        copyGcodeBtn.disabled = false;
+                    }, 2000);
+                } catch (e) {
+                    console.error('Fallback copy failed', e);
+                }
+            });
+        });
 
     </script>
 </body>
