@@ -61,6 +61,15 @@
             background-color: #3b82f633; /* blue-500 with 20% opacity */
             border-left-color: #3b82f6; /* blue-500 */
         }
+        /* Style for highlighting the text area */
+        #full-gcode-output.highlight-line-error {
+            border-color: #ef4444; /* red-500 */
+            box-shadow: 0 0 10px #ef444466;
+        }
+        #full-gcode-output.highlight-line-success {
+            border-color: #2ecc71; /* green-500 */
+            box-shadow: 0 0 10px #2ecc7166;
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-200 font-inter antialiased">
@@ -140,12 +149,19 @@
                 </div>
 
                 <div>
-                    <h2 class="text-xl font-semibold mb-3 text-blue-300">6. Full G-Code Program</h2>
+                    <h2 class="text-xl font-semibold mb-3 text-blue-300">6. G-Code Program & Sender</h2>
                     <div class="bg-gray-900/50 p-4 rounded-lg border border-gray-700 space-y-3">
+                        <p class="text-sm text-gray-400">Full program. Click "Send" to send the next highlighted command to your server.</p>
                         <textarea id="full-gcode-output" rows="8" readonly class="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg shadow-inner focus:outline-none text-gray-200 resize-y font-mono text-sm" placeholder="G-Code program will appear here..."></textarea>
-                        <button id="copy-gcode-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all duration-200">
-                            Copy G-Code
-                        </button>
+                        
+                        <div class="grid grid-cols-2 gap-3">
+                            <button id="reset-gcode-btn" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all duration-200">
+                                Reset
+                            </button>
+                            <button id="send-gcode-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all duration-200" disabled>
+                                Send Next Command
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -162,13 +178,16 @@
         // == ARM PARAMETERS ==
         const L1 = 101.3;
         const L2 = 101.3;
-        const MAX_REACH = L1 + L2; // This is 202.6
+        const MAX_REACH = L1 + L2;
         const GCODE_FACTOR = 360 / 3200; // G-Code conversion factor
-        const CANVAS_WORLD_SIZE = MAX_REACH * 2; // 405.2, so it shows +/- 202.6
-        const HOME_POINT = { x: 0, y: 150 }; // Default "ready" position
-        const SLIDER_MAX = 1000;
-        let DYNAMIC_ANIMATION_SPEED = 4; // Will be updated based on command count
-        const STEPS_PER_SEGMENT_INTERPOLATION = 50; // How many interpolation steps per G-code segment
+        const CANVAS_WORLD_SIZE = MAX_REACH * 2;
+        const HOME_POINT = { x: 0, y: 150 };
+        let DYNAMIC_ANIMATION_SPEED = 4;
+        const STEPS_PER_SEGMENT_INTERPOLATION = 50;
+
+        // --- 1. SERVER URL UPDATED ---
+        // This now points to your new manual-mode endpoint
+        const SERVER_URL = 'http://localhost:5000/send_single_gcode_line';
 
         // == DOM ELEMENTS ==
         const canvas = document.getElementById('ik-canvas');
@@ -180,13 +199,14 @@
         const commandListContainer = document.getElementById('command-list-container');
         const m1Out = document.getElementById('m1-output');
         const m2Out = document.getElementById('m2-output');
-        const gcodeTextArea = document.getElementById('full-gcode-output'); // NEW: G-Code text area
-        const copyGcodeBtn = document.getElementById('copy-gcode-btn'); // NEW: Copy button
+        const gcodeTextArea = document.getElementById('full-gcode-output');
+        const sendGcodeBtn = document.getElementById('send-gcode-btn');
+        const resetGcodeBtn = document.getElementById('reset-gcode-btn');
 
         // == STATE ==
-        let path = []; // Array of {x, y} objects from user input
-        let commandList = []; // Array of calculated command objects
-        let precalculatedPath = []; // Array[SLIDER_MAX + 1] of full arm states
+        let path = [];
+        let commandList = [];
+        let precalculatedPath = [];
         let isPlaying = false;
         let animationFrameId = null;
         let canvasSize = 500;
@@ -194,22 +214,17 @@
         let scale = 1.0;
         let lastHighlightedSegment = -1;
         let homeJointAngles = { a1: Math.PI/2, a2: 0 };
+        let gcodeSendIndex = 0; // State for G-Code sending
 
         // == CORE FUNCTIONS ==
-
-        /**
-         * Calculates the shortest angular distance between two angles (in radians).
-         */
+        // (IK, solveMotorCommands, setupCanvas, draw, etc. are unchanged)
+        
         function shortestAngleDist(a0, a1) {
             const max = Math.PI * 2;
             const da = (a1 - a0) % max;
             return 2 * da % max - da;
         }
 
-        /**
-         * [ROBUST IK SOLVER]
-         * Solves for the required JOINT angles (A1, A2) to reach (x, y).
-         */
         function solveIK(targetX, targetY, previousA1, previousA2) {
             let x = targetX;
             let y = targetY;
@@ -236,7 +251,6 @@
                 return { a1: stableA1, a2: stableA2, clamped: false };
             }
 
-            // --- Standard IK Calculation ---
             let cos_a2 = (D_sq - L1 * L1 - L2 * L2) / (2 * L1 * L2);
             cos_a2 = Math.max(-1, Math.min(1, cos_a2)); 
             
@@ -267,19 +281,12 @@
             }
         }
         
-        /**
-         * [SOLVER LOGIC - Corrected]
-         * Solver: M2_Motor = A2_Joint - (M1_Motor / 8)
-         */
         function solveMotorCommands(a1, a2) {
             const m1 = a1;
             const m2 = a2 - (a1 / 8.0);
             return { m1, m2 };
         }
 
-        /**
-         * Sets up the canvas dimensions and coordinate system.
-         */
         function setupCanvas() {
             canvasSize = canvas.parentElement.clientWidth;
             canvas.width = canvasSize;
@@ -305,9 +312,6 @@
             draw();
         }
 
-        /**
-         * Draws the entire scene (grid, path, arm).
-         */
         function draw() {
             if (!ctx) return;
 
@@ -336,7 +340,6 @@
                 endY = j1_y_home + L2 * Math.sin(homeJointAngles.a1 + homeJointAngles.a2);
             }
             
-            // Update UI (Live Status)
             if (currentSegment !== -1 && commandList.length > currentSegment) {
                 const command = commandList[currentSegment];
                 const remainingT = 1.0 - t_in_segment;
@@ -352,19 +355,17 @@
                 m2Out.textContent = '0.00°';
             }
             
-            highlightCommand(currentSegment); // Update highlight
+            highlightCommand(currentSegment);
 
-            // --- Clear and Setup Context ---
             ctx.clearRect(0, 0, canvasSize, canvasSize);
             ctx.save();
             ctx.translate(origin.x, origin.y);
-            ctx.scale(scale, -scale); // Flip Y-axis so +y is up
+            ctx.scale(scale, -scale);
             
             const line_width_scaled = 2 / scale;
             const joint_radius_scaled = 5 / scale;
             const end_effector_radius_scaled = 6 / scale;
 
-            // --- Draw Grid ---
             ctx.strokeStyle = "#4b5563"; 
             ctx.lineWidth = 1 / scale;
             ctx.beginPath();
@@ -375,7 +376,6 @@
             }
             ctx.stroke();
 
-            // --- Draw Axes ---
             ctx.strokeStyle = "#9ca3af";
             ctx.lineWidth = line_width_scaled;
             ctx.beginPath();
@@ -383,7 +383,6 @@
             ctx.moveTo(0, -gridMax); ctx.lineTo(0, gridMax);
             ctx.stroke();
             
-            // --- Draw Target Path (Dashed) ---
             if (path.length > 0) {
                 ctx.strokeStyle = "#3b82f6"; 
                 ctx.lineWidth = line_width_scaled;
@@ -407,7 +406,6 @@
             const j2_x = endX;
             const j2_y = endY;
 
-            // --- Draw Actual Path (Solid) ---
             ctx.strokeStyle = "rgba(255, 255, 255, 0.5)"; 
             ctx.lineWidth = line_width_scaled;
             ctx.beginPath();
@@ -421,7 +419,6 @@
             }
             ctx.stroke();
 
-            // --- Draw Arm ---
             ctx.strokeStyle = "white";
             ctx.lineWidth = 6 / scale;
             ctx.beginPath();
@@ -436,18 +433,17 @@
             ctx.lineTo(j2_x, j2_y);
             ctx.stroke();
             
-            // --- Draw Joints ---
             ctx.fillStyle = "white";
             ctx.beginPath();
-            ctx.arc(0, 0, joint_radius_scaled * 1.5, 0, 2 * Math.PI); // Base
+            ctx.arc(0, 0, joint_radius_scaled * 1.5, 0, 2 * Math.PI);
             ctx.fill();
             ctx.beginPath();
-            ctx.arc(j1_x, j1_y, joint_radius_scaled, 0, 2 * Math.PI); // Elbow
+            ctx.arc(j1_x, j1_y, joint_radius_scaled, 0, 2 * Math.PI);
             ctx.fill();
             
             ctx.fillStyle = "#2dd4bf";
             if (clamped) { 
-                ctx.fillStyle = "#ef4444"; // red-500
+                ctx.fillStyle = "#ef4444";
             }
             ctx.beginPath();
             ctx.arc(j2_x, j2_y, end_effector_radius_scaled, 0, 2 * Math.PI);
@@ -456,9 +452,6 @@
             ctx.restore();
         }
 
-        /**
-         * [NEW G-CODE PARSER and CARTESIAN INTERPOLATION LOGIC]
-         */
         function parseCoordinates() {
             addCoordsBtn.textContent = "Calculating...";
             addCoordsBtn.disabled = true;
@@ -490,7 +483,7 @@
                 commandList = [];
                 if (path.length === 0) {
                     updateCommandListUI();
-                    updateFullGcodeOutput(); // NEW: Clear G-Code box
+                    updateFullGcodeOutput(); 
                     stopAnimation();
                     slider.value = "0";
                     slider.max = 1;
@@ -500,105 +493,72 @@
                         { x: HOME_POINT.x, y: HOME_POINT.y, ...homeJointAngles, ...homeMotorCommands, clamped: false, segment: -1, t_in_segment: 0 }
                     ];
                     draw();
-                    addCoordsBtn.textContent = "Set Path & Pre-Calculate Motor Commands";
-                    addCoordsBtn.disabled = false;
-                    return;
-                }
-                
-                const pointList = [HOME_POINT, ...path];
-                
-                let previousA1 = homeJointAngles.a1;
-                let previousA2 = homeJointAngles.a2;
+                } else {
+                    const pointList = [HOME_POINT, ...path];
+                    let previousA1 = homeJointAngles.a1;
+                    let previousA2 = homeJointAngles.a2;
+                    precalculatedPath = [];
+                    
+                    for (let i = 0; i < pointList.length - 1; i++) {
+                        const p_start = pointList[i];
+                        const p_end = pointList[i+1];
+                        let segmentName = (i === 0) ? `HOME -> P0` : `P${i-1} -> P${i}`;
+                        let segmentStartM1 = 0, segmentStartM2 = 0;
 
-                precalculatedPath = [];
-                
-                for (let i = 0; i < pointList.length - 1; i++) {
-                    const p_start = pointList[i];
-                    const p_end = pointList[i+1];
-                    let segmentName = (i === 0) ? `HOME -> P0` : `P${i-1} -> P${i}`;
-
-                    let segmentStartM1 = 0; 
-                    let segmentStartM2 = 0;
-
-                    for (let step = 0; step <= STEPS_PER_SEGMENT_INTERPOLATION; step++) {
-                        const t_in_segment = step / STEPS_PER_SEGMENT_INTERPOLATION;
-                        
-                        const interpolatedX = p_start.x + (p_end.x - p_start.x) * t_in_segment;
-                        const interpolatedY = p_start.y + (p_end.y - p_start.y) * t_in_segment;
-                        
-                        const { a1, a2, clamped, endX, endY } = solveIK(interpolatedX, interpolatedY, previousA1, previousA2);
-                        const { m1, m2 } = solveMotorCommands(a1, a2);
-
-                        if (step === 0) {
-                             segmentStartM1 = m1;
-                             segmentStartM2 = m2;
+                        for (let step = 0; step <= STEPS_PER_SEGMENT_INTERPOLATION; step++) {
+                            const t_in_segment = step / STEPS_PER_SEGMENT_INTERPOLATION;
+                            const interpolatedX = p_start.x + (p_end.x - p_start.x) * t_in_segment;
+                            const interpolatedY = p_start.y + (p_end.y - p_start.y) * t_in_segment;
+                            const { a1, a2, clamped, endX, endY } = solveIK(interpolatedX, interpolatedY, previousA1, previousA2);
+                            const { m1, m2 } = solveMotorCommands(a1, a2);
+                            if (step === 0) { segmentStartM1 = m1; segmentStartM2 = m2; }
+                            precalculatedPath.push({ x: interpolatedX, y: interpolatedY, a1, a2, m1, m2, clamped, segment: i, t_in_segment, endX, endY });
+                            previousA1 = a1; previousA2 = a2;
                         }
-
-                        precalculatedPath.push({ 
-                            x: interpolatedX, 
-                            y: interpolatedY, 
-                            a1, a2, m1, m2, 
-                            clamped, 
-                            segment: i, 
-                            t_in_segment,
-                            endX, endY
-                        });
                         
-                        previousA1 = a1;
-                        previousA2 = a2;
+                        const finalSegmentPoint = precalculatedPath[precalculatedPath.length - 1];
+                        const m1_delta = finalSegmentPoint.m1 - segmentStartM1;
+                        const m2_delta = finalSegmentPoint.m2 - segmentStartM2;
+
+                        commandList.push({
+                            segment: segmentName,
+                            m1_delta_deg: m1_delta * 180 / Math.PI,
+                            m2_delta_deg: m2_delta * 180 / Math.PI,
+                            clamped: finalSegmentPoint.clamped
+                        });
                     }
                     
-                    const finalSegmentPoint = precalculatedPath[precalculatedPath.length - 1];
-                    const m1_delta = finalSegmentPoint.m1 - segmentStartM1;
-                    const m2_delta = finalSegmentPoint.m2 - segmentStartM2;
-
-                    commandList.push({
-                        segment: segmentName,
-                        p_start: p_start,
-                        p_end: p_end,
-                        startJointAngles: commandList.length > 0 ? commandList[commandList.length - 1].endJointAngles : homeJointAngles,
-                        endJointAngles: { a1: finalSegmentPoint.a1, a2: finalSegmentPoint.a2 },
-                        startMotorCommands: commandList.length > 0 ? commandList[commandList.length - 1].endMotorCommands : solveMotorCommands(homeJointAngles.a1, homeJointAngles.a2),
-                        endMotorCommands: { m1: finalSegmentPoint.m1, m2: finalSegmentPoint.m2 },
-                        m1_delta_deg: m1_delta * 180 / Math.PI,
-                        m2_delta_deg: m2_delta * 180 / Math.PI,
-                        clamped: finalSegmentPoint.clamped
-                    });
+                    slider.max = precalculatedPath.length - 1;
+                    DYNAMIC_ANIMATION_SPEED = Math.max(1, Math.ceil((precalculatedPath.length -1) / 250)); 
+                    stopAnimation();
+                    slider.value = "0";
+                    lastHighlightedSegment = -1;
+                    draw();
                 }
-                
-                slider.max = precalculatedPath.length - 1;
-                DYNAMIC_ANIMATION_SPEED = Math.max(1, Math.ceil((precalculatedPath.length -1) / 250)); 
 
                 updateCommandListUI();
-                updateFullGcodeOutput(); // NEW: Populate G-Code box
-                stopAnimation();
-                slider.value = "0";
-                lastHighlightedSegment = -1;
-                draw();
+                updateFullGcodeOutput();
+                gcodeSendIndex = 0;
+                updateSendButtonState();
+                highlightGcodeTextareaLine(gcodeSendIndex);
 
-                addCoordsBtn.textContent = "Set Path & Pre-Calculate Motor Commands";
+                addCoordsBtn.textContent = "Set Path & Calculate Motor Commands";
                 addCoordsBtn.disabled = false;
             }, 10);
         }
 
-        /**
-         * Updates the HTML for the command list.
-         */
         function updateCommandListUI() {
             commandListContainer.innerHTML = '';
             if (commandList.length === 0) {
                 commandListContainer.innerHTML = '<p class="text-gray-400">Add 1 or more points to create a path from HOME.</p>';
                 return;
             }
-
             commandList.forEach((cmd, i) => {
                 const el = document.createElement('div');
                 el.id = `command-segment-${i}`;
                 el.className = 'command-item p-2 rounded-md';
-                
                 const m1Sign = cmd.m1_delta_deg >= 0 ? '+' : '';
                 const m2Sign = cmd.m2_delta_deg >= 0 ? '+' : '';
-                
                 el.innerHTML = `
                     <div class="font-bold text-white">${i}: ${cmd.segment} ${cmd.clamped ? '<span class="text-red-400 font-normal">(Out of reach)</span>' : ''}</div>
                     <div class="font-mono text-sm ml-4 flex flex-col">
@@ -610,59 +570,124 @@
             });
         }
 
-        /**
-         * NEW: Updates the G-Code text area with the full program.
-         */
         function updateFullGcodeOutput() {
             if (commandList.length === 0) {
                 gcodeTextArea.value = 'G-Code program will appear here...';
                 return;
             }
-
             const gcodeCommands = commandList.map(cmd => {
                 const base_gcode = cmd.m1_delta_deg * GCODE_FACTOR;
                 const elbow_gcode = cmd.m2_delta_deg * GCODE_FACTOR;
-                // Format: G1 <elbow> <base> 1000
                 return `G1 ${elbow_gcode.toFixed(3)} ${base_gcode.toFixed(3)} 1000`;
             }).join('\n');
-
             gcodeTextArea.value = gcodeCommands;
         }
 
 
-        /**
-         * Highlights a command in the list.
-         */
         function highlightCommand(segmentIndex) {
             if (segmentIndex === lastHighlightedSegment) return; 
-
             if (lastHighlightedSegment !== -1) {
                 const oldEl = document.getElementById(`command-segment-${lastHighlightedSegment}`);
                 if (oldEl) oldEl.classList.remove('highlight');
             }
-
             if (segmentIndex !== -1 && commandList.length > segmentIndex) {
                 const newEl = document.getElementById(`command-segment-${segmentIndex}`);
-                if (newEl) newEl.classList.add('highlight');
+                if (newEl) {
+                    newEl.classList.add('highlight');
+                    newEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
             }
-            
             lastHighlightedSegment = segmentIndex;
         }
+        
+        // --- G-CODE SENDER LOGIC ---
 
-        /**
-         * The main animation loop.
-         */
+        function highlightGcodeTextareaLine(index) {
+            if (commandList.length === 0 || index < 0 || index >= commandList.length) {
+                gcodeTextArea.blur();
+                return;
+            }
+            
+            const lines = gcodeTextArea.value.split('\n');
+            let start = 0;
+            for(let i=0; i < index; i++) {
+                start += lines[i].length + 1; // +1 for the \n
+            }
+            const end = start + lines[index].length;
+            
+            gcodeTextArea.focus();
+            gcodeTextArea.setSelectionRange(start, end);
+            gcodeTextArea.scrollTop = gcodeTextArea.offsetHeight * (index / lines.length);
+        }
+
+        function updateSendButtonState() {
+            if (commandList.length === 0 || gcodeSendIndex >= commandList.length) {
+                sendGcodeBtn.disabled = true;
+                sendGcodeBtn.textContent = (commandList.length > 0) ? 'All Sent' : 'Send Next Command';
+            } else {
+                sendGcodeBtn.disabled = false;
+                sendGcodeBtn.textContent = `Send (${gcodeSendIndex + 1}/${commandList.length})`;
+            }
+        }
+
+        async function sendNextGcode() {
+            if (gcodeSendIndex >= commandList.length) {
+                console.log("No more commands to send.");
+                return;
+            }
+
+            // Get the G-code string directly from the text area line
+            const gcodeString = gcodeTextArea.value.split('\n')[gcodeSendIndex];
+
+            sendGcodeBtn.disabled = true;
+            sendGcodeBtn.textContent = 'Sending...';
+            
+            gcodeTextArea.classList.remove('highlight-line-success', 'highlight-line-error');
+
+            try {
+                const response = await fetch(SERVER_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    // --- 2. JSON BODY UPDATED ---
+                    // This now uses "gcode_line" to match your Python code
+                    body: JSON.stringify({ gcode_line: gcodeString })
+                });
+
+                const result = await response.json(); // Get JSON response from server
+
+                if (!response.ok || !result.success) {
+                    throw new Error(result.error || `Server error: ${response.statusText}`);
+                }
+
+                console.log('Server response:', result);
+                
+                // Success
+                gcodeTextArea.classList.add('highlight-line-success');
+                highlightCommand(gcodeSendIndex); // Highlight in Section 4
+                gcodeSendIndex++; // Move to next command
+                
+            } catch (error) {
+                console.error('Error sending command:', error);
+                alert(`Failed to send command.\nIs the Python server running?\nError: ${error.message}`);
+                gcodeTextArea.classList.add('highlight-line-error');
+            }
+            
+            updateSendButtonState();
+            if (gcodeSendIndex < commandList.length) {
+                highlightGcodeTextareaLine(gcodeSendIndex); // Highlight next line
+            }
+        }
+
+        // --- (Animation loop, stop, play logic is unchanged) ---
+        
         function animationLoop() {
             if (!isPlaying) return;
-
             let currentVal = parseInt(slider.value);
             currentVal += DYNAMIC_ANIMATION_SPEED; 
-
             if (currentVal >= slider.max) { 
                 currentVal = slider.max;
                 stopAnimation();
             }
-
             slider.value = currentVal;
             draw();
             animationFrameId = requestAnimationFrame(animationLoop);
@@ -680,12 +705,8 @@
             draw();
         }
         
-        /**
-         * Toggles the play/pause state.
-         */
         function togglePlay() {
             if (commandList.length === 0) return; 
-
             if (isPlaying) {
                 stopAnimation();
             } else {
@@ -693,7 +714,6 @@
                     slider.value = "0";
                     lastHighlightedSegment = -1; 
                 }
-                
                 isPlaying = true;
                 playBtn.textContent = 'Pause';
                 playBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
@@ -712,7 +732,7 @@ G1 X-181.894 Y-202.600
 G1 X-171.542 Y-202.600
 G1 X-202.600 Y-86.689
 G1 X-202.600 Y-48.052
-G1 X-161.189 Y-202.600
+GS1 X-161.189 Y-202.600
 G1 X-150.836 Y-202.600
 G1 X-202.600 Y-9.415
 G1 X-202.600 Y29.222
@@ -791,7 +811,7 @@ G1 X123.643 Y202.600
 G1 X202.600 Y-92.072
 G1 X202.600 Y-53.435
 G1 X133.996 Y202.600
-G1 X144.349 Y202.600
+G1 X144.349 Y202.Type="text"
 G1 X202.600 Y-14.798
 G1 X202.600 Y23.840
 G1 X154.701 Y202.600
@@ -801,50 +821,27 @@ G1 X202.600 Y101.114
 G1 X175.407 Y202.600
 G1 X185.760 Y202.600
 G1 X202.600 Y139.751
-G1 X202.600 Y178.388
+GBlock"
 G1 X196.112 Y202.600`;
             setupCanvas();
-            parseCoordinates(); // Load default path
+            parseCoordinates();
         });
+
         window.addEventListener('resize', setupCanvas);
-        
         addCoordsBtn.addEventListener('click', parseCoordinates);
-        
-        slider.addEventListener('input', () => {
-            draw();
-        });
-        
+        slider.addEventListener('input', () => { draw(); });
         playBtn.addEventListener('click', togglePlay);
 
-        // NEW: Copy G-Code button listener
-        copyGcodeBtn.addEventListener('click', () => {
-            gcodeTextArea.select();
-            // Use modern clipboard API
-            navigator.clipboard.writeText(gcodeTextArea.value).then(() => {
-                // Success feedback
-                const originalText = copyGcodeBtn.textContent;
-                copyGcodeBtn.textContent = 'Copied!';
-                copyGcodeBtn.disabled = true;
-                setTimeout(() => {
-                    copyGcodeBtn.textContent = originalText;
-                    copyGcodeBtn.disabled = false;
-                }, 2000);
-            }).catch(err => {
-                console.error('Failed to copy G-Code: ', err);
-                // Fallback for older browsers
-                try {
-                    document.execCommand('copy');
-                    const originalText = copyGcodeBtn.textContent;
-                    copyGcodeBtn.textContent = 'Copied!';
-                    copyGcodeBtn.disabled = true;
-                    setTimeout(() => {
-                        copyGcodeBtn.textContent = originalText;
-                        copyGcodeBtn.disabled = false;
-                    }, 2000);
-                } catch (e) {
-                    console.error('Fallback copy failed', e);
-                }
-            });
+        // G-Code button listeners
+        sendGcodeBtn.addEventListener('click', sendNextGcode);
+        
+        resetGcodeBtn.addEventListener('click', () => {
+            gcodeSendIndex = 0;
+            updateSendButtonState();
+            highlightGcodeTextareaLine(0);
+            highlightCommand(-1); // Clear section 4 highlight
+            gcodeTextArea.classList.remove('highlight-line-success', 'highlight-line-error');
+            console.log("Reset send index to 0.");
         });
 
     </script>
