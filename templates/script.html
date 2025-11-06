@@ -241,7 +241,7 @@ G1 0 0 200
          * Converts Cartesian (X,Y) G-Code into the arm's relative step commands.
          * This version performs linear interpolation and path clipping.
          */
-        function convertGCode() {
+       function convertGCode() {
             const gcodeText = gcodeConverterInput.value;
             const lines = gcodeText.split('\n');
             const xyRegex = /G1\s+X(-?[\d.]+)\s+Y(-?[\d.]+)/i;
@@ -269,85 +269,87 @@ G1 0 0 200
             // --- 3. Convert coords to relative arm commands ---
             let generatedCommands = [];
             
-// --- NEW STARTING POSITION LOGIC ---
-// Get the first coordinate from the list
-const first_coord = coords[0];
-let start_theta1;
+            // --- NEW STARTING POSITION LOGIC ---
+            // Get the first coordinate from the list
+            const first_coord = coords[0];
+            let start_theta1;
 
-// Check if first coord is at the origin (singularity)
-if (Math.hypot(first_coord.x, first_coord.y) < 0.1) {
-    // If first point is at origin, just point right (0 degrees)
-    start_theta1 = 0; 
-} else {
-    // Otherwise, get the angle to the first coordinate
-    start_theta1 = Math.atan2(first_coord.y, first_coord.x);
-}
+            // Check if first coord is at the origin (singularity)
+            if (Math.hypot(first_coord.x, first_coord.y) < 0.1) {
+                // If first point is at origin, just point right (0 degrees)
+                start_theta1 = 0; 
+            } else {
+                // Otherwise, get the angle to the first coordinate
+                start_theta1 = Math.atan2(first_coord.y, first_coord.x);
+            }
 
-// Calculate motor angles for a fully extended arm (where theta_bend = 0)
-const start_alpha_rad = start_theta1;
-// From FK: theta_bend = beta_rad - (GEAR_RATIO * alpha_rad)
-// If theta_bend = 0, then beta_rad = GEAR_RATIO * alpha_rad
-const start_beta_rad = GEAR_RATIO * start_alpha_rad;
+            // Calculate motor angles for a fully extended arm (where theta_bend = 0)
+            const start_alpha_rad = start_theta1;
+            // From FK: theta_bend = beta_rad - (GEAR_RATIO * alpha_rad)
+            // If theta_bend = 0, then beta_rad = GEAR_RATIO * alpha_rad
+            const start_beta_rad = GEAR_RATIO * start_alpha_rad;
 
-// Convert these angles to the starting motor steps
-let prev_base_steps = Math.round(-start_alpha_rad * STEPS_PER_RAD);
-let prev_elbow_steps = Math.round(-start_beta_rad * STEPS_PER_RAD);
+            // Convert these angles to the starting motor steps
+            let prev_base_steps = Math.round(-start_alpha_rad * STEPS_PER_RAD);
+            let prev_elbow_steps = Math.round(-start_beta_rad * STEPS_PER_RAD);
 
-// Now, get the arm's actual (x, y) start position from these steps
-let { p2: start_pos } = calculateFK(null, prev_base_steps, prev_elbow_steps); 
-let prev_x = start_pos.x;
-let prev_y = start_pos.y;
-// --- END NEW LOGIC ---
+            // Now, get the arm's actual (x, y) start position from these steps
+            let { p2: start_pos } = calculateFK(null, prev_base_steps, prev_elbow_steps); 
+            let prev_x = start_pos.x;
+            let prev_y = start_pos.y;
+            // --- END NEW LOGIC ---
             
             const segment_length_mm = parseFloat(segmentLengthInput.value) || 2.0;
             const step_delay_us = parseInt(stepDelayInput.value, 10) || 1000;
             
             try {
-for (const coord of coords) {
-                    const end_x = coord.x;
-                    const end_y = coord.y;
-                    
-                    // --- FIX: Capture the *true* start of this G1 line ---
-                    const line_start_x = prev_x;
-                    const line_start_y = prev_y;
+                // Loop over each G1 coordinate
+                for (const coord of coords) {
+                    const end_x = coord.x;
+                    const end_y = coord.y;
+                    
+                    // --- FIX: Capture the *true* start of this G1 line ---
+                    const line_start_x = prev_x;
+                    const line_start_y = prev_y;
 
-                    // These will track the *actual* final position after all segments
-                    let last_clamped_x = prev_x;
-                    let last_clamped_y = prev_y;
+                    // These will track the *actual* final position after all segments
+                    let last_clamped_x = prev_x;
+                    let last_clamped_y = prev_y;
 
-                    // Calculate distance and number of segments
-                    // --- FIX: Use the true line start for distance ---
-                    const distance = Math.hypot(end_x - line_start_x, end_y - line_start_y);
-                    const num_segments = Math.max(1, Math.ceil(distance / segment_length_mm));
+                    // --- FIX: Use the true line start for distance ---
+                    const distance = Math.hypot(end_x - line_start_x, end_y - line_start_y);
+                    const num_segments = Math.max(1, Math.ceil(distance / segment_length_mm));
 
-                    // Interpolate along the straight line
-                    for (let i = 1; i <= num_segments; i++) {
-                        const progress = i / num_segments;
-                        // --- FIX: Always interpolate from the *true* line start ---
-s                       const curr_x = lerp(line_start_x, end_x, progress);
-                        const curr_y = lerp(line_start_y, end_y, progress);
+                    // Interpolate along the *ideal* straight line
+                    for (let i = 1; i <= num_segments; i++) {
+                        const progress = i / num_segments;
+                        // --- FIX: Always interpolate from the *true* line start ---
+                        const curr_x = lerp(line_start_x, end_x, progress);
+                        const curr_y = lerp(line_start_y, end_y, progress);
 
-                        // Calculate IK, which will also clip the *ideal* point
-                        const { base_steps, elbow_steps, clamped_x, clamped_y } = calculateIK(curr_x, curr_y, prev_base_steps);
-                        
-                        const rel_base = Math.round(base_steps - prev_base_steps);
-                        const rel_elbow = Math.round(elbow_steps - prev_elbow_steps);
-                nbsp;   
-                        if (rel_base !== 0 || rel_elbow !== 0) {
-                             generatedCommands.push({ elbow: rel_elbow, base: rel_base, delay: step_delay_us });
-s                     }
+                        // Calculate IK, which will also clip the *ideal* point
+                        const { base_steps, elbow_steps, clamped_x, clamped_y } = calculateIK(curr_x, curr_y, prev_base_steps);
+                        
+                        // Get relative steps from the *previous actual* steps
+                        const rel_base = Math.round(base_steps - prev_base_steps);
+                        const rel_elbow = Math.round(elbow_steps - prev_elbow_steps);
+                        
+                        // Only add a command if there's actual movement
+                        if (rel_base !== 0 || rel_elbow !== 0) {
+                            generatedCommands.push({ elbow: rel_elbow, base: rel_base, delay: step_delay_us });
+                        }
 
-                        // --- FIX: Only update step counters and the *last known* clamped position ---
-                        prev_base_steps = base_steps;
-                        prev_elbow_steps = elbow_steps;
-s                       last_clamped_x = clamped_x; // Store the actual position...
-                        last_clamped_y = clamped_y; // ...but don't use it for interpolation
-                    }
-                    
-nbsp;                 // --- FIX: Update prev_x/y *after* the entire line is finished ---
-                    prev_x = last_clamped_x;
-                    prev_y = last_clamped_y;
-                }
+                        // --- FIX: Update state to the *actual* new position ---
+                        prev_base_steps = base_steps;
+                        prev_elbow_steps = elbow_steps;
+                        last_clamped_x = clamped_x; // Store the actual position...
+                        last_clamped_y = clamped_y; // ...but don't use it for interpolation
+                    }
+                    
+                    // --- FIX: Update prev_x/y *after* the entire line is finished ---
+                    prev_x = last_clamped_x;
+                    prev_y = last_clamped_y;
+                }
             } catch (e) {
                 showModal(`Conversion Error: ${e.message}`);
                 return;
@@ -371,7 +373,6 @@ nbsp;                 // --- FIX: Update prev_x/y *after* the entire lin
             commandsInput.value = commandStrings.join('\n');
             loadCommandsBtn.click(); // Automatically click "Load & Reset"
         }
-
         /**
          * Combines consecutive commands with the same ratio and speed.
          */
@@ -445,13 +446,13 @@ nbsp;                 // --- FIX: Update prev_x/y *after* the entire lin
             let clamped_x = x;
             let clamped_y = y;
 
-// --- 1. Check if reachable & clip if necessary ---
-if (D > arm_max_reach) { 
-    // Clip the point to the edge
-    clamped_x = x * arm_max_reach / D;
-	clamped_y = y * arm_max_reach / D;
-    D = arm_max_reach;
-}
+            // --- 1. Check if reachable & clip if necessary ---
+            if (D > arm_max_reach) { 
+                // Clip the point to the edge
+                clamped_x = x * arm_max_reach / D;
+                clamped_y = y * arm_max_reach / D;
+                D = arm_max_reach;
+            }
 
             let theta1, theta_bend;
 
@@ -479,23 +480,23 @@ if (D > arm_max_reach) {
                 
                 // Use *clamped* x and y for angle
                 // [This was the original line, now calculating a 'raw' angle]
-let raw_theta1 = Math.atan2(clamped_y, clamped_x) - Math.atan2(k2, k1);
+                let raw_theta1 = Math.atan2(clamped_y, clamped_x) - Math.atan2(k2, k1);
 
-// --- START BUG FIX: Angle Unwrapping ---
-// We use the last_base_steps (which we are already tracking)
-// to find the previous angle.
-const last_theta1 = -last_base_steps / STEPS_PER_RAD;
+                // --- START BUG FIX: Angle Unwrapping ---
+                // We use the last_base_steps (which we are already tracking)
+                // to find the previous angle.
+                const last_theta1 = -last_base_steps / STEPS_PER_RAD;
 
-// Calculate the difference in full rotations (2*PI)
-let rotation_diff = (raw_theta1 - last_theta1) / (2 * Math.PI);
+                // Calculate the difference in full rotations (2*PI)
+                let rotation_diff = (raw_theta1 - last_theta1) / (2 * Math.PI);
 
-// Find the nearest integer rotation (e.g., 0, -1, 1)
-let nearest_rotation_offset = Math.round(rotation_diff);
+                // Find the nearest integer rotation (e.g., 0, -1, 1)
+                let nearest_rotation_offset = Math.round(rotation_diff);
 
-// Apply this offset to the raw angle to get the "unwrapped" angle.
-// This finds the version of raw_theta1 that is closest to last_theta1.
-theta1 = raw_theta1 - (nearest_rotation_offset * 2 * Math.PI);
-// --- END BUG FIX ---
+                // Apply this offset to the raw angle to get the "unwrapped" angle.
+                // This finds the version of raw_theta1 that is closest to last_theta1.
+                theta1 = raw_theta1 - (nearest_rotation_offset * 2 * Math.PI);
+                // --- END BUG FIX ---
             }
 
             // --- 4. Convert angles to motor angles (alpha, beta) ---
@@ -513,7 +514,6 @@ theta1 = raw_theta1 - (nearest_rotation_offset * 2 * Math.PI);
                 clamped_y: clamped_y
             };
         }
-
         // --- END: G-Code Converter Functions ---
 
 
