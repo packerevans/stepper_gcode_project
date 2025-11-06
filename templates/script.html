@@ -303,42 +303,51 @@ let prev_y = start_pos.y;
             const step_delay_us = parseInt(stepDelayInput.value, 10) || 1000;
             
             try {
-                for (const coord of coords) {
-                    // *** UPDATED: No scaling ***
-                    const end_x = coord.x;
-                    const end_y = coord.y;
-                    
-                    const start_x = prev_x; // Start from the last *actual* position
-                    const start_y = prev_y;
+for (const coord of coords) {
+                    const end_x = coord.x;
+                    const end_y = coord.y;
+                    
+                    // --- FIX: Capture the *true* start of this G1 line ---
+	const line_start_x = prev_x;
+	const line_start_y = prev_y;
 
-                    // Calculate distance and number of segments
-                    const distance = Math.hypot(end_x - start_x, end_y - start_y);
-                    const num_segments = Math.max(1, Math.ceil(distance / segment_length_mm));
+	// These will track the *actual* final position after all segments
+	let last_clamped_x = prev_x;
+	let last_clamped_y = prev_y;
 
-                    // Interpolate along the straight line
-                    for (let i = 1; i <= num_segments; i++) {
-                        const progress = i / num_segments;
-                        const curr_x = lerp(start_x, end_x, progress);
-                        const curr_y = lerp(start_y, end_y, progress);
+                    // Calculate distance and number of segments
+                    // --- FIX: Use the true line start for distance ---
+                    const distance = Math.hypot(end_x - line_start_x, end_y - line_start_y);
+                    const num_segments = Math.max(1, Math.ceil(distance / segment_length_mm));
 
-                        // Calculate IK, which will also clip the point if unreachable
-                        // *** UPDATED: Get clamped_x/y back from IK ***
-                        const { base_steps, elbow_steps, clamped_x, clamped_y } = calculateIK(curr_x, curr_y, prev_base_steps);
-                        
-                        const rel_base = Math.round(base_steps - prev_base_steps);
-                        const rel_elbow = Math.round(elbow_steps - prev_elbow_steps);
-                        
-                        if (rel_base !== 0 || rel_elbow !== 0) {
-                             generatedCommands.push({ elbow: rel_elbow, base: rel_base, delay: step_delay_us });
-                        }
+                    // Interpolate along the straight line
+                    for (let i = 1; i <= num_segments; i++) {
+                        const progress = i / num_segments;
+                        // --- FIX: Always interpolate from the *true* line start ---
+                        const curr_x = lerp(line_start_x, end_x, progress);
+                        const curr_y = lerp(line_start_y, end_y, progress);
 
-                        // *** UPDATED: Update state to the *actual* new position ***
-                        prev_base_steps = base_steps;
-                        prev_elbow_steps = elbow_steps;
-                        prev_x = clamped_x; // Track the actual (clamped) position
-                        prev_y = clamped_y;
-                    }
-                }
+                        // Calculate IK, which will also clip the *ideal* point
+                        const { base_steps, elbow_steps, clamped_x, clamped_y } = calculateIK(curr_x, curr_y, prev_base_steps);
+nbsp;             
+                        const rel_base = Math.round(base_steps - prev_base_steps);
+                        const rel_elbow = Math.round(elbow_steps - prev_elbow_steps);
+                nbsp;   
+                        if (rel_base !== 0 || rel_elbow !== 0) {
+                             generatedCommands.push({ elbow: rel_elbow, base: rel_base, delay: step_delay_us });
+                        }
+
+                        // --- FIX: Only update step counters and the *last known* clamped position ---
+                        prev_base_steps = base_steps;
+                        prev_elbow_steps = elbow_steps;
+                        last_clamped_x = clamped_x; // Store the actual position...
+                        last_clamped_y = clamped_y; // ...but don't use it for interpolation
+                    }
+                    
+section;         // --- FIX: Update prev_x/y *after* the entire line is finished ---
+	prev_x = last_clamped_x;
+	prev_y = last_clamped_y;
+                }
             } catch (e) {
                 showModal(`Conversion Error: ${e.message}`);
                 return;
