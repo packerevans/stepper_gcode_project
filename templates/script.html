@@ -436,15 +436,13 @@ let prev_y = start_pos.y;
             let clamped_x = x;
             let clamped_y = y;
 
-            // --- 1. Check if reachable & clip if necessary ---
-            // Use a small safety margin (1mm)
-            const max_safe_reach = arm_max_reach - 1; 
-            if (D > max_safe_reach) { 
-                // Clip the point to the edge
-                clamped_x = x * max_safe_reach / D;
-                clamped_y = y * max_safe_reach / D;
-                D = max_safe_reach;
-            }
+// --- 1. Check if reachable & clip if necessary ---
+if (D > arm_max_reach) { 
+    // Clip the point to the edge
+    clamped_x = x * arm_max_reach / D;
+	clamped_y = y * arm_max_reach / D;
+    D = arm_max_reach;
+}
 
             let theta1, theta_bend;
 
