@@ -269,11 +269,35 @@ G1 0 0 200
             // --- 3. Convert coords to relative arm commands ---
             let generatedCommands = [];
             
-            // Get arm's actual start position (0,0 steps)
-            let { target_base_steps: prev_base_steps, target_elbow_steps: prev_elbow_steps, p2: start_pos } = calculateFK(null, 0, 0); 
-            // *** UPDATED: Track previous *actual* (clamped) x, y position ***
-            let prev_x = start_pos.x;
-            let prev_y = start_pos.y;
+// --- NEW STARTING POSITION LOGIC ---
+// Get the first coordinate from the list
+const first_coord = coords[0];
+let start_theta1;
+
+// Check if first coord is at the origin (singularity)
+if (Math.hypot(first_coord.x, first_coord.y) < 0.1) {
+    // If first point is at origin, just point right (0 degrees)
+    start_theta1 = 0; 
+} else {
+    // Otherwise, get the angle to the first coordinate
+    start_theta1 = Math.atan2(first_coord.y, first_coord.x);
+}
+
+// Calculate motor angles for a fully extended arm (where theta_bend = 0)
+const start_alpha_rad = start_theta1;
+// From FK: theta_bend = beta_rad - (GEAR_RATIO * alpha_rad)
+// If theta_bend = 0, then beta_rad = GEAR_RATIO * alpha_rad
+const start_beta_rad = GEAR_RATIO * start_alpha_rad;
+
+// Convert these angles to the starting motor steps
+let prev_base_steps = Math.round(-start_alpha_rad * STEPS_PER_RAD);
+let prev_elbow_steps = Math.round(-start_beta_rad * STEPS_PER_RAD);
+
+// Now, get the arm's actual (x, y) start position from these steps
+let { p2: start_pos } = calculateFK(null, prev_base_steps, prev_elbow_steps); 
+let prev_x = start_pos.x;
+let prev_y = start_pos.y;
+// --- END NEW LOGIC ---
             
             const segment_length_mm = parseFloat(segmentLengthInput.value) || 2.0;
             const step_delay_us = parseInt(stepDelayInput.value, 10) || 1000;
