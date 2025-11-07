@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Packers Sand Table Designs</title>
+    
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
+    
+<style>
+    /* --- Root Variables (Light Mode) --- */
+    :root {
+        --color-primary: #d2b48c; /* Khaki/Tan (Button/Sidebar Background) */
+        --color-secondary: #b08d5c; /* Darker Tan (Button Hover/Accent) */
+        --color-background: #f0f0f0; /* Light Gray Background */
+        --color-surface: #ffffff; /* White Card/Container Background */
+        --color-text: #333333;
+        --color-shadow: rgba(0, 0, 0, 0.08);
+        --color-icon: #000000;
+        
+        --border-radius: 12px;
+    }
+
+    /* --- Dark Mode Variables --- */
+    body[data-theme='dark'] {
+        --color-background: #1e1e1e;
+        --color-surface: #2c2c2c;
+        --color-text: #e0e0e0;
+        --color-shadow: rgba(255, 255, 255, 0.08);
+        --color-icon: #ffffff;
+    }
+    
+    /* --- Base Styles --- */
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: var(--color-background);
+        color: var(--color-text);
+        padding: 0;
+        margin: 0;
+        transition: background 0.3s, color 0.3s;
+    }
+
+    /* --- Sidebar & Header (Copied from your example) --- */
+    .sidebar {
+        height: 100%; width: 0; position: fixed; top: 0; left: 0;
+        background-color: var(--color-primary); overflow-x: hidden;
+        transition: 0.3s; padding-top: 60px; z-index: 1000;
+        box-shadow: 2px 0 5px var(--color-shadow);
+    }
+
+    .sidebar a {
+        padding: 15px 24px; text-decoration: none; font-size: 18px;
+        color: var(--color-text); display: block; transition: 0.2s;
+        font-weight: 500;
+    }
+
+    .sidebar a:hover {
+        background-color: var(--color-secondary);
+        color: var(--color-surface);
+    }
+
+    .openbtn {
+        font-size: 26px; cursor: pointer; background-color: var(--color-primary);
+        color: var(--color-text); padding: 10px 20px; border: none;
+        border-radius: 0 0 var(--border-radius) 0; position: fixed;
+        top: 0; left: 0; z-index: 1100; box-shadow: 0 2px 5px var(--color-shadow);
+    }
+    
+    /* --- Theme Toggle Button (Copied) --- */
+    #themeToggle {
+        position: fixed; top: 15px; right: 15px; background: var(--color-surface);
+        color: var(--color-icon); border: 1px solid var(--color-icon);
+        padding: 8px 15px; border-radius: 20px; z-index: 1200;
+        transition: background 0.3s, color 0.3s, border-color 0.3s;
+    }
+    
+    .main-content {
+        margin-left: 0; transition: margin-left 0.3s; padding: 20px;
+        max-width: 1200px; /* Wider for a grid */
+        margin: 0 auto;
+    }
+
+    h1 {
+        text-align: center; margin-top: 20px; margin-bottom: 30px;
+        font-weight: 300; color: var(--color-secondary);
+    }
+
+    .header-image {
+        width: 100%; max-height: 250px; object-fit: cover;
+        border-radius: var(--border-radius); margin-bottom: 30px;
+        box-shadow: 0 4px 15px var(--color-shadow);
+    }
+    
+    /* --- Re-using .control-panel for card style --- */
+    .card {
+        background-color: var(--color-surface);
+        padding: 20px;
+        border-radius: var(--border-radius);
+        box-shadow: 0 4px 10px var(--color-shadow);
+        margin-bottom: 30px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* --- NEW: Design Grid Styles --- */
+    .design-grid {
+        display: grid;
+        /* Creates responsive columns: 
+           - Fills container with columns that are at least 300px wide.
+           - On small screens, becomes a single column. */
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 24px;
+    }
+
+    .design-card {
+        background-color: var(--color-surface);
+        border-radius: var(--border-radius);
+        box-shadow: 0 4px 10px var(--color-shadow);
+        overflow: hidden; /* To keep canvas corners rounded */
+        display: flex;
+        flex-direction: column;
+        transition: box-shadow 0.2s;
+    }
+
+    .design-card:hover {
+        box-shadow: 0 8px 20px var(--color-shadow);
+    }
+    
+    .design-card canvas {
+        width: 100%;
+        /* Maintain a 1:1 square aspect ratio */
+        aspect-ratio: 1 / 1;
+        display: block;
+        /* The canvas background will be set to white via JS,
+           but this provides a fallback */
+        background-color: #fff; 
+    }
+
+    .design-card .card-content {
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        flex-grow: 1; /* Makes content fill remaining space */
+    }
+
+    .design-card h3 {
+        margin-top: 0;
+        margin-bottom: 15px;
+        font-weight: 600;
+        color: var(--color-text);
+        /* Truncate long filenames */
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* --- Button Style (Copied) --- */
+    button {
+        background-color: var(--color-primary);    
+        color: var(--color-text);
+        border: none; padding: 12px 25px; border-radius: 8px; font-size: 16px;
+        cursor: pointer; transition: background-color 0.2s, box-shadow 0.2s;
+        font-weight: 600;
+        width: 100%;
+        margin-top: auto; /* Pushes button to the bottom */
+    }
+
+    button:hover {
+        background-color: var(--color-secondary);
+        box-shadow: 0 2px 8px var(--color-shadow);
+    }
+    
+    /* --- Mobile Responsiveness (Copied) --- */
+    @media (max-width: 600px) {
+        .main-content {
+            padding: 10px;
+        }
+        .header-image {
+            max-height: 120px;
+            margin-bottom: 15px;
+        }
+        h1, h2 {
+            font-size: 1.5em;
+            margin-bottom: 15px;
+        }
+        .design-grid {
+            /* On mobile, stack to a single column */
+            grid-template-columns: 1fr;
+            gap: 15px;
+        }
+        .design-card .card-content {
+            padding: 15px;
+        }
+    }
+</style>
+    
+</head>
+<body data-theme="light">
+    <div id="mySidebar" class="sidebar">
+        <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
+        <a href="/">Controls</a>
+        <a href="/designs.html">Designs</a> 
+        <a href="/led_controls">Led Controls</a>
+        <a href="/terminal">Terminal</a>
+    </div>
+
+    <button class="openbtn" onclick="openNav()">☰</button>
+    <button id="themeToggle" onclick="toggleDarkMode()">
+        <span id="themeIcon">☀️</span>
+    </button>
+
+    <div class="main-content">
+        <img src="/static/sand.png" alt="Sand Table Header" class="header-image">
+        <h1>Design Library</h1>
+        
+        <div id="designGridContainer" class="design-grid">
+            </div>
+    </div>
+
+<script>
+    // ######################################################################
+    // ##  START: KINEMATIC SIMULATOR LOGIC (Adapted from your file)
+    // ######################################################################
+
+    // --- Simulation Constants ---
+    const L1 = 101.3; // mm (Upper arm)
+    const L2 = 101.3; // mm (Lower arm)
+    const GEAR_RATIO = 9 / 8; // 1.125
+    const STEPS_PER_DEG = 3200 / 360;
+    const STEPS_PER_RAD = STEPS_PER_DEG * (180 / Math.PI);
+
+    /**
+     * Parses command text, calculates all states, and returns the high-res trace path.
+     * This is a "headless" version of your simulator's loadCommands().
+     */
+    function generateTracePathFromText(commandText) {
+        // --- Step 1: Parse Commands ---
+        const commands = commandText.split('\n')
+            .filter(line => line.trim().startsWith('G1'))
+            .map(line => {
+                const parts = line.trim().substring(2).trim().split(/\s+/).map(s => parseInt(s.trim(), 10));
+                return { 
+                    elbow: parts[0] || 0, 
+                    base: parts[1] || 0, 
+                    step_delay_us: parts[2] !== undefined ? parts[2] : 1000 
+                };
+            });
+
+        if (commands.length === 0) {
+            return [];
+        }
+
+        // --- Step 2: Calculate States ---
+        const cumulativeStates = calculateAllStates(commands);
+
+        // --- Step 3: Calculate Trace Path ---
+        const tracePath = calculateTracePath(cumulativeStates);
+        
+        return tracePath;
+    }
+
+    /**
+     * Pre-calculates the arm's position and angles for every step.
+     */
+    function calculateAllStates(commands) {
+        let cumulativeStates = [];
+        let total_base_steps = 0;
+        let total_elbow_steps = 0;
+        const p0 = { x: 0, y: 0 }; // Base pivot is always at origin
+
+        // Add initial state (Step 0)
+        cumulativeStates.push(calculateFK(p0, 0, 0));
+
+        for (const cmd of commands) {
+            total_base_steps += cmd.base;
+            total_elbow_steps += cmd.elbow;
+            
+            const state = calculateFK(p0, total_base_steps, total_elbow_steps);
+            cumulativeStates.push(state);
+        }
+        return cumulativeStates;
+    }
+
+    /**
+     * Pre-calculates the high-resolution path for the trace line.
+     */
+    function calculateTracePath(cumulativeStates) {
+        let tracePath = [];
+        if (cumulativeStates.length < 2) return;
+        
+        tracePath.push(cumulativeStates[0].p2); 
+
+        for (let i = 0; i < cumulativeStates.length - 1; i++) {
+            const fromState = cumulativeStates[i];
+            const toState = cumulativeStates[i+1];
+
+            const base_delta = Math.abs(toState.target_base_steps - fromState.target_base_steps);
+            const elbow_delta = Math.abs(toState.target_elbow_steps - fromState.target_elbow_steps);
+            const max_step_delta = Math.max(base_delta, elbow_delta);
+
+            const stepsPerSegment = Math.max(20, Math.ceil(max_step_delta / 100));
+
+            for (let j = 1; j <= stepsPerSegment; j++) {
+                const progress = j / stepsPerSegment;
+                const interpolatedState = getInterpolatedState(fromState, toState, progress);
+                tracePath.push(interpolatedState.p2);
+            }
+        }
+        return tracePath;
+    }
+
+    /**
+     * Forward Kinematics: Calculates arm position from motor steps.
+     */
+    function calculateFK(p0, base_steps, elbow_steps) {
+        const alpha_rad = -base_steps / STEPS_PER_RAD;
+        const beta_rad = -elbow_steps / STEPS_PER_RAD;  
+        const theta1 = alpha_rad;
+        const theta_bend = beta_rad - (GEAR_RATIO * alpha_rad);
+        const theta2_global = theta1 + theta_bend;
+
+        const p1 = {
+            x: p0.x + L1 * Math.cos(theta1),
+            y: p0.y + L1 * Math.sin(theta1)
+        };
+        const p2 = {
+            x: p1.x + L2 * Math.cos(theta2_global),
+            y: p1.y + L2 * Math.sin(theta2_global)
+        };
+
+        return {
+            p0, p1, p2,
+            target_base_steps: base_steps,
+            target_elbow_steps: elbow_steps,
+            theta1_rad: theta1,
+            theta_bend_rad: theta_bend,
+            theta2_global_rad: theta2_global
+        };
+    }
+
+    /**
+     * Utility function for linear interpolation.
+     */
+    const lerp = (a, b, t) => a + (b - a) * t;
+
+    /**
+     * Factored out interpolation logic.
+     */
+    function getInterpolatedState(from, to, progress) {
+        const theta1_rad = lerp(from.theta1_rad, to.theta1_rad, progress);
+        const theta_bend_rad = lerp(from.theta_bend_rad, to.theta_bend_rad, progress);
+        const theta2_global_rad = lerp(from.theta2_global_rad, to.theta2_global_rad, progress);
+
+        const p0 = from.p0;
+        const p1 = {
+            x: p0.x + L1 * Math.cos(theta1_rad),
+            y: p0.y + L1 * Math.sin(theta1_rad)
+        };
+        const p2 = {
+            x: p1.x + L2 * Math.cos(theta2_global_rad),
+            y: p1.y + L2 * Math.sin(theta2_global_rad)
+        };
+
+        return { p0, p1, p2 };
+    }
+
+    /**
+     * NEW: Draws the generated trace path onto a canvas.
+     * This auto-scales and centers the drawing.
+     * Background: WHITE, Trace: BLACK.
+     */
+    function drawTraceOnCanvas(canvas, tracePath) {
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+
+        // --- 1. Set WHITE background ---
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, width, height);
+
+        if (tracePath.length < 2) {
+            console.warn("Trace path is too short to draw.");
+            return;
+        }
+
+        // --- 2. Find Bounding Box ---
+        let minX = tracePath[0].x, maxX = tracePath[0].x;
+        let minY = tracePath[0].y, maxY = tracePath[0].y;
+        
+        for (const p of tracePath) {
+            if (p.x < minX) minX = p.x;
+            if (p.x > maxX) maxX = p.x;
+            if (p.y < minY) minY = p.y;
+            if (p.y > maxY) maxY = p.y;
+        }
+
+        // Handle divide-by-zero if it's a single point or line
+        const drawingWidth = (maxX - minX) || 1;
+        const drawingHeight = (maxY - minY) || 1;
+        
+        // --- 3. Calculate Scale and Offset ---
+        const padding = 0.1; // 10% padding
+        const scale = Math.min(
+            width / drawingWidth,
+            height / drawingHeight
+        ) * (1 - padding);
+
+        const drawCenterX = (minX + maxX) / 2;
+        const drawCenterY = (minY + maxY) / 2;
+        
+        const canvasCenterX = width / 2;
+        const canvasCenterY = height / 2;
+
+        // --- 4. Draw the BLACK trace ---
+        ctx.beginPath();
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 2; // Fixed 2px line width for the preview
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+
+        for (let i = 0; i < tracePath.length; i++) {
+            const p = tracePath[i];
+            
+            // Transform world coordinates (mm) to canvas coordinates (px)
+            // We also flip the Y-axis (multiply by -scale)
+            const canvasX = canvasCenterX + (p.x - drawCenterX) * scale;
+            const canvasY = canvasCenterY + (p.y - drawCenterY) * -scale; 
+
+            if (i === 0) {
+                ctx.moveTo(canvasX, canvasY);
+            } else {
+                ctx.lineTo(canvasX, canvasY);
+            }
+        }
+        ctx.stroke();
+    }
+
+    // ######################################################################
+    // ##  END: KINEMATIC SIMULATOR LOGIC
+    // ######################################################################
+
+
+    // ######################################################################
+    // ##  START: PAGE UI & FETCH LOGIC
+    // ######################################################################
+
+    // --- Sidebar Functions (Copied) ---
+    function openNav() {
+        document.getElementById("mySidebar").style.width = "200px";
+        const main = document.querySelector(".main-content");
+        if (main) main.style.marginLeft = "200px";
+    }
+
+    function closeNav() {
+        document.getElementById("mySidebar").style.width = "0";
+        const main = document.querySelector(".main-content");
+        if (main) main.style.marginLeft = "0";
+    }
+
+    // --- Dark Mode Toggle (Copied) ---
+    function updateThemeIcon(theme) {
+        document.getElementById('themeIcon').textContent = theme === 'dark' ? '🌙' : '☀️';
+    }
+
+    function toggleDarkMode() {
+        const body = document.body;
+        const currentTheme = body.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        
+        body.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+        updateThemeIcon(newTheme);
+    }
+    
+    /**
+     * This is the function you'll use for the "Select" button.
+     * You can make this send the filename to your backend,
+     * load it into the main controls page, etc.
+     */
+    function selectDesign(filename) {
+        console.log(`Design selected: ${filename}`);
+        alert(`You selected: ${filename}\n\nYou can now hook this up to your backend.`);
+        
+        // Example: You could store this in localStorage
+        // localStorage.setItem('selectedDesign', filename);
+        
+        // Example: Or redirect to the main page
+        // window.location.href = `/?design=${filename}`;
+    }
+
+    /**
+     * Main function to fetch and display all designs.
+     */
+    async function loadDesignLibrary() {
+        const gridContainer = document.getElementById('designGridContainer');
+        if (!gridContainer) return;
+
+        try {
+            // --- 1. Get list of design files ---
+            // !!! IMPORTANT: This MUST be replaced with a real API call
+            // On your server, you need an endpoint (e.g., /api/designs)
+            // that returns a JSON list of your .txt filenames.
+            const designFiles = await fetchMockDesignList(); 
+            
+            // --- 2. Process each file ---
+            for (const filename of designFiles) {
+                // Create the card structure
+                const card = document.createElement('div');
+                card.className = 'design-card';
+                
+                // Canvas resolution. 400x400 is good for previews.
+                const canvasSize = 400; 
+                card.innerHTML = `
+                    <canvas id="canvas-${filename}" width="${canvasSize}" height="${canvasSize}"></canvas>
+                    <div class="card-content">
+                        <h3>${filename}</h3>
+                        <button onclick="selectDesign('${filename}')">Select</button>
+                    </div>
+                `;
+                gridContainer.appendChild(card);
+                
+                // --- 3. Load preview (PNG or generate from TXT) ---
+                // We run this *after* adding the card to the DOM
+                loadPreview(filename);
+            }
+            
+        } catch (error) {
+            console.error("Failed to load design library:", error);
+            gridContainer.innerHTML = "<p>Error loading design library. See console for details.</p>";
+        }
+    }
+    
+    /**
+     * Tries to load a .png preview. If it fails, generates one from .txt.
+     */
+    function loadPreview(filename) {
+        const canvas = document.getElementById(`canvas-${filename}`);
+        if (!canvas) return;
+        
+        const ctx = canvas.getContext('2d');
+        const baseName = filename.replace('.txt', '');
+        const pngPath = `/designs/${baseName}.png`; // Assumes /designs/ folder
+        const txtPath = `/designs/${baseName}.txt`; // Assumes /designs/ folder
+
+        // Try to load the .png first
+        const img = new Image();
+        img.src = pngPath;
+
+        img.onload = () => {
+            // --- SUCCESS: .png exists ---
+            // Draw the loaded image onto the canvas
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        };
+
+        img.onerror = () => {
+            // --- FAILURE: .png does NOT exist ---
+            // Time to generate it from the .txt file
+            console.log(`No .png found for ${filename}, generating from .txt...`);
+            
+            // Fetch the .txt file
+            fetch(txtPath)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`File not found: ${txtPath}`);
+                    }
+                    return response.text();
+                })
+                .then(commandText => {
+                    // Use the kinematic engine to get the trace path
+                    const tracePath = generateTracePathFromText(commandText);
+                    
+                    // Use the new drawing function to render it
+                    drawTraceOnCanvas(canvas, tracePath);
+                })
+                .catch(err => {
+                    console.error(`Failed to generate preview for ${filename}:`, err);
+                    // Draw an error message on the canvas
+                    ctx.fillStyle = 'white';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = 'red';
+                    ctx.font = '16px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('Error loading file', canvas.width / 2, canvas.height / 2);
+                });
+        };
+    }
+    
+    // ######################################################################
+    // ##  MOCK FUNCTIONS (Replace with your server logic)
+    // ######################################################################
+
+    /**
+     * MOCK: Simulates fetching the list of .txt files from your server.
+     * REPLACE this with a real `fetch('/api/designs')` call.
+     */
+    function fetchMockDesignList() {
+        console.warn("Using MOCK design list. Replace 'fetchMockDesignList' with a real API call.");
+        return Promise.resolve([
+            "spiral.txt",
+            "square.txt",
+            "star.txt",
+            "wave.txt",
+            "chaos.txt",
+            "missing_preview.txt" // This one will force a .txt load
+        ]);
+    }
+    
+    /**
+     * MOCK: Overriding `fetch` for this demo to provide fake .txt files.
+     * REMOVE this entire `window.fetch` block when you deploy.
+     * Your real server will handle requests for /designs/*.txt
+     */
+    const originalFetch = window.fetch;
+    window.fetch = function(url, options) {
+        const urlString = url.toString();
+        
+        // Mock data for .txt files
+        const mockTxtData = {
+            '/designs/spiral.txt': "G1 0 400 1000\nG1 0 800 1000\nG1 400 800 500\nG1 400 400 500\nG1 0 0 200",
+            '/designs/square.txt': "G1 2000 2000 500\nG1 -2000 2000 500\nG1 -2000 -2000 500\nG1 2000 -2000 500\nG1 2000 2000 500",
+            '/designs/star.txt': "G1 3000 0 500\nG1 -2427 1854 500\nG1 931 -2853 500\nG1 931 2853 500\nG1 -2427 -1854 500\nG1 3000 0 500",
+            '/designs/wave.txt': "G1 0 1000 500\nG1 500 1000 500\nG1 500 -1000 500\nG1 1000 -1000 500\nG1 1000 1000 500\nG1 1500 1000 500\nG1 1500 -1000 500",
+            '/designs/chaos.txt': "G1 1000 500 200\nG1 -500 1500 200\nG1 2000 -1000 200\nG1 -1500 -1000 200\nG1 500 2000 200\nG1 0 0 200",
+            '/designs/missing_preview.txt': "G1 0 400 1000\nG1 0 800 1000\nG1 400 800 500\nG1 400 400 500\nG1 0 0 200\nG1 -800 0 1000\nG1 -800 -800 1000\nG1 0 -800 500\nG1 0 0 200"
+        };
+        
+        if (mockTxtData[urlString]) {
+            return Promise.resolve(new Response(mockTxtData[urlString], { status: 200 }));
+        }
+
+        // For all other requests (like .png files), use the original fetch
+        // This will let them 404 naturally, triggering the .onerror logic
+        return originalFetch(url, options);
+    };
+
+
+    // --- Initialization ---
+    document.addEventListener('DOMContentLoaded', () => {
+        // Load theme from local storage
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.body.setAttribute('data-theme', savedTheme);
+        updateThemeIcon(savedTheme);
+
+        // Start loading the design library
+        loadDesignLibrary();
+    });
+</script>
+
+</body>
+</html>
