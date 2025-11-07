@@ -60,30 +60,68 @@
         color: var(--color-surface);
     }
 
+    /* --- Menu Button (UPDATED FOR FLOATING LOOK) --- */
     .openbtn {
-        font-size: 26px; cursor: pointer; background-color: var(--color-primary);
-        color: var(--color-text); padding: 10px 20px; border: none;
-        border-radius: 0 0 var(--border-radius) 0; position: fixed;
-        top: 0; left: 0; z-index: 1100; box-shadow: 0 2px 5px var(--color-shadow);
+        font-size: 26px; 
+        cursor: pointer; 
+        background-color: var(--color-surface); /* Card background for floating effect */
+        color: var(--color-text); 
+        padding: 8px 15px; /* Slightly adjusted padding */
+        border: 1px solid var(--color-shadow); /* Added a slight border */
+        border-radius: var(--border-radius); /* Rounded corners */
+        position: fixed;
+        top: 15px; /* Move down from top */
+        left: 15px; /* Move right from left */
+        z-index: 1200; 
+        box-shadow: 0 4px 8px var(--color-shadow); /* Added shadow for floating look */
+        transition: background-color 0.2s, box-shadow 0.2s, color 0.2s;
+        
+        /* Ensure the text is just the icon size */
+        line-height: 1; 
+        font-size: 20px; 
     }
-    
-    /* --- Theme Toggle Button (UPDATED) --- */
+    .openbtn:hover {
+        background-color: var(--color-background);
+    }
+    body[data-theme='dark'] .openbtn {
+        background-color: var(--color-surface);
+        border-color: #444;
+    }
+
+    /* --- Theme Toggle Button (UPDATED FOR FLOATING LOOK) --- */
     #themeToggle {
-        position: fixed; top: 15px; right: 15px; background: var(--color-surface);
-        color: var(--color-icon); border: 1px solid var(--color-icon);
-        /* NEW: Reduced padding */
-        padding: 6px 12px; 
-        border-radius: 20px; z-index: 1200;
+        position: fixed; 
+        top: 15px; 
+        right: 15px; 
+        background: var(--color-surface); /* Card background for floating effect */
+        color: var(--color-icon); 
+        border: 1px solid var(--color-shadow); /* Match the menu button border */
+        
+        /* Compact size, similar to the open button */
+        padding: 8px 12px; 
+        border-radius: var(--border-radius); 
+        z-index: 1200;
+        box-shadow: 0 4px 8px var(--color-shadow); /* Added shadow for floating look */
+        
         transition: background 0.3s, color 0.3s, border-color 0.3s;
         
-        /* NEW: Control the emoji size and line height */
+        /* Control the emoji size and line height */
         font-size: 14px;
         line-height: 1.2;
     }
+    #themeToggle:hover {
+        background-color: var(--color-background);
+    }
+    body[data-theme='dark'] #themeToggle {
+        border-color: #444;
+    }
     
     .main-content {
-        margin-left: 0; transition: margin-left 0.3s; padding: 20px;
-        max-width: 1200px; /* Wider for a grid */
+        /* Add padding at the top to clear the floating buttons */
+        margin-left: 0; 
+        transition: margin-left 0.3s; 
+        padding: 70px 20px 20px 20px; /* Increased top padding */
+        max-width: 1200px; 
         margin: 0 auto;
     }
 
@@ -202,6 +240,7 @@
     @media (max-width: 600px) {
         .main-content {
             padding: 10px;
+            padding-top: 60px; /* Ensure content is below floating buttons on small screens too */
         }
         .header-image {
             max-height: 120px;
@@ -218,6 +257,13 @@
         .design-card .card-content {
             padding: 15px;
         }
+        .openbtn, #themeToggle {
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            padding: 6px 10px;
+            font-size: 18px;
+        }
     }
 </style>
     
@@ -226,9 +272,9 @@
     <!-- Sidebar (Copied) -->
     <div id="mySidebar" class="sidebar">
         <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
-        <!-- UPDATED: Sidebar links now use absolute paths -->
-        <a href="/">Controls</a>
-        <a href="/designs">Designs</a> 
+        <!-- UPDATED: Sidebar links updated -->
+        <a href="/controls">Controls</a>
+        <a href="/">Designs</a> 
         <a href="/led_controls">Led Controls</a>
         <a href="/terminal">Terminal</a>
     </div>
@@ -241,7 +287,6 @@
 
     <!-- Main Content -->
     <div class="main-content">
-        <!-- UPDATED: Use a static path for the header image -->
         <img src="/static/sand.png" alt="Sand Table Header" class="header-image">
         <h1>Design Library</h1>
         
@@ -263,7 +308,6 @@
     
     /**
      * This builds the absolute base URL (e.g., "https://your-ngrok-url.com")
-     * This is the fix for the "Failed to parse URL" error.
      */
     const BASE_URL = `${window.location.protocol}//${window.location.host}`;
     
@@ -402,7 +446,8 @@
     function openNav() {
         document.getElementById("mySidebar").style.width = "200px";
         const main = document.querySelector(".main-content");
-        if (main) main.style.marginLeft = "200px";
+        // Only adjust margin if screen is wide enough to show the sidebar without covering content
+        if (window.innerWidth > 600 && main) main.style.marginLeft = "200px";
     }
 
     function closeNav() {
@@ -504,6 +549,7 @@
             const designFiles = await fetchDesignList(); 
             
             if (designFiles.length === 0) {
+                // This message now correctly means the server reported an empty folder
                 showStatusMessage("No designs found. Check the 'templates/designs' folder.", true);
                 return;
             }
@@ -560,7 +606,7 @@
             
             // UPDATED: Use the new BASE_URL
             fetch(txtPath)
-                .then(response => { // <-- FIXED TYPO HERE (was 'r(response =>')
+                .then(response => {
                     if (!response.ok) throw new Error(`File not found: ${txtPath}`);
                     return response.text();
                 })
