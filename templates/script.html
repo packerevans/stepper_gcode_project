@@ -10,34 +10,76 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 body {
-font-family: 'Inter', sans-serif;
+    font-family: 'Inter', sans-serif;
 }
 /* Style for the highlighted command in the list */
 .command-item.active {
-background-color: #3b82f6; /* bg-blue-600 */
-color: white;
+    background-color: #4f46e5; /* bg-indigo-600 */
+    color: white;
 }
 /* Ensure canvas is responsive and maintains aspect ratio */
 canvas {
-width: 100%;
-height: 100%;
-aspect-ratio: 1/1;
-display: block;
-border-radius: 0.5rem;
+    width: 100%;
+    height: 100%;
+    aspect-ratio: 1/1;
+    display: block;
+    border-radius: 0.5rem;
 }
 /* Custom scrollbar for logic editor */
 textarea {
-scrollbar-width: thin;
-scrollbar-color: #4b5563 #1f2937;
+    scrollbar-width: thin;
+    scrollbar-color: #4b5563 #1f2937;
 }
 /* Hide number input spinners */
 input[type=number]::-webkit-inner-spin-button,
 input[type=number]::-webkit-outer-spin-button {
--webkit-appearance: none;
-margin: 0;
+    -webkit-appearance: none;
+    margin: 0;
 }
 input[type=number] {
--moz-appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+/* --- NEW COLORS --- */
+
+/* Main Buttons: Indigo */
+#convertGCodeBtn {
+    background-color: #4f46e5; /* bg-indigo-600 */
+}
+#convertGCodeBtn:hover {
+    background-color: #4338ca; /* bg-indigo-700 */
+}
+#loadCommandsBtn {
+    background-color: #4f46e5; /* bg-indigo-600 */
+}
+#loadCommandsBtn:hover {
+    background-color: #4338ca; /* bg-indigo-700 */
+}
+#alert-modal button {
+    background-color: #4f46e5; /* bg-indigo-600 */
+}
+#alert-modal button:hover {
+    background-color: #4338ca; /* bg-indigo-700 */
+}
+
+/* Playback Buttons */
+#playBtn {
+    background-color: #0d9488; /* bg-teal-600 */
+}
+#playBtn:hover {
+    background-color: #0f766e; /* bg-teal-700 */
+}
+#playLoopBtn {
+    background-color: #4f46e5; /* bg-indigo-600 */
+}
+#playLoopBtn:hover {
+    background-color: #4338ca; /* bg-indigo-700 */
+}
+#pauseBtn {
+    background-color: #f97316; /* bg-orange-500 */
+}
+#pauseBtn:hover {
+    background-color: #ea580c; /* bg-orange-600 */
 }
 </style>
 </head>
@@ -78,7 +120,7 @@ G1 X203.2 Y0
                         <input type="number" id="smoothingSensitivity" value="0.000001" step="0.000001" class="w-full mt-1 p-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     </div>
                 </div>
-                <button id="convertGCodeBtn" class="w-full mt-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 shadow-md">
+                <button id="convertGCodeBtn" class="w-full mt-3 font-semibold py-2 px-4 rounded-lg transition duration-200 shadow-md">
                     Convert, Smooth & Load
                 </button>
             </div>
@@ -99,7 +141,7 @@ G1 0 0 200
 </textarea>
 </div>
 
-            <button id="loadCommandsBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 shadow-md">
+            <button id="loadCommandsBtn" class="w-full text-white font-semibold py-2 px-4 rounded-lg transition duration-200 shadow-md">
                 Load & Reset Simulation
             </button>
 
@@ -107,18 +149,19 @@ G1 0 0 200
             <div>
                 <label class="block text-sm font-medium text-gray-300 mb-2">Playback</label>
                 <div class="flex items-center gap-4 mb-2">
-                    <button id="playBtn" class="bg-green-600 hover:bg-green-700 text-white p-2 rounded-full disabled:opacity-50" title="Play">
+                    <button id="playBtn" class="text-white p-2 rounded-full disabled:opacity-50" title="Play">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8.002v3.996a1 1 0 001.555.832l3.197-1.998a1 1 0 000-1.664l-3.197-1.998z" clip-rule="evenodd" />
                         </svg>
                     </button>
                     
-                    <button id="playLoopBtn" class="bg-teal-600 hover:bg-teal-700 text-white p-2 rounded-full disabled:opacity-50" title="Play and Loop">
+                    <button id="playLoopBtn" class="text-white p-2 rounded-full disabled:opacity-50" title="Play and Loop">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.89.633A5.002 5.002 0 005.001 9.029V11a1 1 0 11-2 0V3a1 1 0 011-1zm12 14a1 1 0 01-1 1v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 111.89-.633A5.002 5.002 0 0014.999 10.97V9a1 1 0 112 0v8a1 1 0 01-1 1z" clip-rule="evenodd" />
                         </svg>
                     </button>
-                    <button id="pauseBtn" class="bg-yellow-600 hover:bg-yellow-700 text-white p-2 rounded-full" title="Pause">
+
+                    <button id="pauseBtn" class="text-white p-2 rounded-full" title="Pause">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 6a1 1 0 00-1 1v6a1 1 0 002 0V7a1 1 0 00-1-1zm2 0a1 1 0 00-1 1v6a1 1 0 002 0V7a1 1 0 00-1-1z" clip-rule="evenodd" />
                         </svg>
@@ -533,8 +576,7 @@ G1 0 0 200
          * Parses commands from the textarea, calculates all states, and resets the UI.
          */
         function loadCommands() {
-            pause();
-            isLooping = false; // Stop looping when new commands are loaded
+            pause(); // This now correctly stops looping
             
             // --- Step 1: Parse Commands ---
             const text = commandsInput.value;
@@ -675,7 +717,8 @@ G1 0 0 200
          * Jumps to a specific step, cancels animation, and draws the final state.
          */
         function drawState(index) {
-            pause(); // Stop any running animation
+            // *** MODIFIED: Only cancel animation, don't stop playback ***
+            cancelAnimation(); // Stop any in-progress tween
             currentStep = index;
             const state = cumulativeStates[index];
             if (!state) return;
@@ -772,7 +815,7 @@ G1 0 0 200
             ctx.beginPath();
             ctx.moveTo(p0.x, p0.y);
             ctx.lineTo(p1.x, p1.y);
-            ctx.strokeStyle = '#3b82f6'; // bg-blue-600
+            ctx.strokeStyle = '#6366f1'; // *** NEW COLOR ***
             ctx.lineWidth = armWidth;
             ctx.lineCap = 'round';
             ctx.stroke();
@@ -781,7 +824,7 @@ G1 0 0 200
             ctx.beginPath();
             ctx.moveTo(p1.x, p1.y);
             ctx.lineTo(p2.x, p2.y);
-            ctx.strokeStyle = '#10b981'; // bg-emerald-500
+            ctx.strokeStyle = '#06b6d4'; // *** NEW COLOR ***
             ctx.lineWidth = armWidth;
             ctx.lineCap = 'round';
             ctx.stroke();
@@ -796,7 +839,7 @@ G1 0 0 200
             ctx.fill();
             
             // End Effector
-            ctx.fillStyle = '#f87171'; // bg-red-400
+            ctx.fillStyle = '#f43f5e'; // *** NEW COLOR ***
             ctx.beginPath();
             ctx.arc(p2.x, p2.y, jointRadius, 0, 2 * Math.PI);
             ctx.fill();
@@ -854,13 +897,20 @@ G1 0 0 200
             playNextCommand();
         }
         
-        function pause() {
-            isAutoPlaying = false;
+        // --- *** MODIFIED PAUSE LOGIC *** ---
+        function cancelAnimation() {
             if (animationFrameId) {
                 cancelAnimationFrame(animationFrameId);
                 animationFrameId = null;
             }
         }
+        
+        function pause() {
+            isAutoPlaying = false;
+            isLooping = false; // Pause should stop playing AND looping
+            cancelAnimation();
+        }
+        // --- *** END MODIFIED PAUSE LOGIC *** ---
         
         // --- *** NEW FUNCTION HERE *** ---
         function playLoop() {
@@ -988,8 +1038,7 @@ G1 0 0 200
             modalText.textContent = message;
             
             const closeButton = document.createElement('button');
-            closeButton.className = 'w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200';
-            closeButton.textContent = 'OK';
+            closeButton.className = 'w-full text-white font-semibold py-2 px-4 rounded-lg transition duration-200';
             
             // Event listener for close button
             closeButton.onclick = () => {
