@@ -41,7 +41,7 @@
         transition: background 0.3s, color 0.3s;
     }
 
-    /* --- Sidebar & Header (Copied from your example) --- */
+    /* --- Sidebar & Header --- */
     .sidebar {
         height: 100%; width: 0; position: fixed; top: 0; left: 0;
         background-color: var(--color-primary); overflow-x: hidden;
@@ -60,64 +60,39 @@
         color: var(--color-surface);
     }
 
-    /* --- Menu Button (UPDATED FOR FLOATING LOOK) --- */
+    /* --- Button Positions FIX --- */
     .openbtn {
         font-size: 26px; cursor: pointer; background-color: var(--color-primary);
-        color: var(--color-text); padding: 10px 20px; border: none;
-        border-radius: 0 0 var(--border-radius) 0; position: fixed;
-        top: 0; left: 0; z-index: 1100; box-shadow: 0 2px 5px var(--color-shadow);
-    }
-        
-        /* Ensure the text is just the icon size */
-        line-height: 1; 
-        font-size: 20px; 
-    }
-    .openbtn:hover {
-        background-color: var(--color-background);
-    }
-    body[data-theme='dark'] .openbtn {
-        background-color: var(--color-surface);
-        border-color: #444;
+        color: var(--color-text); padding: 10px 18px; border: none;
+        border-radius: 6px; position: fixed;
+        top: 15px; left: 15px; z-index: 1100; box-shadow: 0 2px 5px var(--color-shadow);
+        transition: background-color 0.2s, box-shadow 0.2s;
+        /* Ensure it's not full width */
+        width: auto; height: auto;
     }
 
-    /* --- Theme Toggle Button (UPDATED FOR FLOATING LOOK) --- */
+    /* --- Theme Toggle Button FIX --- */
     #themeToggle {
         position: fixed; 
         top: 15px; 
         right: 15px; 
-        background: var(--color-surface); /* Card background for floating effect */
+        background: var(--color-surface);
         color: var(--color-icon); 
-        border: 1px solid var(--color-shadow); /* Match the menu button border */
-        
-        /* Compact size, similar to the open button */
-        padding: 8px 12px; 
-        border-radius: var(--border-radius); 
+        border: 1px solid var(--color-icon);
+        padding: 6px 12px; /* Smaller padding for a more compact look */
+        border-radius: 20px; 
         z-index: 1200;
-        box-shadow: 0 4px 8px var(--color-shadow); /* Added shadow for floating look */
-        
         transition: background 0.3s, color 0.3s, border-color 0.3s;
-        
-        /* Control the emoji size and line height */
-        font-size: 14px;
-        line-height: 1.2;
-    }
-       #themeToggle {
-        position: fixed; top: 15px; right: 15px; background: var(--color-surface);
-        color: var(--color-icon); border: 1px solid var(--color-icon);
-        padding: 8px 15px; border-radius: 20px; z-index: 1200;
-        transition: background 0.3s, color 0.3s, border-color 0.3s;
-    }
-    body[data-theme='dark'] #themeToggle {
-        border-color: #444;
+        /* Ensure emoji size is manageable */
+        font-size: 14px; 
     }
     
     .main-content {
-        /* Add padding at the top to clear the floating buttons */
-        margin-left: 0; 
-        transition: margin-left 0.3s; 
-        padding: 70px 20px 20px 20px; /* Increased top padding */
+        margin-left: 0; transition: margin-left 0.3s; padding: 20px;
         max-width: 1200px; 
         margin: 0 auto;
+        /* Add top margin to prevent content from hiding behind fixed buttons */
+        padding-top: 60px; 
     }
 
     h1 {
@@ -131,39 +106,53 @@
         box-shadow: 0 4px 15px var(--color-shadow);
     }
     
-    /* --- Status Message Bar --- */
-    .status-message {
-        padding: 15px 20px;
+    /* --- Control / Status Panel --- */
+    .control-panel {
+        background-color: var(--color-surface);
+        padding: 20px;
         border-radius: var(--border-radius);
-        margin-bottom: 24px;
-        font-weight: 600;
-        display: none; /* Hidden by default */
-        border: 2px solid;
+        box-shadow: 0 4px 10px var(--color-shadow);
+        margin-bottom: 30px;
+    }
+    
+    .action-buttons {
+        display: flex; 
+        justify-content: center; 
+        gap: 15px;
+        margin-top: 10px;
+    }
+
+    /* --- Status Banner --- */
+    #status-banner {
+        padding: 12px;
+        border-radius: var(--border-radius);
+        margin-bottom: 20px;
         text-align: center;
+        font-weight: 600;
+        transition: opacity 0.3s, background-color 0.3s, color 0.3s;
+        opacity: 0; /* Hidden by default */
+        min-height: 40px; /* Prevent layout shift when shown */
+        line-height: 1.5;
     }
     .status-success {
-        background: #e6f4e6;
-        color: #2e7d32;
-        border-color: #2e7d32;
+        background-color: #d4edda;
+        color: #155724;
     }
     .status-error {
-        background: #fde6e6;
-        color: #c62828;
-        border-color: #c62828;
+        background-color: #f8d7da;
+        color: #721c24;
     }
     body[data-theme='dark'] .status-success {
-        background: #2c3a2c;
-        color: #a5d6a7;
-        border-color: #a5d6a7;
+        background-color: #14521f;
+        color: #d4edda;
     }
     body[data-theme='dark'] .status-error {
-        background: #3a2c2c;
-        color: #ef9a9a;
-        border-color: #ef9a9a;
+        background-color: #630c17;
+        color: #f8d7da;
     }
-    /* --- End Status Message --- */
 
-    /* --- Design Grid Styles --- */
+
+    /* --- NEW: Design Grid Styles --- */
     .design-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -208,15 +197,15 @@
         text-overflow: ellipsis;
     }
 
-    /* --- Button Style (Copied) --- */
+    /* --- Button Style --- */
     button {
         background-color: var(--color-primary);    
         color: var(--color-text);
         border: none; padding: 12px 25px; border-radius: 8px; font-size: 16px;
-        cursor: pointer; transition: background-color 0.2s, box-shadow 0.2s, opacity 0.2s;
+        cursor: pointer; transition: background-color 0.2s, box-shadow 0.2s;
         font-weight: 600;
-        width: 100%;
-        margin-top: auto; /* Pushes button to the bottom */
+        width: 100%; /* Default width for card buttons */
+        margin-top: auto; 
     }
 
     button:hover {
@@ -224,24 +213,22 @@
         box-shadow: 0 2px 8px var(--color-shadow);
     }
     
-    /* --- Disabled button style --- */
-    button:disabled {
-        background-color: var(--color-secondary);
-        opacity: 0.6;
-        cursor: not-allowed;
+    .action-buttons button {
+         width: auto; /* Override to allow inline buttons */
+         flex-grow: 1;
     }
     
-    /* --- Mobile Responsiveness (Copied) --- */
+    /* --- Mobile Responsiveness --- */
     @media (max-width: 600px) {
         .main-content {
             padding: 10px;
-            padding-top: 60px; /* Ensure content is below floating buttons on small screens too */
+            padding-top: 50px; /* Adjust for mobile fixed buttons */
         }
         .header-image {
             max-height: 120px;
             margin-bottom: 15px;
         }
-        h1, h2 {
+        h1 {
             font-size: 1.5em;
             margin-bottom: 15px;
         }
@@ -252,26 +239,39 @@
         .design-card .card-content {
             padding: 15px;
         }
+        .action-buttons {
+            flex-direction: column;
+        }
         .openbtn, #themeToggle {
             top: 10px;
+            /* Adjust spacing on small screens */
             left: 10px;
             right: 10px;
-            padding: 6px 10px;
-            font-size: 18px;
+        }
+        .openbtn {
+            left: 10px;
+            right: auto;
+        }
+        #themeToggle {
+            right: 10px;
+            left: auto;
         }
     }
 </style>
     
 </head>
 <body data-theme="light">
+    <!-- Sidebar -->
     <div id="mySidebar" class="sidebar">
         <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
-        <a href="/controls">Controls</a>
+        <!-- UPDATED: Links swapped as Designs is now / -->
         <a href="/">Designs</a> 
+        <a href="/controls">Controls</a>
         <a href="/led_controls">Led Controls</a>
         <a href="/terminal">Terminal</a>
     </div>
 
+    <!-- Header Buttons -->
     <button class="openbtn" onclick="openNav()">☰</button>
     <button id="themeToggle" onclick="toggleDarkMode()">
         <span id="themeIcon">☀️</span>
@@ -282,61 +282,77 @@
         <img src="/static/sand.png" alt="Sand Table Header" class="header-image">
         <h1>Design Library</h1>
         
-        <!-- Status message placeholder -->
-        <div id="statusMessage" class="status-message"></div>
+        <!-- NEW: Status Banner -->
+        <div id="status-banner"></div>
 
+        <!-- NEW: Control Panel -->
+        <div class="control-panel">
+            <h2>Queue Management</h2>
+            <div class="action-buttons">
+                <button onclick="clearQueue()">Clear Queue</button>
+                <button onclick="pauseDesign()">PAUSE</button>
+                <button onclick="resumeDesign()">RESUME</button>
+            </div>
+        </div>
+
+        <!-- Design Grid -->
         <div id="designGridContainer" class="design-grid">
-            <!-- 
-              Design cards will be inserted here dynamically by JavaScript
-              after it fetches the list from /api/designs
-            -->
+            <div id="loading-indicator">Loading designs...</div>
+            <div id="error-message" class="card" style="display:none; text-align:center;">
+                No designs found. Check the 'templates/designs' folder.
+            </div>
         </div>
     </div>
 
 <script>
-    // ######################################################################
-    // ##  START: NEW BASE_URL VARIABLE
-    // ######################################################################
-    
-    /**
-     * This builds the absolute base URL (e.g., "https://your-ngrok-url.com")
-     */
+    // --- Configuration ---
+    // Get the base URL dynamically to handle various deployment environments (like ngrok/blob)
     const BASE_URL = `${window.location.protocol}//${window.location.host}`;
-    
+
     // ######################################################################
-    // ##  START: KINEMATIC SIMULATOR LOGIC (Unchanged)
+    // ##  START: KINEMATIC SIMULATOR LOGIC (Used for generating previews)
     // ######################################################################
 
-    // --- Simulation Constants ---
-    const L1 = 101.3;
-    const L2 = 101.3;
-    const GEAR_RATIO = 9 / 8;
+    const L1 = 101.3; 
+    const L2 = 101.3; 
+    const GEAR_RATIO = 9 / 8; 
     const STEPS_PER_DEG = 3200 / 360;
     const STEPS_PER_RAD = STEPS_PER_DEG * (180 / Math.PI);
 
-    function generateTracePathFromText(commandText) {
-        const commands = commandText.split('\n')
-            .filter(line => line.trim().startsWith('G1'))
-            .map(line => {
-                const parts = line.trim().substring(2).trim().split(/\s+/).map(s => parseInt(s.trim(), 10));
-                return { 
-                    elbow: parts[0] || 0, 
-                    base: parts[1] || 0, 
-                    step_delay_us: parts[2] !== undefined ? parts[2] : 1000 
-                };
-            });
-        if (commands.length === 0) return [];
-        const cumulativeStates = calculateAllStates(commands);
-        const tracePath = calculateTracePath(cumulativeStates);
-        return tracePath;
+    const lerp = (a, b, t) => a + (b - a) * t;
+
+    function calculateFK(p0, base_steps, elbow_steps) {
+        const alpha_rad = -base_steps / STEPS_PER_RAD;
+        const beta_rad = -elbow_steps / STEPS_PER_RAD;  
+        const theta1 = alpha_rad;
+        const theta_bend = beta_rad - (GEAR_RATIO * alpha_rad);
+        const theta2_global = theta1 + theta_bend;
+
+        const p1 = { x: p0.x + L1 * Math.cos(theta1), y: p0.y + L1 * Math.sin(theta1) };
+        const p2 = { x: p1.x + L2 * Math.cos(theta2_global), y: p1.y + L2 * Math.sin(theta2_global) };
+
+        return { p0, p1, p2, target_base_steps: base_steps, target_elbow_steps: elbow_steps, theta1_rad: theta1, theta_bend_rad: theta_bend, theta2_global_rad: theta2_global };
     }
 
+    function getInterpolatedState(from, to, progress) {
+        const theta1_rad = lerp(from.theta1_rad, to.theta1_rad, progress);
+        const theta_bend_rad = lerp(from.theta_bend_rad, to.theta_bend_rad, progress);
+        const theta2_global_rad = lerp(from.theta2_global_rad, to.theta2_global_rad, progress);
+
+        const p0 = from.p0;
+        const p1 = { x: p0.x + L1 * Math.cos(theta1_rad), y: p0.y + L1 * Math.sin(theta1_rad) };
+        const p2 = { x: p1.x + L2 * Math.cos(theta2_global_rad), y: p1.y + L2 * Math.sin(theta2_global_rad) };
+        return { p0, p1, p2 };
+    }
+    
     function calculateAllStates(commands) {
         let cumulativeStates = [];
         let total_base_steps = 0;
         let total_elbow_steps = 0;
-        const p0 = { x: 0, y: 0 };
+        const p0 = { x: 0, y: 0 }; 
+
         cumulativeStates.push(calculateFK(p0, 0, 0));
+
         for (const cmd of commands) {
             total_base_steps += cmd.base;
             total_elbow_steps += cmd.elbow;
@@ -348,15 +364,20 @@
 
     function calculateTracePath(cumulativeStates) {
         let tracePath = [];
-        if (cumulativeStates.length < 2) return;
+        if (cumulativeStates.length < 2) return [];
+        
         tracePath.push(cumulativeStates[0].p2); 
+
         for (let i = 0; i < cumulativeStates.length - 1; i++) {
             const fromState = cumulativeStates[i];
             const toState = cumulativeStates[i+1];
+
             const base_delta = Math.abs(toState.target_base_steps - fromState.target_base_steps);
             const elbow_delta = Math.abs(toState.target_elbow_steps - fromState.target_elbow_steps);
             const max_step_delta = Math.max(base_delta, elbow_delta);
+
             const stepsPerSegment = Math.max(20, Math.ceil(max_step_delta / 100));
+
             for (let j = 1; j <= stepsPerSegment; j++) {
                 const progress = j / stepsPerSegment;
                 const interpolatedState = getInterpolatedState(fromState, toState, progress);
@@ -366,61 +387,77 @@
         return tracePath;
     }
 
-    function calculateFK(p0, base_steps, elbow_steps) {
-        const alpha_rad = -base_steps / STEPS_PER_RAD;
-        const beta_rad = -elbow_steps / STEPS_PER_RAD;  
-        const theta1 = alpha_rad;
-        const theta_bend = beta_rad - (GEAR_RATIO * alpha_rad);
-        const theta2_global = theta1 + theta_bend;
-        const p1 = { x: p0.x + L1 * Math.cos(theta1), y: p0.y + L1 * Math.sin(theta1) };
-        const p2 = { x: p1.x + L2 * Math.cos(theta2_global), y: p1.y + L2 * Math.sin(theta2_global) };
-        return { p0, p1, p2, target_base_steps: base_steps, target_elbow_steps: elbow_steps, theta1_rad: theta1, theta_bend_rad: theta_bend, theta2_global_rad: theta2_global };
+    function generateTracePathFromText(commandText) {
+        const commands = commandText.split('\n')
+            .filter(line => line.trim().toUpperCase().startsWith('G1'))
+            .map(line => {
+                const parts = line.trim().substring(2).trim().split(/\s+/).map(s => parseInt(s.trim(), 10));
+                return { 
+                    elbow: parts[0] || 0, 
+                    base: parts[1] || 0, 
+                    step_delay_us: parts[2] !== undefined ? parts[2] : 1000 
+                };
+            });
+
+        if (commands.length === 0) return [];
+
+        const cumulativeStates = calculateAllStates(commands);
+        return calculateTracePath(cumulativeStates);
     }
-
-    const lerp = (a, b, t) => a + (b - a) * t;
-
-    function getInterpolatedState(from, to, progress) {
-        const theta1_rad = lerp(from.theta1_rad, to.theta1_rad, progress);
-        const theta_bend_rad = lerp(from.theta_bend_rad, to.theta_bend_rad, progress);
-        const theta2_global_rad = lerp(from.theta2_global_rad, to.theta2_global_rad, progress);
-        const p0 = from.p0;
-        const p1 = { x: p0.x + L1 * Math.cos(theta1_rad), y: p0.y + L1 * Math.sin(theta1_rad) };
-        const p2 = { x: p1.x + L2 * Math.cos(theta2_global_rad), y: p1.y + L2 * Math.sin(theta2_global_rad) };
-        return { p0, p1, p2 };
-    }
-
+    
     function drawTraceOnCanvas(canvas, tracePath) {
         const ctx = canvas.getContext('2d');
         const width = canvas.width;
         const height = canvas.height;
+
         ctx.fillStyle = 'white';
         ctx.fillRect(0, 0, width, height);
+
         if (tracePath.length < 2) return;
+
         let minX = tracePath[0].x, maxX = tracePath[0].x;
         let minY = tracePath[0].y, maxY = tracePath[0].y;
+        
         for (const p of tracePath) {
-            if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
-            if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+            if (p.x < minX) minX = p.x;
+            if (p.x > maxX) maxX = p.x;
+            if (p.y < minY) minY = p.y;
+            if (p.y > maxY) maxY = p.y;
         }
+
         const drawingWidth = (maxX - minX) || 1;
         const drawingHeight = (maxY - minY) || 1;
+        
         const padding = 0.1;
-        const scale = Math.min(width / drawingWidth, height / drawingHeight) * (1 - padding);
+        const scale = Math.min(
+            width / drawingWidth,
+            height / drawingHeight
+        ) * (1 - padding);
+
         const drawCenterX = (minX + maxX) / 2;
         const drawCenterY = (minY + maxY) / 2;
+        
         const canvasCenterX = width / 2;
         const canvasCenterY = height / 2;
+
         ctx.beginPath();
         ctx.strokeStyle = 'black';
         ctx.lineWidth = 2;
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
+
         for (let i = 0; i < tracePath.length; i++) {
             const p = tracePath[i];
+            
             const canvasX = canvasCenterX + (p.x - drawCenterX) * scale;
+            // Invert Y axis for drawing
             const canvasY = canvasCenterY + (p.y - drawCenterY) * -scale; 
-            if (i === 0) ctx.moveTo(canvasX, canvasY);
-            else ctx.lineTo(canvasX, canvasY);
+
+            if (i === 0) {
+                ctx.moveTo(canvasX, canvasY);
+            } else {
+                ctx.lineTo(canvasX, canvasY);
+            }
         }
         ctx.stroke();
     }
@@ -431,15 +468,211 @@
 
 
     // ######################################################################
-    // ##  START: PAGE UI & FETCH LOGIC (UPDATED)
+    // ##  START: PAGE UI & FETCH LOGIC
     // ######################################################################
 
+    const statusBanner = document.getElementById('status-banner');
+
+    // --- Utility Functions ---
+
+    function showStatus(message, isSuccess = true) {
+        statusBanner.textContent = message;
+        statusBanner.className = isSuccess ? 'status-success' : 'status-error';
+        statusBanner.style.opacity = '1';
+
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+            statusBanner.style.opacity = '0';
+        }, 5000);
+    }
+    
+    function sendCommand(cmd, successMessage = "Command sent.") {
+        fetch(`${BASE_URL}/send`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ command: cmd })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showStatus(successMessage, true);
+            } else {
+                showStatus(`Failed: ${data.error || 'Unknown server error.'}`, false);
+            }
+        })
+        .catch(error => {
+            showStatus(`Network Error: ${error.message}`, false);
+        });
+    }
+
+    // --- Queue Management Buttons ---
+    function clearQueue() {
+        sendCommand('CLEAR', 'Command queue cleared.');
+    }
+
+    function pauseDesign() {
+        sendCommand('PAUSE', 'Sand table paused.');
+    }
+
+    function resumeDesign() {
+        sendCommand('RESUME', 'Sand table resumed.');
+    }
+
+    // --- Design Execution ---
+    async function runDesign(filename) {
+        const baseName = filename.replace('.txt', '');
+        const txtPath = `${BASE_URL}/designs/${baseName}.txt`;
+        
+        showStatus(`Fetching commands for ${filename}...`, true);
+
+        try {
+            // 1. Fetch the G-code content
+            const response = await fetch(txtPath);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch file. Status: ${response.status}`);
+            }
+            const gcode = await response.text();
+
+            // 2. Send the entire block to the server's handshaking endpoint
+            const sendResponse = await fetch(`${BASE_URL}/send_gcode_block`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ gcode: gcode })
+            });
+
+            const sendData = await sendResponse.json();
+            
+            if (sendData.success) {
+                showStatus(`Successfully started design: ${filename}. (Handshaking enabled)`, true);
+            } else {
+                showStatus(`Failed to start job: ${sendData.error || 'Unknown server error.'}`, false);
+            }
+
+        } catch (error) {
+            showStatus(`Error running design: ${filename} (${error.message})`, false);
+        }
+    }
+
+    /**
+     * Tries to load a .png preview. If it fails, generates one from .txt.
+     */
+    function loadPreview(filename) {
+        const canvas = document.getElementById(`canvas-${filename}`);
+        if (!canvas) return;
+        
+        const ctx = canvas.getContext('2d');
+        const baseName = filename.replace('.txt', '');
+        
+        // Use the absolute paths
+        const pngPath = `${BASE_URL}/designs/${baseName}.png`; 
+        const txtPath = `${BASE_URL}/designs/${baseName}.txt`; 
+
+        // Draw white background initially
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // 1. Try to load the .png first
+        const img = new Image();
+        img.src = pngPath;
+
+        img.onload = () => {
+            // SUCCESS: Draw the loaded image onto the canvas
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        };
+
+        img.onerror = () => {
+            // FAILURE: Generate from .txt file
+            fetch(txtPath)
+                .then(response => {
+                    if (!response.ok) {
+                        // If we can't get the file, log and draw a generic error
+                        throw new Error(`File not found: ${txtPath}`);
+                    }
+                    return response.text();
+                })
+                .then(commandText => {
+                    // Generate and render the trace
+                    const tracePath = generateTracePathFromText(commandText);
+                    drawTraceOnCanvas(canvas, tracePath);
+                })
+                .catch(err => {
+                    console.error(`Failed to generate preview for ${filename}:`, err);
+                    // Draw an error message on the canvas
+                    ctx.fillStyle = 'white';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = 'red';
+                    ctx.font = '16px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('Error', canvas.width / 2, canvas.height / 2 - 10);
+                    ctx.fillText('File Missing', canvas.width / 2, canvas.height / 2 + 10);
+                });
+        };
+    }
+    
+    /**
+     * Main function to fetch the list of designs from the server.
+     */
+    async function fetchDesignList() {
+        // Fetch the list from the new API endpoint
+        const response = await fetch(`${BASE_URL}/api/designs`);
+        
+        if (!response.ok) {
+            throw new Error(`Server status: ${response.status}`);
+        }
+        return response.json();
+    }
+
+    /**
+     * Loads the entire design library grid.
+     */
+    async function loadDesignLibrary() {
+        const gridContainer = document.getElementById('designGridContainer');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const errorMessage = document.getElementById('error-message');
+        
+        loadingIndicator.style.display = 'block';
+        errorMessage.style.display = 'none';
+        gridContainer.innerHTML = ''; 
+
+        try {
+            const designFiles = await fetchDesignList();
+            
+            if (designFiles.length === 0) {
+                errorMessage.style.display = 'block';
+                return;
+            }
+
+            for (const filename of designFiles) {
+                const card = document.createElement('div');
+                card.className = 'design-card';
+                
+                const canvasSize = 400; 
+                card.innerHTML = `
+                    <canvas id="canvas-${filename}" width="${canvasSize}" height="${canvasSize}"></canvas>
+                    <div class="card-content">
+                        <h3>${filename}</h3>
+                        <button onclick="runDesign('${filename}')">Run Design</button>
+                    </div>
+                `;
+                gridContainer.appendChild(card);
+                
+                loadPreview(filename);
+            }
+            
+        } catch (error) {
+            console.error("Failed to fetch design list:", error);
+            errorMessage.style.display = 'block';
+            errorMessage.innerHTML = `<p>Error fetching designs: ${error.message}. Is your server running?</p>`;
+        } finally {
+             loadingIndicator.style.display = 'none';
+        }
+    }
+    
     // --- Sidebar Functions (Copied) ---
     function openNav() {
         document.getElementById("mySidebar").style.width = "200px";
         const main = document.querySelector(".main-content");
-        // Only adjust margin if screen is wide enough to show the sidebar without covering content
-        if (window.innerWidth > 600 && main) main.style.marginLeft = "200px";
+        if (main) main.style.marginLeft = "200px";
     }
 
     function closeNav() {
@@ -457,201 +690,21 @@
         const body = document.body;
         const currentTheme = body.getAttribute('data-theme');
         const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        
         body.setAttribute('data-theme', newTheme);
         localStorage.setItem('theme', newTheme);
         updateThemeIcon(newTheme);
     }
-    
-    /**
-     * Displays a status message at the top of the grid.
-     */
-    function showStatusMessage(message, isError = false) {
-        const statusEl = document.getElementById('statusMessage');
-        if (!statusEl) return;
 
-        statusEl.textContent = message;
-        statusEl.className = isError ? 'status-message status-error' : 'status-message status-success';
-        statusEl.style.display = 'block'; // Make it visible
 
-        // Hide it after 5 seconds
-        setTimeout(() => {
-            statusEl.style.display = 'none';
-        }, 5000);
-    }
-
-    /**
-     * This function now sends the G-code to your server.
-     * It's called by the "Run Design" button.
-     */
-    async function runDesign(filename, buttonElement) {
-        // 1. Disable button to prevent double-clicks
-        buttonElement.disabled = true;
-        buttonElement.textContent = 'Sending...';
-
-        // UPDATED: Use the new BASE_URL
-        const txtPath = `${BASE_URL}/designs/${filename}`;
-
-        try {
-            // 2. Fetch the .txt file content from the server
-            const response = await fetch(txtPath);
-            if (!response.ok) {
-                throw new Error(`File not found: ${filename}. Check server logs.`);
-            }
-            const gcodeBlock = await response.text();
-
-            // 3. Send the G-code block to your server's auto-drip endpoint
-            // UPDATED: Use the new BASE_URL
-            const apiResponse = await fetch(`${BASE_URL}/send_gcode_block`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ gcode: gcodeBlock })
-            });
-
-            const result = await apiResponse.json();
-
-            if (!apiResponse.ok || result.success === false) {
-                // This error is from your app.py (e.g., "Arduino not connected.")
-                throw new Error(result.error || "Failed to send block to server.");
-            }
-
-            // 4. Show success message
-            showStatusMessage(`Successfully sent "${filename}" to the sand table. It is now running.`);
-
-        } catch (error) {
-            // 5. Show error message
-            console.error("Error running design:", error);
-            showStatusMessage(`Error: ${error.message}`, true);
-        } finally {
-            // 6. Re-enable the button, whether it succeeded or failed
-            buttonElement.disabled = false;
-            buttonElement.textContent = 'Run Design';
-        }
-    }
-
-    /**
-     * Main function to fetch and display all designs.
-     */
-    async function loadDesignLibrary() {
-        const gridContainer = document.getElementById('designGridContainer');
-        if (!gridContainer) return;
-
-        try {
-            // --- 1. Get list of design files ---
-            // This is NO LONGER A MOCK. It calls /api/designs.
-            const designFiles = await fetchDesignList(); 
-            
-            if (designFiles.length === 0) {
-                // This message now correctly means the server reported an empty folder
-                showStatusMessage("No designs found. Check the 'templates/designs' folder.", true);
-                return;
-            }
-
-            // --- 2. Process each file ---
-            for (const filename of designFiles) {
-                const card = document.createElement('div');
-                card.className = 'design-card';
-                
-                const canvasSize = 400; 
-                
-                card.innerHTML = `
-                    <canvas id="canvas-${filename}" width="${canvasSize}" height="${canvasSize}"></canvas>
-                    <div class="card-content">
-                        <h3>${filename}</h3>
-                        <button onclick="runDesign('${filename}', this)">Run Design</button>
-                    </div>
-                `;
-                gridContainer.appendChild(card);
-                
-                // --- 3. Load preview (PNG or generate from TXT) ---
-                loadPreview(filename);
-            }
-            
-        } catch (error) {
-            console.error("Failed to load design library:", error);
-            gridContainer.innerHTML = `<p>Error loading design library: ${error.message}</p>`;
-        }
-    }
-    
-    /**
-     * Tries to load a .png preview. If it fails, generates one from .txt.
-     */
-    function loadPreview(filename) {
-        const canvas = document.getElementById(`canvas-${filename}`);
-        if (!canvas) return;
-        
-        const ctx = canvas.getContext('2d');
-        const baseName = filename.replace('.txt', '');
-        
-        // UPDATED: Use the new BASE_URL
-        const pngPath = `${BASE_URL}/designs/${baseName}.png`;
-        const txtPath = `${BASE_URL}/designs/${baseName}.txt`;
-
-        const img = new Image();
-        img.src = pngPath;
-
-        img.onload = () => {
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        };
-
-        img.onerror = () => {
-            console.log(`No .png found for ${filename}, generating from .txt...`);
-            
-            // UPDATED: Use the new BASE_URL
-            fetch(txtPath)
-                .then(response => {
-                    if (!response.ok) throw new Error(`File not found: ${txtPath}`);
-                    return response.text();
-                })
-                .then(commandText => {
-                    const tracePath = generateTracePathFromText(commandText);
-                    drawTraceOnCanvas(canvas, tracePath);
-                })
-                .catch(err => {
-                    console.error(`Failed to generate preview for ${filename}:`, err);
-                    ctx.fillStyle = 'white';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    ctx.fillStyle = 'red';
-                    ctx.font = '16px sans-serif';
-                    ctx.textAlign = 'center';
-                    ctx.fillText('Error loading file', canvas.width / 2, canvas.height / 2);
-                });
-        };
-    }
-    
-    // ######################################################################
-    // ##  START: REAL (NO LONGER MOCK) FUNCTIONS
-    // ######################################################################
-
-    /**
-     * Fetches the list of .txt files from the server's /api/designs endpoint.
-     */
-    async function fetchDesignList() {
-        console.log(`Fetching real design list from ${BASE_URL}/api/designs...`);
-        try {
-            // UPDATED: Use the new BASE_URL
-            const response = await fetch(`${BASE_URL}/api/designs`);
-            if (!response.ok) {
-                throw new Error('Server responded with an error.');
-            }
-            const data = await response.json();
-            if (data.error) {
-                 throw new Error(data.error);
-            }
-            return data;
-        } catch (error) {
-            console.error("Failed to fetch design list:", error);
-            showStatusMessage("Error: Could not load design list from server.", true);
-            return []; // Return an empty list to prevent crashes
-        }
-    }
-    
     // --- Initialization ---
     document.addEventListener('DOMContentLoaded', () => {
+        // Load theme from local storage
         const savedTheme = localStorage.getItem('theme') || 'light';
         document.body.setAttribute('data-theme', savedTheme);
         updateThemeIcon(savedTheme);
 
-        // Start loading the design library from the server
+        // Start loading the design library
         loadDesignLibrary();
     });
 </script>
