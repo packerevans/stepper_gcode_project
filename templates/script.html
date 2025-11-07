@@ -120,7 +120,7 @@ G1 X203.2 Y0
                         <input type="number" id="smoothingSensitivity" value="0.000001" step="0.000001" class="w-full mt-1 p-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     </div>
                 </div>
-                <button id="convertGCodeBtn" class="w-full mt-3 font-semibold py-2 px-4 rounded-lg transition duration-200 shadow-md">
+                <button id="convertGCodeBtn" class="w-full font-semibold py-2 px-4 rounded-lg transition duration-200 shadow-md">
                     Convert, Smooth & Load
                 </button>
             </div>
@@ -149,7 +149,7 @@ G1 0 0 200
             <div>
                 <label class="block text-sm font-medium text-gray-300 mb-2">Playback</label>
                 <div class="flex items-center gap-4 mb-2">
-                    <button id="playBtn" class="text-white p-2 rounded-full disabled:opacity-50" title="Play">
+                    <button id="playBtn" class="text-white p-2 rounded-full disabled:opacity-50" title="Step Forward">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8.002v3.996a1 1 0 001.555.832l3.197-1.998a1 1 0 000-1.664l-3.197-1.998z" clip-rule="evenodd" />
                         </svg>
@@ -244,8 +244,8 @@ G1 0 0 200
                 handleSliderInput(e);
             });
             playBtn.addEventListener('click', () => {
-                isLooping = false; // Just play, don't loop
-                play();
+                isLooping = false; 
+                playFrame(); // *** CHANGED: This is now "Step Forward" ***
             });
             pauseBtn.addEventListener('click', () => {
                 isLooping = false; // Stop looping on pause
@@ -493,7 +493,6 @@ G1 0 0 200
 
         /**
          * Inverse Kinematics: Calculates arm motor steps from (X, Y) position.
-         * *** UPDATED: Now returns clamped_x and clamped_y ***
          */
         function calculateIK(x, y, last_base_steps = 0) {
             let D = Math.hypot(x, y);
@@ -534,22 +533,12 @@ G1 0 0 200
                 const k2 = L2 * Math.sin(theta_bend);
                 
                 // Use *clamped* x and y for angle
-                // [This was the original line, now calculating a 'raw' angle]
                 let raw_theta1 = Math.atan2(clamped_y, clamped_x) - Math.atan2(k2, k1);
 
                 // --- START BUG FIX: Angle Unwrapping ---
-                // We use the last_base_steps (which we are already tracking)
-                // to find the previous angle.
                 const last_theta1 = -last_base_steps / STEPS_PER_RAD;
-
-                // Calculate the difference in full rotations (2*PI)
                 let rotation_diff = (raw_theta1 - last_theta1) / (2 * Math.PI);
-
-                // Find the nearest integer rotation (e.g., 0, -1, 1)
                 let nearest_rotation_offset = Math.round(rotation_diff);
-
-                // Apply this offset to the raw angle to get the "unwrapped" angle.
-                // This finds the version of raw_theta1 that is closest to last_theta1.
                 theta1 = raw_theta1 - (nearest_rotation_offset * 2 * Math.PI);
                 // --- END BUG FIX ---
             }
@@ -711,6 +700,19 @@ G1 0 0 200
             pause();
             const newStep = parseInt(e.target.value, 10);
             drawState(newStep); // Jump to the selected state
+        }
+        
+        // --- *** NEW "STEP FORWARD" FUNCTION *** ---
+        function playFrame() {
+            if (isAutoPlaying) {
+                pause(); // Stop any looping playback
+            }
+            isLooping = false;
+            
+            if (currentStep < cumulativeStates.length - 1) {
+                currentStep++;
+                drawState(currentStep);
+            }
         }
         
         /**
@@ -884,7 +886,8 @@ G1 0 0 200
         
         // --- Playback Controls ---
 
-        function play() {
+        // *** RENAMED ***
+        function playFullAnimation() {
             if (isAutoPlaying) return;
             
             // If at the end, reset to start
@@ -920,7 +923,7 @@ G1 0 0 200
             isLooping = true;
             currentStep = 0; // Always start from 0
             drawState(0);
-            play(); // Use the existing play logic to start
+            playFullAnimation(); // *** CHANGED ***
         }
         // --- *** END NEW FUNCTION *** ---
 
@@ -942,7 +945,7 @@ G1 0 0 200
                     
                     // We need to call play() to restart the animation process,
                     // but with a tiny delay to let the browser render the drawState.
-                    setTimeout(play, 50); // 50ms delay before looping
+                    setTimeout(playFullAnimation, 50); // *** CHANGED ***
                     return; // Stop this thread, the setTimeout will start a new one
                     // --- END LOOPING LOGIC ---
                 } else {
