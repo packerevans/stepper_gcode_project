@@ -99,19 +99,24 @@ class GCodeRunner(threading.Thread):
         global current_gcode_runner
         current_gcode_runner = self
         num_commands = len(self.lines)
-        log_message(f"Received G-code block with {num_commands} commands. Starting 2-command priming...")
+        # *** CHANGED: Increased priming count to 4 (queue size is 10) ***
+        PRIME_COUNT = 4 
+        log_message(f"Received G-code block with {num_commands} commands. Starting {PRIME_COUNT}-command priming...")
 
-        # 1. INITIAL: Send the first two commands immediately
-        for _ in range(2):
+        # 1. INITIAL: Send the first four commands immediately, with a small delay between each.
+        for _ in range(PRIME_COUNT):
             if self.is_running and self.line_index < num_commands:
                 self.send_line(self.lines[self.line_index])
-                # Small pause after initial burst to let Arduino catch up
-                time.sleep(0.01) 
+                # Small delay to allow the Arduino queueing process to keep up
+                time.sleep(0.05) 
             else:
-                break # Not enough commands or error occurred
+                break 
+        
+        # *** NEW: Critical pause after priming to allow the Arduino to start executing the first command and send "Done" ***
+        if self.is_running and self.line_index > 0:
+            time.sleep(0.1) # Wait 100ms before entering handshake loop
 
         # 2. DRIP: Wait for 'Done' signal before sending the next command
-        # Start at index 2 (the third command) since the first two were primed.
         while self.is_running and self.line_index < num_commands:
             
             # Wait up to 10 seconds for the 'Done' signal
