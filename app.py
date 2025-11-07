@@ -129,6 +129,12 @@ def reboot():
     
 @app.route("/")
 def index():
+    # UPDATED: This is now the default page
+    return render_template("designs.html")
+
+# NEW: This is the new route for your old controls page
+@app.route("/controls")
+def controls():
     if not arduino_connected:
         return render_template("connect.html")
     return render_template("index.html")
@@ -149,6 +155,7 @@ def script():
 
 @app.route("/designs")
 def designs():
+    # This route just points to the new default page
     return render_template("designs.html")
 
 # --- ROUTE TO SERVE THE .txt AND .png FILES ---
