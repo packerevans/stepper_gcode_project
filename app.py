@@ -148,7 +148,7 @@ def script():
     return render_template("script.html")
 
 @app.route("/designs")
-def script():
+def designs():
     return render_template("designs.html")
 
 # --- G-CODE BLOCK FUNCTIONALITY ---
