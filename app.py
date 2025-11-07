@@ -150,11 +150,11 @@ def script():
 @app.route("/designs")
 def designs():
     return render_template("designs.html")
+
 # --- ROUTE TO SERVE THE .txt AND .png FILES ---
 @app.route('/designs/<path:filename>')
 def serve_design_file(filename):
     """Serves files (txt, png) from the 'templates/designs' directory."""
-    
     # This path now correctly points inside the 'templates' folder
     designs_dir = os.path.join(app.root_path, 'templates', 'designs')
     
@@ -163,6 +163,26 @@ def serve_design_file(filename):
     
     # Securely send the file from that directory
     return send_from_directory(designs_dir, filename)
+
+# --- NEW: API ROUTE TO LIST ALL DESIGN FILES ---
+@app.route('/api/designs')
+def list_designs():
+    """
+    Lists all .txt files in the templates/designs directory
+    so the webpage can fetch them.
+    """
+    designs_dir = os.path.join(app.root_path, 'templates', 'designs')
+    try:
+        # Find all files ending in .txt
+        files = [f for f in os.listdir(designs_dir) if f.endswith('.txt')]
+        # Log it and return the list as JSON
+        log_message(f"Found {len(files)} designs in /templates/designs/.")
+        return jsonify(files)
+    except Exception as e:
+        log_message(f"ERROR: Could not list designs in /templates/designs/: {e}")
+        return jsonify(error=str(e)), 500
+# --- END OF NEW ROUTE ---
+
 
 # --- G-CODE BLOCK FUNCTIONALITY ---
 
