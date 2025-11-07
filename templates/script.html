@@ -106,11 +106,7 @@ G1 X0 Y203.2
 G1 X0 Y0
 G1 X203.2 Y0
 </textarea>
-                <div class="grid grid-cols-3 gap-3 mt-3">
-                    <div>
-                        <label for="segmentLength" class="block text-xs font-medium text-gray-400">Segment (mm)</label>
-                        <input type="number" id="segmentLength" value="2" class="w-full mt-1 p-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    </div>
+                <div class="grid grid-cols-2 gap-3 mt-3">
                     <div>
                         <label for="stepDelayInput" class="block text-xs font-medium text-gray-400">Delay (μs)</label>
                         <input type="number" id="stepDelayInput" value="1000" class="w-full mt-1 p-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
@@ -120,7 +116,7 @@ G1 X203.2 Y0
                         <input type="number" id="smoothingSensitivity" value="0.000001" step="0.000001" class="w-full mt-1 p-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     </div>
                 </div>
-                <button id="convertGCodeBtn" class="w-full font-semibold py-2 px-4 rounded-lg transition duration-200 shadow-md">
+                <button id="convertGCodeBtn" class="w-full mt-3 font-semibold py-2 px-4 rounded-lg transition duration-200 shadow-md">
                     Convert, Smooth & Load
                 </button>
             </div>
@@ -199,7 +195,7 @@ G1 0 0 200
         // Converter DOM elements
         const gcodeConverterInput = document.getElementById('gcodeConverterInput');
         const convertGCodeBtn = document.getElementById('convertGCodeBtn');
-        const segmentLengthInput = document.getElementById('segmentLength');
+        // const segmentLengthInput = document.getElementById('segmentLength'); // *** REMOVED ***
         const stepDelayInput = document.getElementById('stepDelayInput');
         const smoothingSensitivity = document.getElementById('smoothingSensitivity');
 
@@ -292,6 +288,11 @@ G1 0 0 200
 
         // --- G-Code Converter Functions ---
 
+        // *** --- MODIFIED FUNCTION --- ***
+        /**
+         * Converts G-code vertices (X, Y) directly to arm commands.
+         * This creates smooth, angle-space-linear moves between each G-code vertex.
+         */
         function convertGCode() {
             const gcodeText = gcodeConverterInput.value;
             const lines = gcodeText.split('\n');
@@ -314,19 +315,19 @@ G1 0 0 200
                 return;
             }
 
-            // --- 2. Remove scaling logic ---
-            // No scaling is performed.
-
-            // --- 3. Convert coords to relative arm commands ---
+            // --- 2. Convert coords to relative arm commands ---
             let generatedCommands = [];
             
             // --- NEW STARTING POSITION LOGIC ---
+            // Find the *first* point to set the arm's initial angle
             const first_coord = coords[0];
             let start_theta1;
 
             if (Math.hypot(first_coord.x, first_coord.y) < 0.1) {
+                // Start at origin, assume 0 angle
                 start_theta1 = 0; 
             } else {
+                // Start somewhere else, point the arm at it
                 start_theta1 = Math.atan2(first_coord.y, first_coord.x);
             }
 
@@ -335,82 +336,37 @@ G1 0 0 200
             let prev_base_steps = Math.round(-start_alpha_rad * STEPS_PER_RAD);
             let prev_elbow_steps = Math.round(-start_beta_rad * STEPS_PER_RAD);
 
-            // Get the arm's ACTUAL start position (clamped)
-            let { p2: start_pos } = calculateFK(null, prev_base_steps, prev_elbow_steps); 
-            let prev_x = start_pos.x;
-            let prev_y = start_pos.y;
-            
-            // --- THE REAL FIX: Track the IDEAL G-code path ---
-            // We set the *ideal* start point to be the arm's *actual* start point.
-            let ideal_prev_x = prev_x;
-            let ideal_prev_y = prev_y;
-            // --- END FIX ---
-
-            const segment_length_mm = parseFloat(segmentLengthInput.value) || 2.0;
             const step_delay_us = parseInt(stepDelayInput.value, 10) || 1000;
             
             try {
-                // Loop over each G1 coordinate
+                // Loop over each G1 coordinate vertex
                 for (const coord of coords) {
-                    // These are the IDEAL G-code targets
-                    const ideal_end_x = coord.x;
-                    const ideal_end_y = coord.y;
+                    const curr_x = coord.x;
+                    const curr_y = coord.y;
+
+                    // Calculate the arm steps for this vertex, using the previous
+                    // steps to inform the angle unwrapping logic
+                    const { base_steps, elbow_steps } = calculateIK(curr_x, curr_y, prev_base_steps);
                     
-                    // --- FIX: Interpolation is ALWAYS along the ideal G-code line ---
-                    const line_start_x = ideal_prev_x;
-                    const line_start_y = ideal_prev_y;
+                    // Get relative steps from the *previous actual* steps
+                    const rel_base = Math.round(base_steps - prev_base_steps);
+                    const rel_elbow = Math.round(elbow_steps - prev_elbow_steps);
                     
-                    // These track the *actual* arm position during this G1 move
-                    let last_clamped_x = prev_x;
-                    let last_clamped_y = prev_y;
-
-                    // Calculate distance based on the IDEAL path
-                    const distance = Math.hypot(ideal_end_x - line_start_x, ideal_end_y - line_start_y);
-                    const num_segments = Math.max(1, Math.ceil(distance / segment_length_mm));
-
-                    // Interpolate along the *ideal* straight line
-                    for (let i = 1; i <= num_segments; i++) {
-                        const progress = i / num_segments;
-                        // Get the *ideal* point along the line
-                        const curr_x = lerp(line_start_x, ideal_end_x, progress);
-                        const curr_y = lerp(line_start_y, ideal_end_y, progress);
-
-                        // Now, find the *actual* steps to reach that *ideal* point
-                        // (calculateIK will clip it if it's unreachable)
-                        const { base_steps, elbow_steps, clamped_x, clamped_y } = calculateIK(curr_x, curr_y, prev_base_steps);
-                        
-                        // Get relative steps from the *previous actual* steps
-                        const rel_base = Math.round(base_steps - prev_base_steps);
-                        const rel_elbow = Math.round(elbow_steps - prev_elbow_steps);
-                        
-                        // Only add a command if there's actual movement
-                        if (rel_base !== 0 || rel_elbow !== 0) {
-                            generatedCommands.push({ elbow: rel_elbow, base: rel_base, delay: step_delay_us });
-                        }
-
-                        // --- FIX: Update the *actual* state for the next segment ---
-                        prev_base_steps = base_steps;
-                        prev_elbow_steps = elbow_steps;
-                        last_clamped_x = clamped_x;
-                        last_clamped_y = clamped_y;
+                    // Only add a command if there's actual movement
+                    if (rel_base !== 0 || rel_elbow !== 0) {
+                        generatedCommands.push({ elbow: rel_elbow, base: rel_base, delay: step_delay_us });
                     }
-                    
-                    // --- FIX: Update states for the *next* G1 line ---
-                    
-                    // 1. The arm's *actual* position is where it ended up (clamped)
-                    prev_x = last_clamped_x;
-                    prev_y = last_clamped_y;
 
-                    // 2. The *ideal* path continues from the G-code target
-                    ideal_prev_x = ideal_end_x;
-                    ideal_prev_y = ideal_end_y;
+                    // Update the state for the next G1 line
+                    prev_base_steps = base_steps;
+                    prev_elbow_steps = elbow_steps;
                 }
             } catch (e) {
                 showModal(`Conversion Error: ${e.message}`);
                 return;
             }
 
-            // --- 4. Smooth the commands ---
+            // --- 3. Smooth the commands ---
             let commandsToSmooth = generatedCommands;
             let smoothedCommands = [];
             let lastLength = -1; 
@@ -422,11 +378,13 @@ G1 0 0 200
                 commandsToSmooth = smoothedCommands;
             }
 
-            // --- 5. Load into simulator ---
+            // --- 4. Load into simulator ---
             const commandStrings = smoothedCommands.map(cmd => `G1 ${cmd.elbow} ${cmd.base} ${cmd.delay}`);
             commandsInput.value = commandStrings.join('\n');
             loadCommandsBtn.click(); // Automatically click "Load & Reset"
         }
+        // *** --- END MODIFIED FUNCTION --- ***
+
 
         /**
          * Combines consecutive commands with the same ratio and speed.
@@ -1042,6 +1000,7 @@ G1 0 0 200
             
             const closeButton = document.createElement('button');
             closeButton.className = 'w-full text-white font-semibold py-2 px-4 rounded-lg transition duration-200';
+            closeButton.textContent = 'OK'; // Added text to the button
             
             // Event listener for close button
             closeButton.onclick = () => {
