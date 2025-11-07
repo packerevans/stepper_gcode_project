@@ -147,6 +147,10 @@ def led_controls():
 def script():
     return render_template("script.html")
 
+@app.route("/designs")
+def script():
+    return render_template("designs.html")
+
 # --- G-CODE BLOCK FUNCTIONALITY ---
 
 def process_and_send_gcode(gcode_block):
