@@ -62,19 +62,11 @@
 
     /* --- Menu Button (UPDATED FOR FLOATING LOOK) --- */
     .openbtn {
-        font-size: 26px; 
-        cursor: pointer; 
-        background-color: var(--color-surface); /* Card background for floating effect */
-        color: var(--color-text); 
-        padding: 8px 15px; /* Slightly adjusted padding */
-        border: 1px solid var(--color-shadow); /* Added a slight border */
-        border-radius: var(--border-radius); /* Rounded corners */
-        position: fixed;
-        top: 15px; /* Move down from top */
-        left: 15px; /* Move right from left */
-        z-index: 1200; 
-        box-shadow: 0 4px 8px var(--color-shadow); /* Added shadow for floating look */
-        transition: background-color 0.2s, box-shadow 0.2s, color 0.2s;
+        font-size: 26px; cursor: pointer; background-color: var(--color-primary);
+        color: var(--color-text); padding: 10px 20px; border: none;
+        border-radius: 0 0 var(--border-radius) 0; position: fixed;
+        top: 0; left: 0; z-index: 1100; box-shadow: 0 2px 5px var(--color-shadow);
+    }
         
         /* Ensure the text is just the icon size */
         line-height: 1; 
@@ -109,8 +101,11 @@
         font-size: 14px;
         line-height: 1.2;
     }
-    #themeToggle:hover {
-        background-color: var(--color-background);
+       #themeToggle {
+        position: fixed; top: 15px; right: 15px; background: var(--color-surface);
+        color: var(--color-icon); border: 1px solid var(--color-icon);
+        padding: 8px 15px; border-radius: 20px; z-index: 1200;
+        transition: background 0.3s, color 0.3s, border-color 0.3s;
     }
     body[data-theme='dark'] #themeToggle {
         border-color: #444;
@@ -269,17 +264,14 @@
     
 </head>
 <body data-theme="light">
-    <!-- Sidebar (Copied) -->
     <div id="mySidebar" class="sidebar">
         <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
-        <!-- UPDATED: Sidebar links updated -->
         <a href="/controls">Controls</a>
         <a href="/">Designs</a> 
         <a href="/led_controls">Led Controls</a>
         <a href="/terminal">Terminal</a>
     </div>
 
-    <!-- Header Buttons (Copied) -->
     <button class="openbtn" onclick="openNav()">☰</button>
     <button id="themeToggle" onclick="toggleDarkMode()">
         <span id="themeIcon">☀️</span>
