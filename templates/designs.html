@@ -61,17 +61,20 @@
     }
 
     /* --- Button Positions FIX --- */
+    /* Ensure .openbtn (Menu) stays small and fixed in the corner */
     .openbtn {
         font-size: 26px; cursor: pointer; background-color: var(--color-primary);
         color: var(--color-text); padding: 10px 18px; border: none;
         border-radius: 6px; position: fixed;
         top: 15px; left: 15px; z-index: 1100; box-shadow: 0 2px 5px var(--color-shadow);
         transition: background-color 0.2s, box-shadow 0.2s;
-        /* Ensure it's not full width */
-        width: auto; height: auto;
+        /* CRITICAL: Ensure width/height are set to auto */
+        width: auto; 
+        height: auto;
     }
 
     /* --- Theme Toggle Button FIX --- */
+    /* Ensure #themeToggle stays small and fixed in the corner */
     #themeToggle {
         position: fixed; 
         top: 15px; 
@@ -79,12 +82,14 @@
         background: var(--color-surface);
         color: var(--color-icon); 
         border: 1px solid var(--color-icon);
-        padding: 6px 12px; /* Smaller padding for a more compact look */
+        padding: 6px 12px; 
         border-radius: 20px; 
         z-index: 1200;
         transition: background 0.3s, color 0.3s, border-color 0.3s;
-        /* Ensure emoji size is manageable */
         font-size: 14px; 
+        /* CRITICAL: Ensure width/height are set to auto */
+        width: auto; 
+        height: auto;
     }
     
     .main-content {
@@ -131,7 +136,7 @@
         font-weight: 600;
         transition: opacity 0.3s, background-color 0.3s, color 0.3s;
         opacity: 0; /* Hidden by default */
-        min-height: 40px; /* Prevent layout shift when shown */
+        min-height: 40px; 
         line-height: 1.5;
     }
     .status-success {
@@ -222,7 +227,7 @@
     @media (max-width: 600px) {
         .main-content {
             padding: 10px;
-            padding-top: 50px; /* Adjust for mobile fixed buttons */
+            padding-top: 50px; 
         }
         .header-image {
             max-height: 120px;
@@ -242,11 +247,11 @@
         .action-buttons {
             flex-direction: column;
         }
+        /* Ensure fixed buttons are positioned relative to the viewport on mobile */
         .openbtn, #themeToggle {
             top: 10px;
-            /* Adjust spacing on small screens */
-            left: 10px;
-            right: 10px;
+            width: auto;
+            height: auto;
         }
         .openbtn {
             left: 10px;
