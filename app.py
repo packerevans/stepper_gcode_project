@@ -149,7 +149,7 @@ def script():
 
 @app.route("/designs")
 def designs():
-    return render_template("designs.html")
+    return render_template("designs.html")
 # --- ROUTE TO SERVE THE .txt AND .png FILES ---
 @app.route('/designs/<path:filename>')
 def serve_design_file(filename):
