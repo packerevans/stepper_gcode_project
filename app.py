@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, Response, url_for
+from flask import Flask, render_template, request, jsonify, Response, url_for, send_from_directory
 import serial, threading, time, subprocess
 import os  # <-- Make sure this import is here
 import asyncio
@@ -149,7 +149,20 @@ def script():
 
 @app.route("/designs")
 def designs():
-    return render_template("designs.html")
+    return render_template("designs.html")
+
+# --- NEW ROUTE TO SERVE THE .txt AND .png FILES ---
+@app.route('/designs/<path:filename>')
+def serve_design_file(filename):
+    """Serves files (txt, png) from the 'designs' directory."""
+    # Assumes your 'designs' folder is in the same directory as this app.py
+    designs_dir = os.path.join(app.root_path, 'designs')
+    
+    # Log the request
+    log_message(f"Serving file from /designs/: {filename}")
+    
+    # Securely send the file from that directory
+    return send_from_directory(designs_dir, filename)
 
 # --- G-CODE BLOCK FUNCTIONALITY ---
 
