@@ -245,7 +245,7 @@ G1 0 0 200
                 isLooping = false; // Stop looping on pause
                 pause();
             });
-            playLoopBtn.addEventListener('click', playLoop); // Add new listener
+            playLoopBtn.addEventListener('click', playLoop);
             
             window.addEventListener('resize', debounce(resizeAndRedraw, 250));
             
@@ -285,7 +285,6 @@ G1 0 0 200
 
         // --- G-Code Converter Functions ---
 
-        // *** --- MODIFIED FUNCTION --- ***
         /**
          * Converts G-code (X, Y) to arm commands.
          * 1. Parses all X,Y vertices.
@@ -318,7 +317,7 @@ G1 0 0 200
                  }
             }
 
-            // --- 2. NEW: Pre-process coords to remove co-linear points ---
+            // --- 2. Pre-process coords to remove co-linear points ---
             const collinearity_epsilon = 1e-6; // For floating point noise
             let reducedCoords = [];
             
@@ -343,32 +342,22 @@ G1 0 0 200
                 const p3 = coords[p2_index + 1];
 
                 // Check for co-linearity using cross-product.
-                // If (p2.y - p1.y) * (p3.x - p2.x) == (p2.x - p1.x) * (p3.y - p2.y)
-                // then the slopes are the same.
                 const cross_product = (p2.y - p1.y) * (p3.x - p2.x) - (p2.x - p1.x) * (p3.y - p2.y);
 
                 if (Math.abs(cross_product) < collinearity_epsilon) {
                     // p1, p2, p3 are co-linear. p2 is redundant.
-                    // Skip p2 and check the next point (p3) against p1.
                     p2_index++;
                 } else {
-                    // p1, p2, p3 are *not* co-linear.
-                    // This means p2 is a "corner".
-                    // We must add p2 to our list.
+                    // p1, p2, p3 are *not* co-linear. p2 is a "corner".
                     reducedCoords.push(p2);
-                    
-                    // The new line segment starts from p2.
                     p1_index = p2_index;
                     p2_index++;
                 }
             }
-            // --- END NEW STEP ---
-
 
             // --- 3. Convert *reduced* coords to relative arm commands ---
             let generatedCommands = [];
             
-            // Find the *first* point to set the arm's initial angle
             const first_coord = reducedCoords[0];
             let start_theta1;
 
@@ -386,7 +375,6 @@ G1 0 0 200
             const step_delay_us = parseInt(stepDelayInput.value, 10) || 1000;
             
             try {
-                // *** MODIFICATION: Loop over reducedCoords, not coords ***
                 for (const coord of reducedCoords) {
                     const curr_x = coord.x;
                     const curr_y = coord.y;
@@ -400,7 +388,6 @@ G1 0 0 200
                         generatedCommands.push({ elbow: rel_elbow, base: rel_base, delay: step_delay_us });
                     }
 
-                    // Update the state for the next G1 line
                     prev_base_steps = base_steps;
                     prev_elbow_steps = elbow_steps;
                 }
@@ -410,7 +397,6 @@ G1 0 0 200
             }
 
             // --- 4. Smooth the commands ---
-            // This post-processing step is still useful.
             let commandsToSmooth = generatedCommands;
             let smoothedCommands = [];
             let lastLength = -1; 
@@ -427,9 +413,9 @@ G1 0 0 200
             commandsInput.value = commandStrings.join('\n');
             loadCommandsBtn.click(); // Automatically click "Load & Reset"
         }
-        // *** --- END MODIFIED FUNCTION --- ***
 
 
+        // *** --- MODIFIED FUNCTION --- ***
         /**
          * Combines consecutive commands with the same ratio and speed.
          */
@@ -453,23 +439,22 @@ G1 0 0 200
 
                     // Check for vertical moves (base = 0)
                     if (cmd1.base === 0 && cmd2.base === 0) {
-                        if (Math.sign(cmd1.elbow) === Math.sign(cmd2.elbow)) {
-                            canCombine = true;
-                        }
+                        // *** MODIFICATION: Removed sign check ***
+                        canCombine = true;
                     } 
                     // Check for horizontal moves (elbow = 0)
                     else if (cmd1.elbow === 0 && cmd2.elbow === 0) {
-                        if (Math.sign(cmd1.base) === Math.sign(cmd2.base)) {
-                            canCombine = true;
-                        }
+                        // *** MODIFICATION: Removed sign check ***
+                        canCombine = true;
                     }
                     // Check for diagonal moves (neither = 0)
                     else if (cmd1.base !== 0 && cmd2.base !== 0 && cmd1.elbow !== 0 && cmd2.elbow !== 0) {
                         const ratio1 = cmd1.elbow / cmd1.base;
                         const ratio2 = cmd2.elbow / cmd2.base;
                         
-                        if (Math.abs(ratio1 - ratio2) < sensitivity && 
-                            Math.sign(cmd1.base) === Math.sign(cmd2.base)) {
+                        // *** MODIFICATION: Removed the faulty sign check ***
+                        // This was preventing `(10, 10)` and `(-5, -5)` from combining.
+                        if (Math.abs(ratio1 - ratio2) < sensitivity) {
                             canCombine = true;
                         }
                     }
@@ -481,16 +466,22 @@ G1 0 0 200
                     current_command.base += next_command.base;
                 } else {
                     // Push the completed command and start a new one
-                    smoothedCommands.push(current_command);
+                    // Only push if it's not a zero-move
+                    if (current_command.elbow !== 0 || current_command.base !== 0) {
+                        smoothedCommands.push(current_command);
+                    }
                     current_command = { ...next_command };
                 }
             }
             
             // Add the very last command
-            smoothedCommands.push(current_command);
+            if (current_command.elbow !== 0 || current_command.base !== 0) {
+                smoothedCommands.push(current_command);
+            }
             
             return smoothedCommands;
         }
+        // *** --- END MODIFIED FUNCTION --- ***
 
 
         /**
@@ -537,12 +528,10 @@ G1 0 0 200
                 // Use *clamped* x and y for angle
                 let raw_theta1 = Math.atan2(clamped_y, clamped_x) - Math.atan2(k2, k1);
 
-                // --- START BUG FIX: Angle Unwrapping ---
                 const last_theta1 = -last_base_steps / STEPS_PER_RAD;
                 let rotation_diff = (raw_theta1 - last_theta1) / (2 * Math.PI);
                 let nearest_rotation_offset = Math.round(rotation_diff);
                 theta1 = raw_theta1 - (nearest_rotation_offset * 2 * Math.PI);
-                // --- END BUG FIX ---
             }
 
             // --- 4. Convert angles to motor angles (alpha, beta) ---
