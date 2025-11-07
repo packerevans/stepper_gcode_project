@@ -8,6 +8,10 @@ app = Flask(__name__)
 # Add a simple secret key for session management, needed if using Flask sessions later
 app.secret_key = 'your_super_secret_key' 
 
+# === Configuration Variable (REMOVED: Fixed delay is replaced by handshaking) ===
+# Old DRIP_DELAY_SECONDS is removed.
+# ==============================
+
 # === NGROK HEADER FIX ===
 @app.after_request
 def apply_ngrok_header(response: Response):
@@ -20,6 +24,7 @@ arduino_connected = False
 
 try:
     # Use a shorter timeout to avoid blocking if the port is busy
+    # IMPORTANT: Increasing baud rate can help, but 9600 is often safe.
     arduino = serial.Serial('/dev/ttyACM0', 9600, timeout=0.1) 
     time.sleep(2)
     arduino_connected = True
@@ -38,9 +43,10 @@ def log_message(msg):
         if len(serial_log) > 200:
             serial_log.pop(0)
 
-# Background reader thread
+# Background reader thread (MODIFIED to support handshaking)
 def read_from_serial():
     """Reads lines from the serial port and logs them."""
+    global current_gcode_runner
     while arduino_connected:
         try:
             # Check for data available before reading to prevent blocking
@@ -48,12 +54,82 @@ def read_from_serial():
                 line = arduino.readline().decode(errors="ignore").strip()
                 if line:
                     log_message(line)
+                    
+                    # *** UPDATED FIX: Check if the message CONTAINS any part of "DONE" (case-insensitive) ***
+                    if current_gcode_runner and any(letter in line.upper() for letter in "DONE"):
+                        current_gcode_runner.handshake_event.set()
+                        
             else:
                 # Sleep briefly to reduce CPU usage
                 time.sleep(0.01) 
         except Exception as e:
             log_message(f"SERIAL ERROR: {e}")
             time.sleep(1) # Wait before retrying after an error
+
+# Global reference to the current G-code thread runner instance
+current_gcode_runner = None
+
+# Class to encapsulate the G-code running process and its state
+class GCodeRunner(threading.Thread):
+    def __init__(self, gcode_block):
+        super().__init__(daemon=True)
+        self.gcode_block = gcode_block
+        self.handshake_event = threading.Event()
+        self.lines = [
+            line.split(';')[0].strip() for line in gcode_block.split('\n') 
+            if line.split(';')[0].strip().upper().startswith('G1')
+        ]
+        self.line_index = 0
+        self.is_running = True
+
+    def send_line(self, line):
+        """Sends a single G-code line to the Arduino."""
+        try:
+            with lock:
+                arduino.write((line + "\n").encode())
+            log_message(f"Sent line {self.line_index + 1}: {line}")
+            self.line_index += 1
+            return True
+        except Exception as e:
+            log_message(f"SERIAL ERROR while sending line: {e}")
+            self.is_running = False
+            return False
+
+    def run(self):
+        global current_gcode_runner
+        current_gcode_runner = self
+        num_commands = len(self.lines)
+        log_message(f"Received G-code block with {num_commands} commands. Starting 2-command priming...")
+
+        # 1. INITIAL: Send the first two commands immediately
+        for _ in range(2):
+            if self.is_running and self.line_index < num_commands:
+                self.send_line(self.lines[self.line_index])
+                # Small pause after initial burst to let Arduino catch up
+                time.sleep(0.01) 
+            else:
+                break # Not enough commands or error occurred
+
+        # 2. DRIP: Wait for 'Done' signal before sending the next command
+        # Start at index 2 (the third command) since the first two were primed.
+        while self.is_running and self.line_index < num_commands:
+            
+            # Wait up to 10 seconds for the 'Done' signal
+            if self.handshake_event.wait(timeout=10):
+                self.handshake_event.clear() # Clear the signal for the next command
+                
+                # Send the next command
+                if not self.send_line(self.lines[self.line_index]):
+                    break # Stop if sending failed
+            else:
+                # Timeout occurred, usually meaning the Arduino stopped responding
+                log_message("TIMEOUT: Arduino failed to respond with 'Done'. Aborting G-code block.")
+                self.is_running = False
+
+        # 3. CLEANUP
+        current_gcode_runner = None
+        log_message("Finished sending G-code block.")
+
 
 if arduino_connected:
     threading.Thread(target=read_from_serial, daemon=True).start()
@@ -193,49 +269,29 @@ def list_designs():
 
 # --- G-CODE BLOCK FUNCTIONALITY ---
 
+# process_and_send_gcode is replaced by the GCodeRunner Class and its run method
 def process_and_send_gcode(gcode_block):
     """
-    (RUNS IN A THREAD - FOR AUTO-DRIP MODE)
-    Parses a block of text and sends valid G1 commands to Arduino
-    one by one, with a delay.
+    Starts the new GCodeRunner thread for handshaking.
     """
     if not arduino_connected:
         log_message("ERROR: Cannot run G-code. Arduino not connected.")
         return
     
-    lines = gcode_block.split('\n')
-    log_message(f"Received G-code block with {len(lines)} lines. Starting auto-drip...")
-    
-    for line_num, line in enumerate(lines):
-        # Remove whitespace and comments
-        clean_line = line.split(';')[0].strip() 
-        
-        # Process only non-empty G1 lines (case-insensitive)
-        if clean_line and clean_line.upper().startswith('G1'):
-            log_message(f"Sending line {line_num + 1}: {clean_line}")
-            try:
-                # Use the existing lock to prevent serial write conflicts
-                with lock: 
-                    arduino.write((clean_line + "\n").encode())
-                
-                # --- This is the "slow feed" ---
-                # Wait for the Arduino to process.
-                time.sleep(0.05) 
-            except Exception as e:
-                log_message(f"SERIAL ERROR while sending line {line_num + 1}: {e}")
-                log_message("Aborting G-code block.")
-                break # Stop sending if there's an error
-        elif clean_line:
-            # Log lines that are skipped
-            log_message(f"Skipping line {line_num + 1}: {clean_line}")
-    
-    log_message("Finished sending G-code block.")
+    # Check if a job is already running
+    global current_gcode_runner
+    if current_gcode_runner and current_gcode_runner.is_alive():
+        log_message("ERROR: Another G-code job is already running.")
+        return
+
+    runner = GCodeRunner(gcode_block)
+    runner.start()
+
 
 @app.route("/send_gcode_block", methods=["POST"])
 def send_gcode_block_route():
     """
-    API endpoint for AUTO-DRIP mode.
-    Starts the sending process in a background thread.
+    API endpoint for AUTO-DRIP mode, now using handshaking.
     """
     data = request.json
     gcode_block = data.get("gcode")
@@ -246,11 +302,16 @@ def send_gcode_block_route():
     if not arduino_connected:
          return jsonify(success=False, error="Arduino not connected."), 500
 
-    # Run the sending process in a background thread
-    threading.Thread(target=process_and_send_gcode, args=(gcode_block,), daemon=True).start()
+    # Check if a job is already running (prevent multiple simultaneous runs)
+    global current_gcode_runner
+    if current_gcode_runner and current_gcode_runner.is_alive():
+        return jsonify(success=False, error="Another design is currently running. Wait for it to finish."), 503
+
+    # Start the handshaking runner
+    process_and_send_gcode(gcode_block)
 
     # Return an immediate success message to the browser
-    return jsonify(success=True, message="G-code block received and is being sent (auto-drip).")
+    return jsonify(success=True, message="G-code block received and is being sent (handshaking).")
 
 # --- NEW: ENDPOINT FOR MANUAL STEP-BY-STEP ---
 @app.route("/send_single_gcode_line", methods=["POST"])
