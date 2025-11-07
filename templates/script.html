@@ -96,209 +96,8 @@ input[type=number] {
                 </label>
                 <textarea id="commandsInput" rows="8" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., G1 0 800 1000&#10;G1 1600 0 500&#10;..."></textarea>
 Example G-Code (Hilbert Curve):
-G1 X0 Y0
-G1 X0 Y100
 G1 X100 Y100
-G1 X100 Y0
-G1 X0 Y0
-G1 X0 Y200
-G1 X100 Y200
-G1 X100 Y100
-G1 X200 Y100
-G1 X200 Y200
-G1 X100 Y200
-G1 X100 Y300
-G1 X200 Y300
-G1 X200 Y200
-G1 X300 Y200
-G1 X300 Y300
-G1 X200 Y300
-G1 X200 Y400
-G1 X300 Y400
-G1 X300 Y300
-G1 X400 Y300
-G1 X400 Y400
-G1 X300 Y400
-G1 X300 Y200
-G1 X400 Y200
-G1 X400 Y100
-G1 X300 Y100
-G1 X300 Y0
-G1 X400 Y0
-G1 X400 Y100
-G1 X300 Y100
-G1 X200 Y100
-G1 X200 Y0
-G1 X300 Y0
-G1 X300 Y100
-G1 X200 Y100
-G1 X200 Y0
-G1 X100 Y0
-G1 X100 Y-100
-G1 X200 Y-100
-G1 X200 Y0
-G1 X100 Y0
-G1 X100 Y-200
-G1 X200 Y-200
-G1 X200 Y-100
-G1 X300 Y-100
-G1 X300 Y-200
-G1 X200 Y-200
-G1 X200 Y-300
-G1 X300 Y-300
-G1 X300 Y-200
-G1 X400 Y-200
-G1 X400 Y-300
-G1 X300 Y-300
-G1 X300 Y-400
-G1 X400 Y-400
-G1 X400 Y-300
-G1 X300 Y-300
-G1 X200 Y-300
-G1 X200 Y-400
-G1 X100 Y-400
-G1 X100 Y-300
-G1 X0 Y-300
-G1 X0 Y-400
-G1 X100 Y-400
-G1 X100 Y-300
-G1 X0 Y-300
-G1 X0 Y-200
-G1 X-100 Y-200
-G1 X-100 Y-300
-G1 X0 Y-300
-G1 X0 Y-200
-G1 X-200 Y-200
-G1 X-200 Y-300
-G1 X-100 Y-300
-G1 X-100 Y-400
-G1 X-200 Y-400
-G1 X-200 Y-300
-G1 X-300 Y-300
-G1 X-300 Y-400
-G1 X-200 Y-400
-G1 X-200 Y-200
-G1 X-300 Y-200
-G1 X-300 Y-100
-G1 X-200 Y-100
-G1 X-200 Y0
-G1 X-300 Y0
-G1 X-300 Y-100
-G1 X-200 Y-100
-G1 X-100 Y-100
-G1 X-100 Y0
-G1 X-200 Y0
-G1 X-200 Y-100
-G1 X-100 Y-100
-G1 X-100 Y0
-G1 X0 Y0
-G1 X0 Y100
-G1 X-100 Y100
-G1 X-100 Y0
-G1 X0 Y0
-G1 X0 Y200
-G1 X-100 Y200
-G1 X-100 Y100
-G1 X-200 Y100
-G1 X-200 Y200
-G1 X-100 Y200
-G1 X-100 Y300
-G1 X-200 Y300
-G1 X-200 Y200
-G1 X-300 Y200
-G1 X-300 Y300
-G1 X-200 Y300
-G1 X-200 Y400
-G1 X-300 Y400
-G1 X-300 Y300
-G1 X-400 Y300
-G1 X-400 Y400
-G1 X-300 Y400
-G1 X-300 Y200
-G1 X-400 Y200
-G1 X-400 Y100
-G1 X-300 Y100
-G1 X-300 Y0
-G1 X-400 Y0
-G1 X-400 Y100
-G1 X-300 Y100
-G1 X-200 Y100
-G1 X-200 Y0
-G1 X-300 Y0
-G1 X-300 Y100
-G1 X-200 Y100
-G1 X-200 Y0
-G1 X-100 Y0
-G1 X-100 Y-100
-G1 X-200 Y-100
-G1 X-200 Y0
-G1 X-100 Y0
-G1 X-100 Y-200
-G1 X-200 Y-200
-G1 X-200 Y-100
-G1 X-300 Y-100
-G1 X-300 Y-200
-G1 X-200 Y-200
-G1 X-200 Y-300
-G1 X-300 Y-300
-G1 X-300 Y-200
-G1 X-400 Y-200
-G1 X-400 Y-300
-G1 X-300 Y-300
-G1 X-300 Y-400
-G1 X-400 Y-400
-G1 X-400 Y-300
-G1 X-300 Y-300
-G1 X-200 Y-300
-G1 X-200 Y-400
-G1 X-100 Y-400
-G1 X-100 Y-300
-G1 X0 Y-300
-G1 X0 Y-400
-G1 X100 Y-400
-G1 X100 Y-300
-G1 X0 Y-300
-G1 X0 Y-200
-G1 X100 Y-200
-G1 X100 Y-100
-G1 X0 Y-100
-G1 X0 Y0
-G1 X100 Y0
-G1 X100 Y-100
-G1 X0 Y-100
-G1 X-100 Y-100
-G1 X-100 Y0
-G1 X0 Y0
-G1 X0 Y-100
-G1 X-100 Y-100
-G1 X-100 Y0
-G1 X-200 Y0
-G1 X-200 Y100
-G1 X-100 Y100
-G1 X-100 Y0
-G1 X-200 Y0
-G1 X-200 Y200
-G1 X-100 Y200
-G1 X-100 Y100
-G1 X0 Y100
-G1 X0 Y200
-G1 X-100 Y200
-G1 X-100 Y300
-G1 X0 Y300
-G1 X0 Y200
-G1 X100 Y200
-G1 X100 Y300
-G1 X0 Y300
-G1 X0 Y400
-G1 X100 Y400
-G1 X100 Y300
-G1 X200 Y300
-G1 X200 Y400
-G1 X100 Y400
-G1 X100 Y200
-G1 X200 Y200
-G1 X200 Y100
-G1 X1JULIET@EVANS:~$ 
+...
             </div>
 
             <button id="loadCommandsBtn" class="w-full text-white font-semibold py-2 px-4 rounded-lg transition duration-200 shadow-md">
@@ -452,15 +251,12 @@ G1 X1JULIET@EVANS:~$
         /**
          * Converts G-code (X, Y) to arm commands, applying a center offset.
          */
-        /**
-         * Converts G-code (X, Y) to arm commands, applying a center offset
-         * and subdividing lines to follow the Cartesian path.
-         */
         function convertGCode() {
             const gcodeText = gcodeConverterInput.value;
             const lines = gcodeText.split('\n');
             const xyRegex = /G1\s+X(-?[\d.]+)\s+Y(-?[\d.]+)/i;
             
+            // *** NEW: Get offset values ***
             const gcodeCenterX = parseFloat(document.getElementById('gcodeCenterX').value) || 0;
             const gcodeCenterY = parseFloat(document.getElementById('gcodeCenterY').value) || 0;
             
@@ -473,12 +269,14 @@ G1 X1JULIET@EVANS:~$
                     const x_gcode = parseFloat(match[1]);
                     const y_gcode = parseFloat(match[2]);
                     
+                    // Apply the offset to re-center the pattern
                     const x_cart = x_gcode - gcodeCenterX;
                     const y_cart = y_gcode - gcodeCenterY;
                     
                     coords.push({ x: x_cart, y: y_cart });
                 }
             }
+            // *** END MODIFICATION ***
 
             if (coords.length < 2) {
                  if(coords.length === 1) { /* Just one point, not enough for a line */ }
@@ -489,7 +287,6 @@ G1 X1JULIET@EVANS:~$
             }
 
             // --- 2. Pre-process coords to remove co-linear points ---
-            // (This step is still good, it reduces the *corners* we need to process)
             const collinearity_epsilon = 1e-6;
             let reducedCoords = [];
             
@@ -521,72 +318,41 @@ G1 X1JULIET@EVANS:~$
                 }
             }
 
-            // --- 3. Convert *subdivided* coords to relative arm commands ---
+            // --- 3. Convert *reduced* coords to relative arm commands ---
             let generatedCommands = [];
-            const step_delay_us = parseInt(stepDelayInput.value, 10) || 1000;
             
-            // Max length (in mm) of a segment before subdividing.
-            // Smaller = more accurate, but more G-code lines.
-            const maxSegmentLength = 1.0; 
-
-            if (reducedCoords.length < 1) {
-                return; // Nothing to do
-            }
-
-            // --- Calculate initial state ---
             const first_coord = reducedCoords[0];
             let start_theta1;
+
             if (Math.hypot(first_coord.x, first_coord.y) < 0.1) {
                 start_theta1 = 0;
             } else {
                 start_theta1 = Math.atan2(first_coord.y, first_coord.x);
             }
+
             const start_alpha_rad = start_theta1;
             const start_beta_rad = GEAR_RATIO * start_alpha_rad;
             let prev_base_steps = Math.round(-start_alpha_rad * STEPS_PER_RAD);
             let prev_elbow_steps = Math.round(-start_beta_rad * STEPS_PER_RAD);
+
+            const step_delay_us = parseInt(stepDelayInput.value, 10) || 1000;
             
-            let prev_x = first_coord.x;
-            let prev_y = first_coord.y;
-
             try {
-                // Loop from the *second* coordinate onwards
-                for (let i = 1; i < reducedCoords.length; i++) {
-                    const current_coord = reducedCoords[i];
-                    const curr_x = current_coord.x;
-                    const curr_y = current_coord.y;
+                for (const coord of reducedCoords) {
+                    const curr_x = coord.x;
+                    const curr_y = coord.y;
 
-                    const dx = curr_x - prev_x;
-                    const dy = curr_y - prev_y;
-                    const dist = Math.hypot(dx, dy);
-
-                    // Calculate number of steps needed to subdivide this line
-                    const num_subdivs = Math.max(1, Math.ceil(dist / maxSegmentLength));
-
-                    // Interpolate along the *Cartesian* line
-                    for (let j = 1; j <= num_subdivs; j++) {
-                        const t = j / num_subdivs; // Progress from 0 to 1
-                        const interp_x = prev_x + dx * t;
-                        const interp_y = prev_y + dy * t;
-
-                        // Now, run IK for this *intermediate* point
-                        const { base_steps, elbow_steps } = calculateIK(interp_x, interp_y, prev_base_steps);
-
-                        const rel_base = Math.round(base_steps - prev_base_steps);
-                        const rel_elbow = Math.round(elbow_steps - prev_elbow_steps);
-                        
-                        if (rel_base !== 0 || rel_elbow !== 0) {
-                            generatedCommands.push({ elbow: rel_elbow, base: rel_base, delay: step_delay_us });
-                        }
-
-                        // Update prev_steps for the *next* IK calculation
-                        prev_base_steps = base_steps;
-                        prev_elbow_steps = elbow_steps;
-                    }
+                    const { base_steps, elbow_steps } = calculateIK(curr_x, curr_y, prev_base_steps);
                     
-                    // Update prev_x/y for the next *line segment*
-                    prev_x = curr_x;
-                    prev_y = curr_y;
+                    const rel_base = Math.round(base_steps - prev_base_steps);
+                    const rel_elbow = Math.round(elbow_steps - prev_elbow_steps);
+                    
+                    if (rel_base !== 0 || rel_elbow !== 0) {
+                        generatedCommands.push({ elbow: rel_elbow, base: rel_base, delay: step_delay_us });
+                    }
+
+                    prev_base_steps = base_steps;
+                    prev_elbow_steps = elbow_steps;
                 }
             } catch (e) {
                 showModal(`Conversion Error: ${e.message}`);
@@ -610,7 +376,6 @@ G1 X1JULIET@EVANS:~$
             commandsInput.value = commandStrings.join('\n');
             loadCommandsBtn.click();
         }
-
         // *** --- END MODIFIED FUNCTION --- ***
 
 
