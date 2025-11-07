@@ -55,8 +55,10 @@ def read_from_serial():
                 if line:
                     log_message(line)
                     
-                    # *** UPDATED FIX: Check if the message CONTAINS any part of "DONE" (case-insensitive) ***
-                    if current_gcode_runner and any(letter in line.upper() for letter in "DONE"):
+                    # *** CRITICAL FIX: Reverting to a strict check. ***
+                    # The loose check was being triggered by "Queued...", "Ignored...", etc.
+                    # We will check for the exact string "Done", case-insensitive.
+                    if current_gcode_runner and line.strip().upper() == "DONE":
                         current_gcode_runner.handshake_event.set()
                         
             else:
