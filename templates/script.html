@@ -44,49 +44,49 @@ input[type=number] {
 <body class="bg-gray-900 text-gray-200 antialiased">
 
 <div class="max-w-7xl mx-auto p-4 lg:p-8">
-    <header class="mb-6">
-        <h1 class="text-3xl font-bold text-white">2DOF Arm Kinematic Simulator & G-Code Converter</h1>
-        <p class="text-lg text-gray-400">Simulating a 2-motor arm with 101.3mm links and 9/8 gearing.</p>
-    </header>
+    <header class="mb-6">
+        <h1 class="text-3xl font-bold text-white">2DOF Arm Kinematic Simulator & G-Code Converter</h1>
+        <p class="text-lg text-gray-400">Simulating a 2-motor arm with 101.3mm links and 9/8 gearing.</p>
+    </header>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-                <div class="lg:col-span-1 bg-gray-800 p-6 rounded-xl shadow-lg flex flex-col gap-6">
-            
-                        <div class="bg-gray-900 p-4 rounded-lg border border-gray-700">
-                <label for="gcodeConverterInput" class="block text-sm font-medium text-gray-300 mb-2">
-                    1. Paste Cartesian (X, Y) G-Code
-                </label>
-                <textarea id="gcodeConverterInput" rows="8" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="e.g.,&#10;G1 X203.2 Y0&#10;G1 X0 Y0&#10;G1 X0 Y203.2&#10;G1 X0 Y0">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <div class="lg:col-span-1 bg-gray-800 p-6 rounded-xl shadow-lg flex flex-col gap-6">
+            
+            <div class="bg-gray-900 p-4 rounded-lg border border-gray-700">
+                <label for="gcodeConverterInput" class="block text-sm font-medium text-gray-300 mb-2">
+                    1. Paste Cartesian (X, Y) G-Code
+                </label>
+                <textarea id="gcodeConverterInput" rows="8" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="e.g.,&#10;G1 X203.2 Y0&#10;G1 X0 Y0&#10;G1 X0 Y203.2&#10;G1 X0 Y0">
 G1 X203.2 Y0
 G1 X0 Y0
 G1 X0 Y203.2
 G1 X0 Y0
 G1 X203.2 Y0
 </textarea>
-                <div class="grid grid-cols-3 gap-3 mt-3">
-                    <div>
-                        <label for="segmentLength" class="block text-xs font-medium text-gray-400">Segment (mm)</label>
-                        <input type="number" id="segmentLength" value="2" class="w-full mt-1 p-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-                    <div>
-                        <label for="stepDelayInput" class="block text-xs font-medium text-gray-400">Delay (μs)</label>
-                        <input type="number" id="stepDelayInput" value="1000" class="w-full mt-1 p-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-                    <div>
-                        <label for="smoothingSensitivity" class="block text-xs font-medium text-gray-400">Smooth (ε)</label>
-                        <input type="number" id="smoothingSensitivity" value="0.000001" step="0.000001" class="w-full mt-1 p-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-                </div>
-                <button id="convertGCodeBtn" class="w-full mt-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 shadow-md">
-                    Convert, Smooth & Load
-                </button>
-            </div>
-                                    <div>
-                <label for="commandsInput" class="block text-sm font-medium text-gray-300 mb-2">
-                    2. Arm Commands (G1 Elbow Base StepDelay_μs)
-                </label>
-                <textarea id="commandsInput" rows="8" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., G1 0 800 1000&#10;G1 1600 0 500&#10;G1 0 -800 1000&#10;G1 -1600 0 2000">
+                <div class="grid grid-cols-3 gap-3 mt-3">
+                    <div>
+                        <label for="segmentLength" class="block text-xs font-medium text-gray-400">Segment (mm)</label>
+                        <input type="number" id="segmentLength" value="2" class="w-full mt-1 p-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label for="stepDelayInput" class="block text-xs font-medium text-gray-400">Delay (μs)</label>
+                        <input type="number" id="stepDelayInput" value="1000" class="w-full mt-1 p-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label for="smoothingSensitivity" class="block text-xs font-medium text-gray-400">Smooth (ε)</label>
+                        <input type="number" id="smoothingSensitivity" value="0.000001" step="0.000001" class="w-full mt-1 p-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                </div>
+                <button id="convertGCodeBtn" class="w-full mt-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 shadow-md">
+                    Convert, Smooth & Load
+                </button>
+            </div>
+            <div>
+                <label for="commandsInput" class="block text-sm font-medium text-gray-300 mb-2">
+                    2. Arm Commands (G1 Elbow Base StepDelay_μs)
+                </label>
+                <textarea id="commandsInput" rows="8" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., G1 0 800 1000&#10;G1 1600 0 500&#10;G1 0 -800 1000&#10;G1 -1600 0 2000">
 G1 0 400 1000
 G1 0 800 1000
 G1 400 800 500
@@ -99,916 +99,917 @@ G1 0 0 200
 </textarea>
 </div>
 
-            <button id="loadCommandsBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 shadow-md">
-                Load & Reset Simulation
-            </button>
+            <button id="loadCommandsBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 shadow-md">
+                Load & Reset Simulation
+            </button>
 
 
-                        <div>
-                <label class="block text-sm font-medium text-gray-300 mb-2">Playback</label>
-                <div class="flex items-center gap-4 mb-2">
-                    <button id="playBtn" class="bg-green-600 hover:bg-green-700 text-white p-2 rounded-full disabled:opacity-50" title="Play">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8.002v3.996a1 1 0 001.555.832l3.197-1.998a1 1 0 000-1.664l-3.197-1.998z" clip-rule="evenodd" />
-                        </svg>
-                    </button>
-                    
-                                        <button id="playLoopBtn" class="bg-teal-600 hover:bg-teal-700 text-white p-2 rounded-full disabled:opacity-50" title="Play and Loop">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.89.633A5.002 5.002 0 005.001 9.029V11a1 1 0 11-2 0V3a1 1 0 011-1zm12 14a1 1 0 01-1 1v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 111.89-.633A5.002 5.002 0 0014.999 10.97V9a1 1 0 112 0v8a1 1 0 01-1 1z" clip-rule="evenodd" />
-                        </svg>
-                    </button>
-                                        <button id="pauseBtn" class="bg-yellow-600 hover:bg-yellow-700 text-white p-2 rounded-full" title="Pause">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 6a1 1 0 00-1 1v6a1 1 0 002 0V7a1 1 0 00-1-1zm2 0a1 1 0 00-1 1v6a1 1 0 002 0V7a1 1 0 00-1-1z" clip-rule="evenodd" />
-                        </svg>
-                    </button>
-                    <span id="stepDisplay" class="font-mono text-sm text-gray-400">Step: 0 / 0</span>
-                </div>
-                <input id="commandSlider" type="range" min="0" max="0" value="0" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer disabled:opacity-50">
-            </div>
-            
-        </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">Playback</label>
+                <div class="flex items-center gap-4 mb-2">
+                    <button id="playBtn" class="bg-green-600 hover:bg-green-700 text-white p-2 rounded-full disabled:opacity-50" title="Play">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8.002v3.996a1 1 0 001.555.832l3.197-1.998a1 1 0 000-1.664l-3.197-1.998z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                    
+                    <button id="playLoopBtn" class="bg-teal-600 hover:bg-teal-700 text-white p-2 rounded-full disabled:opacity-50" title="Play and Loop">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.89.633A5.002 5.002 0 005.001 9.029V11a1 1 0 11-2 0V3a1 1 0 011-1zm12 14a1 1 0 01-1 1v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 111.89-.633A5.002 5.002 0 0014.999 10.97V9a1 1 0 112 0v8a1 1 0 01-1 1z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                    <button id="pauseBtn" class="bg-yellow-600 hover:bg-yellow-700 text-white p-2 rounded-full" title="Pause">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 6a1 1 0 00-1 1v6a1 1 0 002 0V7a1 1 0 00-1-1zm2 0a1 1 0 00-1 1v6a1 1 0 002 0V7a1 1 0 00-1-1z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                    <span id="stepDisplay" class="font-mono text-sm text-gray-400">Step: 0 / 0</span>
+                </div>
+                <input id="commandSlider" type="range" min="0" max="0" value="0" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer disabled:opacity-50">
+            </div>
+            
+        </div>
 
-                <div class="lg:col-span-2 flex flex-col gap-6">
-            
-                        <div class="bg-gray-800 p-4 rounded-xl shadow-lg">
-                <canvas id="armCanvas" class="bg-gray-900"></canvas>
-            </div>
-            
-        </div>
-    </div>
+        <div class="lg:col-span-2 flex flex-col gap-6">
+            
+            <div class="bg-gray-800 p-4 rounded-xl shadow-lg">
+                <canvas id="armCanvas" class="bg-gray-900"></canvas>
+            </div>
+            
+        </div>
+    </div>
 </div>
 
 <script>
-d   document.addEventListener('DOMContentLoaded', () => {
-        // --- DOM Elements ---
-        const canvas = document.getElementById('armCanvas');
-        const ctx = canvas.getContext('2d');
-        const commandsInput = document.getElementById('commandsInput');
-        const loadCommandsBtn = document.getElementById('loadCommandsBtn');
-        const commandSlider = document.getElementById('commandSlider');
-        const playBtn = document.getElementById('playBtn');
-        const pauseBtn = document.getElementById('pauseBtn');
-        const playLoopBtn = document.getElementById('playLoopBtn'); // *** NEW ***
-        const stepDisplay = document.getElementById('stepDisplay');
-        
-        // Converter DOM elements
-        const gcodeConverterInput = document.getElementById('gcodeConverterInput');
-        const convertGCodeBtn = document.getElementById('convertGCodeBtn');
-        const segmentLengthInput = document.getElementById('segmentLength');
-        const stepDelayInput = document.getElementById('stepDelayInput');
-        const smoothingSensitivity = document.getElementById('smoothingSensitivity');
-
-        // --- Simulation Constants ---
-        const L1 = 101.3; // mm (Upper arm)
-        const L2 = 101.3; // mm (Lower arm)
-        const GEAR_RATIO = 9 / 8; // 1.125
-        
-        const STEPS_PER_DEG = 3200 / 360;
-        const STEPS_PER_RAD = (3200 / 360) * (180 / Math.PI); // 1600 / PI
-
-        // --- Simulation State ---
-        let commands = []; // List of {base, elbow} steps
-        let cumulativeStates = []; // List of all arm states (pos, angles)
-        let currentStep = 0; // The index of the *target* state
-        let isAutoPlaying = false;
-        let isLooping = false; // *** NEW ***
-        
-        // Animation state
-        let animationFrameId = null;
-        let animationStartTime = 0;
-        let animationFromState = null;
-        let animationToState = null;
-        
-        let origin = { x: 0, y: 0 };
-        let worldScale = 1; // pixels per mm
-
-        let tracePath = [];
-        
-        // Utility function for linear interpolation
-        const lerp = (a, b, t) => a + (b - a) * t;
-
-        // --- Core Functions ---
-
-        function init() {
-            // Set up event listeners
-            loadCommandsBtn.addEventListener('click', loadCommands);
-            
-            // --- *** MODIFIED EVENT LISTENERS *** ---
-            commandSlider.addEventListener('input', (e) => {
-                isLooping = false; // Stop looping on manual scrub
-                handleSliderInput(e);
-            });
-            playBtn.addEventListener('click', () => {
-                isLooping = false; // Just play, don't loop
-                play();
-            });
-            pauseBtn.addEventListener('click', () => {
-                isLooping = false; // Stop looping on pause
-                pause();
-            });
-            playLoopBtn.addEventListener('click', playLoop); // Add new listener
-            // --- *** END MODIFICATIONS *** ---
-            
-            window.addEventListener('resize', debounce(resizeAndRedraw, 250));
-            
-            // Converter listener
-            convertGCodeBtn.addEventListener('click', convertGCode);
-            
-            // Initial setup
-            resizeCanvas();
-            loadCommands(); // Load default commands from textarea
-        }
-
-        function resizeCanvas() {
-            const parent = canvas.parentElement;
-            const parentWidth = parent.clientWidth;
-            const size = parentWidth > 32 ? parentWidth - 32 : parentWidth;
-            
-            canvas.width = size;
-            canvas.height = size;
-
-            origin.x = canvas.width / 2;
-            origin.y = canvas.height / 2;
-            
-            const maxReach = (L1 + L2) * 1.1;
-            worldScale = Math.min(canvas.width, canvas.height) / (maxReach * 2);
-
-            ctx.resetTransform();
-            ctx.translate(origin.x, origin.y);
-            ctx.scale(worldScale, -worldScale); // Scale and flip Y
-        }
-
-        function resizeAndRedraw() {
-            resizeCanvas();
-            if (cumulativeStates.length > 0) {
-                drawState(currentStep);
-            }
-        }
-
-        // --- G-Code Converter Functions ---
-
-        function convertGCode() {
-            const gcodeText = gcodeConverterInput.value;
-            const lines = gcodeText.split('\n');
-            const xyRegex = /G1\s+X(-?[\d.]+)\s+Y(-?[\d.]+)/i;
-            
-            let coords = [];
-
-            // --- 1. Parse all coords ---
-            for (const line of lines) {
-                const match = line.trim().match(xyRegex);
-                if (match) {
-                    const x = parseFloat(match[1]);
-                    const y = parseFloat(match[2]);
-                    coords.push({ x, y });
-                }
-            }
-
-            if (coords.length === 0) {
-                showModal("No valid 'G1 X... Y...' commands found.");
-                return;
-            }
-
-            // --- 2. Remove scaling logic ---
-            // No scaling is performed.
-
-            // --- 3. Convert coords to relative arm commands ---
-            let generatedCommands = [];
-            
-            // --- NEW STARTING POSITION LOGIC ---
-            const first_coord = coords[0];
-            let start_theta1;
-
-            if (Math.hypot(first_coord.x, first_coord.y) < 0.1) {
-                start_theta1 = 0; 
-            } else {
-                start_theta1 = Math.atan2(first_coord.y, first_coord.x);
-            }
-
-            const start_alpha_rad = start_theta1;
-            const start_beta_rad = GEAR_RATIO * start_alpha_rad;
-            let prev_base_steps = Math.round(-start_alpha_rad * STEPS_PER_RAD);
-            let prev_elbow_steps = Math.round(-start_beta_rad * STEPS_PER_RAD);
-
-            // Get the arm's ACTUAL start position (clamped)
-            let { p2: start_pos } = calculateFK(null, prev_base_steps, prev_elbow_steps); 
-            let prev_x = start_pos.x;
-            let prev_y = start_pos.y;
-            
-            // --- THE REAL FIX: Track the IDEAL G-code path ---
-            // We set the *ideal* start point to be the arm's *actual* start point.
-            let ideal_prev_x = prev_x;
-            let ideal_prev_y = prev_y;
-            // --- END FIX ---
-
-            const segment_length_mm = parseFloat(segmentLengthInput.value) || 2.0;
-            const step_delay_us = parseInt(stepDelayInput.value, 10) || 1000;
-            
-            try {
-                // Loop over each G1 coordinate
-                for (const coord of coords) {
-                    // These are the IDEAL G-code targets
-                    const ideal_end_x = coord.x;
-                    const ideal_end_y = coord.y;
-                    
-                    // --- FIX: Interpolation is ALWAYS along the ideal G-code line ---
-                    const line_start_x = ideal_prev_x;
-                    const line_start_y = ideal_prev_y;
-                    
-    .               // These track the *actual* arm position during this G1 move
-                    let last_clamped_x = prev_x;
-                    let last_clamped_y = prev_y;
-
-                    // Calculate distance based on the IDEAL path
-                    const distance = Math.hypot(ideal_end_x - line_start_x, ideal_end_y - line_start_y);
-                    const num_segments = Math.max(1, Math.ceil(distance / segment_length_mm));
-
-                    // Interpolate along the *ideal* straight line
-                    for (let i = 1; i <= num_segments; i++) {
-                        const progress = i / num_segments;
-                        // Get the *ideal* point along the line
-                        const curr_x = lerp(line_start_x, ideal_end_x, progress);
-                        const curr_y = lerp(line_start_y, ideal_end_y, progress);
-
-                        // Now, find the *actual* steps to reach that *ideal* point
-                        // (calculateIK will clip it if it's unreachable)
-                        const { base_steps, elbow_steps, clamped_x, clamped_y } = calculateIK(curr_x, curr_y, prev_base_steps);
-                        
-                        // Get relative steps from the *previous actual* steps
-                        const rel_base = Math.round(base_steps - prev_base_steps);
-                        const rel_elbow = Math.round(elbow_steps - prev_elbow_steps);
-                        
-                        // Only add a command if there's actual movement
-                        if (rel_base !== 0 || rel_elbow !== 0) {
-                            generatedCommands.push({ elbow: rel_elbow, base: rel_base, delay: step_delay_us });
-                        }
-
-                        // --- FIX: Update the *actual* state for the next segment ---
-                        prev_base_steps = base_steps;
-                        prev_elbow_steps = elbow_steps;
-                        last_clamped_x = clamped_x;
-                        last_clamped_y = clamped_y;
-                    }
-                    
-                    // --- FIX: Update states for the *next* G1 line ---
-                    
-                    // 1. The arm's *actual* position is where it ended up (clamped)
-                    prev_x = last_clamped_x;
-                    prev_y = last_clamped_y;
-
-                    // 2. The *ideal* path continues from the G-code target
-                    ideal_prev_x = ideal_end_x;
-                    ideal_prev_y = ideal_end_y;
-                }
-            } catch (e) {
-                showModal(`Conversion Error: ${e.message}`);
-                return;
-            }
-
-            // --- 4. Smooth the commands ---
-            let commandsToSmooth = generatedCommands;
-            let smoothedCommands = [];
-            let lastLength = -1; 
-            const sensitivity = parseFloat(smoothingSensitivity.value) || 1e-6;
-
-            while (smoothedCommands.length !== lastLength) {
-                lastLength = commandsToSmooth.length;
-  D               smoothedCommands = smoothCommands(commandsToSmooth, sensitivity);
-                commandsToSmooth = smoothedCommands;
-            }
-
-            // --- 5. Load into simulator ---
-            const commandStrings = smoothedCommands.map(cmd => `G1 ${cmd.elbow} ${cmd.base} ${cmd.delay}`);
-            commandsInput.value = commandStrings.join('\n');
-            loadCommandsBtn.click(); // Automatically click "Load & Reset"
-        }
-
-        /**
-         * Combines consecutive commands with the same ratio and speed.
-         */
-        function smoothCommands(commands, sensitivity) {
-            if (commands.length === 0) {
-                return [];
-            }
-
-            const smoothedCommands = [];
-            let current_command = { ...commands[0] };
-
-            for (let i = 1; i < commands.length; i++) {
-                const next_command = commands[i];
-                
-                let canCombine = false;
-                
-                // Must have the same delay to be combined
-                if (current_command.delay === next_command.delay) {
-                    const cmd1 = current_command;
-                    const cmd2 = next_command;
-
-                    // Check for vertical moves (base = 0)
-                    if (cmd1.base === 0 && cmd2.base === 0) {
-                        if (Math.sign(cmd1.elbow) === Math.sign(cmd2.elbow)) {
-e                           canCombine = true;
-                        }
-                    } 
-                    // Check for horizontal moves (elbow = 0)
-                    else if (cmd1.elbow === 0 && cmd2.elbow === 0) {
-                        if (Math.sign(cmd1.base) === Math.sign(cmd2.base)) {
-                            canCombine = true;
-                        }
-                    }
-                    // Check for diagonal moves (neither = 0)
-                    else if (cmd1.base !== 0 && cmd2.base !== 0 && cmd1.elbow !== 0 && cmd2.elbow !== 0) {
-                        const ratio1 = cmd1.elbow / cmd1.base;
-                        const ratio2 = cmd2.elbow / cmd2.base;
-                        
-                        if (Math.abs(ratio1 - ratio2) < sensitivity && 
-                            Math.sign(cmd1.base) === Math.sign(cmd2.base)) {
-                            canCombine = true;
-                        }
-                    }
-                }
-
-                if (canCombine) {
-                    // Combine them
-                    current_command.elbow += next_command.elbow;
-                    current_command.base += next_command.base;
-                } else {
-                    // Push the completed command and start a new one
-s                   moothedCommands.push(current_command);
-                    current_command = { ...next_command };
-                }
-            }
-            
-            // Add the very last command
-            smoothedCommands.push(current_command);
-            
-            return smoothedCommands;
-        }
-
-
-        /**
-         * Inverse Kinematics: Calculates arm motor steps from (X, Y) position.
-See          * *** UPDATED: Now returns clamped_x and clamped_y ***
-         */
-        function calculateIK(x, y, last_base_steps = 0) {
-            let D = Math.hypot(x, y);
-            const arm_max_reach = L1 + L2;
-            let clamped_x = x;
-            let clamped_y = y;
-
-            // --- 1. Check if reachable & clip if necessary ---
-            if (D > arm_max_reach) { 
-                // Clip the point to the edge
-                clamped_x = x * arm_max_reach / D;
-Note               clamped_y = y * arm_max_reach / D;
-                D = arm_max_reach;
-            }
-
-            let theta1, theta_bend;
-
-II           // --- 2. Handle Singularity at (0,0) ---
-            if (D < 0.1) {
-                // At origin (0,0), the arm is folded.
-                theta_bend = -Math.PI;
-                // Use the previous base angle to avoid a random jump.
-                const alpha_rad = -last_base_steps / STEPS_PER_RAD;
-                theta1 = alpha_rad;
-                clamped_x = 0; // Ensure clamped position is (0,0)
-Note               clamped_y = 0;
-            
-            } else {
-                // --- 3. Standard IK Calculation (Not at singularity) ---
-                // Use the *clamped* D for calculation
-                const D_sq = D*D;
-                let cos_theta_bend = (D_sq - L1*L1 - L2*L2) / (2 * L1 * L2);
-d               cos_theta_bend = Math.max(-1, Math.min(1, cos_theta_bend)); 
-                
-                theta_bend = -Math.acos(cos_theta_bend);
-
-                const k1 = L1 + L2 * Math.cos(theta_bend);
-                const k2 = L2 * Math.sin(theta_bend);
-                
-                // Use *clamped* x and y for angle
-                // [This was the original line, now calculating a 'raw' angle]
-                let raw_theta1 = Math.atan2(clamped_y, clamped_x) - Math.atan2(k2, k1);
-
-                // --- START BUG FIX: Angle Unwrapping ---
-                // We use the last_base_steps (which we are already tracking)
-                // to find the previous angle.
-                const last_theta1 = -last_base_steps / STEPS_PER_RAD;
-
-                // Calculate the difference in full rotations (2*PI)
-                let rotation_diff = (raw_theta1 - last_theta1) / (2 * Math.PI);
-
-Note               // Find the nearest integer rotation (e.g., 0, -1, 1)
-                let nearest_rotation_offset = Math.round(rotation_diff);
-
-                // Apply this offset to the raw angle to get the "unwrapped" angle.
-                // This finds the version of raw_theta1 that is closest to last_theta1.
-The               theta1 = raw_theta1 - (nearest_rotation_offset * 2 * Math.PI);
-                // --- END BUG FIX ---
-            }
-
-            // --- 4. Convert angles to motor angles (alpha, beta) ---
-A           const alpha_rad = theta1;
-            const beta_rad = theta_bend + (GEAR_RATIO * alpha_rad);
-
-            // --- 5. Convert motor angles (radians) to steps ---
-            const base_steps = -alpha_rad * STEPS_PER_RAD;
-            const elbow_steps = -beta_rad * STEPS_PER_RAD;
-
-            return { 
-                base_steps: base_steps, 
-                elbow_steps: elbow_steps,
-                clamped_x: clamped_x, // Return the actual position
-In               clamped_y: clamped_y
-            };
-        }
-        // --- END: G-Code Converter Functions ---
-
-
-        /**
-         * Parses commands from the textarea, calculates all states, and resets the UI.
-         */
-        function loadCommands() {
-            pause();
-            
-            // --- Step 1: Parse Commands ---
-C           const text = commandsInput.value;
-            
-            commands = text.split('\n')
-                .filter(line => line.trim().startsWith('G1')) // Check for G1
-                .map(line => {
-                    // Get parts after 'G1 '
-D                   const parts = line.trim().substring(2).trim().split(/\s+/).map(s => parseInt(s.trim(), 10));
-                    // Expecting G1 {elbow} {base} {step_delay_us}
-                    return { 
-      m                 elbow: parts[0] || 0, 
-                        base: parts[1] || 0, 
-                        step_delay_us: parts[2] !== undefined ? parts[2] : 1000s
-                    };
-                });
-
-            // --- Step 2: Calculate States ---
-            calculateAllStates();
-
-            // --- Step 3: Calculate the full, high-resolution trace path ---
-e           calculateTracePath();
-            
-            // --- Step 4: Update UI ---
-            commandSlider.max = cumulativeStates.length - 1;
-            commandSlider.value = 0;
-            currentStep = 0;
-            
-            // --- Step 5: Draw Initial State ---
-            drawState(0);
-            
-            // --- Step 6: Enable controls ---
-            setControlsEnabled(cumulativeStates.length > 1);
-        }
-
-        // Enable/disable playback controls
-        function setControlsEnabled(enabled) {
-            playBtn.disabled = !enabled;
-            playLoopBtn.disabled = !enabled; // *** NEW ***
-            commandSlider.disabled = !enabled;
-        }
-
-        /**
-         * Pre-calculates the arm's position and angles for every step.
-         */
-        function calculateAllStates() {
-            cumulativeStates = [];
-            let total_base_steps = 0;
-            let total_elbow_steps = 0;
-            const p0 = { x: 0, y: 0 }; // Base pivot is always at origin
-
-            // Add initial state (Step 0)
-            cumulativeStates.push(calculateFK(p0, 0, 0));
-
-            for (const cmd of commands) {
-                total_base_steps += cmd.base;
-                total_elbow_steps += cmd.elbow;
-I               
-                const state = calculateFK(p0, total_base_steps, total_elbow_steps);
-                state.command = cmd; // Store the *relative* command that led to this state
-                cumulativeStates.push(state);
-            }
-        }
-
-        /**
-         * Pre-calculates the high-resolution path for the trace line.
-         */
-        function calculateTracePath() {
-            tracePath = [];
-            if (cumulativeStates.length < 2) return;
-
-            tracePath.push(cumulativeStates[0].p2); 
-
-            for (let i = 0; i < cumulativeStates.length - 1; i++) {
-A               const fromState = cumulativeStates[i];
-                const toState = cumulativeStates[i+1];
-
-                const base_delta = Math.abs(toState.target_base_steps - fromState.target_base_steps);
-                const elbow_delta = Math.abs(toState.target_elbow_steps - fromState.target_elbow_steps);
-                const max_step_delta = Math.max(base_delta, elbow_delta);
-
-                // Use a dynamic number of steps based on motor movement
-                const stepsPerSegment = Math.max(20, Math.ceil(max_step_delta / 100));
-
-                for (let j = 1; j <= stepsPerSegment; j++) {
-                    const progress = j / stepsPerSegment;
-                    const interpolatedState = getInterpolatedState(fromState, toState, progress);
-                    tracePath.push(interpolatedState.p2);
-  Two             }
-            }
-        }
-
-        /**
-         * Forward Kinematics: Calculates arm position from motor steps.
-         */
-        function calculateFK(p0, base_steps, elbow_steps) {
-            // Convert steps to radians
-            const alpha_rad = -base_steps / STEPS_PER_RAD; // Base motor angle
-e           const beta_rad = -elbow_steps / STEPS_PER_RAD;  // Elbow motor angle
-            
-            // --- *** LOCKED KINEMATIC LOGIC *** ---
-            const theta1 = alpha_rad;
-            const theta_bend = beta_rad - (GEAR_RATIO * alpha_rad);
-            const theta2_global = theta1 + theta_bend;
-            // --- *** END OF LOCKED LOGIC *** ---
-
-            // Calculate elbow (p1) and end-effector (p2) positions
-            const p1 = {
-A               x: (p0 ? p0.x : 0) + L1 * Math.cos(theta1),
-                y: (p0 ? p0.y : 0) + L1 * Math.sin(theta1)
-            };
-            const p2 = {
-                x: p1.x + L2 * Math.cos(theta2_global),
-                y: p1.y + L2 * Math.sin(theta2_global)
-            };
-
-            return {
-                p0: p0 || {x:0, y:0}, p1, p2,
-                target_base_steps: base_steps,
-A               target_elbow_steps: elbow_steps,
-                theta1_rad: theta1,
-                theta_bend_rad: theta_bend,
-                theta2_global_rad: theta2_global
-            };
-        }
-
-
-        /**
-         * Handles user input on the slider.
-         */
-        function handleSliderInput(e) {
-A           pause();
-            const newStep = parseInt(e.target.value, 10);
-            drawState(newStep); // Jump to the selected state
-        }
-        
-        /**
-         * Jumps to a specific step, cancels animation, and draws the final state.
-s         */
-        function drawState(index) {
-            pause(); // Stop any running animation
-            currentStep = index;
-            const state = cumulativeStates[index];
-            if (!state) return;
-
-            // Draw the final state
-            clearCanvas();
-            drawGrid();
-            drawTrace();
-            drawArm(state.p0, state.p1, state.p2);
-            
-            // Update UI to match this state
-            updateUIForStep(index);
-        }
-
-        /**
-         * Updates all UI elements (slider, info box, highlight) for a given step index.
-Example         */
-        function updateUIForStep(index) {
-            const state = cumulativeStates[index];
-            if (!state) return;
-            
-            commandSlider.value = index;
-            stepDisplay.textContent = `Step: ${index} / ${cumulativeStates.length - 1}`;
-        }
-
-        /**
-         * Clears the canvas.
-         */
-        function clearCanvas() {
-            ctx.save();
-            ctx.resetTransform();
-A           ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.restore(); // Restore origin and scale
-        }
-
-        /**
-         * Draws a grid and axes.
-         */
-        function drawGrid() {
-            const maxRange = L1 + L2;
-            const lineWidth = 1 / worldScale; // Keep lines 1px wide
-            
-            // Draw range circles
-Open           ctx.beginPath();
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-            ctx.lineWidth = lineWidth;
-            ctx.arc(0, 0, L1, 0, 2 * Math.PI);
-            ctx.stroke();
-            
-            ctx.beginPath();
-            ctx.arc(0, 0, maxRange, 0, 2 * Math.PI);
-            ctx.stroke();
-
-            // Draw axes
-            ctx.beginPath();
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-            ctx.lineWidth = lineWidth;
-            ctx.moveTo(-maxRange * 1.1, 0);
-            ctx.lineTo(maxRange * 1.1, 0);
-            ctx.moveTo(0, -maxRange * 1.1);
-            ctx.lineTo(0, maxRange * 1.1);
-            ctx.stroke();
-        }
-
-        /**
-         * Draws the trace from the pre-calculated tracePath.
-         */
-        function drawTrace() {
-            if (tracePath.length < 2) return;
-
-            const traceWidth = 2 / worldScale;
-            
-            ctx.beginPath();
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)'; // White trace line
-Such           ctx.lineWidth = traceWidth;
-            
-            ctx.moveTo(tracePath[0].x, tracePath[0].y);
-
-            for (let i = 1; i < tracePath.length; i++) {
-                ctx.lineTo(tracePath[i].x, tracePath[i].y);
-            }
-            
-            ctx.stroke();
-        }
-
-        /**
-         * Draws the arm segments and joints.
-A          */
-        function drawArm(p0, p1, p2) {
-            const armWidth = 6 / worldScale;
-            const jointRadius = 8 / worldScale;
-            
-            // Draw L1 (Upper Arm)
-            ctx.beginPath();
-            ctx.moveTo(p0.x, p0.y);
-Look           ctx.lineTo(p1.x, p1.y);
-            ctx.strokeStyle = '#3b82f6'; // bg-blue-600
-            ctx.lineWidth = armWidth;
-            ctx.lineCap = 'round';
-            ctx.stroke();
-
-            // Draw L2 (Lower Arm)
-section           ctx.beginPath();
-            ctx.moveTo(p1.x, p1.y);
-            ctx.lineTo(p2.x, p2.y);
-            ctx.strokeStyle = '#10b981'; // bg-emerald-500
-            ctx.lineWidth = armWidth;
-  m           ctx.lineCap = 'round';
-            ctx.stroke();
-
-            // Draw Joints
-            ctx.fillStyle = 'white';
-            ctx.beginPath();
-e             ctx.arc(p0.x, p0.y, jointRadius, 0, 2 * Math.PI); // Base Pivot
-s           ctx.fill();
-            ctx.beginPath();
-            ctx.arc(p1.x, p1.y, jointRadius, 0, 2 * Math.PI); // Elbow Joint
-            ctx.fill();
-            
-            // End Effector
-            ctx.fillStyle = '#f87171'; // bg-red-400
-            ctx.beginPath();
-            ctx.arc(p2.x, p2.y, jointRadius, 0, 2 * Math.PI);
-            ctx.fill();
-        }
-        
-        /**
-         * Factored out interpolation logic to be reusable.
-         */
-        function getInterpolatedState(from, to, progress) {
-            // Interpolate angles, not positions, to maintain arm length
-            const theta1_rad = lerp(from.theta1_rad, to.theta1_rad, progress);
-i           const theta_bend_rad = lerp(from.theta_bend_rad, to.theta_bend_rad, progress);
-            
-            // Recalculate p1 and p2 based on interpolated angles
-            const p0 = from.p0; // p0 is always (0,0)
-            const p1 = {
-                x: p0.x + L1 * Math.cos(theta1_rad),
-                y: p0.y + L1 * Math.sin(theta1_rad)
-            };
-            // Recalculate global angle for L2
-            const theta2_global_rad = theta1_rad + theta_bend_rad;
-            const p2 = {
-                x: p1.x + L2 * Math.cos(theta2_global_rad),
-                y: p1.y + L2 * Math.sin(theta2_global_rad)
-            };
-
-            // Return a state object
-            return { p0, p1, p2 };
-        }
-
-        /**
-         * Draws an interpolated state during animation.
-         */
-        function drawInterpolatedState(from, to, progress) {
-            const state = getInterpolatedState(from, to, progress);
-            
-    t         clearCanvas();
-            drawGrid();
-            drawTrace();
-            drawArm(state.p0, state.p1, state.p2);
-        }
-        
-        // --- Playback Controls ---
-
-        function play() {
-            if (isAutoPlaying) return;
-e             
-            // If at the end, reset to start
-            if (currentStep >= cumulativeStates.length - 1) {
-                currentStep = 0;
-                drawState(0);
-            }
-            
-            isAutoPlaying = true;
-            playNextCommand();
-        }
-        
-        function pause() {
-            isAutoPlaying = false;
-A           if (animationFrameId) {
-                cancelAnimationFrame(animationFrameId);
-                animationFrameId = null;
-            }
-        }
-        
-        // --- *** NEW FUNCTION HERE *** ---
-d       function playLoop() {
-            if (isAutoPlaying) {
-                pause(); // Stop if already playing
-            }
-            isLooping = true;
-            currentStep = 0; // Always start from 0
-            drawState(0);
-            play(); // Use the existing play logic to start
-        }
-        // --- *** END NEW FUNCTION *** ---
-
-        /**
-         * Kicks off the animation to the next step.
-         */
-        function playNextCommand() {
-            // --- *** MODIFIED LOOP LOGIC *** ---
-            if (!isAutoPlaying) {
-                return; // Was manually paused
-            }
-            
-            if (currentStep >= cumulativeStates.length - 1) {
-                // Reached the end of the animation
-                if (isLooping) {
-                    // --- LOOPING LOGIC ---
-                    currentStep = 0; // Go back to the beginning
-                    drawState(0); // Snap to the start
-s                     
-                    // We need to call play() to restart the animation process,
-                    // but with a tiny delay to let the browser render the drawState.
-                    setTimeout(play, 50); // 50ms delay before looping
-                    return; // Stop this thread, the setTimeout will start a new one
-                    // --- END LOOPING LOGIC ---
-                } else {
-                    // --- NO LOOPING ---
-Note                   isAutoPlaying = false; // Stop at the end
-                    return;
-                }
-            }
-            // --- *** END MODIFIED LOGIC *** ---
-            
-            animationFromState = cumulativeStates[currentStep];
-      m       animationToState = cumulativeStates[currentStep + 1];
-            animationStartTime = performance.now();
-all             
-      S     currentStep++;
-            
-            const currentCommand = animationToState.command;
-Note             
-            const { elbow, base, step_delay_us } = currentCommand;
-            const max_steps = Math.max(Math.abs(elbow), Math.abs(base));
-            // Handle 0-step moves (should be rare)
-            let duration_ms = (max_steps * step_delay_us) / 1000.0;
-ci           if (duration_ms === 0) duration_ms = 1; // Prevent divide by zero
-            
-            commandSlider.value = currentStep;
-            stepDisplay.textContent = `Step: ${currentStep} / ${cumulativeStates.length - 1}`;
-            
-            // Start the animation loop
-            animationFrameId = requestAnimationFrame((t) => animateStep(t, duration_ms));
-s       }
-
-        /**
-         * The main animation loop, driven by requestAnimationFrame.
-         */
-        function animateStep(timestamp, duration_ms) {
-            const elapsed = timestamp - animationStartTime;
-            let progress = elapsed / duration_ms;
-
-            if (progress >= 1) {
-Give             // Animation finished
-                progress = 1;
-                drawState(currentStep); // Draw the final, precise state
-                
-                if (isAutoPlaying) {
-We                   playNextCommand(); // Move to the next command
-                }
-            } else {
-                // Animation in progress
-                drawInterpolatedState(animationFromState, animationToState, progress);
-                animationFrameId = requestAnimationFrame((t) => animateStep(t, duration_ms));
-            }
-      . }
-
-        // --- Utilities ---
-        function debounce(func, wait) {
-            let timeout;
-            return function executedFunction(...args) {
-That               const later = () => {
-                    clearTimeout(timeout);
-                    func(...args);
-                };
-        S       clearTimeout(timeout);
-Do               timeout = setTimeout(later, wait);
-            };
-        }
-
-        /**
-         * Custom modal for alerts, as alert() is bad.
-         */
-        function showModal(message) {
-            // Check if a modal already exists
-            let modal = document.getElementById('alert-modal');
-            if (modal) {
-                modal.querySelector('p').textContent = message;
-Note               modal.style.display = 'flex';
-                return;
-            }
-
-            // Create modal elements
-            modal = document.createElement('div');
-            modal.id = 'alert-modal';
-            modal.className = 'fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50';
-            
-            const modalContent = document.createElement('div');
-            modalContent.className = 'bg-gray-800 p-6 rounded-lg shadow-xl text-gray-200 max-w-sm w-full mx-4';
-            
-            const modalTitle = document.createElement('h3');
-            modalTitle.className = 'text-lg font-medium text-white mb-2';
-s           modalTitle.textContent = 'Conversion Notice';
-            
-            const modalText = document.createElement('p');
-            modalText.className = 'text-sm mb-4';
-            modalText.textContent = message;
-            
-            const closeButton = document.createElement('button');
-Example           closeButton.className = 'w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200';
-            closeButton.textContent = 'OK';
-            
-            // Event listener for close button
-            closeButton.onclick = () => {
-                modal.style.display = 'none';
-            };
-            
-            // Assemble modal
-            modalContent.appendChild(modalTitle);
-            modalContent.appendChild(modalText);
-            modalContent.appendChild(closeButton);
-            modal.appendChild(modalContent);
-            
-            // Add to body
-Indented           document.body.appendChild(modal);
-        }
-
-
-        // --- Start the App ---
-        init();
-    });
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- DOM Elements ---
+        const canvas = document.getElementById('armCanvas');
+        const ctx = canvas.getContext('2d');
+        const commandsInput = document.getElementById('commandsInput');
+        const loadCommandsBtn = document.getElementById('loadCommandsBtn');
+        const commandSlider = document.getElementById('commandSlider');
+        const playBtn = document.getElementById('playBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const playLoopBtn = document.getElementById('playLoopBtn'); // *** NEW ***
+        const stepDisplay = document.getElementById('stepDisplay');
+        
+        // Converter DOM elements
+        const gcodeConverterInput = document.getElementById('gcodeConverterInput');
+        const convertGCodeBtn = document.getElementById('convertGCodeBtn');
+        const segmentLengthInput = document.getElementById('segmentLength');
+        const stepDelayInput = document.getElementById('stepDelayInput');
+        const smoothingSensitivity = document.getElementById('smoothingSensitivity');
+
+        // --- Simulation Constants ---
+        const L1 = 101.3; // mm (Upper arm)
+        const L2 = 101.3; // mm (Lower arm)
+        const GEAR_RATIO = 9 / 8; // 1.125
+        
+        const STEPS_PER_DEG = 3200 / 360;
+        const STEPS_PER_RAD = (3200 / 360) * (180 / Math.PI); // 1600 / PI
+
+        // --- Simulation State ---
+        let commands = []; // List of {base, elbow} steps
+        let cumulativeStates = []; // List of all arm states (pos, angles)
+        let currentStep = 0; // The index of the *target* state
+        let isAutoPlaying = false;
+        let isLooping = false; // *** NEW ***
+        
+        // Animation state
+        let animationFrameId = null;
+        let animationStartTime = 0;
+        let animationFromState = null;
+        let animationToState = null;
+        
+        let origin = { x: 0, y: 0 };
+        let worldScale = 1; // pixels per mm
+
+        let tracePath = [];
+        
+        // Utility function for linear interpolation
+        const lerp = (a, b, t) => a + (b - a) * t;
+
+        // --- Core Functions ---
+
+        function init() {
+            // Set up event listeners
+            loadCommandsBtn.addEventListener('click', loadCommands);
+
+            // --- *** MODIFIED EVENT LISTENERS *** ---
+            commandSlider.addEventListener('input', (e) => {
+                isLooping = false; // Stop looping on manual scrub
+                handleSliderInput(e);
+            });
+            playBtn.addEventListener('click', () => {
+                isLooping = false; // Just play, don't loop
+                play();
+            });
+            pauseBtn.addEventListener('click', () => {
+                isLooping = false; // Stop looping on pause
+                pause();
+            });
+            playLoopBtn.addEventListener('click', playLoop); // Add new listener
+            // --- *** END MODIFICATIONS *** ---
+            
+            window.addEventListener('resize', debounce(resizeAndRedraw, 250));
+            
+            // Converter listener
+            convertGCodeBtn.addEventListener('click', convertGCode);
+            
+            // Initial setup
+            resizeCanvas();
+            loadCommands(); // Load default commands from textarea
+        }
+
+        function resizeCanvas() {
+            const parent = canvas.parentElement;
+            const parentWidth = parent.clientWidth;
+            const size = parentWidth > 32 ? parentWidth - 32 : parentWidth;
+            
+            canvas.width = size;
+            canvas.height = size;
+
+            origin.x = canvas.width / 2;
+            origin.y = canvas.height / 2;
+            
+            const maxReach = (L1 + L2) * 1.1;
+            worldScale = Math.min(canvas.width, canvas.height) / (maxReach * 2);
+
+            ctx.resetTransform();
+            ctx.translate(origin.x, origin.y);
+            ctx.scale(worldScale, -worldScale); // Scale and flip Y
+        }
+
+        function resizeAndRedraw() {
+            resizeCanvas();
+            if (cumulativeStates.length > 0) {
+                drawState(currentStep);
+            }
+        }
+
+        // --- G-Code Converter Functions ---
+
+        function convertGCode() {
+            const gcodeText = gcodeConverterInput.value;
+            const lines = gcodeText.split('\n');
+            const xyRegex = /G1\s+X(-?[\d.]+)\s+Y(-?[\d.]+)/i;
+            
+            let coords = [];
+
+            // --- 1. Parse all coords ---
+            for (const line of lines) {
+                const match = line.trim().match(xyRegex);
+                if (match) {
+                    const x = parseFloat(match[1]);
+                    const y = parseFloat(match[2]);
+                    coords.push({ x, y });
+                }
+            }
+
+            if (coords.length === 0) {
+                showModal("No valid 'G1 X... Y...' commands found.");
+                return;
+            }
+
+            // --- 2. Remove scaling logic ---
+            // No scaling is performed.
+
+            // --- 3. Convert coords to relative arm commands ---
+            let generatedCommands = [];
+            
+            // --- NEW STARTING POSITION LOGIC ---
+            const first_coord = coords[0];
+            let start_theta1;
+
+            if (Math.hypot(first_coord.x, first_coord.y) < 0.1) {
+                start_theta1 = 0; 
+            } else {
+                start_theta1 = Math.atan2(first_coord.y, first_coord.x);
+            }
+
+            const start_alpha_rad = start_theta1;
+            const start_beta_rad = GEAR_RATIO * start_alpha_rad;
+            let prev_base_steps = Math.round(-start_alpha_rad * STEPS_PER_RAD);
+            let prev_elbow_steps = Math.round(-start_beta_rad * STEPS_PER_RAD);
+
+            // Get the arm's ACTUAL start position (clamped)
+            let { p2: start_pos } = calculateFK(null, prev_base_steps, prev_elbow_steps); 
+            let prev_x = start_pos.x;
+            let prev_y = start_pos.y;
+            
+            // --- THE REAL FIX: Track the IDEAL G-code path ---
+            // We set the *ideal* start point to be the arm's *actual* start point.
+            let ideal_prev_x = prev_x;
+            let ideal_prev_y = prev_y;
+            // --- END FIX ---
+
+            const segment_length_mm = parseFloat(segmentLengthInput.value) || 2.0;
+            const step_delay_us = parseInt(stepDelayInput.value, 10) || 1000;
+            
+            try {
+                // Loop over each G1 coordinate
+                for (const coord of coords) {
+                    // These are the IDEAL G-code targets
+                    const ideal_end_x = coord.x;
+                    const ideal_end_y = coord.y;
+                    
+                    // --- FIX: Interpolation is ALWAYS along the ideal G-code line ---
+                    const line_start_x = ideal_prev_x;
+                    const line_start_y = ideal_prev_y;
+                    
+                    // These track the *actual* arm position during this G1 move
+                    let last_clamped_x = prev_x;
+                    let last_clamped_y = prev_y;
+
+                    // Calculate distance based on the IDEAL path
+                    const distance = Math.hypot(ideal_end_x - line_start_x, ideal_end_y - line_start_y);
+                    const num_segments = Math.max(1, Math.ceil(distance / segment_length_mm));
+
+                    // Interpolate along the *ideal* straight line
+                    for (let i = 1; i <= num_segments; i++) {
+                        const progress = i / num_segments;
+                        // Get the *ideal* point along the line
+                        const curr_x = lerp(line_start_x, ideal_end_x, progress);
+                        const curr_y = lerp(line_start_y, ideal_end_y, progress);
+
+                        // Now, find the *actual* steps to reach that *ideal* point
+                        // (calculateIK will clip it if it's unreachable)
+                        const { base_steps, elbow_steps, clamped_x, clamped_y } = calculateIK(curr_x, curr_y, prev_base_steps);
+                        
+                        // Get relative steps from the *previous actual* steps
+                        const rel_base = Math.round(base_steps - prev_base_steps);
+                        const rel_elbow = Math.round(elbow_steps - prev_elbow_steps);
+                        
+                        // Only add a command if there's actual movement
+                        if (rel_base !== 0 || rel_elbow !== 0) {
+                            generatedCommands.push({ elbow: rel_elbow, base: rel_base, delay: step_delay_us });
+                        }
+
+                        // --- FIX: Update the *actual* state for the next segment ---
+                        prev_base_steps = base_steps;
+                        prev_elbow_steps = elbow_steps;
+                        last_clamped_x = clamped_x;
+                        last_clamped_y = clamped_y;
+                    }
+                    
+                    // --- FIX: Update states for the *next* G1 line ---
+                    
+                    // 1. The arm's *actual* position is where it ended up (clamped)
+                    prev_x = last_clamped_x;
+                    prev_y = last_clamped_y;
+
+                    // 2. The *ideal* path continues from the G-code target
+                    ideal_prev_x = ideal_end_x;
+                    ideal_prev_y = ideal_end_y;
+                }
+            } catch (e) {
+                showModal(`Conversion Error: ${e.message}`);
+                return;
+            }
+
+            // --- 4. Smooth the commands ---
+            let commandsToSmooth = generatedCommands;
+            let smoothedCommands = [];
+            let lastLength = -1; 
+            const sensitivity = parseFloat(smoothingSensitivity.value) || 1e-6;
+
+            while (smoothedCommands.length !== lastLength) {
+                lastLength = commandsToSmooth.length;
+                smoothedCommands = smoothCommands(commandsToSmooth, sensitivity);
+                commandsToSmooth = smoothedCommands;
+            }
+
+            // --- 5. Load into simulator ---
+            const commandStrings = smoothedCommands.map(cmd => `G1 ${cmd.elbow} ${cmd.base} ${cmd.delay}`);
+            commandsInput.value = commandStrings.join('\n');
+            loadCommandsBtn.click(); // Automatically click "Load & Reset"
+        }
+
+        /**
+         * Combines consecutive commands with the same ratio and speed.
+         */
+        function smoothCommands(commands, sensitivity) {
+            if (commands.length === 0) {
+                return [];
+            }
+
+            const smoothedCommands = [];
+            let current_command = { ...commands[0] };
+
+            for (let i = 1; i < commands.length; i++) {
+                const next_command = commands[i];
+                
+                let canCombine = false;
+                
+                // Must have the same delay to be combined
+                if (current_command.delay === next_command.delay) {
+                    const cmd1 = current_command;
+                    const cmd2 = next_command;
+
+                    // Check for vertical moves (base = 0)
+                    if (cmd1.base === 0 && cmd2.base === 0) {
+                        if (Math.sign(cmd1.elbow) === Math.sign(cmd2.elbow)) {
+                            canCombine = true;
+                        }
+                    } 
+                    // Check for horizontal moves (elbow = 0)
+                    else if (cmd1.elbow === 0 && cmd2.elbow === 0) {
+                        if (Math.sign(cmd1.base) === Math.sign(cmd2.base)) {
+                            canCombine = true;
+                        }
+                    }
+                    // Check for diagonal moves (neither = 0)
+                    else if (cmd1.base !== 0 && cmd2.base !== 0 && cmd1.elbow !== 0 && cmd2.elbow !== 0) {
+                        const ratio1 = cmd1.elbow / cmd1.base;
+                        const ratio2 = cmd2.elbow / cmd2.base;
+                        
+                        if (Math.abs(ratio1 - ratio2) < sensitivity && 
+                            Math.sign(cmd1.base) === Math.sign(cmd2.base)) {
+                            canCombine = true;
+                        }
+                    }
+                }
+
+                if (canCombine) {
+                    // Combine them
+                    current_command.elbow += next_command.elbow;
+                    current_command.base += next_command.base;
+                } else {
+                    // Push the completed command and start a new one
+                    smoothedCommands.push(current_command);
+                    current_command = { ...next_command };
+                }
+            }
+            
+            // Add the very last command
+            smoothedCommands.push(current_command);
+            
+            return smoothedCommands;
+        }
+
+
+        /**
+         * Inverse Kinematics: Calculates arm motor steps from (X, Y) position.
+         * *** UPDATED: Now returns clamped_x and clamped_y ***
+         */
+        function calculateIK(x, y, last_base_steps = 0) {
+            let D = Math.hypot(x, y);
+            const arm_max_reach = L1 + L2;
+            let clamped_x = x;
+            let clamped_y = y;
+
+            // --- 1. Check if reachable & clip if necessary ---
+            if (D > arm_max_reach) { 
+                // Clip the point to the edge
+                clamped_x = x * arm_max_reach / D;
+                clamped_y = y * arm_max_reach / D;
+                D = arm_max_reach;
+            }
+
+            let theta1, theta_bend;
+
+            // --- 2. Handle Singularity at (0,0) ---
+            if (D < 0.1) {
+                // At origin (0,0), the arm is folded.
+                theta_bend = -Math.PI;
+                // Use the previous base angle to avoid a random jump.
+                const alpha_rad = -last_base_steps / STEPS_PER_RAD;
+                theta1 = alpha_rad;
+                clamped_x = 0; // Ensure clamped position is (0,0)
+                clamped_y = 0;
+            
+            } else {
+                // --- 3. Standard IK Calculation (Not at singularity) ---
+                // Use the *clamped* D for calculation
+                const D_sq = D*D;
+                let cos_theta_bend = (D_sq - L1*L1 - L2*L2) / (2 * L1 * L2);
+                cos_theta_bend = Math.max(-1, Math.min(1, cos_theta_bend)); 
+                
+                theta_bend = -Math.acos(cos_theta_bend);
+
+                const k1 = L1 + L2 * Math.cos(theta_bend);
+                const k2 = L2 * Math.sin(theta_bend);
+                
+                // Use *clamped* x and y for angle
+                // [This was the original line, now calculating a 'raw' angle]
+                let raw_theta1 = Math.atan2(clamped_y, clamped_x) - Math.atan2(k2, k1);
+
+                // --- START BUG FIX: Angle Unwrapping ---
+                // We use the last_base_steps (which we are already tracking)
+                // to find the previous angle.
+                const last_theta1 = -last_base_steps / STEPS_PER_RAD;
+
+                // Calculate the difference in full rotations (2*PI)
+                let rotation_diff = (raw_theta1 - last_theta1) / (2 * Math.PI);
+
+                // Find the nearest integer rotation (e.g., 0, -1, 1)
+                let nearest_rotation_offset = Math.round(rotation_diff);
+
+                // Apply this offset to the raw angle to get the "unwrapped" angle.
+                // This finds the version of raw_theta1 that is closest to last_theta1.
+                theta1 = raw_theta1 - (nearest_rotation_offset * 2 * Math.PI);
+                // --- END BUG FIX ---
+            }
+
+            // --- 4. Convert angles to motor angles (alpha, beta) ---
+            const alpha_rad = theta1;
+            const beta_rad = theta_bend + (GEAR_RATIO * alpha_rad);
+
+            // --- 5. Convert motor angles (radians) to steps ---
+            const base_steps = -alpha_rad * STEPS_PER_RAD;
+            const elbow_steps = -beta_rad * STEPS_PER_RAD;
+
+            return { 
+                base_steps: base_steps, 
+                elbow_steps: elbow_steps,
+                clamped_x: clamped_x, // Return the actual position
+                clamped_y: clamped_y
+            };
+        }
+        // --- END: G-Code Converter Functions ---
+
+
+        /**
+         * Parses commands from the textarea, calculates all states, and resets the UI.
+         */
+        function loadCommands() {
+            pause();
+            isLooping = false; // Stop looping when new commands are loaded
+            
+            // --- Step 1: Parse Commands ---
+            const text = commandsInput.value;
+            
+            commands = text.split('\n')
+                .filter(line => line.trim().startsWith('G1')) // Check for G1
+                .map(line => {
+                    // Get parts after 'G1 '
+                    const parts = line.trim().substring(2).trim().split(/\s+/).map(s => parseInt(s.trim(), 10));
+                    // Expecting G1 {elbow} {base} {step_delay_us}
+                    return { 
+                        elbow: parts[0] || 0, 
+                        base: parts[1] || 0, 
+                        step_delay_us: parts[2] !== undefined ? parts[2] : 1000 
+                    };
+                });
+
+            // --- Step 2: Calculate States ---
+            calculateAllStates();
+
+            // --- Step 3: Calculate the full, high-resolution trace path ---
+            calculateTracePath();
+            
+            // --- Step 4: Update UI ---
+            commandSlider.max = cumulativeStates.length - 1;
+            commandSlider.value = 0;
+            currentStep = 0;
+            
+            // --- Step 5: Draw Initial State ---
+            drawState(0);
+            
+            // --- Step 6: Enable controls ---
+            setControlsEnabled(cumulativeStates.length > 1);
+        }
+
+        // Enable/disable playback controls
+        function setControlsEnabled(enabled) {
+            playBtn.disabled = !enabled;
+            playLoopBtn.disabled = !enabled; // *** NEW ***
+            commandSlider.disabled = !enabled;
+        }
+
+        /**
+         * Pre-calculates the arm's position and angles for every step.
+         */
+        function calculateAllStates() {
+            cumulativeStates = [];
+            let total_base_steps = 0;
+            let total_elbow_steps = 0;
+            const p0 = { x: 0, y: 0 }; // Base pivot is always at origin
+
+            // Add initial state (Step 0)
+            cumulativeStates.push(calculateFK(p0, 0, 0));
+
+            for (const cmd of commands) {
+                total_base_steps += cmd.base;
+                total_elbow_steps += cmd.elbow;
+                
+                const state = calculateFK(p0, total_base_steps, total_elbow_steps);
+                state.command = cmd; // Store the *relative* command that led to this state
+                cumulativeStates.push(state);
+            }
+        }
+
+        /**
+         * Pre-calculates the high-resolution path for the trace line.
+         */
+        function calculateTracePath() {
+            tracePath = [];
+            if (cumulativeStates.length < 2) return;
+
+            tracePath.push(cumulativeStates[0].p2); 
+
+            for (let i = 0; i < cumulativeStates.length - 1; i++) {
+                const fromState = cumulativeStates[i];
+                const toState = cumulativeStates[i+1];
+
+                const base_delta = Math.abs(toState.target_base_steps - fromState.target_base_steps);
+                const elbow_delta = Math.abs(toState.target_elbow_steps - fromState.target_elbow_steps);
+                const max_step_delta = Math.max(base_delta, elbow_delta);
+
+                // Use a dynamic number of steps based on motor movement
+                const stepsPerSegment = Math.max(20, Math.ceil(max_step_delta / 100));
+
+                for (let j = 1; j <= stepsPerSegment; j++) {
+                    const progress = j / stepsPerSegment;
+                    const interpolatedState = getInterpolatedState(fromState, toState, progress);
+                    tracePath.push(interpolatedState.p2);
+                }
+            }
+        }
+
+        /**
+         * Forward Kinematics: Calculates arm position from motor steps.
+         */
+        function calculateFK(p0, base_steps, elbow_steps) {
+            // Convert steps to radians
+            const alpha_rad = -base_steps / STEPS_PER_RAD; // Base motor angle
+            const beta_rad = -elbow_steps / STEPS_PER_RAD;  // Elbow motor angle
+            
+            // --- *** LOCKED KINEMATIC LOGIC *** ---
+            const theta1 = alpha_rad;
+            const theta_bend = beta_rad - (GEAR_RATIO * alpha_rad);
+            const theta2_global = theta1 + theta_bend;
+            // --- *** END OF LOCKED LOGIC *** ---
+
+            // Calculate elbow (p1) and end-effector (p2) positions
+            const p1 = {
+                x: (p0 ? p0.x : 0) + L1 * Math.cos(theta1),
+                y: (p0 ? p0.y : 0) + L1 * Math.sin(theta1)
+            };
+            const p2 = {
+                x: p1.x + L2 * Math.cos(theta2_global),
+                y: p1.y + L2 * Math.sin(theta2_global)
+            };
+
+            return {
+                p0: p0 || {x:0, y:0}, p1, p2,
+                target_base_steps: base_steps,
+                target_elbow_steps: elbow_steps,
+                theta1_rad: theta1,
+                theta_bend_rad: theta_bend,
+                theta2_global_rad: theta2_global
+            };
+        }
+
+
+        /**
+         * Handles user input on the slider.
+         */
+        function handleSliderInput(e) {
+            pause();
+            const newStep = parseInt(e.target.value, 10);
+            drawState(newStep); // Jump to the selected state
+        }
+        
+        /**
+         * Jumps to a specific step, cancels animation, and draws the final state.
+         */
+        function drawState(index) {
+            pause(); // Stop any running animation
+            currentStep = index;
+            const state = cumulativeStates[index];
+            if (!state) return;
+
+            // Draw the final state
+            clearCanvas();
+            drawGrid();
+            drawTrace();
+            drawArm(state.p0, state.p1, state.p2);
+            
+            // Update UI to match this state
+            updateUIForStep(index);
+        }
+
+        /**
+         * Updates all UI elements (slider, info box, highlight) for a given step index.
+         */
+        function updateUIForStep(index) {
+            const state = cumulativeStates[index];
+            if (!state) return;
+            
+            commandSlider.value = index;
+            stepDisplay.textContent = `Step: ${index} / ${cumulativeStates.length - 1}`;
+        }
+
+        /**
+         * Clears the canvas.
+         */
+        function clearCanvas() {
+            ctx.save();
+            ctx.resetTransform();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.restore(); // Restore origin and scale
+        }
+
+        /**
+         * Draws a grid and axes.
+         */
+        function drawGrid() {
+            const maxRange = L1 + L2;
+            const lineWidth = 1 / worldScale; // Keep lines 1px wide
+            
+            // Draw range circles
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.lineWidth = lineWidth;
+            ctx.arc(0, 0, L1, 0, 2 * Math.PI);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.arc(0, 0, maxRange, 0, 2 * Math.PI);
+            ctx.stroke();
+
+            // Draw axes
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.lineWidth = lineWidth;
+            ctx.moveTo(-maxRange * 1.1, 0);
+            ctx.lineTo(maxRange * 1.1, 0);
+            ctx.moveTo(0, -maxRange * 1.1);
+            ctx.lineTo(0, maxRange * 1.1);
+            ctx.stroke();
+        }
+
+        /**
+         * Draws the trace from the pre-calculated tracePath.
+         */
+        function drawTrace() {
+            if (tracePath.length < 2) return;
+
+            const traceWidth = 2 / worldScale;
+            
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)'; // White trace line
+            ctx.lineWidth = traceWidth;
+            
+            ctx.moveTo(tracePath[0].x, tracePath[0].y);
+
+            for (let i = 1; i < tracePath.length; i++) {
+                ctx.lineTo(tracePath[i].x, tracePath[i].y);
+            }
+            
+            ctx.stroke();
+        }
+
+        /**
+         * Draws the arm segments and joints.
+         */
+        function drawArm(p0, p1, p2) {
+            const armWidth = 6 / worldScale;
+            const jointRadius = 8 / worldScale;
+            
+            // Draw L1 (Upper Arm)
+            ctx.beginPath();
+            ctx.moveTo(p0.x, p0.y);
+            ctx.lineTo(p1.x, p1.y);
+            ctx.strokeStyle = '#3b82f6'; // bg-blue-600
+            ctx.lineWidth = armWidth;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            // Draw L2 (Lower Arm)
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.strokeStyle = '#10b981'; // bg-emerald-500
+            ctx.lineWidth = armWidth;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            // Draw Joints
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(p0.x, p0.y, jointRadius, 0, 2 * Math.PI); // Base Pivot
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(p1.x, p1.y, jointRadius, 0, 2 * Math.PI); // Elbow Joint
+            ctx.fill();
+            
+            // End Effector
+            ctx.fillStyle = '#f87171'; // bg-red-400
+            ctx.beginPath();
+            ctx.arc(p2.x, p2.y, jointRadius, 0, 2 * Math.PI);
+            ctx.fill();
+        }
+        
+        /**
+         * Factored out interpolation logic to be reusable.
+         */
+        function getInterpolatedState(from, to, progress) {
+            // Interpolate angles, not positions, to maintain arm length
+            const theta1_rad = lerp(from.theta1_rad, to.theta1_rad, progress);
+            const theta_bend_rad = lerp(from.theta_bend_rad, to.theta_bend_rad, progress);
+            
+            // Recalculate p1 and p2 based on interpolated angles
+            const p0 = from.p0; // p0 is always (0,0)
+            const p1 = {
+                x: p0.x + L1 * Math.cos(theta1_rad),
+                y: p0.y + L1 * Math.sin(theta1_rad)
+            };
+            // Recalculate global angle for L2
+            const theta2_global_rad = theta1_rad + theta_bend_rad;
+            const p2 = {
+                x: p1.x + L2 * Math.cos(theta2_global_rad),
+                y: p1.y + L2 * Math.sin(theta2_global_rad)
+            };
+
+            // Return a state object
+            return { p0, p1, p2 };
+        }
+
+        /**
+         * Draws an interpolated state during animation.
+         */
+        function drawInterpolatedState(from, to, progress) {
+            const state = getInterpolatedState(from, to, progress);
+            
+            clearCanvas();
+            drawGrid();
+            drawTrace();
+            drawArm(state.p0, state.p1, state.p2);
+        }
+        
+        // --- Playback Controls ---
+
+        function play() {
+            if (isAutoPlaying) return;
+            
+            // If at the end, reset to start
+            if (currentStep >= cumulativeStates.length - 1) {
+                currentStep = 0;
+                drawState(0);
+            }
+            
+            isAutoPlaying = true;
+            playNextCommand();
+        }
+        
+        function pause() {
+            isAutoPlaying = false;
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+        }
+        
+        // --- *** NEW FUNCTION HERE *** ---
+        function playLoop() {
+            if (isAutoPlaying) {
+                pause(); // Stop if already playing
+            }
+            isLooping = true;
+            currentStep = 0; // Always start from 0
+            drawState(0);
+            play(); // Use the existing play logic to start
+        }
+        // --- *** END NEW FUNCTION *** ---
+
+        /**
+         * Kicks off the animation to the next step.
+         */
+        function playNextCommand() {
+            // --- *** MODIFIED LOOP LOGIC *** ---
+            if (!isAutoPlaying) {
+                return; // Was manually paused
+            }
+            
+            if (currentStep >= cumulativeStates.length - 1) {
+                // Reached the end of the animation
+                if (isLooping) {
+                    // --- LOOPING LOGIC ---
+                    currentStep = 0; // Go back to the beginning
+                    drawState(0); // Snap to the start
+                    
+                    // We need to call play() to restart the animation process,
+                    // but with a tiny delay to let the browser render the drawState.
+                    setTimeout(play, 50); // 50ms delay before looping
+                    return; // Stop this thread, the setTimeout will start a new one
+                    // --- END LOOPING LOGIC ---
+                } else {
+                    // --- NO LOOPING ---
+                    isAutoPlaying = false; // Stop at the end
+                    return;
+                }
+            }
+            // --- *** END MODIFIED LOGIC *** ---
+            
+            animationFromState = cumulativeStates[currentStep];
+            animationToState = cumulativeStates[currentStep + 1];
+            animationStartTime = performance.now();
+            
+            currentStep++;
+            
+            const currentCommand = animationToState.command;
+            
+            const { elbow, base, step_delay_us } = currentCommand;
+            const max_steps = Math.max(Math.abs(elbow), Math.abs(base));
+            // Handle 0-step moves (should be rare)
+            let duration_ms = (max_steps * step_delay_us) / 1000.0;
+            if (duration_ms === 0) duration_ms = 1; // Prevent divide by zero
+            
+            commandSlider.value = currentStep;
+            stepDisplay.textContent = `Step: ${currentStep} / ${cumulativeStates.length - 1}`;
+            
+            // Start the animation loop
+            animationFrameId = requestAnimationFrame((t) => animateStep(t, duration_ms));
+        }
+
+        /**
+         * The main animation loop, driven by requestAnimationFrame.
+         */
+        function animateStep(timestamp, duration_ms) {
+            const elapsed = timestamp - animationStartTime;
+            let progress = elapsed / duration_ms;
+
+            if (progress >= 1) {
+                // Animation finished
+                progress = 1;
+                drawState(currentStep); // Draw the final, precise state
+                
+                if (isAutoPlaying) {
+                    playNextCommand(); // Move to the next command
+                }
+            } else {
+                // Animation in progress
+                drawInterpolatedState(animationFromState, animationToState, progress);
+                animationFrameId = requestAnimationFrame((t) => animateStep(t, duration_ms));
+            }
+        }
+
+        // --- Utilities ---
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        /**
+         * Custom modal for alerts, as alert() is bad.
+         */
+        function showModal(message) {
+            // Check if a modal already exists
+            let modal = document.getElementById('alert-modal');
+            if (modal) {
+                modal.querySelector('p').textContent = message;
+                modal.style.display = 'flex';
+                return;
+            }
+
+            // Create modal elements
+            modal = document.createElement('div');
+            modal.id = 'alert-modal';
+            modal.className = 'fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50';
+            
+            const modalContent = document.createElement('div');
+            modalContent.className = 'bg-gray-800 p-6 rounded-lg shadow-xl text-gray-200 max-w-sm w-full mx-4';
+            
+            const modalTitle = document.createElement('h3');
+            modalTitle.className = 'text-lg font-medium text-white mb-2';
+            modalTitle.textContent = 'Conversion Notice';
+            
+            const modalText = document.createElement('p');
+            modalText.className = 'text-sm mb-4';
+            modalText.textContent = message;
+            
+            const closeButton = document.createElement('button');
+            closeButton.className = 'w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200';
+            closeButton.textContent = 'OK';
+            
+            // Event listener for close button
+            closeButton.onclick = () => {
+                modal.style.display = 'none';
+            };
+            
+            // Assemble modal
+            modalContent.appendChild(modalTitle);
+            modalContent.appendChild(modalText);
+            modalContent.appendChild(closeButton);
+            modal.appendChild(modalContent);
+            
+            // Add to body
+            document.body.appendChild(modal);
+        }
+
+
+        // --- Start the App ---
+        init();
+    });
 </script>
 </body>
 </html>
