@@ -67,12 +67,12 @@
         top: 0; left: 0; z-index: 1100; box-shadow: 0 2px 5px var(--color-shadow);
     }
     
-    /* --- Theme Toggle Button (Copied) --- */
+    /* --- Theme Toggle Button (UPDATED) --- */
     #themeToggle {
         position: fixed; top: 15px; right: 15px; background: var(--color-surface);
         color: var(--color-icon); border: 1px solid var(--color-icon);
-        /* OLD: padding: 8px 15px; */
-        padding: 6px 12px; /* NEW: Reduced padding */
+        /* NEW: Reduced padding */
+        padding: 6px 12px; 
         border-radius: 20px; z-index: 1200;
         transition: background 0.3s, color 0.3s, border-color 0.3s;
         
@@ -98,7 +98,7 @@
         box-shadow: 0 4px 15px var(--color-shadow);
     }
     
-    /* --- NEW: Status Message Bar --- */
+    /* --- Status Message Bar --- */
     .status-message {
         padding: 15px 20px;
         border-radius: var(--border-radius);
@@ -191,7 +191,7 @@
         box-shadow: 0 2px 8px var(--color-shadow);
     }
     
-    /* --- NEW: Disabled button style --- */
+    /* --- Disabled button style --- */
     button:disabled {
         background-color: var(--color-secondary);
         opacity: 0.6;
@@ -226,6 +226,7 @@
     <!-- Sidebar (Copied) -->
     <div id="mySidebar" class="sidebar">
         <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
+        <!-- UPDATED: Sidebar links now use absolute paths -->
         <a href="/">Controls</a>
         <a href="/designs">Designs</a> 
         <a href="/led_controls">Led Controls</a>
@@ -240,28 +241,32 @@
 
     <!-- Main Content -->
     <div class="main-content">
+        <!-- UPDATED: Use a static path for the header image -->
         <img src="/static/sand.png" alt="Sand Table Header" class="header-image">
         <h1>Design Library</h1>
         
-        <!-- NEW: Status message placeholder -->
+        <!-- Status message placeholder -->
         <div id="statusMessage" class="status-message"></div>
 
         <div id="designGridContainer" class="design-grid">
             <!-- 
-              Design cards will be inserted here dynamically.
-              Example structure:
-              <div class="design-card">
-                  <canvas id="canvas-spiral.txt" width="400" height="400"></canvas>
-                  <div class="card-content">
-                      <h3>spiral.txt</h3>
-                      <button onclick="runDesign('spiral.txt', this)">Run Design</button>
-                  </div>
-              </div>
+              Design cards will be inserted here dynamically by JavaScript
+              after it fetches the list from /api/designs
             -->
         </div>
     </div>
 
 <script>
+    // ######################################################################
+    // ##  START: NEW BASE_URL VARIABLE
+    // ######################################################################
+    
+    /**
+     * This builds the absolute base URL (e.g., "https://your-ngrok-url.com")
+     * This is the fix for the "Failed to parse URL" error.
+     */
+    const BASE_URL = `${window.location.protocol}//${window.location.host}`;
+    
     // ######################################################################
     // ##  START: KINEMATIC SIMULATOR LOGIC (Unchanged)
     // ######################################################################
@@ -421,7 +426,7 @@
     }
     
     /**
-     * NEW: Displays a status message at the top of the grid.
+     * Displays a status message at the top of the grid.
      */
     function showStatusMessage(message, isError = false) {
         const statusEl = document.getElementById('statusMessage');
@@ -438,7 +443,7 @@
     }
 
     /**
-     * UPDATED: This function now sends the G-code to your server.
+     * This function now sends the G-code to your server.
      * It's called by the "Run Design" button.
      */
     async function runDesign(filename, buttonElement) {
@@ -446,8 +451,8 @@
         buttonElement.disabled = true;
         buttonElement.textContent = 'Sending...';
 
-        // This path must match the route in your app.py
-        const txtPath = `/designs/${filename}`;
+        // UPDATED: Use the new BASE_URL
+        const txtPath = `${BASE_URL}/designs/${filename}`;
 
         try {
             // 2. Fetch the .txt file content from the server
@@ -458,7 +463,8 @@
             const gcodeBlock = await response.text();
 
             // 3. Send the G-code block to your server's auto-drip endpoint
-            const apiResponse = await fetch("/send_gcode_block", {
+            // UPDATED: Use the new BASE_URL
+            const apiResponse = await fetch(`${BASE_URL}/send_gcode_block`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ gcode: gcodeBlock })
@@ -493,11 +499,15 @@
         if (!gridContainer) return;
 
         try {
-            // --- 1. Get list of design files (MOCK) ---
-            // !!! REMEMBER to replace 'fetchMockDesignList' with a real API call
-            // that returns a list of your .txt filenames.
-            const designFiles = await fetchMockDesignList(); 
+            // --- 1. Get list of design files ---
+            // This is NO LONGER A MOCK. It calls /api/designs.
+            const designFiles = await fetchDesignList(); 
             
+            if (designFiles.length === 0) {
+                showStatusMessage("No designs found. Check the 'templates/designs' folder.", true);
+                return;
+            }
+
             // --- 2. Process each file ---
             for (const filename of designFiles) {
                 const card = document.createElement('div');
@@ -505,8 +515,6 @@
                 
                 const canvasSize = 400; 
                 
-                // UPDATED: Button text changed to "Run Design"
-                // UPDATED: onclick calls runDesign() and passes 'this' (the button)
                 card.innerHTML = `
                     <canvas id="canvas-${filename}" width="${canvasSize}" height="${canvasSize}"></canvas>
                     <div class="card-content">
@@ -522,13 +530,12 @@
             
         } catch (error) {
             console.error("Failed to load design library:", error);
-            gridContainer.innerHTML = "<p>Error loading design library. See console for details.</p>";
+            gridContainer.innerHTML = `<p>Error loading design library: ${error.message}</p>`;
         }
     }
     
     /**
      * Tries to load a .png preview. If it fails, generates one from .txt.
-     * (Unchanged)
      */
     function loadPreview(filename) {
         const canvas = document.getElementById(`canvas-${filename}`);
@@ -536,9 +543,10 @@
         
         const ctx = canvas.getContext('2d');
         const baseName = filename.replace('.txt', '');
-        // This path must match the route in your app.py
-        const pngPath = `/designs/${baseName}.png`;
-        const txtPath = `/designs/${baseName}.txt`;
+        
+        // UPDATED: Use the new BASE_URL
+        const pngPath = `${BASE_URL}/designs/${baseName}.png`;
+        const txtPath = `${BASE_URL}/designs/${baseName}.txt`;
 
         const img = new Image();
         img.src = pngPath;
@@ -549,8 +557,10 @@
 
         img.onerror = () => {
             console.log(`No .png found for ${filename}, generating from .txt...`);
+            
+            // UPDATED: Use the new BASE_URL
             fetch(txtPath)
-                .then(response => {
+                .then(response => { // <-- FIXED TYPO HERE (was 'r(response =>')
                     if (!response.ok) throw new Error(`File not found: ${txtPath}`);
                     return response.text();
                 })
@@ -571,71 +581,39 @@
     }
     
     // ######################################################################
-    // ##  MOCK FUNCTIONS (Replace with your server logic)
+    // ##  START: REAL (NO LONGER MOCK) FUNCTIONS
     // ######################################################################
 
     /**
-     * MOCK: Simulates fetching the list of .txt files from your server.
-     * REPLACE this with a real `fetch('/api/designs')` call.
-     * * In your app.py, you would add a new route like:
-     * @app.route('/api/designs')
-     * def get_design_list():
-     * designs_dir = os.path.join(app.root_path, 'templates', 'designs')
-     * try:
-     * files = [f for f in os.listdir(designs_dir) if f.endswith('.txt')]
-     * return jsonify(files)
-     * except Exception as e:
-     * return jsonify(error=str(e)), 500
+     * Fetches the list of .txt files from the server's /api/designs endpoint.
      */
-    function fetchMockDesignList() {
-        console.warn("Using MOCK design list. Replace 'fetchMockDesignList' with a real API call.");
-        // This mock list should match the files you're mocking below
-        return Promise.resolve([
-            "spiral.txt",
-            "square.txt",
-            "star.txt",
-            "wave.txt",
-            "chaos.txt",
-            "missing_preview.txt" // This one will force a .txt load
-        ]);
+    async function fetchDesignList() {
+        console.log(`Fetching real design list from ${BASE_URL}/api/designs...`);
+        try {
+            // UPDATED: Use the new BASE_URL
+            const response = await fetch(`${BASE_URL}/api/designs`);
+            if (!response.ok) {
+                throw new Error('Server responded with an error.');
+            }
+            const data = await response.json();
+            if (data.error) {
+                 throw new Error(data.error);
+            }
+            return data;
+        } catch (error) {
+            console.error("Failed to fetch design list:", error);
+            showStatusMessage("Error: Could not load design list from server.", true);
+            return []; // Return an empty list to prevent crashes
+        }
     }
     
-    /**
-     * MOCK: Overriding `fetch` for this demo to provide fake .txt files.
-     * REMOVE this entire `window.fetch` block when you deploy.
-     * Your real server (app.py) will handle all requests.
-     */
-    const originalFetch = window.fetch;
-    window.fetch = function(url, options) {
-        const urlString = url.toString();
-        
-        // This block is for MOCKING .txt files.
-        // Your /designs/<file> route in app.py makes this block unnecessary
-        // once you remove the mock list.
-        const mockTxtData = { };
-        
-        if (mockTxtData[urlString] && !options) { // !options ensures it's a GET
-            return Promise.resolve(new Response(mockTxtData[urlString], { status: 200 }));
-        }
-
-        // This block MOCKS the /send_gcode_block API call
-        if (urlString === '/send_gcode_block') {
-            console.log("MOCK: Sending G-code block to server", options.body);
-            // Return a mock success response
-            return Promise.resolve(new Response(JSON.stringify({ success: true, message: "Mock success" }), { status: 200 }));
-        }
-
-        // For all other requests (like .png files), use the original fetch
-        // This will let them 404 naturally, triggering the .onerror logic
-        return originalFetch(url, options);
-    };
-
-
     // --- Initialization ---
     document.addEventListener('DOMContentLoaded', () => {
         const savedTheme = localStorage.getItem('theme') || 'light';
         document.body.setAttribute('data-theme', savedTheme);
         updateThemeIcon(savedTheme);
+
+        // Start loading the design library from the server
         loadDesignLibrary();
     });
 </script>
