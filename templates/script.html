@@ -14,7 +14,7 @@ body {
 }
 canvas {
     width: 100%;
-    /* height: 100%; <-- THIS LINE WAS REMOVED */
+    height: 100%;
     aspect-ratio: 1/1;
     display: block;
     border-radius: 0.5rem;
@@ -95,9 +95,6 @@ input[type=number] {
                     2. Arm Commands (G1 Elbow Base StepDelay_μs)
                 </label>
                 <textarea id="commandsInput" rows="8" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., G1 0 800 1000&#10;G1 1600 0 500&#10;..."></textarea>
-Example G-Code (Hilbert Curve):
-G1 X100 Y100
-...
             </div>
 
             <button id="loadCommandsBtn" class="w-full text-white font-semibold py-2 px-4 rounded-lg transition duration-200 shadow-md">
