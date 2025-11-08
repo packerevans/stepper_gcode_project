@@ -318,33 +318,27 @@ G1 X100 Y100
                 }
             }
 
-                        // --- 3. Convert *reduced* coords to relative arm commands ---
+            // --- 3. Convert *reduced* coords to relative arm commands ---
             let generatedCommands = [];
             
-            if (reducedCoords.length < 2) {
-                showModal("Not enough valid coordinates to convert.");
-                return;
+            const first_coord = reducedCoords[0];
+            let start_theta1;
+
+            if (Math.hypot(first_coord.x, first_coord.y) < 0.1) {
+                start_theta1 = 0;
+            } else {
+                start_theta1 = Math.atan2(first_coord.y, first_coord.x);
             }
 
-            const first_coord = reducedCoords[0];
+            const start_alpha_rad = start_theta1;
+            const start_beta_rad = GEAR_RATIO * start_alpha_rad;
+            let prev_base_steps = Math.round(-start_alpha_rad * STEPS_PER_RAD);
+            let prev_elbow_steps = Math.round(-start_beta_rad * STEPS_PER_RAD);
+
             const step_delay_us = parseInt(stepDelayInput.value, 10) || 1000;
             
-            // *** START FIX ***
-            // Run IK on the first point to get the *actual* starting steps,
-            // using 0 as the "previous" state to bootstrap.
-            const { 
-                base_steps: initial_base_steps, 
-                elbow_steps: initial_elbow_steps 
-            } = calculateIK(first_coord.x, first_coord.y, 0); // Pass 0 for last_base_steps
-
-            let prev_base_steps = initial_base_steps;
-            let prev_elbow_steps = initial_elbow_steps;
-            // *** END FIX ***
-            
             try {
-                // *** FIX: Start the loop from the *second* coordinate (i = 1) ***
-                for (let i = 1; i < reducedCoords.length; i++) {
-                    const coord = reducedCoords[i];
+                for (const coord of reducedCoords) {
                     const curr_x = coord.x;
                     const curr_y = coord.y;
 
