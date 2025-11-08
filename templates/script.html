@@ -14,7 +14,7 @@ body {
 }
 canvas {
     width: 100%;
-    /* height: 100%; <-- THIS LINE WAS REMOVED */
+    height: 100%;
     aspect-ratio: 1/1;
     display: block;
     border-radius: 0.5rem;
@@ -53,7 +53,7 @@ input[type=number] {
 <div class="max-w-7xl mx-auto p-4 lg:p-8">
     <header class="mb-6">
         <h1 class="text-3xl font-bold text-white">2DOF Arm Kinematic Simulator & G-Code Converter</h1>
-        <p class="text-lg text-gray-400">Simulating a 2-motor arm with 101.3mm links and 9/8 gearing.</p>
+        <p class="text-lg text-gray-400">Simulating a 2-motor arm with 101.3mm links.</p>
     </header>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -76,6 +76,7 @@ input[type=number] {
                         <input type="number" id="gcodeCenterY" value="202.6" class="w-full mt-1 p-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     </div>
                 </div>
+
                 <div class="grid grid-cols-2 gap-3 mt-4">
                     <div>
                         <label for="stepDelayInput" class="block text-xs font-medium text-gray-400">Delay (μs)</label>
@@ -95,9 +96,6 @@ input[type=number] {
                     2. Arm Commands (G1 Elbow Base StepDelay_μs)
                 </label>
                 <textarea id="commandsInput" rows="8" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., G1 0 800 1000&#10;G1 1600 0 500&#10;..."></textarea>
-Example G-Code (Hilbert Curve):
-G1 X100 Y100
-...
             </div>
 
             <button id="loadCommandsBtn" class="w-full text-white font-semibold py-2 px-4 rounded-lg transition duration-200 shadow-md">
@@ -159,15 +157,11 @@ G1 X100 Y100
         const convertGCodeBtn = document.getElementById('convertGCodeBtn');
         const stepDelayInput = document.getElementById('stepDelayInput');
         const smoothingSensitivity = document.getElementById('smoothingSensitivity');
-        
-        // *** NEW: Offset Elements ***
-        // (Note: The elements gcodeCenterX and gcodeCenterY are fetched inside convertGCode)
-        // *** END NEW ***
 
         // --- Simulation Constants ---
         const L1 = 101.3; // mm (Upper arm)
         const L2 = 101.3; // mm (Lower arm)
-        const GEAR_RATIO = 9 / 8; // 1.125
+        // *** REMOVED: const GEAR_RATIO = 9 / 8; ***
         
         const STEPS_PER_DEG = 3200 / 360;
         const STEPS_PER_RAD = (3200 / 360) * (180 / Math.PI); // 1600 / PI
@@ -247,7 +241,6 @@ G1 X100 Y100
 
         // --- G-Code Converter Functions ---
 
-        // *** --- MODIFIED FUNCTION --- ***
         /**
          * Converts G-code (X, Y) to arm commands, applying a center offset.
          */
@@ -256,7 +249,6 @@ G1 X100 Y100
             const lines = gcodeText.split('\n');
             const xyRegex = /G1\s+X(-?[\d.]+)\s+Y(-?[\d.]+)/i;
             
-            // *** NEW: Get offset values ***
             const gcodeCenterX = parseFloat(document.getElementById('gcodeCenterX').value) || 0;
             const gcodeCenterY = parseFloat(document.getElementById('gcodeCenterY').value) || 0;
             
@@ -269,17 +261,15 @@ G1 X100 Y100
                     const x_gcode = parseFloat(match[1]);
                     const y_gcode = parseFloat(match[2]);
                     
-                    // Apply the offset to re-center the pattern
                     const x_cart = x_gcode - gcodeCenterX;
                     const y_cart = y_gcode - gcodeCenterY;
                     
                     coords.push({ x: x_cart, y: y_cart });
                 }
             }
-            // *** END MODIFICATION ***
 
             if (coords.length < 2) {
-                 if(coords.length === 1) { /* Just one point, not enough for a line */ }
+                 if(coords.length === 1) { /* Just one point */ }
                  else {
                     showModal("No valid 'G1 X... Y...' commands found.");
                     return;
@@ -330,10 +320,10 @@ G1 X100 Y100
                 start_theta1 = Math.atan2(first_coord.y, first_coord.x);
             }
 
-            const start_alpha_rad = start_theta1;
-            const start_beta_rad = GEAR_RATIO * start_alpha_rad;
-            let prev_base_steps = Math.round(-start_alpha_rad * STEPS_PER_RAD);
-            let prev_elbow_steps = Math.round(-start_beta_rad * STEPS_PER_RAD);
+            // *** MODIFIED: Simplified for serial arm ***
+            // We just need to track the last angles.
+            let { base_steps: prev_base_steps, elbow_steps: prev_elbow_steps } = calculateIK(first_coord.x, first_coord.y, 0);
+            // *** END MODIFICATION ***
 
             const step_delay_us = parseInt(stepDelayInput.value, 10) || 1000;
             
@@ -342,7 +332,9 @@ G1 X100 Y100
                     const curr_x = coord.x;
                     const curr_y = coord.y;
 
-                    const { base_steps, elbow_steps } = calculateIK(curr_x, curr_y, prev_base_steps);
+                    // Pass the previous *base angle* (theta1) to IK for unwrapping
+                    const last_theta1 = -prev_base_steps / STEPS_PER_RAD;
+                    const { base_steps, elbow_steps } = calculateIK(curr_x, curr_y, last_theta1);
                     
                     const rel_base = Math.round(base_steps - prev_base_steps);
                     const rel_elbow = Math.round(elbow_steps - prev_elbow_steps);
@@ -376,7 +368,6 @@ G1 X100 Y100
             commandsInput.value = commandStrings.join('\n');
             loadCommandsBtn.click();
         }
-        // *** --- END MODIFIED FUNCTION --- ***
 
 
         /**
@@ -434,10 +425,12 @@ G1 X100 Y100
         }
 
 
+        // *** --- MODIFIED FUNCTION --- ***
         /**
-         * Inverse Kinematics: Calculates arm motor steps from (X, Y) position.
+         * Inverse Kinematics: Calculates arm motor steps from (X, Y) position
+         * for a SIMPLE SERIAL arm.
          */
-        function calculateIK(x, y, last_base_steps = 0) {
+        function calculateIK(x, y, last_theta1 = 0) {
             let D = Math.hypot(x, y);
             const arm_max_reach = L1 + L2;
             let clamped_x = x;
@@ -449,12 +442,11 @@ G1 X100 Y100
                 D = arm_max_reach;
             }
 
-            let theta1, theta_bend;
+            let theta1_rad, theta_bend_rad;
 
             if (D < 0.1) {
-                theta_bend = -Math.PI;
-                const alpha_rad = -last_base_steps / STEPS_PER_RAD;
-                theta1 = alpha_rad;
+                theta_bend_rad = -Math.PI;
+                theta1_rad = last_theta1; // Use previous angle
                 clamped_x = 0;
                 clamped_y = 0;
             } else {
@@ -462,24 +454,24 @@ G1 X100 Y100
                 let cos_theta_bend = (D_sq - L1*L1 - L2*L2) / (2 * L1 * L2);
                 cos_theta_bend = Math.max(-1, Math.min(1, cos_theta_bend)); 
                 
-                theta_bend = -Math.acos(cos_theta_bend);
+                theta_bend_rad = -Math.acos(cos_theta_bend); // Elbow bend angle
 
-                const k1 = L1 + L2 * Math.cos(theta_bend);
-                const k2 = L2 * Math.sin(theta_bend);
+                const k1 = L1 + L2 * Math.cos(theta_bend_rad);
+                const k2 = L2 * Math.sin(theta_bend_rad);
                 
                 let raw_theta1 = Math.atan2(clamped_y, clamped_x) - Math.atan2(k2, k1);
 
-                const last_theta1 = -last_base_steps / STEPS_PER_RAD;
+                // Angle unwrapping
                 let rotation_diff = (raw_theta1 - last_theta1) / (2 * Math.PI);
                 let nearest_rotation_offset = Math.round(rotation_diff);
-                theta1 = raw_theta1 - (nearest_rotation_offset * 2 * Math.PI);
+                theta1_rad = raw_theta1 - (nearest_rotation_offset * 2 * Math.PI);
             }
 
-            const alpha_rad = theta1;
-            const beta_rad = theta_bend + (GEAR_RATIO * alpha_rad);
-
-            const base_steps = -alpha_rad * STEPS_PER_RAD;
-            const elbow_steps = -beta_rad * STEPS_PER_RAD;
+            // --- 4. Convert angles to motor steps (Simple Serial) ---
+            // Base motor angle = L1 angle
+            // Elbow motor angle = L2 bend angle
+            const base_steps = -theta1_rad * STEPS_PER_RAD;
+            const elbow_steps = -theta_bend_rad * STEPS_PER_RAD;
 
             return { 
                 base_steps: base_steps, 
@@ -575,35 +567,38 @@ G1 X100 Y100
             }
         }
 
+        // *** --- MODIFIED FUNCTION --- ***
         /**
-         * Forward Kinematics: Calculates arm position from motor steps.
+         * Forward Kinematics: Calculates arm position from motor steps
+         * for a SIMPLE SERIAL arm.
          */
         function calculateFK(p0, base_steps, elbow_steps) {
-            const alpha_rad = -base_steps / STEPS_PER_RAD;
-            const beta_rad = -elbow_steps / STEPS_PER_RAD;
+            // Convert steps to radians
+            const theta1_rad = -base_steps / STEPS_PER_RAD; // Base motor controls L1 angle
+            const theta_bend_rad = -elbow_steps / STEPS_PER_RAD;  // Elbow motor controls L2 bend
             
-            const theta1 = alpha_rad;
-            const theta_bend = beta_rad - (GEAR_RATIO * alpha_rad);
-            const theta2_global = theta1 + theta_bend;
+            const theta2_global_rad = theta1_rad + theta_bend_rad;
 
+            // Calculate elbow (p1) and end-effector (p2) positions
             const p1 = {
-                x: (p0 ? p0.x : 0) + L1 * Math.cos(theta1),
-                y: (p0 ? p0.y : 0) + L1 * Math.sin(theta1)
+                x: (p0 ? p0.x : 0) + L1 * Math.cos(theta1_rad),
+                y: (p0 ? p0.y : 0) + L1 * Math.sin(theta1_rad)
             };
             const p2 = {
-                x: p1.x + L2 * Math.cos(theta2_global),
-                y: p1.y + L2 * Math.sin(theta2_global)
+                x: p1.x + L2 * Math.cos(theta2_global_rad),
+                y: p1.y + L2 * Math.sin(theta2_global_rad)
             };
 
             return {
                 p0: p0 || {x:0, y:0}, p1, p2,
                 target_base_steps: base_steps,
                 target_elbow_steps: elbow_steps,
-                theta1_rad: theta1,
-                theta_bend_rad: theta_bend,
-                theta2_global_rad: theta2_global
+                theta1_rad: theta1_rad,
+                theta_bend_rad: theta_bend_rad,
+                theta2_global_rad: theta2_global_rad
             };
         }
+        // *** --- END MODIFIED FUNCTION --- ***
 
 
         function handleSliderInput(e) {
