@@ -49,6 +49,13 @@ input[type=number] {
 #convertGCodeBtn:hover {
     background-color: #4338ca; /* bg-indigo-700 */
 }
+/* --- NEW: Polar Button: Teal --- */
+#convertPolarGCodeBtn {
+    background-color: #0d9488; /* bg-teal-600 */
+}
+#convertPolarGCodeBtn:hover {
+    background-color: #0f766e; /* bg-teal-700 */
+}
 #loadCommandsBtn {
     background-color: #4f46e5; /* bg-indigo-600 */
 }
@@ -97,9 +104,9 @@ input[type=number] {
             
             <div class="bg-gray-900 p-4 rounded-lg border border-gray-700">
                 <label for="gcodeConverterInput" class="block text-sm font-medium text-gray-300 mb-2">
-                    1. Paste Cartesian (X, Y) G-Code
+                    1. Paste G-Code
                 </label>
-                <textarea id="gcodeConverterInput" rows="8" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="e.g.,&#10;G1 X203.2 Y0&#10;G1 X0 Y0&#10;G1 X0 Y203.2&#10;G1 X0 Y0">
+                <textarea id="gcodeConverterInput" rows="8" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., (XY)&#10;G1 X203.2 Y0&#10;G1 X0 Y0&#10;---&#10;e.g., (Polar)&#10;G1 R100 A0&#10;G1 R100 A90">
 G1 X203.2 Y0
 G1 X0 Y0
 G1 X0 Y203.2
@@ -116,9 +123,14 @@ G1 X203.2 Y0
                         <input type="number" id="smoothingSensitivity" value="0.000001" step="0.000001" class="w-full mt-1 p-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     </div>
                 </div>
-                <button id="convertGCodeBtn" class="w-full mt-3 font-semibold py-2 px-4 rounded-lg transition duration-200 shadow-md">
-                    Convert, Smooth & Load
-                </button>
+                <div class="grid grid-cols-2 gap-3 mt-3">
+                    <button id="convertGCodeBtn" class="w-full font-semibold py-2 px-4 rounded-lg transition duration-200 shadow-md">
+                        Convert XY to Arm
+                    </button>
+                    <button id="convertPolarGCodeBtn" class="w-full font-semibold py-2 px-4 rounded-lg transition duration-200 shadow-md text-white">
+                        Convert Polar to Arm
+                    </button>
+                </div>
             </div>
             <div>
                 <label for="commandsInput" class="block text-sm font-medium text-gray-300 mb-2">
@@ -195,6 +207,8 @@ G1 0 0 200
         // Converter DOM elements
         const gcodeConverterInput = document.getElementById('gcodeConverterInput');
         const convertGCodeBtn = document.getElementById('convertGCodeBtn');
+        // --- NEW: Polar Button Element ---
+        const convertPolarGCodeBtn = document.getElementById('convertPolarGCodeBtn');
         const stepDelayInput = document.getElementById('stepDelayInput');
         const smoothingSensitivity = document.getElementById('smoothingSensitivity');
 
@@ -249,8 +263,10 @@ G1 0 0 200
             
             window.addEventListener('resize', debounce(resizeAndRedraw, 250));
             
-            // Converter listener
-            convertGCodeBtn.addEventListener('click', convertGCode);
+            // --- MODIFIED: Renamed listener function ---
+            convertGCodeBtn.addEventListener('click', convertCartesianGCode);
+            // --- NEW: Added Polar Button listener ---
+            convertPolarGCodeBtn.addEventListener('click', convertPolarGCode);
             
             // Initial setup
             resizeCanvas();
@@ -284,16 +300,48 @@ G1 0 0 200
         }
 
         // --- G-Code Converter Functions ---
-
-        // *** --- MODIFIED FUNCTION --- ***
+        
+        // --- NEW: Polar G-Code Converter ---
         /**
-         * Converts G-code (X, Y) to arm commands.
-         * 1. Parses all X,Y vertices.
-         * 2. Pre-processes vertices to remove redundant co-linear points.
-         * 3. Converts the *reduced* list of vertices to IK commands.
-         * 4. Post-processes commands to smooth any remaining co-linear *angle* moves.
+         * Parses Polar G-Code (R, A) and converts to arm commands.
          */
-        function convertGCode() {
+        function convertPolarGCode() {
+            const gcodeText = gcodeConverterInput.value;
+            const lines = gcodeText.split('\n');
+            // New Regex for G1 R(radius) A(angle in degrees)
+            const polarRegex = /G1\s+R(-?[\d.]+)\s+A(-?[\d.]+)/i;
+            
+            let coords = [];
+
+            for (const line of lines) {
+                const match = line.trim().match(polarRegex);
+                if (match) {
+                    const r = parseFloat(match[1]);
+                    const a_deg = parseFloat(match[2]);
+                    
+                    // Convert Polar (R, A) to Cartesian (X, Y)
+                    const a_rad = a_deg * (Math.PI / 180);
+                    const x = r * Math.cos(a_rad);
+                    const y = r * Math.sin(a_rad);
+                    
+                    coords.push({ x, y });
+                }
+            }
+
+            if (coords.length < 1) { // Can process even a single point
+                showModal("No valid 'G1 R... A...' commands found.");
+                return;
+            }
+
+            // Call the new helper function
+            processCoordinates(coords);
+        }
+        
+        // --- MODIFIED: Renamed and refactored from original convertGCode ---
+        /**
+         * Parses Cartesian G-code (X, Y) and converts to arm commands.
+         */
+        function convertCartesianGCode() {
             const gcodeText = gcodeConverterInput.value;
             const lines = gcodeText.split('\n');
             const xyRegex = /G1\s+X(-?[\d.]+)\s+Y(-?[\d.]+)/i;
@@ -310,15 +358,23 @@ G1 0 0 200
                 }
             }
 
-            if (coords.length < 2) {
-                 if(coords.length === 1) { /* Just one point, not enough for a line */ }
-                 else {
-                    showModal("No valid 'G1 X... Y...' commands found.");
-                    return;
-                 }
+            if (coords.length < 1) { // Can process even a single point
+                 showModal("No valid 'G1 X... Y...' commands found.");
+                 return;
             }
 
-            // --- 2. NEW: Pre-process coords to remove co-linear points ---
+            // Call the new helper function
+            processCoordinates(coords);
+        }
+
+        // --- NEW: Helper function to process coordinates from either parser ---
+        /**
+         * Takes an array of {x, y} coordinates, processes them,
+         * and loads them into the simulator.
+         * (This contains the logic from the original convertGCode function)
+         */
+        function processCoordinates(coords) {
+            // --- 2. Pre-process coords to remove co-linear points ---
             const collinearity_epsilon = 1e-6; // For floating point noise
             let reducedCoords = [];
             
@@ -343,26 +399,20 @@ G1 0 0 200
                 const p3 = coords[p2_index + 1];
 
                 // Check for co-linearity using cross-product.
-                // If (p2.y - p1.y) * (p3.x - p2.x) == (p2.x - p1.x) * (p3.y - p2.y)
-                // then the slopes are the same.
                 const cross_product = (p2.y - p1.y) * (p3.x - p2.x) - (p2.x - p1.x) * (p3.y - p2.y);
 
                 if (Math.abs(cross_product) < collinearity_epsilon) {
                     // p1, p2, p3 are co-linear. p2 is redundant.
-                    // Skip p2 and check the next point (p3) against p1.
                     p2_index++;
                 } else {
                     // p1, p2, p3 are *not* co-linear.
-                    // This means p2 is a "corner".
-                    // We must add p2 to our list.
                     reducedCoords.push(p2);
                     
-                    // The new line segment starts from p2.
                     p1_index = p2_index;
                     p2_index++;
                 }
             }
-            // --- END NEW STEP ---
+            // --- END Pre-processing ---
 
 
             // --- 3. Convert *reduced* coords to relative arm commands ---
@@ -410,7 +460,6 @@ G1 0 0 200
             }
 
             // --- 4. Smooth the commands ---
-            // This post-processing step is still useful.
             let commandsToSmooth = generatedCommands;
             let smoothedCommands = [];
             let lastLength = -1; 
@@ -427,7 +476,7 @@ G1 0 0 200
             commandsInput.value = commandStrings.join('\n');
             loadCommandsBtn.click(); // Automatically click "Load & Reset"
         }
-        // *** --- END MODIFIED FUNCTION --- ***
+        // --- END G-Code Converter Functions ---
 
 
         /**
@@ -560,7 +609,6 @@ G1 0 0 200
                 clamped_y: clamped_y
             };
         }
-        // --- END: G-Code Converter Functions ---
 
 
         /**
