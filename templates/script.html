@@ -106,11 +106,7 @@ G1 X0 Y203.2
 G1 X0 Y0
 G1 X203.2 Y0
 </textarea>
-                <div class="grid grid-cols-3 gap-3 mt-3">
-                    <div>
-                        <label for="segmentLength" class="block text-xs font-medium text-gray-400">Segment (mm)</label>
-                        <input type="number" id="segmentLength" value="2" class="w-full mt-1 p-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    </div>
+                <div class="grid grid-cols-2 gap-3 mt-3">
                     <div>
                         <label for="stepDelayInput" class="block text-xs font-medium text-gray-400">Delay (μs)</label>
                         <input type="number" id="stepDelayInput" value="1000" class="w-full mt-1 p-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
@@ -120,7 +116,7 @@ G1 X203.2 Y0
                         <input type="number" id="smoothingSensitivity" value="0.000001" step="0.000001" class="w-full mt-1 p-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     </div>
                 </div>
-                <button id="convertGCodeBtn" class="w-full font-semibold py-2 px-4 rounded-lg transition duration-200 shadow-md">
+                <button id="convertGCodeBtn" class="w-full mt-3 font-semibold py-2 px-4 rounded-lg transition duration-200 shadow-md">
                     Convert, Smooth & Load
                 </button>
             </div>
@@ -193,13 +189,12 @@ G1 0 0 200
         const commandSlider = document.getElementById('commandSlider');
         const playBtn = document.getElementById('playBtn');
         const pauseBtn = document.getElementById('pauseBtn');
-        const playLoopBtn = document.getElementById('playLoopBtn'); // *** NEW ***
+        const playLoopBtn = document.getElementById('playLoopBtn');
         const stepDisplay = document.getElementById('stepDisplay');
         
         // Converter DOM elements
         const gcodeConverterInput = document.getElementById('gcodeConverterInput');
         const convertGCodeBtn = document.getElementById('convertGCodeBtn');
-        const segmentLengthInput = document.getElementById('segmentLength');
         const stepDelayInput = document.getElementById('stepDelayInput');
         const smoothingSensitivity = document.getElementById('smoothingSensitivity');
 
@@ -216,7 +211,7 @@ G1 0 0 200
         let cumulativeStates = []; // List of all arm states (pos, angles)
         let currentStep = 0; // The index of the *target* state
         let isAutoPlaying = false;
-        let isLooping = false; // *** NEW ***
+        let isLooping = false;
         
         // Animation state
         let animationFrameId = null;
@@ -238,21 +233,19 @@ G1 0 0 200
             // Set up event listeners
             loadCommandsBtn.addEventListener('click', loadCommands);
 
-            // --- *** MODIFIED EVENT LISTENERS *** ---
             commandSlider.addEventListener('input', (e) => {
                 isLooping = false; // Stop looping on manual scrub
                 handleSliderInput(e);
             });
             playBtn.addEventListener('click', () => {
                 isLooping = false; 
-                playFrame(); // *** CHANGED: This is now "Step Forward" ***
+                playFrame(); // "Step Forward"
             });
             pauseBtn.addEventListener('click', () => {
                 isLooping = false; // Stop looping on pause
                 pause();
             });
             playLoopBtn.addEventListener('click', playLoop); // Add new listener
-            // --- *** END MODIFICATIONS *** ---
             
             window.addEventListener('resize', debounce(resizeAndRedraw, 250));
             
@@ -292,6 +285,14 @@ G1 0 0 200
 
         // --- G-Code Converter Functions ---
 
+        // *** --- MODIFIED FUNCTION --- ***
+        /**
+         * Converts G-code (X, Y) to arm commands.
+         * 1. Parses all X,Y vertices.
+         * 2. Pre-processes vertices to remove redundant co-linear points.
+         * 3. Converts the *reduced* list of vertices to IK commands.
+         * 4. Post-processes commands to smooth any remaining co-linear *angle* moves.
+         */
         function convertGCode() {
             const gcodeText = gcodeConverterInput.value;
             const lines = gcodeText.split('\n');
@@ -309,23 +310,70 @@ G1 0 0 200
                 }
             }
 
-            if (coords.length === 0) {
-                showModal("No valid 'G1 X... Y...' commands found.");
-                return;
+            if (coords.length < 2) {
+                 if(coords.length === 1) { /* Just one point, not enough for a line */ }
+                 else {
+                    showModal("No valid 'G1 X... Y...' commands found.");
+                    return;
+                 }
             }
 
-            // --- 2. Remove scaling logic ---
-            // No scaling is performed.
+            // --- 2. NEW: Pre-process coords to remove co-linear points ---
+            const collinearity_epsilon = 1e-6; // For floating point noise
+            let reducedCoords = [];
+            
+            if (coords.length > 0) {
+                reducedCoords.push(coords[0]); // Always add the first point
+            }
 
-            // --- 3. Convert coords to relative arm commands ---
+            // We look at 3 points: p1 (anchor), p2 (current), p3 (next)
+            let p1_index = 0;
+            let p2_index = 1;
+
+            while (p2_index < coords.length) {
+                const p1 = coords[p1_index];
+                const p2 = coords[p2_index];
+
+                if (p2_index === coords.length - 1) {
+                    // This is the last point, always add it
+                    reducedCoords.push(p2);
+                    break;
+                }
+                
+                const p3 = coords[p2_index + 1];
+
+                // Check for co-linearity using cross-product.
+                // If (p2.y - p1.y) * (p3.x - p2.x) == (p2.x - p1.x) * (p3.y - p2.y)
+                // then the slopes are the same.
+                const cross_product = (p2.y - p1.y) * (p3.x - p2.x) - (p2.x - p1.x) * (p3.y - p2.y);
+
+                if (Math.abs(cross_product) < collinearity_epsilon) {
+                    // p1, p2, p3 are co-linear. p2 is redundant.
+                    // Skip p2 and check the next point (p3) against p1.
+                    p2_index++;
+                } else {
+                    // p1, p2, p3 are *not* co-linear.
+                    // This means p2 is a "corner".
+                    // We must add p2 to our list.
+                    reducedCoords.push(p2);
+                    
+                    // The new line segment starts from p2.
+                    p1_index = p2_index;
+                    p2_index++;
+                }
+            }
+            // --- END NEW STEP ---
+
+
+            // --- 3. Convert *reduced* coords to relative arm commands ---
             let generatedCommands = [];
             
-            // --- NEW STARTING POSITION LOGIC ---
-            const first_coord = coords[0];
+            // Find the *first* point to set the arm's initial angle
+            const first_coord = reducedCoords[0];
             let start_theta1;
 
             if (Math.hypot(first_coord.x, first_coord.y) < 0.1) {
-                start_theta1 = 0; 
+                start_theta1 = 0; // Start at origin
             } else {
                 start_theta1 = Math.atan2(first_coord.y, first_coord.x);
             }
@@ -335,75 +383,26 @@ G1 0 0 200
             let prev_base_steps = Math.round(-start_alpha_rad * STEPS_PER_RAD);
             let prev_elbow_steps = Math.round(-start_beta_rad * STEPS_PER_RAD);
 
-            // Get the arm's ACTUAL start position (clamped)
-            let { p2: start_pos } = calculateFK(null, prev_base_steps, prev_elbow_steps); 
-            let prev_x = start_pos.x;
-            let prev_y = start_pos.y;
-            
-            // --- THE REAL FIX: Track the IDEAL G-code path ---
-            // We set the *ideal* start point to be the arm's *actual* start point.
-            let ideal_prev_x = prev_x;
-            let ideal_prev_y = prev_y;
-            // --- END FIX ---
-
-            const segment_length_mm = parseFloat(segmentLengthInput.value) || 2.0;
             const step_delay_us = parseInt(stepDelayInput.value, 10) || 1000;
             
             try {
-                // Loop over each G1 coordinate
-                for (const coord of coords) {
-                    // These are the IDEAL G-code targets
-                    const ideal_end_x = coord.x;
-                    const ideal_end_y = coord.y;
+                // *** MODIFICATION: Loop over reducedCoords, not coords ***
+                for (const coord of reducedCoords) {
+                    const curr_x = coord.x;
+                    const curr_y = coord.y;
+
+                    const { base_steps, elbow_steps } = calculateIK(curr_x, curr_y, prev_base_steps);
                     
-                    // --- FIX: Interpolation is ALWAYS along the ideal G-code line ---
-                    const line_start_x = ideal_prev_x;
-                    const line_start_y = ideal_prev_y;
+                    const rel_base = Math.round(base_steps - prev_base_steps);
+                    const rel_elbow = Math.round(elbow_steps - prev_elbow_steps);
                     
-                    // These track the *actual* arm position during this G1 move
-                    let last_clamped_x = prev_x;
-                    let last_clamped_y = prev_y;
-
-                    // Calculate distance based on the IDEAL path
-                    const distance = Math.hypot(ideal_end_x - line_start_x, ideal_end_y - line_start_y);
-                    const num_segments = Math.max(1, Math.ceil(distance / segment_length_mm));
-
-                    // Interpolate along the *ideal* straight line
-                    for (let i = 1; i <= num_segments; i++) {
-                        const progress = i / num_segments;
-                        // Get the *ideal* point along the line
-                        const curr_x = lerp(line_start_x, ideal_end_x, progress);
-                        const curr_y = lerp(line_start_y, ideal_end_y, progress);
-
-                        // Now, find the *actual* steps to reach that *ideal* point
-                        // (calculateIK will clip it if it's unreachable)
-                        const { base_steps, elbow_steps, clamped_x, clamped_y } = calculateIK(curr_x, curr_y, prev_base_steps);
-                        
-                        // Get relative steps from the *previous actual* steps
-                        const rel_base = Math.round(base_steps - prev_base_steps);
-                        const rel_elbow = Math.round(elbow_steps - prev_elbow_steps);
-                        
-                        // Only add a command if there's actual movement
-                        if (rel_base !== 0 || rel_elbow !== 0) {
-                            generatedCommands.push({ elbow: rel_elbow, base: rel_base, delay: step_delay_us });
-                        }
-
-                        // --- FIX: Update the *actual* state for the next segment ---
-                        prev_base_steps = base_steps;
-                        prev_elbow_steps = elbow_steps;
-                        last_clamped_x = clamped_x;
-                        last_clamped_y = clamped_y;
+                    if (rel_base !== 0 || rel_elbow !== 0) {
+                        generatedCommands.push({ elbow: rel_elbow, base: rel_base, delay: step_delay_us });
                     }
-                    
-                    // --- FIX: Update states for the *next* G1 line ---
-                    
-                    // 1. The arm's *actual* position is where it ended up (clamped)
-                    prev_x = last_clamped_x;
-                    prev_y = last_clamped_y;
 
-                    // 2. The *ideal* path continues from the G-code target
-                    ideal_prev_x = ideal_end_x;
-                    ideal_prev_y = ideal_end_y;
+                    // Update the state for the next G1 line
+                    prev_base_steps = base_steps;
+                    prev_elbow_steps = elbow_steps;
                 }
             } catch (e) {
                 showModal(`Conversion Error: ${e.message}`);
@@ -411,6 +410,7 @@ G1 0 0 200
             }
 
             // --- 4. Smooth the commands ---
+            // This post-processing step is still useful.
             let commandsToSmooth = generatedCommands;
             let smoothedCommands = [];
             let lastLength = -1; 
@@ -427,6 +427,8 @@ G1 0 0 200
             commandsInput.value = commandStrings.join('\n');
             loadCommandsBtn.click(); // Automatically click "Load & Reset"
         }
+        // *** --- END MODIFIED FUNCTION --- ***
+
 
         /**
          * Combines consecutive commands with the same ratio and speed.
@@ -604,7 +606,7 @@ G1 0 0 200
         // Enable/disable playback controls
         function setControlsEnabled(enabled) {
             playBtn.disabled = !enabled;
-            playLoopBtn.disabled = !enabled; // *** NEW ***
+            playLoopBtn.disabled = !enabled;
             commandSlider.disabled = !enabled;
         }
 
@@ -666,11 +668,9 @@ G1 0 0 200
             const alpha_rad = -base_steps / STEPS_PER_RAD; // Base motor angle
             const beta_rad = -elbow_steps / STEPS_PER_RAD;  // Elbow motor angle
             
-            // --- *** LOCKED KINEMATIC LOGIC *** ---
             const theta1 = alpha_rad;
             const theta_bend = beta_rad - (GEAR_RATIO * alpha_rad);
             const theta2_global = theta1 + theta_bend;
-            // --- *** END OF LOCKED LOGIC *** ---
 
             // Calculate elbow (p1) and end-effector (p2) positions
             const p1 = {
@@ -702,7 +702,6 @@ G1 0 0 200
             drawState(newStep); // Jump to the selected state
         }
         
-        // --- *** NEW "STEP FORWARD" FUNCTION *** ---
         function playFrame() {
             if (isAutoPlaying) {
                 pause(); // Stop any looping playback
@@ -719,7 +718,6 @@ G1 0 0 200
          * Jumps to a specific step, cancels animation, and draws the final state.
          */
         function drawState(index) {
-            // *** MODIFIED: Only cancel animation, don't stop playback ***
             cancelAnimation(); // Stop any in-progress tween
             currentStep = index;
             const state = cumulativeStates[index];
@@ -817,7 +815,7 @@ G1 0 0 200
             ctx.beginPath();
             ctx.moveTo(p0.x, p0.y);
             ctx.lineTo(p1.x, p1.y);
-            ctx.strokeStyle = '#6366f1'; // *** NEW COLOR ***
+            ctx.strokeStyle = '#6366f1';
             ctx.lineWidth = armWidth;
             ctx.lineCap = 'round';
             ctx.stroke();
@@ -826,7 +824,7 @@ G1 0 0 200
             ctx.beginPath();
             ctx.moveTo(p1.x, p1.y);
             ctx.lineTo(p2.x, p2.y);
-            ctx.strokeStyle = '#06b6d4'; // *** NEW COLOR ***
+            ctx.strokeStyle = '#06b6d4';
             ctx.lineWidth = armWidth;
             ctx.lineCap = 'round';
             ctx.stroke();
@@ -841,7 +839,7 @@ G1 0 0 200
             ctx.fill();
             
             // End Effector
-            ctx.fillStyle = '#f43f5e'; // *** NEW COLOR ***
+            ctx.fillStyle = '#f43f5e';
             ctx.beginPath();
             ctx.arc(p2.x, p2.y, jointRadius, 0, 2 * Math.PI);
             ctx.fill();
@@ -886,11 +884,9 @@ G1 0 0 200
         
         // --- Playback Controls ---
 
-        // *** RENAMED ***
         function playFullAnimation() {
             if (isAutoPlaying) return;
             
-            // If at the end, reset to start
             if (currentStep >= cumulativeStates.length - 1) {
                 currentStep = 0;
                 drawState(0);
@@ -900,7 +896,6 @@ G1 0 0 200
             playNextCommand();
         }
         
-        // --- *** MODIFIED PAUSE LOGIC *** ---
         function cancelAnimation() {
             if (animationFrameId) {
                 cancelAnimationFrame(animationFrameId);
@@ -913,9 +908,7 @@ G1 0 0 200
             isLooping = false; // Pause should stop playing AND looping
             cancelAnimation();
         }
-        // --- *** END MODIFIED PAUSE LOGIC *** ---
         
-        // --- *** NEW FUNCTION HERE *** ---
         function playLoop() {
             if (isAutoPlaying) {
                 pause(); // Stop if already playing
@@ -923,15 +916,13 @@ G1 0 0 200
             isLooping = true;
             currentStep = 0; // Always start from 0
             drawState(0);
-            playFullAnimation(); // *** CHANGED ***
+            playFullAnimation();
         }
-        // --- *** END NEW FUNCTION *** ---
 
         /**
          * Kicks off the animation to the next step.
          */
         function playNextCommand() {
-            // --- *** MODIFIED LOOP LOGIC *** ---
             if (!isAutoPlaying) {
                 return; // Was manually paused
             }
@@ -939,22 +930,16 @@ G1 0 0 200
             if (currentStep >= cumulativeStates.length - 1) {
                 // Reached the end of the animation
                 if (isLooping) {
-                    // --- LOOPING LOGIC ---
                     currentStep = 0; // Go back to the beginning
                     drawState(0); // Snap to the start
                     
-                    // We need to call play() to restart the animation process,
-                    // but with a tiny delay to let the browser render the drawState.
-                    setTimeout(playFullAnimation, 50); // *** CHANGED ***
-                    return; // Stop this thread, the setTimeout will start a new one
-                    // --- END LOOPING LOGIC ---
+                    setTimeout(playFullAnimation, 50);
+                    return;
                 } else {
-                    // --- NO LOOPING ---
                     isAutoPlaying = false; // Stop at the end
                     return;
                 }
             }
-            // --- *** END MODIFIED LOGIC *** ---
             
             animationFromState = cumulativeStates[currentStep];
             animationToState = cumulativeStates[currentStep + 1];
@@ -966,7 +951,7 @@ G1 0 0 200
             
             const { elbow, base, step_delay_us } = currentCommand;
             const max_steps = Math.max(Math.abs(elbow), Math.abs(base));
-            // Handle 0-step moves (should be rare)
+            
             let duration_ms = (max_steps * step_delay_us) / 1000.0;
             if (duration_ms === 0) duration_ms = 1; // Prevent divide by zero
             
@@ -1013,10 +998,9 @@ G1 0 0 200
         }
 
         /**
-         * Custom modal for alerts, as alert() is bad.
+         * Custom modal for alerts.
          */
         function showModal(message) {
-            // Check if a modal already exists
             let modal = document.getElementById('alert-modal');
             if (modal) {
                 modal.querySelector('p').textContent = message;
@@ -1024,7 +1008,6 @@ G1 0 0 200
                 return;
             }
 
-            // Create modal elements
             modal = document.createElement('div');
             modal.id = 'alert-modal';
             modal.className = 'fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50';
@@ -1042,19 +1025,17 @@ G1 0 0 200
             
             const closeButton = document.createElement('button');
             closeButton.className = 'w-full text-white font-semibold py-2 px-4 rounded-lg transition duration-200';
+            closeButton.textContent = 'OK';
             
-            // Event listener for close button
             closeButton.onclick = () => {
                 modal.style.display = 'none';
             };
             
-            // Assemble modal
             modalContent.appendChild(modalTitle);
             modalContent.appendChild(modalText);
             modalContent.appendChild(closeButton);
             modal.appendChild(modalContent);
             
-            // Add to body
             document.body.appendChild(modal);
         }
 
