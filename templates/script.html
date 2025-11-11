@@ -303,7 +303,6 @@ G1 0 0 200
 
         // --- G-Code Converter Functions ---
 
-        // *** --- MODIFIED FUNCTION --- ***
         /**
          * Converts G-code (X, Y) or (R, A) to arm commands.
          */
@@ -319,7 +318,6 @@ G1 0 0 200
             
             let coords = [];
             
-            // *** NEW: Add flags to detect data type ***
             let isRawPolarData = false;
             let foundGCode = false;
 
@@ -329,7 +327,6 @@ G1 0 0 200
                 if (trimmedLine.length === 0) continue; 
                 
                 if (format === 'cartesian') {
-                    // Cartesian always assumes G-Code (straight lines)
                     const match = trimmedLine.match(xyRegex);
                     if (match) {
                         const x = parseFloat(match[1]);
@@ -340,29 +337,22 @@ G1 0 0 200
                 } else if (format === 'polar') {
                     let match = trimmedLine.match(raRegex); 
                     if (match) {
-                        // Format is G1 R... A... (Angle in DEGREES)
                         foundGCode = true;
-                        isRawPolarData = false; // It's G-Code, not raw data
+                        isRawPolarData = false; 
                         const r = parseFloat(match[1]);
                         const angle_deg = parseFloat(match[2]);
                         const angle_rad = angle_deg * (Math.PI / 180);
-                        
                         const abs_r = Math.abs(r);
-                        
                         const x = abs_r * Math.cos(angle_rad);
                         const y = abs_r * Math.sin(angle_rad);
                         coords.push({ x, y });
                     } else if (!foundGCode) { 
-                        // Only check for raw data if we haven't found any G-Code yet
                         match = trimmedLine.match(rawRaRegex);
                         if (match) {
-                            // Format is "R A" (Angle in RADIANS)
-                            isRawPolarData = true; // This is a raw data file
+                            isRawPolarData = true; 
                             const r = parseFloat(match[1]);
                             const angle_rad = parseFloat(match[2]); 
-                            
                             const abs_r = Math.abs(r);
-                            
                             const x = abs_r * Math.cos(angle_rad);
                             const y = abs_r * Math.sin(angle_rad);
                             coords.push({ x, y });
@@ -370,7 +360,6 @@ G1 0 0 200
                     }
                 }
             }
-            // *** --- END MODIFICATION --- ***
 
 
             if (coords.length === 0) {
@@ -380,9 +369,8 @@ G1 0 0 200
 
             let reducedCoords;
             
-            // *** MODIFICATION: Skip co-linearity check if it's raw data ***
             if (isRawPolarData) {
-                reducedCoords = coords; // Use all points
+                reducedCoords = coords; 
             } else {
                 // --- 2. Pre-process G-Code coords to remove co-linear points ---
                 const collinearity_epsilon = 1e-6; 
@@ -433,9 +421,8 @@ G1 0 0 200
 
             let interpolatedCoords;
             
-            // *** MODIFICATION: Skip interpolation if it's raw data ***
             if (isRawPolarData) {
-                interpolatedCoords = reducedCoords; // Use all points directly
+                interpolatedCoords = reducedCoords; 
             } else {
                 // --- 3. Interpolate straight lines (for G-Code) ---
                 const resolution_mm = parseFloat(linearResolutionInput.value) || 1.0;
@@ -523,7 +510,6 @@ G1 0 0 200
             commandsInput.value = commandStrings.join('\n');
             loadCommandsBtn.click(); // Automatically click "Load & Reset"
         }
-        // *** --- END MODIFIED FUNCTION --- ***
 
 
         /**
@@ -605,12 +591,10 @@ G1 0 0 200
             const last_theta1 = -last_base_steps / STEPS_PER_RAD;
 
             if (D < 0.1) {
-                // --- NEW SINGULARITY LOGIC ---
+                // --- NEW SINGULARITY LOGIC (v2) ---
                 // We are at or near the origin singularity (0,0).
                 // The arm must be folded.
                 theta_bend = -Math.PI;
-                clamped_x = 0; 
-                clamped_y = 0;
 
                 let raw_theta1;
                 if (D < 1e-6) {
@@ -620,18 +604,20 @@ G1 0 0 200
                     raw_theta1 = last_theta1;
                 } else {
                     // D is small, but not zero. We are NEAR (0,0).
-                    // We can safely use atan2(y,x) to get the angle of the point.
-                    // e.g., (0.05, 0.05) -> 45 deg
-                    // e.g., (-0.05, -0.05) -> 225 deg
+                    // Use the *original* x and y to get the angle of the line.
                     // Because the arm is folded, k1 and k2 are 0, so the IK
                     // math `atan2(y,x) - atan2(k2,k1)` simplifies to just `atan2(y,x)`.
-                    raw_theta1 = Math.atan2(clamped_y, clamped_x);
+                    raw_theta1 = Math.atan2(y, x); // <-- Use original y, x
                 }
                 
                 // Apply the same "shortest path" logic as the main block
                 let rotation_diff = (raw_theta1 - last_theta1) / (2 * Math.PI);
                 let nearest_rotation_offset = Math.round(rotation_diff);
                 theta1 = raw_theta1 - (nearest_rotation_offset * 2 * Math.PI);
+                
+                // We are near the center, so the clamped position IS (0,0)
+                clamped_x = 0; 
+                clamped_y = 0;
                 // --- END NEW LOGIC ---
             
             } else {
@@ -1095,7 +1081,7 @@ G1 0 0 200
             const modalContent = document.createElement('div');
             modalContent.className = 'bg-gray-800 p-6 rounded-lg shadow-xl text-gray-200 max-w-sm w-full mx-4';
             
-            const modalTitle = document.createElement('h3');
+            const modalTitle = document.col(div');
             modalTitle.className = 'text-lg font-medium text-white mb-2';
             modalTitle.textContent = 'Conversion Notice';
             
