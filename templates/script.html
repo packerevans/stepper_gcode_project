@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-g">
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>2DOF Arm Kinematic Simulator & G-Code Converter</title>
 <script src="https://cdn.tailwindcss.com"></script>
@@ -315,7 +315,6 @@ G1 0 0 200
 
             const xyRegex = /G1\s+X(-?[\d.]+)\s+Y(-?[\d.]+)/i;
             const raRegex = /G1\s+R(-?[\d.]+)\s+A(-?[\d.]+)/i;
-            // *** NEW: Regex for raw "R A_rad" (assuming A is in RADIANS) ***
             const rawRaRegex = /^(-?[\d.]+)\s+(-?[\d.]+)/;
             
             let coords = [];
@@ -323,7 +322,7 @@ G1 0 0 200
             // --- 1. Parse all coords based on format ---
             for (const line of lines) {
                 const trimmedLine = line.trim();
-                if (trimmedLine.length === 0) continue; // Skip empty lines
+                if (trimmedLine.length === 0) continue; 
                 
                 if (format === 'cartesian') {
                     const match = trimmedLine.match(xyRegex);
@@ -333,26 +332,31 @@ G1 0 0 200
                         coords.push({ x, y });
                     }
                 } else if (format === 'polar') {
-                    let match = trimmedLine.match(raRegex); // Try G1 format first
+                    let match = trimmedLine.match(raRegex); 
                     if (match) {
                         // Format is G1 R... A... (Angle in DEGREES)
                         const r = parseFloat(match[1]);
                         const angle_deg = parseFloat(match[2]);
                         const angle_rad = angle_deg * (Math.PI / 180);
                         
-                        const x = r * Math.cos(angle_rad);
-                        const y = r * Math.sin(angle_rad);
+                        // *** FIX: Use absolute value of radius ***
+                        const abs_r = Math.abs(r);
+                        
+                        const x = abs_r * Math.cos(angle_rad);
+                        const y = abs_r * Math.sin(angle_rad);
                         coords.push({ x, y });
                     } else {
-                        // *** NEW: Try raw "R A_rad" format ***
                         match = trimmedLine.match(rawRaRegex);
                         if (match) {
                             // Format is "R A" (Angle in RADIANS)
                             const r = parseFloat(match[1]);
-                            const angle_rad = parseFloat(match[2]); // Assuming RADIANS
+                            const angle_rad = parseFloat(match[2]); 
                             
-                            const x = r * Math.cos(angle_rad);
-                            const y = r * Math.sin(angle_rad);
+                            // *** FIX: Use absolute value of radius ***
+                            const abs_r = Math.abs(r);
+                            
+                            const x = abs_r * Math.cos(angle_rad);
+                            const y = abs_r * Math.sin(angle_rad);
                             coords.push({ x, y });
                         }
                     }
@@ -367,11 +371,11 @@ G1 0 0 200
             }
 
             // --- 2. Pre-process coords to remove co-linear points ---
-            const collinearity_epsilon = 1e-6; // For floating point noise
+            const collinearity_epsilon = 1e-6; 
             let reducedCoords = [];
             
             if (coords.length > 0) {
-                reducedCoords.push(coords[0]); // Always add the first point
+                reducedCoords.push(coords[0]); 
             }
 
             let p1_index = 0;
@@ -382,7 +386,7 @@ G1 0 0 200
                 const p2 = coords[p2_index];
 
                 if (p2_index === coords.length - 1) {
-                    reducedCoords.push(p2); // Always add the last point
+                    reducedCoords.push(p2); 
                     break;
                 }
                 
