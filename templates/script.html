@@ -318,6 +318,10 @@ G1 0 0 200
             const rawRaRegex = /^(-?[\d.]+)\s+(-?[\d.]+)/;
             
             let coords = [];
+            
+            // *** NEW: Add flags to detect data type ***
+            let isRawPolarData = false;
+            let foundGCode = false;
 
             // --- 1. Parse all coords based on format ---
             for (const line of lines) {
@@ -325,34 +329,38 @@ G1 0 0 200
                 if (trimmedLine.length === 0) continue; 
                 
                 if (format === 'cartesian') {
+                    // Cartesian always assumes G-Code (straight lines)
                     const match = trimmedLine.match(xyRegex);
                     if (match) {
                         const x = parseFloat(match[1]);
                         const y = parseFloat(match[2]);
                         coords.push({ x, y });
+                        foundGCode = true;
                     }
                 } else if (format === 'polar') {
                     let match = trimmedLine.match(raRegex); 
                     if (match) {
                         // Format is G1 R... A... (Angle in DEGREES)
+                        foundGCode = true;
+                        isRawPolarData = false; // It's G-Code, not raw data
                         const r = parseFloat(match[1]);
                         const angle_deg = parseFloat(match[2]);
                         const angle_rad = angle_deg * (Math.PI / 180);
                         
-                        // *** FIX: Use absolute value of radius ***
                         const abs_r = Math.abs(r);
                         
                         const x = abs_r * Math.cos(angle_rad);
                         const y = abs_r * Math.sin(angle_rad);
                         coords.push({ x, y });
-                    } else {
+                    } else if (!foundGCode) { 
+                        // Only check for raw data if we haven't found any G-Code yet
                         match = trimmedLine.match(rawRaRegex);
                         if (match) {
                             // Format is "R A" (Angle in RADIANS)
+                            isRawPolarData = true; // This is a raw data file
                             const r = parseFloat(match[1]);
                             const angle_rad = parseFloat(match[2]); 
                             
-                            // *** FIX: Use absolute value of radius ***
                             const abs_r = Math.abs(r);
                             
                             const x = abs_r * Math.cos(angle_rad);
@@ -370,86 +378,101 @@ G1 0 0 200
                 return;
             }
 
-            // --- 2. Pre-process coords to remove co-linear points ---
-            const collinearity_epsilon = 1e-6; 
-            let reducedCoords = [];
+            let reducedCoords;
             
-            if (coords.length > 0) {
-                reducedCoords.push(coords[0]); 
-            }
-
-            let p1_index = 0;
-            let p2_index = 1;
-
-            while (p2_index < coords.length) {
-                const p1 = coords[p1_index];
-                const p2 = coords[p2_index];
-
-                if (p2_index === coords.length - 1) {
-                    reducedCoords.push(p2); 
-                    break;
-                }
+            // *** MODIFICATION: Skip co-linearity check if it's raw data ***
+            if (isRawPolarData) {
+                reducedCoords = coords; // Use all points
+            } else {
+                // --- 2. Pre-process G-Code coords to remove co-linear points ---
+                const collinearity_epsilon = 1e-6; 
+                reducedCoords = [];
                 
-                const p3 = coords[p2_index + 1];
-
-                const cross_product = (p2.y - p1.y) * (p3.x - p2.x) - (p2.x - p1.x) * (p3.y - p2.y);
-
-                let isCoLinear = Math.abs(cross_product) < collinearity_epsilon;
-
-                if (isCoLinear) {
-                    const v1_x = p2.x - p1.x;
-                    const v1_y = p2.y - p1.y;
-                    const v2_x = p3.x - p2.x;
-                    const v2_y = p3.y - p2.y;
-                    
-                    const dot_product = (v1_x * v2_x) + (v1_y * v2_y);
-                    
-                    if (dot_product < 0) {
-                        isCoLinear = false; 
-                    }
+                if (coords.length > 0) {
+                    reducedCoords.push(coords[0]); 
                 }
 
-                if (isCoLinear) {
-                    p2_index++;
-                } else {
-                    reducedCoords.push(p2);
-                    p1_index = p2_index;
-                    p2_index++;
+                let p1_index = 0;
+                let p2_index = 1;
+
+                while (p2_index < coords.length) {
+                    const p1 = coords[p1_index];
+                    const p2 = coords[p2_index];
+
+                    if (p2_index === coords.length - 1) {
+                        reducedCoords.push(p2); 
+                        break;
+                    }
+                    
+                    const p3 = coords[p2_index + 1];
+                    const cross_product = (p2.y - p1.y) * (p3.x - p2.x) - (p2.x - p1.x) * (p3.y - p2.y);
+                    let isCoLinear = Math.abs(cross_product) < collinearity_epsilon;
+
+                    if (isCoLinear) {
+                        const v1_x = p2.x - p1.x;
+                        const v1_y = p2.y - p1.y;
+                        const v2_x = p3.x - p2.x;
+                        const v2_y = p3.y - p2.y;
+                        const dot_product = (v1_x * v2_x) + (v1_y * v2_y);
+                        
+                        if (dot_product < 0) {
+                            isCoLinear = false; 
+                        }
+                    }
+
+                    if (isCoLinear) {
+                        p2_index++;
+                    } else {
+                        reducedCoords.push(p2);
+                        p1_index = p2_index;
+                        p2_index++;
+                    }
                 }
             }
             // --- END STEP 2 ---
 
-
-            // --- 3. Interpolate straight lines ---
-            const resolution_mm = parseFloat(linearResolutionInput.value) || 1.0;
-            let interpolatedCoords = [];
-
-            if (reducedCoords.length === 0) {
-                 showModal("No coordinates left after processing.");
-                 return;
-            }
+            let interpolatedCoords;
             
-            interpolatedCoords.push(reducedCoords[0]); 
+            // *** MODIFICATION: Skip interpolation if it's raw data ***
+            if (isRawPolarData) {
+                interpolatedCoords = reducedCoords; // Use all points directly
+            } else {
+                // --- 3. Interpolate straight lines (for G-Code) ---
+                const resolution_mm = parseFloat(linearResolutionInput.value) || 1.0;
+                interpolatedCoords = [];
 
-            for (let i = 0; i < reducedCoords.length - 1; i++) {
-                const p_start = reducedCoords[i];
-                const p_end = reducedCoords[i+1];
+                if (reducedCoords.length === 0) {
+                     showModal("No coordinates left after processing.");
+                     return;
+                }
+                
+                interpolatedCoords.push(reducedCoords[0]); 
 
-                const dist = Math.hypot(p_end.x - p_start.x, p_end.y - p_start.y);
-                const num_steps = Math.max(1, Math.ceil(dist / resolution_mm)); 
+                for (let i = 0; i < reducedCoords.length - 1; i++) {
+                    const p_start = reducedCoords[i];
+                    const p_end = reducedCoords[i+1];
 
-                for (let j = 1; j <= num_steps; j++) {
-                    const progress = j / num_steps;
-                    const inter_x = lerp(p_start.x, p_end.x, progress);
-                    const inter_y = lerp(p_start.y, p_end.y, progress);
-                    interpolatedCoords.push({ x: inter_x, y: inter_y });
+                    const dist = Math.hypot(p_end.x - p_start.x, p_end.y - p_start.y);
+                    const num_steps = Math.max(1, Math.ceil(dist / resolution_mm)); 
+
+                    for (let j = 1; j <= num_steps; j++) {
+                        const progress = j / num_steps;
+                        const inter_x = lerp(p_start.x, p_end.x, progress);
+                        const inter_y = lerp(p_start.y, p_end.y, progress);
+                        interpolatedCoords.push({ x: inter_x, y: inter_y });
+                    }
                 }
             }
             // --- END NEW STEP 3 ---
 
 
-            // --- 4. Convert *all interpolated* coords to relative arm commands ---
+            // --- 4. Convert *all* coords to relative arm commands ---
             let generatedCommands = [];
+            
+            if (interpolatedCoords.length === 0) {
+                showModal("No coordinates to convert.");
+                return;
+            }
             
             const first_coord = interpolatedCoords[0];
             const { base_steps: start_base_steps, elbow_steps: start_elbow_steps } = calculateIK(first_coord.x, first_coord.y, 0);
@@ -460,6 +483,7 @@ G1 0 0 200
             const step_delay_us = parseInt(stepDelayInput.value, 10) || 1000;
             
             try {
+                // Start at j=1 because we've already processed the first point
                 for (let j = 1; j < interpolatedCoords.length; j++) {
                     const coord = interpolatedCoords[j];
                     const curr_x = coord.x;
