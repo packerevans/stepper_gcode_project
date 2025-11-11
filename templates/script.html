@@ -310,11 +310,11 @@ G1 0 0 200
             const gcodeText = gcodeConverterInput.value;
             const lines = gcodeText.split('\n');
             
-            // --- NEW: Get selected format ---
+            // --- Get selected format ---
             const format = document.querySelector('input[name="gcodeFormat"]:checked').value;
 
             const xyRegex = /G1\s+X(-?[\d.]+)\s+Y(-?[\d.]+)/i;
-            // --- NEW: Regex for Polar (Radius, Angle in degrees) ---
+            // --- Regex for Polar (Radius, Angle in degrees) ---
             const raRegex = /G1\s+R(-?[\d.]+)\s+A(-?[\d.]+)/i;
             
             let coords = [];
@@ -331,7 +331,7 @@ G1 0 0 200
                         coords.push({ x, y });
                     }
                 } else if (format === 'polar') {
-                    // --- NEW: Polar parsing logic ---
+                    // --- Polar parsing logic ---
                     const match = trimmedLine.match(raRegex);
                     if (match) {
                         const r = parseFloat(match[1]);
@@ -345,16 +345,13 @@ G1 0 0 200
                 }
             }
 
-            if (coords.length < 2) {
-                 if(coords.length === 1) { /* Just one point, not enough for a line */ }
-                 else {
-                    // --- MODIFIED: Updated error message ---
-                    showModal(`No valid '${format === 'cartesian' ? 'G1 X... Y...' : 'G1 R... A...'}' commands found.`);
-                    return;
-                 }
+            if (coords.length === 0) {
+                // --- MODIFIED: Updated error message ---
+                showModal(`No valid '${format === 'cartesian' ? 'G1 X... Y...' : 'G1 R... A...'}' commands found.`);
+                return;
             }
 
-            // --- 2. NEW: Pre-process coords to remove co-linear points ---
+            // --- 2. Pre-process coords to remove co-linear points ---
             const collinearity_epsilon = 1e-6; // For floating point noise
             let reducedCoords = [];
             
@@ -379,16 +376,37 @@ G1 0 0 200
                 const p3 = coords[p2_index + 1];
 
                 // Check for co-linearity using cross-product.
-                // If (p2.y - p1.y) * (p3.x - p2.x) == (p2.x - p1.x) * (p3.y - p2.y)
-                // then the slopes are the same.
                 const cross_product = (p2.y - p1.y) * (p3.x - p2.x) - (p2.x - p1.x) * (p3.y - p2.y);
 
-                if (Math.abs(cross_product) < collinearity_epsilon) {
-                    // p1, p2, p3 are co-linear. p2 is redundant.
-                    // Skip p2 and check the next point (p3) against p1.
+                // *** --- START FIX --- ***
+                let isCoLinear = Math.abs(cross_product) < collinearity_epsilon;
+
+                if (isCoLinear) {
+                    // It's co-linear, but is it a turning point? (e.g., A -> B -> A)
+                    // We check this by seeing if the vectors (p1->p2) and (p2->p3)
+                    // point in opposite directions.
+                    const v1_x = p2.x - p1.x;
+                    const v1_y = p2.y - p1.y;
+                    const v2_x = p3.x - p2.x;
+                    const v2_y = p3.y - p2.y;
+                    
+                    // Calculate the dot product
+                    const dot_product = (v1_x * v2_x) + (v1_y * v2_y);
+                    
+                    if (dot_product < 0) {
+                        // Dot product is negative, vectors point in opposite directions.
+                        // This means p2 is a turning point and must be kept.
+                        isCoLinear = false; // Treat it as a corner.
+                    }
+                }
+
+                if (isCoLinear) {
+                // *** --- END FIX --- ***
+                    // p1, p2, p3 are co-linear AND p2 is not a turning point.
+                    // p2 is redundant. Skip it.
                     p2_index++;
                 } else {
-                    // p1, p2, p3 are *not* co-linear.
+                    // p1, p2, p3 are *not* co-linear (or p2 is a turning point).
                     // This means p2 is a "corner".
                     // We must add p2 to our list.
                     reducedCoords.push(p2);
@@ -403,21 +421,10 @@ G1 0 0 200
 
             // --- 3. Convert *reduced* coords to relative arm commands ---
             let generatedCommands = [];
-            
-            // Find the *first* point to set the arm's initial angle
-            const first_coord = reducedCoords[0];
-            let start_theta1;
 
-            if (Math.hypot(first_coord.x, first_coord.y) < 0.1) {
-                start_theta1 = 0; // Start at origin
-            } else {
-                start_theta1 = Math.atan2(first_coord.y, first_coord.x);
-            }
-
-            const start_alpha_rad = start_theta1;
-            const start_beta_rad = GEAR_RATIO * start_alpha_rad;
-            let prev_base_steps = Math.round(-start_alpha_rad * STEPS_PER_RAD);
-            let prev_elbow_steps = Math.round(-start_beta_rad * STEPS_PER_RAD);
+            // Assume arm starts at 0,0 (relative to its own state)
+            let prev_base_steps = 0;
+            let prev_elbow_steps = 0;
 
             const step_delay_us = parseInt(stepDelayInput.value, 10) || 1000;
             
