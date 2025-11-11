@@ -582,6 +582,10 @@ G1 0 0 200
         }
 
 
+        // ***************************************************************
+        // *** FIXED FUNCTION STARTS HERE                ***
+        // ***************************************************************
+        
         /**
          * Inverse Kinematics: Calculates arm motor steps from (X, Y) position.
          */
@@ -598,15 +602,40 @@ G1 0 0 200
             }
 
             let theta1, theta_bend;
+            const last_theta1 = -last_base_steps / STEPS_PER_RAD;
 
             if (D < 0.1) {
+                // --- NEW SINGULARITY LOGIC ---
+                // We are at or near the origin singularity (0,0).
+                // The arm must be folded.
                 theta_bend = -Math.PI;
-                const alpha_rad = -last_base_steps / STEPS_PER_RAD;
-                theta1 = alpha_rad;
                 clamped_x = 0; 
                 clamped_y = 0;
+
+                let raw_theta1;
+                if (D < 1e-6) {
+                    // D is effectively zero. We are AT (0,0).
+                    // We can't use atan2(0,0) as it snaps to 0.
+                    // We MUST re-use the last angle to prevent a snap.
+                    raw_theta1 = last_theta1;
+                } else {
+                    // D is small, but not zero. We are NEAR (0,0).
+                    // We can safely use atan2(y,x) to get the angle of the point.
+                    // e.g., (0.05, 0.05) -> 45 deg
+                    // e.g., (-0.05, -0.05) -> 225 deg
+                    // Because the arm is folded, k1 and k2 are 0, so the IK
+                    // math `atan2(y,x) - atan2(k2,k1)` simplifies to just `atan2(y,x)`.
+                    raw_theta1 = Math.atan2(clamped_y, clamped_x);
+                }
+                
+                // Apply the same "shortest path" logic as the main block
+                let rotation_diff = (raw_theta1 - last_theta1) / (2 * Math.PI);
+                let nearest_rotation_offset = Math.round(rotation_diff);
+                theta1 = raw_theta1 - (nearest_rotation_offset * 2 * Math.PI);
+                // --- END NEW LOGIC ---
             
             } else {
+                // Standard case: Not near the origin.
                 const D_sq = D*D;
                 let cos_theta_bend = (D_sq - L1*L1 - L2*L2) / (2 * L1 * L2);
                 cos_theta_bend = Math.max(-1, Math.min(1, cos_theta_bend)); 
@@ -618,7 +647,6 @@ G1 0 0 200
                 
                 let raw_theta1 = Math.atan2(clamped_y, clamped_x) - Math.atan2(k2, k1);
 
-                const last_theta1 = -last_base_steps / STEPS_PER_RAD;
                 let rotation_diff = (raw_theta1 - last_theta1) / (2 * Math.PI);
                 let nearest_rotation_offset = Math.round(rotation_diff);
                 theta1 = raw_theta1 - (nearest_rotation_offset * 2 * Math.PI);
@@ -637,6 +665,11 @@ G1 0 0 200
                 clamped_y: clamped_y
             };
         }
+        
+        // ***************************************************************
+        // *** FIXED FUNCTION ENDS HERE                 ***
+        // ***************************************************************
+        
         // --- END: G-Code Converter Functions ---
 
 
