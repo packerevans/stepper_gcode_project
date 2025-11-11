@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-g">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>2DOF Arm Kinematic Simulator & G-Code Converter</title>
 <script src="https://cdn.tailwindcss.com"></script>
@@ -112,14 +112,14 @@ input[type=number] {
                 <label for="gcodeConverterInput" class="block text-sm font-medium text-gray-300 mb-2">
                     1. Paste G-Code
                 </label>
-                <textarea id="gcodeConverterInput" rows="8" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Cartesian: G1 X100 Y50&#10;Polar: G1 R111.8 A26.5">
+                <textarea id="gcodeConverterInput" rows="8" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Cartesian: G1 X100 Y50&#10;Polar: G1 R111.8 A26.5&#10;Raw Polar: 111.8 0.463">
 G1 X203.2 Y0
 G1 X0 Y0
 G1 X0 Y203.2
 G1 X0 Y0
 G1 X203.2 Y0
 </textarea>
-                <div class="grid grid-cols-2 gap-3 mt-3">
+                <div class="grid grid-cols-3 gap-3 mt-3">
                     <div>
                         <label for="stepDelayInput" class="block text-xs font-medium text-gray-400">Delay (μs)</label>
                         <input type="number" id="stepDelayInput" value="1000" class="w-full mt-1 p-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
@@ -127,6 +127,10 @@ G1 X203.2 Y0
                     <div>
                         <label for="smoothingSensitivity" class="block text-xs font-medium text-gray-400">Smooth (ε)</label>
                         <input type="number" id="smoothingSensitivity" value="0.000001" step="0.000001" class="w-full mt-1 p-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label for="linearResolution" class="block text-xs font-medium text-gray-400">Res. (mm)</label>
+                        <input type="number" id="linearResolution" value="1.0" step="0.1" class="w-full mt-1 p-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     </div>
                 </div>
                 <button id="convertGCodeBtn" class="w-full mt-3 font-semibold py-2 px-4 rounded-lg transition duration-200 shadow-md">
@@ -210,6 +214,7 @@ G1 0 0 200
         const convertGCodeBtn = document.getElementById('convertGCodeBtn');
         const stepDelayInput = document.getElementById('stepDelayInput');
         const smoothingSensitivity = document.getElementById('smoothingSensitivity');
+        const linearResolutionInput = document.getElementById('linearResolution');
 
         // --- Simulation Constants ---
         const L1 = 101.3; // mm (Upper arm)
@@ -301,27 +306,24 @@ G1 0 0 200
         // *** --- MODIFIED FUNCTION --- ***
         /**
          * Converts G-code (X, Y) or (R, A) to arm commands.
-         * 1. Parses all vertices based on selected format.
-         * 2. Pre-processes vertices to remove redundant co-linear points.
-         * 3. Converts the *reduced* list of vertices to IK commands.
-         * 4. Post-processes commands to smooth any remaining co-linear *angle* moves.
          */
         function convertGCode() {
             const gcodeText = gcodeConverterInput.value;
             const lines = gcodeText.split('\n');
             
-            // --- Get selected format ---
             const format = document.querySelector('input[name="gcodeFormat"]:checked').value;
 
             const xyRegex = /G1\s+X(-?[\d.]+)\s+Y(-?[\d.]+)/i;
-            // --- Regex for Polar (Radius, Angle in degrees) ---
             const raRegex = /G1\s+R(-?[\d.]+)\s+A(-?[\d.]+)/i;
+            // *** NEW: Regex for raw "R A_rad" (assuming A is in RADIANS) ***
+            const rawRaRegex = /^(-?[\d.]+)\s+(-?[\d.]+)/;
             
             let coords = [];
 
             // --- 1. Parse all coords based on format ---
             for (const line of lines) {
                 const trimmedLine = line.trim();
+                if (trimmedLine.length === 0) continue; // Skip empty lines
                 
                 if (format === 'cartesian') {
                     const match = trimmedLine.match(xyRegex);
@@ -331,9 +333,9 @@ G1 0 0 200
                         coords.push({ x, y });
                     }
                 } else if (format === 'polar') {
-                    // --- Polar parsing logic ---
-                    const match = trimmedLine.match(raRegex);
+                    let match = trimmedLine.match(raRegex); // Try G1 format first
                     if (match) {
+                        // Format is G1 R... A... (Angle in DEGREES)
                         const r = parseFloat(match[1]);
                         const angle_deg = parseFloat(match[2]);
                         const angle_rad = angle_deg * (Math.PI / 180);
@@ -341,13 +343,26 @@ G1 0 0 200
                         const x = r * Math.cos(angle_rad);
                         const y = r * Math.sin(angle_rad);
                         coords.push({ x, y });
+                    } else {
+                        // *** NEW: Try raw "R A_rad" format ***
+                        match = trimmedLine.match(rawRaRegex);
+                        if (match) {
+                            // Format is "R A" (Angle in RADIANS)
+                            const r = parseFloat(match[1]);
+                            const angle_rad = parseFloat(match[2]); // Assuming RADIANS
+                            
+                            const x = r * Math.cos(angle_rad);
+                            const y = r * Math.sin(angle_rad);
+                            coords.push({ x, y });
+                        }
                     }
                 }
             }
+            // *** --- END MODIFICATION --- ***
+
 
             if (coords.length === 0) {
-                // --- MODIFIED: Updated error message ---
-                showModal(`No valid '${format === 'cartesian' ? 'G1 X... Y...' : 'G1 R... A...'}' commands found.`);
+                showModal(`No valid coordinates found for the selected format.`);
                 return;
             }
 
@@ -359,7 +374,6 @@ G1 0 0 200
                 reducedCoords.push(coords[0]); // Always add the first point
             }
 
-            // We look at 3 points: p1 (anchor), p2 (current), p3 (next)
             let p1_index = 0;
             let p2_index = 1;
 
@@ -368,69 +382,82 @@ G1 0 0 200
                 const p2 = coords[p2_index];
 
                 if (p2_index === coords.length - 1) {
-                    // This is the last point, always add it
-                    reducedCoords.push(p2);
+                    reducedCoords.push(p2); // Always add the last point
                     break;
                 }
                 
                 const p3 = coords[p2_index + 1];
 
-                // Check for co-linearity using cross-product.
                 const cross_product = (p2.y - p1.y) * (p3.x - p2.x) - (p2.x - p1.x) * (p3.y - p2.y);
 
-                // *** --- START FIX --- ***
                 let isCoLinear = Math.abs(cross_product) < collinearity_epsilon;
 
                 if (isCoLinear) {
-                    // It's co-linear, but is it a turning point? (e.g., A -> B -> A)
-                    // We check this by seeing if the vectors (p1->p2) and (p2->p3)
-                    // point in opposite directions.
                     const v1_x = p2.x - p1.x;
                     const v1_y = p2.y - p1.y;
                     const v2_x = p3.x - p2.x;
                     const v2_y = p3.y - p2.y;
                     
-                    // Calculate the dot product
                     const dot_product = (v1_x * v2_x) + (v1_y * v2_y);
                     
                     if (dot_product < 0) {
-                        // Dot product is negative, vectors point in opposite directions.
-                        // This means p2 is a turning point and must be kept.
-                        isCoLinear = false; // Treat it as a corner.
+                        isCoLinear = false; 
                     }
                 }
 
                 if (isCoLinear) {
-                // *** --- END FIX --- ***
-                    // p1, p2, p3 are co-linear AND p2 is not a turning point.
-                    // p2 is redundant. Skip it.
                     p2_index++;
                 } else {
-                    // p1, p2, p3 are *not* co-linear (or p2 is a turning point).
-                    // This means p2 is a "corner".
-                    // We must add p2 to our list.
                     reducedCoords.push(p2);
-                    
-                    // The new line segment starts from p2.
                     p1_index = p2_index;
                     p2_index++;
                 }
             }
-            // --- END NEW STEP ---
+            // --- END STEP 2 ---
 
 
-            // --- 3. Convert *reduced* coords to relative arm commands ---
+            // --- 3. Interpolate straight lines ---
+            const resolution_mm = parseFloat(linearResolutionInput.value) || 1.0;
+            let interpolatedCoords = [];
+
+            if (reducedCoords.length === 0) {
+                 showModal("No coordinates left after processing.");
+                 return;
+            }
+            
+            interpolatedCoords.push(reducedCoords[0]); 
+
+            for (let i = 0; i < reducedCoords.length - 1; i++) {
+                const p_start = reducedCoords[i];
+                const p_end = reducedCoords[i+1];
+
+                const dist = Math.hypot(p_end.x - p_start.x, p_end.y - p_start.y);
+                const num_steps = Math.max(1, Math.ceil(dist / resolution_mm)); 
+
+                for (let j = 1; j <= num_steps; j++) {
+                    const progress = j / num_steps;
+                    const inter_x = lerp(p_start.x, p_end.x, progress);
+                    const inter_y = lerp(p_start.y, p_end.y, progress);
+                    interpolatedCoords.push({ x: inter_x, y: inter_y });
+                }
+            }
+            // --- END NEW STEP 3 ---
+
+
+            // --- 4. Convert *all interpolated* coords to relative arm commands ---
             let generatedCommands = [];
+            
+            const first_coord = interpolatedCoords[0];
+            const { base_steps: start_base_steps, elbow_steps: start_elbow_steps } = calculateIK(first_coord.x, first_coord.y, 0);
 
-            // Assume arm starts at 0,0 (relative to its own state)
-            let prev_base_steps = 0;
-            let prev_elbow_steps = 0;
+            let prev_base_steps = start_base_steps;
+            let prev_elbow_steps = start_elbow_steps;
 
             const step_delay_us = parseInt(stepDelayInput.value, 10) || 1000;
             
             try {
-                // *** MODIFICATION: Loop over reducedCoords, not coords ***
-                for (const coord of reducedCoords) {
+                for (let j = 1; j < interpolatedCoords.length; j++) {
+                    const coord = interpolatedCoords[j];
                     const curr_x = coord.x;
                     const curr_y = coord.y;
 
@@ -443,7 +470,6 @@ G1 0 0 200
                         generatedCommands.push({ elbow: rel_elbow, base: rel_base, delay: step_delay_us });
                     }
 
-                    // Update the state for the next G1 line
                     prev_base_steps = base_steps;
                     prev_elbow_steps = elbow_steps;
                 }
@@ -452,8 +478,7 @@ G1 0 0 200
                 return;
             }
 
-            // --- 4. Smooth the commands ---
-            // This post-processing step is still useful.
+            // --- 5. Smooth the commands ---
             let commandsToSmooth = generatedCommands;
             let smoothedCommands = [];
             let lastLength = -1; 
@@ -465,7 +490,7 @@ G1 0 0 200
                 commandsToSmooth = smoothedCommands;
             }
 
-            // --- 5. Load into simulator ---
+            // --- 6. Load into simulator ---
             const commandStrings = smoothedCommands.map(cmd => `G1 ${cmd.elbow} ${cmd.base} ${cmd.delay}`);
             commandsInput.value = commandStrings.join('\n');
             loadCommandsBtn.click(); // Automatically click "Load & Reset"
@@ -489,24 +514,20 @@ G1 0 0 200
                 
                 let canCombine = false;
                 
-                // Must have the same delay to be combined
                 if (current_command.delay === next_command.delay) {
                     const cmd1 = current_command;
                     const cmd2 = next_command;
 
-                    // Check for vertical moves (base = 0)
                     if (cmd1.base === 0 && cmd2.base === 0) {
                         if (Math.sign(cmd1.elbow) === Math.sign(cmd2.elbow)) {
                             canCombine = true;
                         }
                     } 
-                    // Check for horizontal moves (elbow = 0)
                     else if (cmd1.elbow === 0 && cmd2.elbow === 0) {
                         if (Math.sign(cmd1.base) === Math.sign(cmd2.base)) {
                             canCombine = true;
                         }
                     }
-                    // Check for diagonal moves (neither = 0)
                     else if (cmd1.base !== 0 && cmd2.base !== 0 && cmd1.elbow !== 0 && cmd2.elbow !== 0) {
                         const ratio1 = cmd1.elbow / cmd1.base;
                         const ratio2 = cmd2.elbow / cmd2.base;
@@ -519,17 +540,14 @@ G1 0 0 200
                 }
 
                 if (canCombine) {
-                    // Combine them
                     current_command.elbow += next_command.elbow;
                     current_command.base += next_command.base;
                 } else {
-                    // Push the completed command and start a new one
                     smoothedCommands.push(current_command);
                     current_command = { ...next_command };
                 }
             }
             
-            // Add the very last command
             smoothedCommands.push(current_command);
             
             return smoothedCommands;
@@ -545,9 +563,7 @@ G1 0 0 200
             let clamped_x = x;
             let clamped_y = y;
 
-            // --- 1. Check if reachable & clip if necessary ---
             if (D > arm_max_reach) { 
-                // Clip the point to the edge
                 clamped_x = x * arm_max_reach / D;
                 clamped_y = y * arm_max_reach / D;
                 D = arm_max_reach;
@@ -555,19 +571,14 @@ G1 0 0 200
 
             let theta1, theta_bend;
 
-            // --- 2. Handle Singularity at (0,0) ---
             if (D < 0.1) {
-                // At origin (0,0), the arm is folded.
                 theta_bend = -Math.PI;
-                // Use the previous base angle to avoid a random jump.
                 const alpha_rad = -last_base_steps / STEPS_PER_RAD;
                 theta1 = alpha_rad;
-                clamped_x = 0; // Ensure clamped position is (0,0)
+                clamped_x = 0; 
                 clamped_y = 0;
             
             } else {
-                // --- 3. Standard IK Calculation (Not at singularity) ---
-                // Use the *clamped* D for calculation
                 const D_sq = D*D;
                 let cos_theta_bend = (D_sq - L1*L1 - L2*L2) / (2 * L1 * L2);
                 cos_theta_bend = Math.max(-1, Math.min(1, cos_theta_bend)); 
@@ -577,29 +588,24 @@ G1 0 0 200
                 const k1 = L1 + L2 * Math.cos(theta_bend);
                 const k2 = L2 * Math.sin(theta_bend);
                 
-                // Use *clamped* x and y for angle
                 let raw_theta1 = Math.atan2(clamped_y, clamped_x) - Math.atan2(k2, k1);
 
-                // --- START BUG FIX: Angle Unwrapping ---
                 const last_theta1 = -last_base_steps / STEPS_PER_RAD;
                 let rotation_diff = (raw_theta1 - last_theta1) / (2 * Math.PI);
                 let nearest_rotation_offset = Math.round(rotation_diff);
                 theta1 = raw_theta1 - (nearest_rotation_offset * 2 * Math.PI);
-                // --- END BUG FIX ---
             }
 
-            // --- 4. Convert angles to motor angles (alpha, beta) ---
             const alpha_rad = theta1;
             const beta_rad = theta_bend + (GEAR_RATIO * alpha_rad);
 
-            // --- 5. Convert motor angles (radians) to steps ---
             const base_steps = -alpha_rad * STEPS_PER_RAD;
             const elbow_steps = -beta_rad * STEPS_PER_RAD;
 
             return { 
                 base_steps: base_steps, 
                 elbow_steps: elbow_steps,
-                clamped_x: clamped_x, // Return the actual position
+                clamped_x: clamped_x, 
                 clamped_y: clamped_y
             };
         }
@@ -610,17 +616,14 @@ G1 0 0 200
          * Parses commands from the textarea, calculates all states, and resets the UI.
          */
         function loadCommands() {
-            pause(); // This now correctly stops looping
+            pause(); 
             
-            // --- Step 1: Parse Commands ---
             const text = commandsInput.value;
             
             commands = text.split('\n')
-                .filter(line => line.trim().startsWith('G1')) // Check for G1
+                .filter(line => line.trim().startsWith('G1')) 
                 .map(line => {
-                    // Get parts after 'G1 '
                     const parts = line.trim().substring(2).trim().split(/\s+/).map(s => parseInt(s.trim(), 10));
-                    // Expecting G1 {elbow} {base} {step_delay_us}
                     return { 
                         elbow: parts[0] || 0, 
                         base: parts[1] || 0, 
@@ -628,25 +631,18 @@ G1 0 0 200
                     };
                 });
 
-            // --- Step 2: Calculate States ---
             calculateAllStates();
-
-            // --- Step 3: Calculate the full, high-resolution trace path ---
             calculateTracePath();
             
-            // --- Step 4: Update UI ---
             commandSlider.max = cumulativeStates.length - 1;
             commandSlider.value = 0;
             currentStep = 0;
             
-            // --- Step 5: Draw Initial State ---
             drawState(0);
             
-            // --- Step 6: Enable controls ---
             setControlsEnabled(cumulativeStates.length > 1);
         }
 
-        // Enable/disable playback controls
         function setControlsEnabled(enabled) {
             playBtn.disabled = !enabled;
             playLoopBtn.disabled = !enabled;
@@ -660,9 +656,8 @@ G1 0 0 200
             cumulativeStates = [];
             let total_base_steps = 0;
             let total_elbow_steps = 0;
-            const p0 = { x: 0, y: 0 }; // Base pivot is always at origin
+            const p0 = { x: 0, y: 0 };
 
-            // Add initial state (Step 0)
             cumulativeStates.push(calculateFK(p0, 0, 0));
 
             for (const cmd of commands) {
@@ -670,7 +665,7 @@ G1 0 0 200
                 total_elbow_steps += cmd.elbow;
                 
                 const state = calculateFK(p0, total_base_steps, total_elbow_steps);
-                state.command = cmd; // Store the *relative* command that led to this state
+                state.command = cmd; 
                 cumulativeStates.push(state);
             }
         }
@@ -692,7 +687,6 @@ G1 0 0 200
                 const elbow_delta = Math.abs(toState.target_elbow_steps - fromState.target_elbow_steps);
                 const max_step_delta = Math.max(base_delta, elbow_delta);
 
-                // Use a dynamic number of steps based on motor movement
                 const stepsPerSegment = Math.max(20, Math.ceil(max_step_delta / 100));
 
                 for (let j = 1; j <= stepsPerSegment; j++) {
@@ -707,15 +701,13 @@ G1 0 0 200
          * Forward Kinematics: Calculates arm position from motor steps.
          */
         function calculateFK(p0, base_steps, elbow_steps) {
-            // Convert steps to radians
-            const alpha_rad = -base_steps / STEPS_PER_RAD; // Base motor angle
-            const beta_rad = -elbow_steps / STEPS_PER_RAD;  // Elbow motor angle
+            const alpha_rad = -base_steps / STEPS_PER_RAD; 
+            const beta_rad = -elbow_steps / STEPS_PER_RAD;  
             
             const theta1 = alpha_rad;
             const theta_bend = beta_rad - (GEAR_RATIO * alpha_rad);
             const theta2_global = theta1 + theta_bend;
 
-            // Calculate elbow (p1) and end-effector (p2) positions
             const p1 = {
                 x: (p0 ? p0.x : 0) + L1 * Math.cos(theta1),
                 y: (p0 ? p0.y : 0) + L1 * Math.sin(theta1)
@@ -742,12 +734,12 @@ G1 0 0 200
         function handleSliderInput(e) {
             pause();
             const newStep = parseInt(e.target.value, 10);
-            drawState(newStep); // Jump to the selected state
+            drawState(newStep); 
         }
         
         function playFrame() {
             if (isAutoPlaying) {
-                pause(); // Stop any looping playback
+                pause(); 
             }
             isLooping = false;
             
@@ -761,18 +753,16 @@ G1 0 0 200
          * Jumps to a specific step, cancels animation, and draws the final state.
          */
         function drawState(index) {
-            cancelAnimation(); // Stop any in-progress tween
+            cancelAnimation(); 
             currentStep = index;
             const state = cumulativeStates[index];
             if (!state) return;
 
-            // Draw the final state
             clearCanvas();
             drawGrid();
             drawTrace();
             drawArm(state.p0, state.p1, state.p2);
             
-            // Update UI to match this state
             updateUIForStep(index);
         }
 
@@ -794,7 +784,7 @@ G1 0 0 200
             ctx.save();
             ctx.resetTransform();
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.restore(); // Restore origin and scale
+            ctx.restore(); 
         }
 
         /**
@@ -802,9 +792,8 @@ G1 0 0 200
          */
         function drawGrid() {
             const maxRange = L1 + L2;
-            const lineWidth = 1 / worldScale; // Keep lines 1px wide
+            const lineWidth = 1 / worldScale; 
             
-            // Draw range circles
             ctx.beginPath();
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
             ctx.lineWidth = lineWidth;
@@ -815,7 +804,6 @@ G1 0 0 200
             ctx.arc(0, 0, maxRange, 0, 2 * Math.PI);
             ctx.stroke();
 
-            // Draw axes
             ctx.beginPath();
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
             ctx.lineWidth = lineWidth;
@@ -835,7 +823,7 @@ G1 0 0 200
             const traceWidth = 2 / worldScale;
             
             ctx.beginPath();
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)'; // White trace line
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)'; 
             ctx.lineWidth = traceWidth;
             
             ctx.moveTo(tracePath[0].x, tracePath[0].y);
@@ -854,7 +842,6 @@ G1 0 0 200
             const armWidth = 6 / worldScale;
             const jointRadius = 8 / worldScale;
             
-            // Draw L1 (Upper Arm)
             ctx.beginPath();
             ctx.moveTo(p0.x, p0.y);
             ctx.lineTo(p1.x, p1.y);
@@ -863,7 +850,6 @@ G1 0 0 200
             ctx.lineCap = 'round';
             ctx.stroke();
 
-            // Draw L2 (Lower Arm)
             ctx.beginPath();
             ctx.moveTo(p1.x, p1.y);
             ctx.lineTo(p2.x, p2.y);
@@ -872,16 +858,14 @@ G1 0 0 200
             ctx.lineCap = 'round';
             ctx.stroke();
 
-            // Draw Joints
             ctx.fillStyle = 'white';
             ctx.beginPath();
-            ctx.arc(p0.x, p0.y, jointRadius, 0, 2 * Math.PI); // Base Pivot
+            ctx.arc(p0.x, p0.y, jointRadius, 0, 2 * Math.PI); 
             ctx.fill();
             ctx.beginPath();
-            ctx.arc(p1.x, p1.y, jointRadius, 0, 2 * Math.PI); // Elbow Joint
+            ctx.arc(p1.x, p1.y, jointRadius, 0, 2 * Math.PI); 
             ctx.fill();
             
-            // End Effector
             ctx.fillStyle = '#f43f5e';
             ctx.beginPath();
             ctx.arc(p2.x, p2.y, jointRadius, 0, 2 * Math.PI);
@@ -892,24 +876,20 @@ G1 0 0 200
          * Factored out interpolation logic to be reusable.
          */
         function getInterpolatedState(from, to, progress) {
-            // Interpolate angles, not positions, to maintain arm length
             const theta1_rad = lerp(from.theta1_rad, to.theta1_rad, progress);
             const theta_bend_rad = lerp(from.theta_bend_rad, to.theta_bend_rad, progress);
             
-            // Recalculate p1 and p2 based on interpolated angles
-            const p0 = from.p0; // p0 is always (0,0)
+            const p0 = from.p0; 
             const p1 = {
                 x: p0.x + L1 * Math.cos(theta1_rad),
                 y: p0.y + L1 * Math.sin(theta1_rad)
             };
-            // Recalculate global angle for L2
             const theta2_global_rad = theta1_rad + theta_bend_rad;
             const p2 = {
                 x: p1.x + L2 * Math.cos(theta2_global_rad),
                 y: p1.y + L2 * Math.sin(theta2_global_rad)
             };
 
-            // Return a state object
             return { p0, p1, p2 };
         }
 
@@ -948,16 +928,16 @@ G1 0 0 200
         
         function pause() {
             isAutoPlaying = false;
-            isLooping = false; // Pause should stop playing AND looping
+            isLooping = false; 
             cancelAnimation();
         }
         
         function playLoop() {
             if (isAutoPlaying) {
-                pause(); // Stop if already playing
+                pause(); 
             }
             isLooping = true;
-            currentStep = 0; // Always start from 0
+            currentStep = 0; 
             drawState(0);
             playFullAnimation();
         }
@@ -967,19 +947,18 @@ G1 0 0 200
          */
         function playNextCommand() {
             if (!isAutoPlaying) {
-                return; // Was manually paused
+                return; 
             }
             
             if (currentStep >= cumulativeStates.length - 1) {
-                // Reached the end of the animation
                 if (isLooping) {
-                    currentStep = 0; // Go back to the beginning
-                    drawState(0); // Snap to the start
+                    currentStep = 0; 
+                    drawState(0); 
                     
                     setTimeout(playFullAnimation, 50);
                     return;
                 } else {
-                    isAutoPlaying = false; // Stop at the end
+                    isAutoPlaying = false; 
                     return;
                 }
             }
@@ -996,12 +975,11 @@ G1 0 0 200
             const max_steps = Math.max(Math.abs(elbow), Math.abs(base));
             
             let duration_ms = (max_steps * step_delay_us) / 1000.0;
-            if (duration_ms === 0) duration_ms = 1; // Prevent divide by zero
+            if (duration_ms === 0) duration_ms = 1; 
             
             commandSlider.value = currentStep;
             stepDisplay.textContent = `Step: ${currentStep} / ${cumulativeStates.length - 1}`;
             
-            // Start the animation loop
             animationFrameId = requestAnimationFrame((t) => animateStep(t, duration_ms));
         }
 
@@ -1013,15 +991,13 @@ G1 0 0 200
             let progress = elapsed / duration_ms;
 
             if (progress >= 1) {
-                // Animation finished
                 progress = 1;
-                drawState(currentStep); // Draw the final, precise state
+                drawState(currentStep); 
                 
                 if (isAutoPlaying) {
-                    playNextCommand(); // Move to the next command
+                    playNextCommand(); 
                 }
             } else {
-                // Animation in progress
                 drawInterpolatedState(animationFromState, animationToState, progress);
                 animationFrameId = requestAnimationFrame((t) => animateStep(t, duration_ms));
             }
