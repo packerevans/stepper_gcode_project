@@ -119,7 +119,7 @@ G1 X0 Y203.2
 G1 X0 Y0
 G1 X203.2 Y0
 </textarea>
-                <div class="grid grid-cols-3 gap-3 mt-3">
+                <div class="grid grid-cols-2 gap-3 mt-3">
                     <div>
                         <label for="stepDelayInput" class="block text-xs font-medium text-gray-400">Delay (μs)</label>
                         <input type="number" id="stepDelayInput" value="1000" class="w-full mt-1 p-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
@@ -127,10 +127,6 @@ G1 X203.2 Y0
                     <div>
                         <label for="smoothingSensitivity" class="block text-xs font-medium text-gray-400">Smooth (ε)</label>
                         <input type="number" id="smoothingSensitivity" value="0.000001" step="0.000001" class="w-full mt-1 p-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-                    <div>
-                        <label for="linearResolution" class="block text-xs font-medium text-gray-400">Res. (mm)</label>
-                        <input type="number" id="linearResolution" value="1.0" step="0.1" class="w-full mt-1 p-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     </div>
                 </div>
                 <button id="convertGCodeBtn" class="w-full mt-3 font-semibold py-2 px-4 rounded-lg transition duration-200 shadow-md">
@@ -214,8 +210,6 @@ G1 0 0 200
         const convertGCodeBtn = document.getElementById('convertGCodeBtn');
         const stepDelayInput = document.getElementById('stepDelayInput');
         const smoothingSensitivity = document.getElementById('smoothingSensitivity');
-        // *** NEW: Get resolution input ***
-        const linearResolutionInput = document.getElementById('linearResolution');
 
         // --- Simulation Constants ---
         const L1 = 101.3; // mm (Upper arm)
@@ -309,17 +303,18 @@ G1 0 0 200
          * Converts G-code (X, Y) or (R, A) to arm commands.
          * 1. Parses all vertices based on selected format.
          * 2. Pre-processes vertices to remove redundant co-linear points.
-         * 3. NEW: Interpolates straight (X,Y) lines between remaining vertices.
-         * 4. Converts the *interpolated* list of points to IK commands.
-         * 5. Post-processes commands to smooth any remaining co-linear *angle* moves.
+         * 3. Converts the *reduced* list of vertices to IK commands.
+         * 4. Post-processes commands to smooth any remaining co-linear *angle* moves.
          */
         function convertGCode() {
             const gcodeText = gcodeConverterInput.value;
             const lines = gcodeText.split('\n');
             
+            // --- Get selected format ---
             const format = document.querySelector('input[name="gcodeFormat"]:checked').value;
 
             const xyRegex = /G1\s+X(-?[\d.]+)\s+Y(-?[\d.]+)/i;
+            // --- Regex for Polar (Radius, Angle in degrees) ---
             const raRegex = /G1\s+R(-?[\d.]+)\s+A(-?[\d.]+)/i;
             
             let coords = [];
@@ -336,6 +331,7 @@ G1 0 0 200
                         coords.push({ x, y });
                     }
                 } else if (format === 'polar') {
+                    // --- Polar parsing logic ---
                     const match = trimmedLine.match(raRegex);
                     if (match) {
                         const r = parseFloat(match[1]);
@@ -350,6 +346,7 @@ G1 0 0 200
             }
 
             if (coords.length === 0) {
+                // --- MODIFIED: Updated error message ---
                 showModal(`No valid '${format === 'cartesian' ? 'G1 X... Y...' : 'G1 R... A...'}' commands found.`);
                 return;
             }
@@ -362,6 +359,7 @@ G1 0 0 200
                 reducedCoords.push(coords[0]); // Always add the first point
             }
 
+            // We look at 3 points: p1 (anchor), p2 (current), p3 (next)
             let p1_index = 0;
             let p2_index = 1;
 
@@ -370,40 +368,47 @@ G1 0 0 200
                 const p2 = coords[p2_index];
 
                 if (p2_index === coords.length - 1) {
-                    reducedCoords.push(p2); // Always add the last point
+                    // This is the last point, always add it
+                    reducedCoords.push(p2);
                     break;
                 }
                 
                 const p3 = coords[p2_index + 1];
 
+                // Check for co-linearity using cross-product.
                 const cross_product = (p2.y - p1.y) * (p3.x - p2.x) - (p2.x - p1.x) * (p3.y - p2.y);
 
-                // Check for co-linearity
+                // *** --- START FIX --- ***
                 let isCoLinear = Math.abs(cross_product) < collinearity_epsilon;
 
                 if (isCoLinear) {
                     // It's co-linear, but is it a turning point? (e.g., A -> B -> A)
+                    // We check this by seeing if the vectors (p1->p2) and (p2->p3)
+                    // point in opposite directions.
                     const v1_x = p2.x - p1.x;
                     const v1_y = p2.y - p1.y;
                     const v2_x = p3.x - p2.x;
                     const v2_y = p3.y - p2.y;
                     
+                    // Calculate the dot product
                     const dot_product = (v1_x * v2_x) + (v1_y * v2_y);
                     
                     if (dot_product < 0) {
-                        // Dot product is negative: vectors point in opposite directions.
-                        // p2 is a turning point and must be kept.
+                        // Dot product is negative, vectors point in opposite directions.
+                        // This means p2 is a turning point and must be kept.
                         isCoLinear = false; // Treat it as a corner.
                     }
                 }
 
                 if (isCoLinear) {
+                // *** --- END FIX --- ***
                     // p1, p2, p3 are co-linear AND p2 is not a turning point.
                     // p2 is redundant. Skip it.
                     p2_index++;
                 } else {
                     // p1, p2, p3 are *not* co-linear (or p2 is a turning point).
-                    // This means p2 is a "corner". Add it.
+                    // This means p2 is a "corner".
+                    // We must add p2 to our list.
                     reducedCoords.push(p2);
                     
                     // The new line segment starts from p2.
@@ -411,67 +416,24 @@ G1 0 0 200
                     p2_index++;
                 }
             }
-            // --- END STEP 2 ---
+            // --- END NEW STEP ---
 
 
-            // --- 3. NEW: Interpolate straight lines ---
-            const resolution_mm = parseFloat(linearResolutionInput.value) || 1.0;
-            let interpolatedCoords = [];
-
-            if (reducedCoords.length === 0) {
-                 showModal("No coordinates left after processing."); // Should be impossible if coords.length > 0
-                 return;
-            }
-            
-            // Always add the very first point
-            interpolatedCoords.push(reducedCoords[0]); 
-
-            for (let i = 0; i < reducedCoords.length - 1; i++) {
-                const p_start = reducedCoords[i];
-                const p_end = reducedCoords[i+1];
-
-                const dist = Math.hypot(p_end.x - p_start.x, p_end.y - p_start.y);
-                
-                // Determine number of steps for this segment
-                // Need at least 1 step (the end point)
-                const num_steps = Math.max(1, Math.ceil(dist / resolution_mm)); 
-
-                // Start at j=1 because p_start (j=0) is already in the list
-                for (let j = 1; j <= num_steps; j++) {
-                    const progress = j / num_steps;
-                    const inter_x = lerp(p_start.x, p_end.x, progress);
-                    const inter_y = lerp(p_start.y, p_end.y, progress);
-                    interpolatedCoords.push({ x: inter_x, y: inter_y });
-                }
-            }
-            // --- END NEW STEP 3 ---
-
-
-            // --- 4. Convert *all interpolated* coords to relative arm commands ---
+            // --- 3. Convert *reduced* coords to relative arm commands ---
             let generatedCommands = [];
-            
-            // --- FIX: Calculate initial steps based on the *first* point ---
-            // This prevents the arm from "unfurling" from (0,0) to the start point.
-            const first_coord = interpolatedCoords[0];
-            
-            // Calculate the IK for the very first point, assuming we start from 0
-            const { base_steps: start_base_steps, elbow_steps: start_elbow_steps } = calculateIK(first_coord.x, first_coord.y, 0);
 
-            let prev_base_steps = start_base_steps;
-            let prev_elbow_steps = start_elbow_steps;
-            // --- END FIX ---
+            // Assume arm starts at 0,0 (relative to its own state)
+            let prev_base_steps = 0;
+            let prev_elbow_steps = 0;
 
             const step_delay_us = parseInt(stepDelayInput.value, 10) || 1000;
             
             try {
-                // *** MODIFICATION: Loop over interpolatedCoords ***
-                // Start at j=1 because we've already processed the first point (j=0)
-                for (let j = 1; j < interpolatedCoords.length; j++) {
-                    const coord = interpolatedCoords[j];
+                // *** MODIFICATION: Loop over reducedCoords, not coords ***
+                for (const coord of reducedCoords) {
                     const curr_x = coord.x;
                     const curr_y = coord.y;
 
-                    // Calculate IK relative to the *previous* point's angle
                     const { base_steps, elbow_steps } = calculateIK(curr_x, curr_y, prev_base_steps);
                     
                     const rel_base = Math.round(base_steps - prev_base_steps);
@@ -481,7 +443,7 @@ G1 0 0 200
                         generatedCommands.push({ elbow: rel_elbow, base: rel_base, delay: step_delay_us });
                     }
 
-                    // Update the state for the next point
+                    // Update the state for the next G1 line
                     prev_base_steps = base_steps;
                     prev_elbow_steps = elbow_steps;
                 }
@@ -490,7 +452,8 @@ G1 0 0 200
                 return;
             }
 
-            // --- 5. Smooth the commands ---
+            // --- 4. Smooth the commands ---
+            // This post-processing step is still useful.
             let commandsToSmooth = generatedCommands;
             let smoothedCommands = [];
             let lastLength = -1; 
@@ -502,7 +465,7 @@ G1 0 0 200
                 commandsToSmooth = smoothedCommands;
             }
 
-            // --- 6. Load into simulator ---
+            // --- 5. Load into simulator ---
             const commandStrings = smoothedCommands.map(cmd => `G1 ${cmd.elbow} ${cmd.base} ${cmd.delay}`);
             commandsInput.value = commandStrings.join('\n');
             loadCommandsBtn.click(); // Automatically click "Load & Reset"
@@ -778,7 +741,7 @@ G1 0 0 200
          */
         function handleSliderInput(e) {
             pause();
-            const newStep = parseInt(e.targe.value, 10);
+            const newStep = parseInt(e.target.value, 10);
             drawState(newStep); // Jump to the selected state
         }
         
