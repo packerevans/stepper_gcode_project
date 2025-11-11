@@ -569,7 +569,7 @@ G1 0 0 200
 
 
         // ***************************************************************
-        // *** FIXED FUNCTION STARTS HERE                ***
+        // *** RE-FIXED KINEMATICS FUNCTION (v3)         ***
         // ***************************************************************
         
         /**
@@ -653,7 +653,7 @@ G1 0 0 200
         }
         
         // ***************************************************************
-        // *** FIXED FUNCTION ENDS HERE                 ***
+        // *** END OF FIXED FUNCTION                     ***
         // ***************************************************************
         
         // --- END: G-Code Converter Functions ---
@@ -852,7 +852,7 @@ G1 0 0 200
             ctx.stroke();
 
             ctx.beginPath();
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.strokeStyle = 'rgba(255, 255, 20.2)';
             ctx.lineWidth = lineWidth;
             ctx.moveTo(-maxRange * 1.1, 0);
             ctx.lineTo(maxRange * 1.1, 0);
@@ -1081,7 +1081,10 @@ G1 0 0 200
             const modalContent = document.createElement('div');
             modalContent.className = 'bg-gray-800 p-6 rounded-lg shadow-xl text-gray-200 max-w-sm w-full mx-4';
             
-            const modalTitle = document.col(div');
+            // --- THIS WAS THE BUG ---
+            const modalTitle = document.createElement('h3'); // <-- Was document.col(div')
+            // --- END OF BUG ---
+
             modalTitle.className = 'text-lg font-medium text-white mb-2';
             modalTitle.textContent = 'Conversion Notice';
             
