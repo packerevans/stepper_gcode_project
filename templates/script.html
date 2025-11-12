@@ -461,7 +461,6 @@ G1 0 0 200
                 return;
             }
             
-            // *** MODIFICATION: Call with last_elbow_steps = 0 ***
             const first_coord = interpolatedCoords[0];
             const { base_steps: start_base_steps, elbow_steps: start_elbow_steps } = calculateIK(first_coord.x, first_coord.y, 0, 0);
 
@@ -477,7 +476,6 @@ G1 0 0 200
                     const curr_x = coord.x;
                     const curr_y = coord.y;
 
-                    // *** MODIFICATION: Pass prev_elbow_steps ***
                     const { base_steps, elbow_steps } = calculateIK(curr_x, curr_y, prev_base_steps, prev_elbow_steps);
                     
                     const rel_base = Math.round(base_steps - prev_base_steps);
@@ -571,12 +569,25 @@ G1 0 0 200
 
 
         // ***************************************************************
-        // *** FIXED FUNCTION STARTS HERE                ***
+        // *** NEW HELPER FUNCTION (v5)                  ***
+        // ***************************************************************
+
+        /**
+         * Helper function to find the shortest rotation from a last angle.
+         */
+        function getShortestRotation(raw_rad, last_rad) {
+            let rotation_diff = (raw_rad - last_rad) / (2 * Math.PI);
+            let nearest_rotation_offset = Math.round(rotation_diff);
+            return raw_rad - (nearest_rotation_offset * 2 * Math.PI);
+        }
+
+        // ***************************************************************
+        // *** FIXED FUNCTION STARTS HERE (v5)             ***
         // ***************************************************************
         
         /**
          * Inverse Kinematics: Calculates arm motor steps from (X, Y) position.
-         * Now stateful for the elbow.
+         * Now stateful and calculates the "cheapest" kinematic solution.
          */
         function calculateIK(x, y, last_base_steps = 0, last_elbow_steps = 0) {
             let D = Math.hypot(x, y);
@@ -590,68 +601,87 @@ G1 0 0 200
                 D = arm_max_reach;
             }
 
-            let theta1, theta_bend;
             const last_theta1 = -last_base_steps / STEPS_PER_RAD;
-
-            // *** NEW: Calculate the last known elbow bend angle ***
             const last_alpha_rad = -last_base_steps / STEPS_PER_RAD;
             const last_beta_rad = -last_elbow_steps / STEPS_PER_RAD;
             const last_theta_bend = last_beta_rad - (GEAR_RATIO * last_alpha_rad);
 
+            let final_theta1, final_theta_bend, final_clamped_x, final_clamped_y;
 
             if (D < 0.1) {
                 // --- Singularity Logic ---
+                // We are at or near the origin.
+                final_clamped_x = 0; 
+                final_clamped_y = 0;
                 
-                // *** NEW: Fold to the closest PI (positive or negative) ***
+                // Fold to the closest PI (positive or negative)
                 if (last_theta_bend > 0) {
-                    theta_bend = Math.PI;
+                    final_theta_bend = Math.PI;
                 } else {
-                    theta_bend = -Math.PI;
+                    final_theta_bend = -Math.PI;
                 }
 
                 let raw_theta1;
                 if (D < 1e-6) {
+                    // AT (0,0), reuse last angle
                     raw_theta1 = last_theta1;
                 } else {
+                    // NEAR (0,0), use angle of the line
                     raw_theta1 = Math.atan2(y, x);
                 }
                 
-                let rotation_diff = (raw_theta1 - last_theta1) / (2 * Math.PI);
-                let nearest_rotation_offset = Math.round(rotation_diff);
-                theta1 = raw_theta1 - (nearest_rotation_offset * 2 * Math.PI);
-                
-                clamped_x = 0; 
-                clamped_y = 0;
+                final_theta1 = getShortestRotation(raw_theta1, last_theta1);
             
             } else {
-                // --- Standard (non-singularity) case ---
+                // --- Standard (non-singularity) case: Calculate both solutions ---
                 const D_sq = D*D;
                 let cos_theta_bend = (D_sq - L1*L1 - L2*L2) / (2 * L1 * L2);
                 cos_theta_bend = Math.max(-1, Math.min(1, cos_theta_bend)); 
                 
-                // *** NEW: Calculate both solutions ***
-                const theta_bend_sol_1 = -Math.acos(cos_theta_bend); // Elbow down
-                const theta_bend_sol_2 = +Math.acos(cos_theta_bend); // Elbow up
-
-                // *** NEW: Choose the solution closest to the last one ***
-                if (Math.abs(theta_bend_sol_1 - last_theta_bend) <= Math.abs(theta_bend_sol_2 - last_theta_bend)) {
-                    theta_bend = theta_bend_sol_1;
-                } else {
-                    theta_bend = theta_bend_sol_2;
-                }
-
-                const k1 = L1 + L2 * Math.cos(theta_bend);
-                const k2 = L2 * Math.sin(theta_bend);
+                // --- Solution 1 (Elbow Down) ---
+                const theta_bend_1 = -Math.acos(cos_theta_bend);
+                const k1_1 = L1 + L2 * Math.cos(theta_bend_1);
+                const k2_1 = L2 * Math.sin(theta_bend_1);
+                const raw_theta1_1 = Math.atan2(clamped_y, clamped_x) - Math.atan2(k2_1, k1_1);
+                const theta1_1 = getShortestRotation(raw_theta1_1, last_theta1);
                 
-                let raw_theta1 = Math.atan2(clamped_y, clamped_x) - Math.atan2(k2, k1);
+                const alpha_rad_1 = theta1_1;
+                const beta_rad_1 = theta_bend_1 + (GEAR_RATIO * alpha_rad_1);
+                const base_steps_1 = -alpha_rad_1 * STEPS_PER_RAD;
+                const elbow_steps_1 = -beta_rad_1 * STEPS_PER_RAD;
 
-                let rotation_diff = (raw_theta1 - last_theta1) / (2 * Math.PI);
-                let nearest_rotation_offset = Math.round(rotation_diff);
-                theta1 = raw_theta1 - (nearest_rotation_offset * 2 * Math.PI);
+                // --- Solution 2 (Elbow Up) ---
+                const theta_bend_2 = +Math.acos(cos_theta_bend);
+                const k1_2 = L1 + L2 * Math.cos(theta_bend_2);
+                const k2_2 = L2 * Math.sin(theta_bend_2);
+                const raw_theta1_2 = Math.atan2(clamped_y, clamped_x) - Math.atan2(k2_2, k1_2);
+                const theta1_2 = getShortestRotation(raw_theta1_2, last_theta1);
+                
+                const alpha_rad_2 = theta1_2;
+                const beta_rad_2 = theta_bend_2 + (GEAR_RATIO * alpha_rad_2);
+                const base_steps_2 = -alpha_rad_2 * STEPS_PER_RAD;
+                const elbow_steps_2 = -beta_rad_2 * STEPS_PER_RAD;
+
+                // --- Compare "cost" (total steps moved) ---
+                // Using simple absolute difference (Manhattan distance) as a cost metric
+                const travel_1 = Math.abs(base_steps_1 - last_base_steps) + Math.abs(elbow_steps_1 - last_elbow_steps);
+                const travel_2 = Math.abs(base_steps_2 - last_base_steps) + Math.abs(elbow_steps_2 - last_elbow_steps);
+
+                // --- Choose the winner ---
+                if (travel_1 <= travel_2) {
+                    final_theta1 = theta1_1;
+                    final_theta_bend = theta_bend_1;
+                } else {
+                    final_theta1 = theta1_2;
+                    final_theta_bend = theta_bend_2;
+                }
+                final_clamped_x = clamped_x;
+                final_clamped_y = clamped_y;
             }
 
-            const alpha_rad = theta1;
-            const beta_rad = theta_bend + (GEAR_RATIO * alpha_rad);
+            // --- Calculate final step values based on the winning solution ---
+            const alpha_rad = final_theta1;
+            const beta_rad = final_theta_bend + (GEAR_RATIO * alpha_rad);
 
             const base_steps = -alpha_rad * STEPS_PER_RAD;
             const elbow_steps = -beta_rad * STEPS_PER_RAD;
@@ -659,8 +689,8 @@ G1 0 0 200
             return { 
                 base_steps: base_steps, 
                 elbow_steps: elbow_steps,
-                clamped_x: clamped_x, 
-                clamped_y: clamped_y
+                clamped_x: final_clamped_x, 
+                clamped_y: final_clamped_y
             };
         }
         
