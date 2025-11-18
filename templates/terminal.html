@@ -265,6 +265,12 @@
             <h2 class="text-3xl font-light text-center mb-4 md:mb-0 text-secondary">System Console</h2>
 
             <div class="system-actions flex gap-3 flex-wrap justify-center">
+                
+                <button id="updateBtn" class="btn-action" onclick="sendCommand('/update_firmware', 'Update Firmware')">
+                    <span class="md:hidden">Update FW</span>
+                    <span class="hidden md:inline">Update Firmware</span>
+                </button>
+
                 <button id="pullBtn" class="btn-action" onclick="sendCommand('/pull', 'Git Pull')">
                     <span class="md:hidden">Pull</span>
                     <span class="hidden md:inline">Git Pull</span>
