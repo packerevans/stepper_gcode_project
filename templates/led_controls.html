@@ -18,11 +18,6 @@
             --color-shadow: rgba(0, 0, 0, 0.08);
             --color-icon: #000000;
             
-            /* Terminal Colors (Light) */
-            --color-terminal-bg: #e9e9e9;
-            --color-terminal-text: #333333;
-            --color-terminal-prompt: #008080; /* Teal/Cyan */
-            
             --border-radius: 12px;
         }
 
@@ -33,11 +28,6 @@
             --color-text: #e0e0e0;
             --color-shadow: rgba(255, 255, 255, 0.08);
             --color-icon: #ffffff;
-            
-            /* Terminal Colors (Dark) */
-            --color-terminal-bg: #1a1a1a;
-            --color-terminal-text: #cccccc;
-            --color-terminal-prompt: #98fb98; /* Pale Green */
         }
         
         /* --- Base Styles --- */
@@ -85,137 +75,113 @@
         .main-content {
             margin-left: 0; transition: margin-left 0.3s; padding: 20px;
             max-width: 800px; margin: 0 auto;
+            padding-top: 70px;
         }
 
         h1 {
-            text-align: center; margin-top: 20px; margin-bottom: 30px;
+            text-align: center; margin-top: 10px; margin-bottom: 20px;
             font-weight: 300; color: var(--color-secondary);
         }
 
-        .header-image {
-            width: 100%; max-height: 250px; object-fit: cover;
-            border-radius: var(--border-radius); margin-bottom: 30px;
-            box-shadow: 0 4px 15px var(--color-shadow);
-        }
-
-        /* --- Control Sections --- */
+        /* --- Control Cards --- */
         .control-section {
             background-color: var(--color-surface); padding: 25px;
             border-radius: var(--border-radius); box-shadow: 0 4px 8px var(--color-shadow);
             margin-bottom: 25px;
+            text-align: center;
         }
 
-        .status-section {
+        /* --- Status Indicators --- */
+        .status-row {
             display: flex; justify-content: center; align-items: center;
-            gap: 20px; margin-bottom: 15px; padding: 10px 0;
+            gap: 15px; margin-bottom: 15px;
         }
         .indicator {
-            width: 15px; height: 15px; border-radius: 50%;
-            background-color: lightgray; transition: background-color 0.3s;
+            width: 12px; height: 12px; border-radius: 50%;
+            background-color: #ccc; transition: background-color 0.3s;
+            display: inline-block;
         }
         
+        /* --- Buttons --- */
         button {
             background-color: var(--color-primary); color: var(--color-text);
-            border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer;
-            font-size: 16px; transition: 0.2s ease-in-out; font-weight: 500;
+            border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer;
+            font-size: 16px; transition: 0.2s ease-in-out; font-weight: 600;
+            min-width: 120px;
         }
         button:hover {
             background-color: var(--color-secondary); box-shadow: 0 2px 5px var(--color-shadow);
         }
+        button.btn-outline {
+            background: transparent; border: 2px solid var(--color-primary);
+        }
+        button.btn-outline:hover {
+            background: var(--color-primary); color: var(--color-text);
+        }
         
-        /* --- Sliders --- */
-        .slider-section { display: flex; flex-direction: column; gap: 10px;}
-        .slider-container { display: flex; align-items: center; justify-content: space-between; gap: 15px; }
-        .slider-container label { width: 80px; font-weight: 600; }
+        /* --- Color Picker UI --- */
+        .color-wrapper {
+            display: flex; flex-direction: column; align-items: center; gap: 20px;
+        }
         
+        /* Hide default color input but keep functionality */
+        input[type="color"] {
+            -webkit-appearance: none; border: none;
+            width: 150px; height: 150px;
+            cursor: pointer; background: none;
+        }
+        input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+        input[type="color"]::-webkit-color-swatch {
+            border: 4px solid var(--color-text); border-radius: 50%;
+            box-shadow: 0 4px 10px var(--color-shadow);
+        }
+
+        /* --- Brightness Slider --- */
+        .brightness-container {
+            width: 100%; max-width: 300px; margin-top: 10px;
+        }
         input[type="range"] {
-            flex-grow: 1; -webkit-appearance: none; appearance: none;
-            height: 8px; background: #ddd; border-radius: 5px; cursor: pointer;
-            transition: background 0.3s;
+            width: 100%; -webkit-appearance: none; appearance: none;
+            height: 10px; background: #ddd; border-radius: 5px; cursor: pointer;
         }
-        body[data-theme='dark'] input[type="range"] { background: #555; }
-        
         input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none; appearance: none; width: 18px; height: 18px;
-            border-radius: 50%; background: var(--color-secondary); cursor: pointer;
-            box-shadow: 0 0 5px var(--color-shadow);
+            -webkit-appearance: none; width: 24px; height: 24px;
+            border-radius: 50%; background: var(--color-secondary);
+            box-shadow: 0 0 5px var(--color-shadow); margin-top: -7px;
+        }
+        input[type="range"]::-webkit-slider-runnable-track {
+            height: 10px; background: #ddd; border-radius: 5px;
         }
 
-        .bottom-section {
-            display: flex; justify-content: space-around; align-items: flex-start;
-            gap: 20px; margin-top: 25px;
+        /* --- Favorites System --- */
+        .favorites-grid {
+            display: flex; justify-content: center; gap: 20px; margin-top: 20px;
         }
-        .bottom-section > div { flex: 1; display: flex; flex-direction: column; align-items: center; }
+        .fav-circle {
+            width: 50px; height: 50px; border-radius: 50%;
+            border: 2px solid var(--color-shadow); cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 2px 5px var(--color-shadow);
+        }
+        .fav-circle:hover { transform: scale(1.1); }
+        .fav-circle:active { transform: scale(0.95); }
 
-        .color-display {
-            width: 120px; height: 120px; border-radius: 50%;
-            border: 5px solid var(--color-text); transition: background-color 0.5s, border-color 0.3s, opacity 0.5s;
-        }
-        
         /* --- Terminal --- */
         .terminal {
             background: var(--color-terminal-bg); color: var(--color-terminal-text);
             font-family: 'Consolas', 'Courier New', monospace; padding: 15px;
-            border-radius: 8px; width: 100%; height: 150px; overflow-y: auto;
+            border-radius: 8px; width: 100%; height: 120px; overflow-y: auto;
             font-size: 12px; border: 1px solid var(--color-shadow);
-            white-space: pre-wrap; box-shadow: inset 0 0 5px rgba(0,0,0,0.2);
-            transition: background 0.3s, color 0.3s;
+            text-align: left;
+            box-sizing: border-box;
         }
-        .terminal .prompt { color: var(--color-terminal-prompt); font-weight: bold; }
-        .terminal .response { color: var(--color-terminal-text); }
 
-
-        /* --- Mobile Responsiveness (Shared with Sand Table Page) --- */
+        /* --- Mobile Responsiveness --- */
         @media (max-width: 600px) {
-            .main-content {
-                padding: 10px;
-            }
-            .sidebar {
-                padding-top: 10px;
-            }
-            .header-image {
-                max-height: 150px;
-                margin-bottom: 20px;
-            }
-            h1 {
-                font-size: 1.8em;
-                margin-bottom: 20px;
-            }
-            
-            /* LED Page Specific */
-            .status-section {
-                flex-wrap: wrap;
-                justify-content: space-between;
-                gap: 10px;
-            }
-            .status-section button {
-                flex-basis: calc(50% - 10px);
-                padding: 10px 5px;
-                font-size: 14px;
-            }
-            .slider-container {
-                flex-direction: row; /* Keep sliders side-by-side on mobile if possible, but adjust spacing */
-                align-items: center;
-                gap: 5px;
-                padding: 5px 0;
-                border-bottom: 1px dashed #ccc5;
-                flex-wrap: nowrap;
-            }
-            .slider-container label {
-                width: 70px; /* Give a fixed width for labels */
-                min-width: 70px;
-            }
-            input[type="range"] {
-                width: auto;
-            }
-            .bottom-section {
-                flex-direction: column;
-                gap: 30px;
-            }
-            .color-display {
-                width: 100px;
-                height: 100px;
-            }
+            .sidebar { padding-top: 10px; }
+            h1 { font-size: 1.8em; }
+            .status-row { flex-direction: column; gap: 10px; }
+            button { width: 100%; }
         }
     </style>
 </head>
@@ -234,238 +200,255 @@
     </button>
 
     <div class="main-content">
-        <!-- Using a generic placeholder image -->
-        <img src="{{ url_for('static', filename='led.png') }}" alt="LED Header" class="header-image">
-
-        <h1>LED Strip Controller</h1>
+        <h1>LED Controller</h1>
 
         <div class="control-section">
-            <h2>Connection & Power</h2>
-            <div class="status-section">
-                <span style="font-weight:bold;">BLE Status:</span>
-                <div class="indicator" id="connIndicator"></div>
-                <span id="connStatusText">DISCONNECTED</span>
-                
+            <div class="status-row">
+                <div>
+                    <div class="indicator" id="connIndicator"></div>
+                    <span id="connStatusText" style="font-weight:bold; margin-left:5px;">DISCONNECTED</span>
+                </div>
                 <button onclick="toggleConnection()" id="connBtn">Connect</button>
-                <button onclick="togglePower()" id="powerBtn">Turn OFF</button>
+            </div>
+            <div class="status-row">
+                 <button onclick="togglePower()" id="powerBtn" class="btn-outline">Power ON/OFF</button>
             </div>
         </div>
 
         <div class="control-section">
-            <h2>Color Selector</h2>
-            <div class="slider-section">
-                <div class="slider-container">
-                    <label>Red</label>
-                    <input type="range" id="redSlider" min="0" max="255" value="255" oninput="updateColorDisplay()">
-                    <span id="redVal">255</span>
+            <h2>Color & Brightness</h2>
+            
+            <div class="color-wrapper">
+                <input type="color" id="colorPicker" value="#ff0000" oninput="handleColorInput()">
+                
+                <div class="brightness-container">
+                    <label>Brightness: <span id="brightVal">16</span></label>
+                    <input type="range" id="brightnessSlider" min="1" max="16" value="16" oninput="handleColorInput()">
                 </div>
-                <div class="slider-container">
-                    <label>Green</label>
-                    <input type="range" id="greenSlider" min="0" max="255" value="255" oninput="updateColorDisplay()">
-                    <span id="greenVal">255</span>
-                </div>
-                <div class="slider-container">
-                    <label>Blue</label>
-                    <input type="range" id="blueSlider" min="0" max="255" value="255" oninput="updateColorDisplay()">
-                    <span id="blueVal">255</span>
-                </div>
-                <!-- FIX: Corrected ID and range for Brightness slider -->
-                <div class="slider-container">
-                    <label>Brightness</label>
-                    <input type="range" id="brightnessSlider" min="1" max="16" value="16" oninput="updateColorDisplay()">
-                    <span id="brightnessVal">16</span>
-                </div>
-                <div style="text-align:center; margin-top:20px;">
-                    <button onclick="sendLEDCommand()">Set Color</button>
-                </div>
+            </div>
+
+            <div style="margin-top: 30px;">
+                <h3>Quick Favorites</h3>
+                <div class="favorites-grid" id="favGrid">
+                    </div>
+                <button onclick="saveCurrentToFavorite()" style="margin-top:15px; font-size:14px; padding:8px 16px;">Save Current Color</button>
             </div>
         </div>
 
-        <div class="bottom-section">
-            <div>
-                <h3>Current Color</h3>
-                <div class="color-display" id="colorDisplay"></div>
-            </div>
-            <div>
-                <h3>Terminal Log</h3>
-                <div class="terminal" id="terminal"></div>
-            </div>
+        <div class="control-section" style="padding:15px;">
+            <h3 style="margin-top:0;">Log</h3>
+            <div class="terminal" id="terminal">System Ready. Click Connect to start.</div>
         </div>
     </div>
 
     <script>
-        // Global state variable for brightness
-        let brightnessValue = 16; 
-        
-        // --- Sidebar Functions ---
+        // --- CONFIGURATION ---
+        let isConnected = false;
+        let debounceTimer;
+        // Max favorites to store
+        const MAX_FAVS = 3; 
+        // Default favs if none saved
+        const DEFAULT_FAVS = ["#ff0000", "#00ff00", "#0000ff"];
+
+        // --- THEME & SIDEBAR (Standard) ---
         function openNav() {
             document.getElementById("mySidebar").style.width = "200px";
-            if (window.innerWidth > 600) {
-                 document.querySelector(".main-content").style.marginLeft = "200px";
-            }
+            if(window.innerWidth > 600) document.querySelector(".main-content").style.marginLeft = "200px";
         }
-
         function closeNav() {
             document.getElementById("mySidebar").style.width = "0";
             document.querySelector(".main-content").style.marginLeft = "0";
         }
-        
-        // --- Dark Mode Toggle ---
-        function updateThemeIcon(theme) {
-            document.getElementById('themeIcon').textContent = theme === 'dark' ? '🌙' : '☀️';
-        }
-
         function toggleDarkMode() {
             const body = document.body;
-            const currentTheme = body.getAttribute('data-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            
-            body.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
-            updateThemeIcon(newTheme);
+            const current = body.getAttribute('data-theme');
+            const next = current === 'dark' ? 'light' : 'dark';
+            body.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+            document.getElementById('themeIcon').textContent = next === 'dark' ? '🌙' : '☀️';
         }
 
-        // --- State and UI Updates ---
-        let isConnected = false;
-        let powerOn = true;
+        // --- COLOR LOGIC ---
 
-        function updateColorDisplay() {
-            const r = parseInt(document.getElementById('redSlider').value);
-            const g = parseInt(document.getElementById('greenSlider').value);
-            const b = parseInt(document.getElementById('blueSlider').value);
-            // FIX: Use the correct ID for brightness slider and span
-            const br = parseInt(document.getElementById('brightnessSlider').value);
-
-            document.getElementById('redVal').textContent = r;
-            document.getElementById('greenVal').textContent = g;
-            document.getElementById('blueVal').textContent = b;
-            document.getElementById('brightnessVal').textContent = br;
-
-            // Update the global state variable
-            brightnessValue = br; 
-
-            // Visual Display: Modulate color circle brightness/opacity for a visual cue (1/16 to 1)
-            const brightnessRatio = br / 16; 
-            
-            // Set the color circle background
-            document.getElementById('colorDisplay').style.backgroundColor = `rgb(${r},${g},${b})`;
-            // Adjust opacity (0.2 minimum to 1 maximum)
-            document.getElementById('colorDisplay').style.opacity = brightnessRatio * 0.8 + 0.2; 
+        function hexToRgb(hex) {
+            const bigint = parseInt(hex.slice(1), 16);
+            const r = (bigint >> 16) & 255;
+            const g = (bigint >> 8) & 255;
+            const b = bigint & 255;
+            return { r, g, b };
         }
 
-        function updateConnectionStatusUI(connected) {
-            if (isConnected !== connected) {
-                isConnected = connected;
-                const indicator = document.getElementById("connIndicator");
-                const statusText = document.getElementById("connStatusText");
-                const btn = document.getElementById("connBtn");
+        // This function is called whenever the wheel moves or brightness changes
+        function handleColorInput() {
+            // Update UI Text immediately
+            document.getElementById('brightVal').textContent = document.getElementById('brightnessSlider').value;
 
-                indicator.style.backgroundColor = connected ? "green" : "red";
-                statusText.textContent = connected ? "CONNECTED" : "DISCONNECTED";
-                btn.textContent = connected ? "Disconnect" : "Connect";
-                logToTerminal(`Status: Bluetooth ${connected ? 'CONNECTED' : 'DISCONNECTED'}`, 'info', true);
-            }
+            // Debounce: Wait 300ms after user stops moving before sending data
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                sendCurrentState();
+            }, 300); 
         }
 
-        function updatePowerStatusUI(on) {
-            powerOn = on;
-            document.getElementById("powerBtn").textContent = on ? "Turn OFF" : "Turn ON";
+        async function sendCurrentState() {
+            if (!isConnected) return; // Don't spam if not connected
+
+            const hex = document.getElementById('colorPicker').value;
+            const br = document.getElementById('brightnessSlider').value;
+            const rgb = hexToRgb(hex);
             
-            // Re-call updateColorDisplay to visually dim/restore based on power state
-            updateColorDisplay();
+            const cmd = `LED:${rgb.r},${rgb.g},${rgb.b},${br}`;
+            await sendCommand(cmd, false); // false = don't log every color change to keep terminal clean
         }
 
-        // --- Terminal Logger ---
-        function logToTerminal(msg, type = 'info', isStatus = false) {
-            const term = document.getElementById("terminal");
-            const line = document.createElement("div");
-            const time = `[${new Date().toLocaleTimeString()}]`;
-            
-            if (isStatus) {
-                 line.innerHTML = `<span class="prompt">${time} ${msg}</span>`;
-            } else if (type === 'error') {
-                line.innerHTML = `<span class="response" style="color:red; font-weight:bold;">${time} ERROR: ${msg}</span>`;
-            } else {
-                line.innerHTML = `<span class="response">${time} ${msg}</span>`;
-            }
-            
-            term.appendChild(line);
-            term.scrollTop = term.scrollHeight;  
+        async function applyFavorite(hex) {
+            document.getElementById('colorPicker').value = hex;
+            handleColorInput(); // Trigger send
         }
 
-        // --- Backend Communication ---
+        // --- FAVORITES SYSTEM ---
+        function loadFavorites() {
+            const container = document.getElementById('favGrid');
+            container.innerHTML = '';
+            
+            let favs = JSON.parse(localStorage.getItem('ledFavs'));
+            if (!favs || favs.length === 0) favs = DEFAULT_FAVS;
 
-        async function sendCommand(cmd) {
-            logToTerminal(`Sending: ${cmd}`);
+            favs.forEach(color => {
+                const circle = document.createElement('div');
+                circle.className = 'fav-circle';
+                circle.style.backgroundColor = color;
+                circle.onclick = () => applyFavorite(color);
+                container.appendChild(circle);
+            });
+        }
+
+        function saveCurrentToFavorite() {
+            const current = document.getElementById('colorPicker').value;
+            let favs = JSON.parse(localStorage.getItem('ledFavs')) || [...DEFAULT_FAVS];
+            
+            // Add to front, remove last if > MAX
+            favs.unshift(current);
+            if (favs.length > MAX_FAVS) favs.pop();
+            
+            localStorage.setItem('ledFavs', JSON.stringify(favs));
+            loadFavorites();
+            logToTerminal(`Saved color ${current} to favorites.`);
+        }
+
+        // --- COMMUNICATIONS ---
+
+        async function sendCommand(cmd, logIt = true) {
+            if (logIt) logToTerminal(`Sending: ${cmd}`);
             try {
-                const response = await fetch("/send", {
+                const res = await fetch("/send", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ command: cmd })
                 });
-                const data = await response.json();
-                if (!data.success) {
-                    logToTerminal(`Command failed: ${data.error || 'Unknown Error'}`, 'error');
-                } else {
-                    logToTerminal(`Command successful: ${data.message || 'Sent.'}`, 'info');
-                }
+                const data = await res.json();
+                if (!data.success && logIt) logToTerminal(`Error: ${data.error}`, 'error');
+                else if (logIt) logToTerminal("Sent.");
+                return data.success;
             } catch (e) {
-                logToTerminal(`Network Error: Could not reach server (${e.message})`, 'error');
+                logToTerminal(`Network Error: ${e.message}`, 'error');
+                return false;
             }
-        }
-
-        async function sendLEDCommand() {
-            const r = parseInt(document.getElementById('redSlider').value);
-            const g = parseInt(document.getElementById('greenSlider').value);
-            const b = parseInt(document.getElementById('blueSlider').value);
-            
-            // FIX: Use the global brightnessValue variable
-            const cmd = `LED:${r},${g},${b},${brightnessValue}`; 
-            
-            await sendCommand(cmd);
-            updatePowerStatusUI(true); // Always turn on power when color is set
         }
 
         async function toggleConnection() {
+            const btn = document.getElementById("connBtn");
+            btn.disabled = true; // Prevent double clicks
+            
             const cmd = isConnected ? "DISCONNECT" : "CONNECT";
-            await sendCommand(cmd); 
-        }
-
-        async function togglePower() {
-            const cmd = powerOn ? "POWER:OFF" : "POWER:ON";
-            await sendCommand(cmd);
-            updatePowerStatusUI(!powerOn);  
-        }
-
-        // --- Status Polling ---
-        async function pollStatus() {
-            try {
-                const response = await fetch("/status");
-                if (!response.ok) throw new Error('Failed to fetch status');
-                const data = await response.json();
-                // Assumes /status returns { connected: bool }
-                updateConnectionStatusUI(data.connected);
-                
-            } catch (e) {
-                // If status polling fails, assume disconnected
-                updateConnectionStatusUI(false); 
+            logToTerminal(`Attempting to ${cmd}...`);
+            
+            const success = await sendCommand(cmd);
+            
+            // Allow the status poller to update the actual UI state
+            // But give a momentary visual feedback
+            if(success) {
+                // Wait a second for Python to actually establish/break link
+                setTimeout(pollStatus, 1000);
+            } else {
+                btn.disabled = false;
             }
         }
 
-        // --- Initialization ---
+        function togglePower() {
+             // We blindly toggle, relying on the previous state logic or just sending ON/OFF
+             // Ideally, we track state, but simpler is to check connection first
+             if(!isConnected) {
+                 logToTerminal("Connect Bluetooth first!", "error");
+                 return;
+             }
+             // We will determine state by just sending the opposite of what we think, 
+             // or just create separate ON/OFF buttons if needed. 
+             // For now, let's send POWER:ON if we are "connected" but maybe off.
+             // Actually, best to toggle based on a variable or just send specific commands.
+             // Let's use a prompt for now to keep it simple single button? 
+             // No, let's just assume if we are clicking it, we want to toggle.
+             // Since we don't know current power state from Python easily without tracking, 
+             // let's use the button text to toggle logic locally.
+             const btn = document.getElementById('powerBtn');
+             const isOff = btn.innerText.includes("OFF");
+             const cmd = isOff ? "POWER:OFF" : "POWER:ON"; // Logic inverted based on label
+             sendCommand(cmd);
+             
+             // Toggle label immediately for responsiveness
+             btn.innerText = isOff ? "Power ON" : "Power OFF";
+        }
+
+        // --- STATUS POLLING ---
+        async function pollStatus() {
+            try {
+                const res = await fetch("/status");
+                const data = await res.json();
+                
+                if (isConnected !== data.connected) {
+                    isConnected = data.connected;
+                    updateStatusUI(isConnected);
+                }
+            } catch (e) {
+                console.log("Poll failed");
+            }
+        }
+
+        function updateStatusUI(connected) {
+            const ind = document.getElementById("connIndicator");
+            const txt = document.getElementById("connStatusText");
+            const btn = document.getElementById("connBtn");
+            
+            ind.style.backgroundColor = connected ? "#28a745" : "#dc3545"; // Green/Red
+            txt.textContent = connected ? "CONNECTED" : "DISCONNECTED";
+            txt.style.color = connected ? "#28a745" : "#dc3545";
+            btn.textContent = connected ? "Disconnect" : "Connect";
+            btn.disabled = false;
+            
+            if(connected) logToTerminal("Device Connected.");
+            else logToTerminal("Device Disconnected.");
+        }
+
+        function logToTerminal(msg, type='info') {
+            const term = document.getElementById("terminal");
+            const time = new Date().toLocaleTimeString();
+            const color = type === 'error' ? 'red' : 'inherit';
+            term.innerHTML += `<div style="color:${color}">[${time}] ${msg}</div>`;
+            term.scrollTop = term.scrollHeight;
+        }
+
+        // --- INIT ---
         document.addEventListener('DOMContentLoaded', () => {
-            // Load theme from local storage
+            // Theme
             const savedTheme = localStorage.getItem('theme') || 'light';
             document.body.setAttribute('data-theme', savedTheme);
-            updateThemeIcon(savedTheme);
+            document.getElementById('themeIcon').textContent = savedTheme === 'dark' ? '🌙' : '☀️';
 
-            // Set initial state based on slider defaults
-            updateColorDisplay();
-            updatePowerStatusUI(false); // Initialize to OFF visually
+            loadFavorites();
             
-            // Start polling status
-            setInterval(pollStatus, 2000);
-            pollStatus(); // Run immediately
+            // Start Polling Status (Every 3 seconds is enough, don't spam)
+            setInterval(pollStatus, 3000);
+            pollStatus();
         });
     </script>
 </body>
