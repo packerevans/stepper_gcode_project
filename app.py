@@ -102,7 +102,7 @@ class GCodeRunner(threading.Thread):
         current_gcode_runner = self
         num_commands = len(self.lines)
         # *** CHANGED: Increased priming count to 4 (queue size is 10) ***
-        PRIME_COUNT = 4 
+        PRIME_COUNT = 12 
         log_message(f"Received G-code block with {num_commands} commands. Starting {PRIME_COUNT}-command priming...")
 
         # 1. INITIAL: Send the first four commands immediately, with a small delay between each.
