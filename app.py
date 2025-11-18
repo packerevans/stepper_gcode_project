@@ -408,52 +408,44 @@ def send_single_gcode_line_route():
 # --- END OF NEW ENDPOINT ---
 
 
+# In app.py
+
 @app.route("/send", methods=["POST"])
 def send_command():
-    """
-    This route is still used for BLE commands and
-    any other single-line commands you might add later.
-    """
     data = request.json
     cmd = data.get("command")
     
-    if cmd:
+    if not cmd:
+        return jsonify(success=False, error="No command")
+
+    # ... (Your existing serial logic) ...
+
+    # BLE Handling
+    if cmd.startswith("LED:"):
+        # Parse RGB
         try:
-            # Check for BLE/Serial command routing
-            if cmd.startswith("LED:") or cmd in ["CONNECT", "DISCONNECT", "POWER:ON", "POWER:OFF"]:
-                # --- BLE COMMANDS (Async handling remains the same) ---
-                if cmd.startswith("LED:"):
-                    parts = cmd.split(":")[1].split(",")
-                    r, g, b, br = map(int, parts)
-                    future = asyncio.run_coroutine_threadsafe(
-                        ble_controller.send_led_command(r, g, b, br),
-                        ble_controller.loop
-                    )
-                    future.result(timeout=5)
-                else: # CONNECT/DISCONNECT/POWER commands
-                    future = asyncio.run_coroutine_threadsafe(
-                        ble_controller.handle_command(cmd),
-                        ble_controller.loop
-                    )
-                    future.result(timeout=5)
-            elif arduino_connected:
-                # --- SERIAL COMMANDS (Single) ---
-                # NOTE: This is NOT used by the new manual G-code feature.
-                # This is for other single commands (e.g., from index.html)
-                with lock:
-                    arduino.write((cmd + "\n").encode())
-            else:
-                log_message(f"Warning: Command '{cmd}' received but no device connected.")
-                return jsonify(success=False, error="No device connected to send command to."), 500
-
-            log_message(f"Sent: {cmd}")
-            return jsonify(success=True)
-
+            parts = cmd.split(":")[1].split(",")
+            r, g, b, br = map(int, parts)
+            
+            # Fire and Forget: Schedule the task, but don't make Flask wait for the physical Bluetooth ack
+            asyncio.run_coroutine_threadsafe(
+                ble_controller.send_led_command(r, g, b, br),
+                ble_controller.loop
+            )
+            return jsonify(success=True, message="Color update queued")
+            
         except Exception as e:
-            log_message(f"Error sending {cmd}: {e}")
-            return jsonify(success=False, error=str(e)), 500
+            return jsonify(success=False, error=str(e))
 
-    return jsonify(success=False), 400
+    # Power/Connect Handling
+    if cmd in ["CONNECT", "DISCONNECT", "POWER:ON", "POWER:OFF"]:
+        asyncio.run_coroutine_threadsafe(
+            ble_controller.handle_command(cmd),
+            ble_controller.loop
+        )
+        return jsonify(success=True, message=f"{cmd} queued")
+
+    # ... (Rest of function)
 
 @app.route("/status", methods=["GET"])
 def get_status():
