@@ -1,148 +1,236 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>2DOF Arm Kinematic Simulator & G-Code Converter</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-body {
-    font-family: 'Inter', sans-serif;
-}
-/* Style for the highlighted command in the list */
-.command-item.active {
-    background-color: #4f46e5; /* bg-indigo-600 */
-    color: white;
-}
-/* Ensure canvas is responsive and maintains aspect ratio */
-canvas {
-    width: 100%;
-    height: 100%;
-    aspect-ratio: 1/1;
-    display: block;
-    border-radius: 0.5rem;
-}
-/* Custom scrollbar for logic editor */
-textarea {
-    scrollbar-width: thin;
-    scrollbar-color: #4b5563 #1f2937;
-}
-/* Hide number input spinners */
-input[type=number]::-webkit-inner-spin-button,
-input[type=number]::-webkit-outer-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-}
-input[type=number] {
-    -moz-appearance: textfield;
-}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bulk G-Code Converter</title>
+    
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+    <link rel="apple-touch-icon" sizes="512x512" href="{{ url_for('static', filename='icons/icon-512.png') }}">
 
-/* --- NEW COLORS --- */
-
-/* Main Buttons: Indigo */
-#convertGCodeBtn {
-    background-color: #4f46e5; /* bg-indigo-600 */
-}
-#convertGCodeBtn:hover {
-    background-color: #4338ca; /* bg-indigo-700 */
-}
-#loadCommandsBtn {
-    background-color: #4f46e5; /* bg-indigo-600 */
-}
-#loadCommandsBtn:hover {
-    background-color: #4338ca; /* bg-indigo-700 */
-}
-#alert-modal button {
-    background-color: #4f46e5; /* bg-indigo-600 */
-}
-#alert-modal button:hover {
-    background-color: #4338ca; /* bg-indigo-700 */
-}
-
-/* Playback Buttons */
-#playBtn {
-    background-color: #0d9488; /* bg-teal-600 */
-}
-#playBtn:hover {
-    background-color: #0f766e; /* bg-teal-700 */
-}
-#playLoopBtn {
-    background-color: #4f46e5; /* bg-indigo-600 */
-}
-#playLoopBtn:hover {
-    background-color: #4338ca; /* bg-indigo-700 */
-}
-#pauseBtn {
-    background-color: #f97316; /* bg-orange-500 */
-}
-#pauseBtn:hover {
-    background-color: #ea580c; /* bg-orange-600 */
-}
-</style>
-</head>
-<body class="bg-gray-900 text-gray-200 antialiased">
-
-<div class="max-w-7xl mx-auto p-4 lg:p-8">
-    <header class="mb-6">
-        <h1 class="text-3xl font-bold text-white">2DOF Arm Kinematic Simulator & G-Code Converter</h1>
-        <p class="text-lg text-gray-400">Simulating a 2-motor arm with 101.3mm links and 9/8 gearing.</p>
-    </header>
-
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        <div class="lg:col-span-1 bg-gray-800 p-6 rounded-xl shadow-lg flex flex-col gap-6">
+    <style>
+        /* --- Root Variables --- */
+        :root {
+            --color-primary: #d2b48c; /* Khaki/Tan */
+            --color-secondary: #b08d5c; /* Darker Tan */
+            --color-background: #f0f0f0; 
+            --color-surface: #ffffff; 
+            --color-text: #333333;
+            --color-shadow: rgba(0, 0, 0, 0.08);
+            --border-radius: 12px;
             
-            <div class="bg-gray-900 p-4 rounded-lg border border-gray-700">
-                <div class="mb-3">
-                    <label class="block text-sm font-medium text-gray-300 mb-2">Input Format</label>
-                    <div class="flex gap-4">
-                        <label for="formatCartesian" class="flex items-center gap-2 text-sm text-gray-200">
-                            <input type="radio" id="formatCartesian" name="gcodeFormat" value="cartesian" class="text-indigo-600 bg-gray-700 border-gray-600 focus:ring-indigo-500" checked>
-                            Cartesian (X, Y)
+            /* Input Colors */
+            --color-input-bg: #f9f9f9;
+            --color-input-border: #ccc;
+        }
+
+        body[data-theme='dark'] {
+            --color-background: #1e1e1e;
+            --color-surface: #2c2c2c;
+            --color-text: #e0e0e0;
+            --color-shadow: rgba(255, 255, 255, 0.08);
+            --color-input-bg: #333;
+            --color-input-border: #555;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--color-background);
+            color: var(--color-text);
+            padding: 0; margin: 0;
+            transition: background 0.3s, color 0.3s;
+        }
+
+        /* --- Sidebar & Nav --- */
+        .sidebar {
+            height: 100%; width: 0; position: fixed; top: 0; left: 0;
+            background-color: var(--color-primary); overflow-x: hidden;
+            transition: 0.3s; padding-top: 60px; z-index: 1000;
+            box-shadow: 2px 0 5px var(--color-shadow);
+        }
+        .sidebar a {
+            padding: 15px 24px; text-decoration: none; font-size: 18px;
+            color: var(--color-text); display: block; transition: 0.2s; font-weight: 500;
+        }
+        .sidebar a:hover { background-color: var(--color-secondary); color: var(--color-surface); }
+
+        .openbtn {
+            font-size: 26px; cursor: pointer; background-color: var(--color-primary);
+            color: var(--color-text); padding: 10px 20px; border: none;
+            border-radius: 0 0 var(--border-radius) 0; position: fixed;
+            top: 0; left: 0; z-index: 1100; box-shadow: 0 2px 5px var(--color-shadow);
+        }
+        
+        #themeToggle {
+            position: fixed; top: 15px; right: 15px; background: var(--color-surface);
+            color: var(--color-text); border: 1px solid var(--color-text);
+            padding: 8px; border-radius: 50%; z-index: 1200;
+            width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+            transition: background 0.3s; cursor: pointer;
+        }
+
+        .main-content {
+            margin-left: 0; transition: margin-left 0.3s; padding: 20px;
+            max-width: 1200px; margin: 0 auto; padding-top: 70px;
+        }
+
+        h1 {
+            text-align: center; margin-bottom: 10px;
+            font-weight: 300; color: var(--color-secondary);
+        }
+        p.subtitle {
+            text-align: center; color: var(--color-text); opacity: 0.7; margin-bottom: 30px;
+        }
+
+        /* --- Layout Grid --- */
+        .grid-container {
+            display: grid;
+            grid-template-columns: 1fr 2fr; /* 1/3 left, 2/3 right */
+            gap: 25px;
+        }
+
+        /* --- Cards --- */
+        .card {
+            background-color: var(--color-surface); padding: 25px;
+            border-radius: var(--border-radius); box-shadow: 0 4px 10px var(--color-shadow);
+            display: flex; flex-direction: column; gap: 15px;
+        }
+
+        /* --- Form Elements --- */
+        label { font-weight: 600; font-size: 14px; margin-bottom: 5px; display: block; }
+        
+        textarea {
+            width: 100%; padding: 10px; border-radius: 8px;
+            border: 1px solid var(--color-input-border);
+            background-color: var(--color-input-bg); color: var(--color-text);
+            font-family: 'Consolas', monospace; font-size: 13px;
+            resize: vertical; box-sizing: border-box;
+        }
+
+        input[type="number"] {
+            width: 100%; padding: 8px; border-radius: 6px;
+            border: 1px solid var(--color-input-border);
+            background-color: var(--color-input-bg); color: var(--color-text);
+            box-sizing: border-box;
+        }
+
+        /* --- Radio Buttons --- */
+        .radio-group { display: flex; gap: 15px; margin-bottom: 10px; }
+        .radio-item { display: flex; align-items: center; gap: 5px; cursor: pointer; font-size: 14px; }
+
+        /* --- Buttons --- */
+        button {
+            background-color: var(--color-primary); color: var(--color-text);
+            border: none; padding: 12px; border-radius: 8px; font-size: 15px;
+            cursor: pointer; transition: 0.2s; font-weight: 600; width: 100%;
+            box-shadow: 0 2px 5px var(--color-shadow);
+        }
+        button:hover {
+            background-color: var(--color-secondary);
+            transform: translateY(-1px);
+        }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        /* --- Playback Controls --- */
+        .playback-bar {
+            display: flex; align-items: center; gap: 10px;
+            background: var(--color-background); padding: 10px; border-radius: 8px;
+        }
+        .playback-btn { width: 40px; height: 40px; padding: 0; display: flex; justify-content: center; align-items: center; }
+        
+        input[type="range"] {
+            flex-grow: 1; height: 6px; border-radius: 5px;
+            background: #ccc; outline: none; -webkit-appearance: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%;
+            background: var(--color-secondary); cursor: pointer;
+        }
+
+        /* --- Canvas --- */
+        canvas {
+            width: 100%; aspect-ratio: 1/1; display: block;
+            background-color: #fff; border-radius: 8px;
+            border: 1px solid var(--color-input-border);
+        }
+
+        /* --- Param Grid --- */
+        .param-grid {
+            display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;
+        }
+
+        /* --- Mobile --- */
+        @media (max-width: 900px) {
+            .grid-container { grid-template-columns: 1fr; }
+            .param-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body data-theme="light">
+
+    <div id="mySidebar" class="sidebar">
+        <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
+        <a href="/controls">Controls</a>
+        <a href="/">Designs</a> 
+        <a href="/led_controls">Led Controls</a>
+        <a href="/terminal">Terminal</a>
+    </div>
+
+    <button class="openbtn" onclick="openNav()">☰</button>
+    <button id="themeToggle" onclick="toggleDarkMode()">
+        <span id="themeIcon">☀️</span>
+    </button>
+
+    <div class="main-content">
+        <h1>Simulator & Converter</h1>
+        <p class="subtitle">Convert Cartesian/Polar Coordinates to Arm G-Code</p>
+
+        <div class="grid-container">
+            
+            <div class="card">
+                <div>
+                    <label>Input Format</label>
+                    <div class="radio-group">
+                        <label class="radio-item">
+                            <input type="radio" name="gcodeFormat" value="cartesian" checked> Cartesian (X,Y)
                         </label>
-                        <label for="formatPolar" class="flex items-center gap-2 text-sm text-gray-200">
-                            <input type="radio" id="formatPolar" name="gcodeFormat" value="polar" class="text-indigo-600 bg-gray-700 border-gray-600 focus:ring-indigo-500">
-                            Polar (R, A°)
+                        <label class="radio-item">
+                            <input type="radio" name="gcodeFormat" value="polar"> Polar (R,A)
                         </label>
                     </div>
                 </div>
-                <label for="gcodeConverterInput" class="block text-sm font-medium text-gray-300 mb-2">
-                    1. Paste G-Code
-                </label>
-                <textarea id="gcodeConverterInput" rows="8" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Cartesian: G1 X100 Y50&#10;Polar: G1 R111.8 A26.5&#10;Raw Polar: 111.8 0.463">
-G1 X203.2 Y0
+
+                <div>
+                    <label for="gcodeConverterInput">1. Paste Coordinates</label>
+                    <textarea id="gcodeConverterInput" rows="6" placeholder="G1 X100 Y50&#10;G1 X0 Y0">G1 X203.2 Y0
 G1 X0 Y0
 G1 X0 Y203.2
 G1 X0 Y0
-G1 X203.2 Y0
-</textarea>
-                <div class="grid grid-cols-3 gap-3 mt-3">
+G1 X203.2 Y0</textarea>
+                </div>
+
+                <div class="param-grid">
                     <div>
-                        <label for="stepDelayInput" class="block text-xs font-medium text-gray-400">Delay (μs)</label>
-                        <input type="number" id="stepDelayInput" value="1000" class="w-full mt-1 p-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <label>Delay (μs)</label>
+                        <input type="number" id="stepDelayInput" value="1000">
                     </div>
                     <div>
-                        <label for="smoothingSensitivity" class="block text-xs font-medium text-gray-400">Smooth (ε)</label>
-                        <input type="number" id="smoothingSensitivity" value="0.000001" step="0.000001" class="w-full mt-1 p-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <label>Smooth (ε)</label>
+                        <input type="number" id="smoothingSensitivity" value="0.000001" step="0.000001">
                     </div>
                     <div>
-                        <label for="linearResolution" class="block text-xs font-medium text-gray-400">Res. (mm)</label>
-                        <input type="number" id="linearResolution" value="1.0" step="0.1" class="w-full mt-1 p-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <label>Res. (mm)</label>
+                        <input type="number" id="linearResolution" value="1.0" step="0.1">
                     </div>
                 </div>
-                <button id="convertGCodeBtn" class="w-full mt-3 font-semibold py-2 px-4 rounded-lg transition duration-200 shadow-md">
-                    Convert, Smooth & Load
-                </button>
-            </div>
-            <div>
-                <label for="commandsInput" class="block text-sm font-medium text-gray-300 mb-2">
-                    2. Arm Commands (G1 Elbow Base StepDelay_μs)
-                </label>
-                <textarea id="commandsInput" rows="8" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., G1 0 800 1000&#10;G1 1600 0 500&#10;G1 0 -800 1000&#10;G1 -1600 0 2000">
-G1 0 400 1000
+
+                <button id="convertGCodeBtn">Convert, Smooth & Load</button>
+
+                <hr style="border:0; border-top:1px solid var(--color-shadow); width:100%;">
+
+                <div>
+                    <label for="commandsInput">2. Arm Commands (Output)</label>
+                    <textarea id="commandsInput" rows="6" placeholder="Generated commands will appear here...">G1 0 400 1000
 G1 0 800 1000
 G1 400 800 500
 G1 400 400 500
@@ -150,1007 +238,513 @@ G1 0 0 200
 G1 -800 0 1000
 G1 -800 -800 1000
 G1 0 -800 500
-G1 0 0 200
-</textarea>
-</div>
-
-            <button id="loadCommandsBtn" class="w-full text-white font-semibold py-2 px-4 rounded-lg transition duration-200 shadow-md">
-                Load & Reset Simulation
-            </button>
-
-
-            <div>
-                <label class="block text-sm font-medium text-gray-300 mb-2">Playback</label>
-                <div class="flex items-center gap-4 mb-2">
-                    <button id="playBtn" class="text-white p-2 rounded-full disabled:opacity-50" title="Step Forward">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8.002v3.996a1 1 0 001.555.832l3.197-1.998a1 1 0 000-1.664l-3.197-1.998z" clip-rule="evenodd" />
-                        </svg>
-                    </button>
-                    
-                    <button id="playLoopBtn" class="text-white p-2 rounded-full disabled:opacity-50" title="Play and Loop">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.89.633A5.002 5.002 0 005.001 9.029V11a1 1 0 11-2 0V3a1 1 0 011-1zm12 14a1 1 0 01-1 1v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 111.89-.633A5.002 5.002 0 0014.999 10.97V9a1 1 0 112 0v8a1 1 0 01-1 1z" clip-rule="evenodd" />
-                        </svg>
-                    </button>
-
-                    <button id="pauseBtn" class="text-white p-2 rounded-full" title="Pause">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 6a1 1 0 00-1 1v6a1 1 0 002 0V7a1 1 0 00-1-1zm2 0a1 1 0 00-1 1v6a1 1 0 002 0V7a1 1 0 00-1-1z" clip-rule="evenodd" />
-                        </svg>
-                    </button>
-                    <span id="stepDisplay" class="font-mono text-sm text-gray-400">Step: 0 / 0</span>
+G1 0 0 200</textarea>
                 </div>
-                <input id="commandSlider" type="range" min="0" max="0" value="0" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer disabled:opacity-50">
-            </div>
-            
-        </div>
 
-        <div class="lg:col-span-2 flex flex-col gap-6">
-            
-            <div class="bg-gray-800 p-4 rounded-xl shadow-lg">
-                <canvas id="armCanvas" class="bg-gray-900"></canvas>
+                <button id="loadCommandsBtn">Reset Simulation</button>
             </div>
-            
+
+            <div class="card" style="justify-content: start;">
+                <div style="position:relative;">
+                    <canvas id="armCanvas" width="600" height="600"></canvas>
+                    <div id="stepDisplay" style="position:absolute; top:10px; left:10px; background:rgba(255,255,255,0.8); padding:4px 8px; border-radius:4px; font-size:12px; font-family:monospace; color:black;">Step: 0 / 0</div>
+                </div>
+
+                <div class="playback-bar">
+                    <button id="playBtn" class="playback-btn" title="Step Forward">▶</button>
+                    <button id="playLoopBtn" class="playback-btn" title="Loop">🔁</button>
+                    <button id="pauseBtn" class="playback-btn" title="Pause">⏸</button>
+                    <input id="commandSlider" type="range" min="0" max="0" value="0">
+                </div>
+            </div>
+
         </div>
     </div>
-</div>
 
-<script>
-    document.addEventListener('DOMContentLoaded', () => {
-        // --- DOM Elements ---
-        const canvas = document.getElementById('armCanvas');
-        const ctx = canvas.getContext('2d');
-        const commandsInput = document.getElementById('commandsInput');
-        const loadCommandsBtn = document.getElementById('loadCommandsBtn');
-        const commandSlider = document.getElementById('commandSlider');
-        const playBtn = document.getElementById('playBtn');
-        const pauseBtn = document.getElementById('pauseBtn');
-        const playLoopBtn = document.getElementById('playLoopBtn');
-        const stepDisplay = document.getElementById('stepDisplay');
-        
-        // Converter DOM elements
-        const gcodeConverterInput = document.getElementById('gcodeConverterInput');
-        const convertGCodeBtn = document.getElementById('convertGCodeBtn');
-        const stepDelayInput = document.getElementById('stepDelayInput');
-        const smoothingSensitivity = document.getElementById('smoothingSensitivity');
-        const linearResolutionInput = document.getElementById('linearResolution');
-
-        // --- Simulation Constants ---
-        const L1 = 101.3; // mm (Upper arm)
-        const L2 = 101.3; // mm (Lower arm)
-        const GEAR_RATIO = 9 / 8; // 1.125
-        
+    <script>
+        // --- CONFIGURATION ---
+        const L1 = 101.3; 
+        const L2 = 101.3; 
+        const GEAR_RATIO = 9 / 8; 
         const STEPS_PER_DEG = 3200 / 360;
-        const STEPS_PER_RAD = (3200 / 360) * (180 / Math.PI); // 1600 / PI
+        const STEPS_PER_RAD = STEPS_PER_DEG * (180 / Math.PI);
 
-        // --- Simulation State ---
-        let commands = []; // List of {base, elbow} steps
-        let cumulativeStates = []; // List of all arm states (pos, angles)
-        let currentStep = 0; // The index of the *target* state
+        // --- STATE ---
+        let commands = [];
+        let cumulativeStates = [];
+        let currentStep = 0;
         let isAutoPlaying = false;
         let isLooping = false;
-        
-        // Animation state
         let animationFrameId = null;
         let animationStartTime = 0;
         let animationFromState = null;
         let animationToState = null;
-        
         let origin = { x: 0, y: 0 };
-        let worldScale = 1; // pixels per mm
-
+        let worldScale = 1;
         let tracePath = [];
-        
-        // Utility function for linear interpolation
         const lerp = (a, b, t) => a + (b - a) * t;
 
-        // --- Core Functions ---
+        // --- DOM ---
+        const canvas = document.getElementById('armCanvas');
+        const ctx = canvas.getContext('2d');
+        const slider = document.getElementById('commandSlider');
+        const stepDisp = document.getElementById('stepDisplay');
 
+        // --- INIT ---
         function init() {
-            // Set up event listeners
-            loadCommandsBtn.addEventListener('click', loadCommands);
+            // UI Logic
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.body.setAttribute('data-theme', savedTheme);
+            document.getElementById('themeIcon').textContent = savedTheme === 'dark' ? '🌙' : '☀️';
 
-            commandSlider.addEventListener('input', (e) => {
-                isLooping = false; // Stop looping on manual scrub
-                handleSliderInput(e);
-            });
-            playBtn.addEventListener('click', () => {
+            // Listeners
+            document.getElementById('loadCommandsBtn').addEventListener('click', loadCommands);
+            document.getElementById('convertGCodeBtn').addEventListener('click', convertGCode);
+            
+            slider.addEventListener('input', (e) => {
                 isLooping = false; 
-                playFrame(); // "Step Forward"
-            });
-            pauseBtn.addEventListener('click', () => {
-                isLooping = false; // Stop looping on pause
                 pause();
+                drawState(parseInt(e.target.value));
             });
-            playLoopBtn.addEventListener('click', playLoop); // Add new listener
-            
-            window.addEventListener('resize', debounce(resizeAndRedraw, 250));
-            
-            // Converter listener
-            convertGCodeBtn.addEventListener('click', convertGCode);
-            
-            // Initial setup
+
+            document.getElementById('playBtn').addEventListener('click', () => {
+                isLooping = false;
+                playFrame();
+            });
+
+            document.getElementById('playLoopBtn').addEventListener('click', () => {
+                if(isAutoPlaying) pause();
+                isLooping = true;
+                currentStep = 0;
+                drawState(0);
+                playFullAnimation();
+            });
+
+            document.getElementById('pauseBtn').addEventListener('click', pause);
+            window.addEventListener('resize', () => { resizeCanvas(); if(cumulativeStates.length) drawState(currentStep); });
+
             resizeCanvas();
-            loadCommands(); // Load default commands from textarea
+            loadCommands();
         }
 
+        // --- CANVAS ---
         function resizeCanvas() {
             const parent = canvas.parentElement;
-            const parentWidth = parent.clientWidth;
-            const size = parentWidth > 32 ? parentWidth - 32 : parentWidth;
-            
+            const size = parent.clientWidth;
             canvas.width = size;
             canvas.height = size;
 
-            origin.x = canvas.width / 2;
-            origin.y = canvas.height / 2;
+            origin.x = size / 2;
+            origin.y = size / 2;
             
             const maxReach = (L1 + L2) * 1.1;
-            worldScale = Math.min(canvas.width, canvas.height) / (maxReach * 2);
+            worldScale = size / (maxReach * 2);
 
             ctx.resetTransform();
             ctx.translate(origin.x, origin.y);
-            ctx.scale(worldScale, -worldScale); // Scale and flip Y
+            ctx.scale(worldScale, -worldScale);
         }
 
-        function resizeAndRedraw() {
-            resizeCanvas();
-            if (cumulativeStates.length > 0) {
-                drawState(currentStep);
-            }
-        }
-
-        // --- G-Code Converter Functions ---
-
-        /**
-         * Converts G-code (X, Y) or (R, A) to arm commands.
-         */
-        function convertGCode() {
-            const gcodeText = gcodeConverterInput.value;
-            const lines = gcodeText.split('\n');
-            
-            const format = document.querySelector('input[name="gcodeFormat"]:checked').value;
-
-            const xyRegex = /G1\s+X(-?[\d.]+)\s+Y(-?[\d.]+)/i;
-            const raRegex = /G1\s+R(-?[\d.]+)\s+A(-?[\d.]+)/i;
-            const rawRaRegex = /^(-?[\d.]+)\s+(-?[\d.]+)/;
-            
-            let coords = [];
-            
-            let isRawPolarData = false;
-            let foundGCode = false;
-
-            // --- 1. Parse all coords based on format ---
-            for (const line of lines) {
-                const trimmedLine = line.trim();
-                if (trimmedLine.length === 0) continue; 
-                
-                if (format === 'cartesian') {
-                    const match = trimmedLine.match(xyRegex);
-                    if (match) {
-                        const x = parseFloat(match[1]);
-                        const y = parseFloat(match[2]);
-                        coords.push({ x, y });
-                        foundGCode = true;
-                    }
-                } else if (format === 'polar') {
-                    let match = trimmedLine.match(raRegex); 
-                    if (match) {
-                        foundGCode = true;
-                        isRawPolarData = false; 
-                        const r = parseFloat(match[1]);
-                        const angle_deg = parseFloat(match[2]);
-                        const angle_rad = angle_deg * (Math.PI / 180);
-                        const abs_r = Math.abs(r);
-                        const x = abs_r * Math.cos(angle_rad);
-                        const y = abs_r * Math.sin(angle_rad);
-                        coords.push({ x, y });
-                    } else if (!foundGCode) { 
-                        match = trimmedLine.match(rawRaRegex);
-                        if (match) {
-                            isRawPolarData = true; 
-                            const r = parseFloat(match[1]);
-                            const angle_rad = parseFloat(match[2]); 
-                            const abs_r = Math.abs(r);
-                            const x = abs_r * Math.cos(angle_rad);
-                            const y = abs_r * Math.sin(angle_rad);
-                            coords.push({ x, y });
-                        }
-                    }
-                }
-            }
-
-
-            if (coords.length === 0) {
-                showModal(`No valid coordinates found for the selected format.`);
-                return;
-            }
-
-            let reducedCoords;
-            
-            if (isRawPolarData) {
-                reducedCoords = coords; 
-            } else {
-                // --- 2. Pre-process G-Code coords to remove co-linear points ---
-                const collinearity_epsilon = 1e-6; 
-                reducedCoords = [];
-                
-                if (coords.length > 0) {
-                    reducedCoords.push(coords[0]); 
-                }
-
-                let p1_index = 0;
-                let p2_index = 1;
-
-                while (p2_index < coords.length) {
-                    const p1 = coords[p1_index];
-                    const p2 = coords[p2_index];
-
-                    if (p2_index === coords.length - 1) {
-                        reducedCoords.push(p2); 
-                        break;
-                    }
-                    
-                    const p3 = coords[p2_index + 1];
-                    const cross_product = (p2.y - p1.y) * (p3.x - p2.x) - (p2.x - p1.x) * (p3.y - p2.y);
-                    let isCoLinear = Math.abs(cross_product) < collinearity_epsilon;
-
-                    if (isCoLinear) {
-                        const v1_x = p2.x - p1.x;
-                        const v1_y = p2.y - p1.y;
-                        const v2_x = p3.x - p2.x;
-                        const v2_y = p3.y - p2.y;
-                        const dot_product = (v1_x * v2_x) + (v1_y * v2_y);
-                        
-                        if (dot_product < 0) {
-                            isCoLinear = false; 
-                        }
-                    }
-
-                    if (isCoLinear) {
-                        p2_index++;
-                    } else {
-                        reducedCoords.push(p2);
-                        p1_index = p2_index;
-                        p2_index++;
-                    }
-                }
-            }
-            // --- END STEP 2 ---
-
-            let interpolatedCoords;
-            
-            if (isRawPolarData) {
-                interpolatedCoords = reducedCoords; 
-            } else {
-                // --- 3. Interpolate straight lines (for G-Code) ---
-                const resolution_mm = parseFloat(linearResolutionInput.value) || 1.0;
-                interpolatedCoords = [];
-
-                if (reducedCoords.length === 0) {
-                     showModal("No coordinates left after processing.");
-                     return;
-                }
-                
-                interpolatedCoords.push(reducedCoords[0]); 
-
-                for (let i = 0; i < reducedCoords.length - 1; i++) {
-                    const p_start = reducedCoords[i];
-                    const p_end = reducedCoords[i+1];
-
-                    const dist = Math.hypot(p_end.x - p_start.x, p_end.y - p_start.y);
-                    const num_steps = Math.max(1, Math.ceil(dist / resolution_mm)); 
-
-                    for (let j = 1; j <= num_steps; j++) {
-                        const progress = j / num_steps;
-                        const inter_x = lerp(p_start.x, p_end.x, progress);
-                        const inter_y = lerp(p_start.y, p_end.y, progress);
-                        interpolatedCoords.push({ x: inter_x, y: inter_y });
-                    }
-                }
-            }
-            // --- END NEW STEP 3 ---
-
-
-            // --- 4. Convert *all* coords to relative arm commands ---
-            let generatedCommands = [];
-            
-            if (interpolatedCoords.length === 0) {
-                showModal("No coordinates to convert.");
-                return;
-            }
-            
-            const first_coord = interpolatedCoords[0];
-            const { base_steps: start_base_steps, elbow_steps: start_elbow_steps } = calculateIK(first_coord.x, first_coord.y, 0, 0);
-
-            let prev_base_steps = start_base_steps;
-            let prev_elbow_steps = start_elbow_steps;
-
-            const step_delay_us = parseInt(stepDelayInput.value, 10) || 1000;
-            
-            try {
-                // Start at j=1 because we've already processed the first point
-                for (let j = 1; j < interpolatedCoords.length; j++) {
-                    const coord = interpolatedCoords[j];
-                    const curr_x = coord.x;
-                    const curr_y = coord.y;
-
-                    const { base_steps, elbow_steps } = calculateIK(curr_x, curr_y, prev_base_steps, prev_elbow_steps);
-                    
-                    const rel_base = Math.round(base_steps - prev_base_steps);
-                    const rel_elbow = Math.round(elbow_steps - prev_elbow_steps);
-                    
-                    if (rel_base !== 0 || rel_elbow !== 0) {
-                        generatedCommands.push({ elbow: rel_elbow, base: rel_base, delay: step_delay_us });
-                    }
-
-                    prev_base_steps = base_steps;
-                    prev_elbow_steps = elbow_steps;
-                }
-            } catch (e) {
-                showModal(`Conversion Error: ${e.message}`);
-                return;
-            }
-
-            // --- 5. Smooth the commands ---
-            let commandsToSmooth = generatedCommands;
-            let smoothedCommands = [];
-            let lastLength = -1; 
-            const sensitivity = parseFloat(smoothingSensitivity.value) || 1e-6;
-
-            while (smoothedCommands.length !== lastLength) {
-                lastLength = commandsToSmooth.length;
-                smoothedCommands = smoothCommands(commandsToSmooth, sensitivity);
-                commandsToSmooth = smoothedCommands;
-            }
-
-            // --- 6. Load into simulator ---
-            const commandStrings = smoothedCommands.map(cmd => `G1 ${cmd.elbow} ${cmd.base} ${cmd.delay}`);
-            commandsInput.value = commandStrings.join('\n');
-            loadCommandsBtn.click(); // Automatically click "Load & Reset"
-        }
-
-
-        /**
-         * Combines consecutive commands with the same ratio and speed.
-         */
-        function smoothCommands(commands, sensitivity) {
-            if (commands.length === 0) {
-                return [];
-            }
-
-            const smoothedCommands = [];
-            let current_command = { ...commands[0] };
-
-            for (let i = 1; i < commands.length; i++) {
-                const next_command = commands[i];
-                
-                let canCombine = false;
-                
-                if (current_command.delay === next_command.delay) {
-                    const cmd1 = current_command;
-                    const cmd2 = next_command;
-
-                    if (cmd1.base === 0 && cmd2.base === 0) {
-                        if (Math.sign(cmd1.elbow) === Math.sign(cmd2.elbow)) {
-                            canCombine = true;
-                        }
-                    } 
-                    else if (cmd1.elbow === 0 && cmd2.elbow === 0) {
-                        if (Math.sign(cmd1.base) === Math.sign(cmd2.base)) {
-                            canCombine = true;
-                        }
-                    }
-                    else if (cmd1.base !== 0 && cmd2.base !== 0 && cmd1.elbow !== 0 && cmd2.elbow !== 0) {
-                        const ratio1 = cmd1.elbow / cmd1.base;
-                        const ratio2 = cmd2.elbow / cmd2.base;
-                        
-                        if (Math.abs(ratio1 - ratio2) < sensitivity && 
-                            Math.sign(cmd1.base) === Math.sign(cmd2.base)) {
-                            canCombine = true;
-                        }
-                    }
-                }
-
-                if (canCombine) {
-                    current_command.elbow += next_command.elbow;
-                    current_command.base += next_command.base;
-                } else {
-                    smoothedCommands.push(current_command);
-                    current_command = { ...next_command };
-                }
-            }
-            
-            smoothedCommands.push(current_command);
-            
-            return smoothedCommands;
-        }
-
-
-        // ***************************************************************
-        // *** NEW HELPER FUNCTION (v5)                  ***
-        // ***************************************************************
-
-        /**
-         * Helper function to find the shortest rotation from a last angle.
-         */
-        function getShortestRotation(raw_rad, last_rad) {
-            let rotation_diff = (raw_rad - last_rad) / (2 * Math.PI);
-            let nearest_rotation_offset = Math.round(rotation_diff);
-            return raw_rad - (nearest_rotation_offset * 2 * Math.PI);
-        }
-
-        // ***************************************************************
-        // *** FIXED FUNCTION STARTS HERE (v5)             ***
-        // ***************************************************************
-        
-        /**
-         * Inverse Kinematics: Calculates arm motor steps from (X, Y) position.
-         * Now stateful and calculates the "cheapest" kinematic solution.
-         */
-        function calculateIK(x, y, last_base_steps = 0, last_elbow_steps = 0) {
-            let D = Math.hypot(x, y);
-            const arm_max_reach = L1 + L2;
-            let clamped_x = x;
-            let clamped_y = y;
-
-            if (D > arm_max_reach) { 
-                clamped_x = x * arm_max_reach / D;
-                clamped_y = y * arm_max_reach / D;
-                D = arm_max_reach;
-            }
-
-            const last_theta1 = -last_base_steps / STEPS_PER_RAD;
-            const last_alpha_rad = -last_base_steps / STEPS_PER_RAD;
-            const last_beta_rad = -last_elbow_steps / STEPS_PER_RAD;
-            const last_theta_bend = last_beta_rad - (GEAR_RATIO * last_alpha_rad);
-
-            let final_theta1, final_theta_bend, final_clamped_x, final_clamped_y;
-
-            if (D < 0.1) {
-                // --- Singularity Logic ---
-                // We are at or near the origin.
-                final_clamped_x = 0; 
-                final_clamped_y = 0;
-                
-                // Fold to the closest PI (positive or negative)
-                if (last_theta_bend > 0) {
-                    final_theta_bend = Math.PI;
-                } else {
-                    final_theta_bend = -Math.PI;
-                }
-
-                let raw_theta1;
-                if (D < 1e-6) {
-                    // AT (0,0), reuse last angle
-                    raw_theta1 = last_theta1;
-                } else {
-                    // NEAR (0,0), use angle of the line
-                    raw_theta1 = Math.atan2(y, x);
-                }
-                
-                final_theta1 = getShortestRotation(raw_theta1, last_theta1);
-            
-            } else {
-                // --- Standard (non-singularity) case: Calculate both solutions ---
-                const D_sq = D*D;
-                let cos_theta_bend = (D_sq - L1*L1 - L2*L2) / (2 * L1 * L2);
-                cos_theta_bend = Math.max(-1, Math.min(1, cos_theta_bend)); 
-                
-                // --- Solution 1 (Elbow Down) ---
-                const theta_bend_1 = -Math.acos(cos_theta_bend);
-                const k1_1 = L1 + L2 * Math.cos(theta_bend_1);
-                const k2_1 = L2 * Math.sin(theta_bend_1);
-                const raw_theta1_1 = Math.atan2(clamped_y, clamped_x) - Math.atan2(k2_1, k1_1);
-                const theta1_1 = getShortestRotation(raw_theta1_1, last_theta1);
-                
-                const alpha_rad_1 = theta1_1;
-                const beta_rad_1 = theta_bend_1 + (GEAR_RATIO * alpha_rad_1);
-                const base_steps_1 = -alpha_rad_1 * STEPS_PER_RAD;
-                const elbow_steps_1 = -beta_rad_1 * STEPS_PER_RAD;
-
-                // --- Solution 2 (Elbow Up) ---
-                const theta_bend_2 = +Math.acos(cos_theta_bend);
-                const k1_2 = L1 + L2 * Math.cos(theta_bend_2);
-                const k2_2 = L2 * Math.sin(theta_bend_2);
-                const raw_theta1_2 = Math.atan2(clamped_y, clamped_x) - Math.atan2(k2_2, k1_2);
-                const theta1_2 = getShortestRotation(raw_theta1_2, last_theta1);
-                
-                const alpha_rad_2 = theta1_2;
-                const beta_rad_2 = theta_bend_2 + (GEAR_RATIO * alpha_rad_2);
-                const base_steps_2 = -alpha_rad_2 * STEPS_PER_RAD;
-                const elbow_steps_2 = -beta_rad_2 * STEPS_PER_RAD;
-
-                // --- Compare "cost" (total steps moved) ---
-                // Using simple absolute difference (Manhattan distance) as a cost metric
-                const travel_1 = Math.abs(base_steps_1 - last_base_steps) + Math.abs(elbow_steps_1 - last_elbow_steps);
-                const travel_2 = Math.abs(base_steps_2 - last_base_steps) + Math.abs(elbow_steps_2 - last_elbow_steps);
-
-                // --- Choose the winner ---
-                if (travel_1 <= travel_2) {
-                    final_theta1 = theta1_1;
-                    final_theta_bend = theta_bend_1;
-                } else {
-                    final_theta1 = theta1_2;
-                    final_theta_bend = theta_bend_2;
-                }
-                final_clamped_x = clamped_x;
-                final_clamped_y = clamped_y;
-            }
-
-            // --- Calculate final step values based on the winning solution ---
-            const alpha_rad = final_theta1;
-            const beta_rad = final_theta_bend + (GEAR_RATIO * alpha_rad);
-
-            const base_steps = -alpha_rad * STEPS_PER_RAD;
-            const elbow_steps = -beta_rad * STEPS_PER_RAD;
-
-            return { 
-                base_steps: base_steps, 
-                elbow_steps: elbow_steps,
-                clamped_x: final_clamped_x, 
-                clamped_y: final_clamped_y
-            };
-        }
-        
-        // ***************************************************************
-        // *** FIXED FUNCTION ENDS HERE                 ***
-        // ***************************************************************
-        
-        // --- END: G-Code Converter Functions ---
-
-
-        /**
-         * Parses commands from the textarea, calculates all states, and resets the UI.
-         */
-        function loadCommands() {
-            pause(); 
-            
-            const text = commandsInput.value;
-            
-            commands = text.split('\n')
-                .filter(line => line.trim().startsWith('G1')) 
-                .map(line => {
-                    const parts = line.trim().substring(2).trim().split(/\s+/).map(s => parseInt(s.trim(), 10));
-                    return { 
-                        elbow: parts[0] || 0, 
-                        base: parts[1] || 0, 
-                        step_delay_us: parts[2] !== undefined ? parts[2] : 1000 
-                    };
-                });
-
-            calculateAllStates();
-            calculateTracePath();
-            
-            commandSlider.max = cumulativeStates.length - 1;
-            commandSlider.value = 0;
-            currentStep = 0;
-            
-            drawState(0);
-            
-            setControlsEnabled(cumulativeStates.length > 1);
-        }
-
-        function setControlsEnabled(enabled) {
-            playBtn.disabled = !enabled;
-            playLoopBtn.disabled = !enabled;
-            commandSlider.disabled = !enabled;
-        }
-
-        /**
-         * Pre-calculates the arm's position and angles for every step.
-         */
-        function calculateAllStates() {
-            cumulativeStates = [];
-            let total_base_steps = 0;
-            let total_elbow_steps = 0;
-            const p0 = { x: 0, y: 0 };
-
-            cumulativeStates.push(calculateFK(p0, 0, 0));
-
-            for (const cmd of commands) {
-                total_base_steps += cmd.base;
-                total_elbow_steps += cmd.elbow;
-                
-                const state = calculateFK(p0, total_base_steps, total_elbow_steps);
-                state.command = cmd; 
-                cumulativeStates.push(state);
-            }
-        }
-
-        /**
-         * Pre-calculates the high-resolution path for the trace line.
-         */
-        function calculateTracePath() {
-            tracePath = [];
-            if (cumulativeStates.length < 2) return;
-
-            tracePath.push(cumulativeStates[0].p2); 
-
-            for (let i = 0; i < cumulativeStates.length - 1; i++) {
-                const fromState = cumulativeStates[i];
-                const toState = cumulativeStates[i+1];
-
-                const base_delta = Math.abs(toState.target_base_steps - fromState.target_base_steps);
-                const elbow_delta = Math.abs(toState.target_elbow_steps - fromState.target_elbow_steps);
-                const max_step_delta = Math.max(base_delta, elbow_delta);
-
-                const stepsPerSegment = Math.max(20, Math.ceil(max_step_delta / 100));
-
-                for (let j = 1; j <= stepsPerSegment; j++) {
-                    const progress = j / stepsPerSegment;
-                    const interpolatedState = getInterpolatedState(fromState, toState, progress);
-                    tracePath.push(interpolatedState.p2);
-                }
-            }
-        }
-
-        /**
-         * Forward Kinematics: Calculates arm position from motor steps.
-         */
-        function calculateFK(p0, base_steps, elbow_steps) {
-            const alpha_rad = -base_steps / STEPS_PER_RAD; 
-            const beta_rad = -elbow_steps / STEPS_PER_RAD;  
-            
-            const theta1 = alpha_rad;
-            const theta_bend = beta_rad - (GEAR_RATIO * alpha_rad);
-            const theta2_global = theta1 + theta_bend;
-
-            const p1 = {
-                x: (p0 ? p0.x : 0) + L1 * Math.cos(theta1),
-                y: (p0 ? p0.y : 0) + L1 * Math.sin(theta1)
-            };
-            const p2 = {
-                x: p1.x + L2 * Math.cos(theta2_global),
-                y: p1.y + L2 * Math.sin(theta2_global)
-            };
-
-            return {
-                p0: p0 || {x:0, y:0}, p1, p2,
-                target_base_steps: base_steps,
-                target_elbow_steps: elbow_steps,
-                theta1_rad: theta1,
-                theta_bend_rad: theta_bend,
-                theta2_global_rad: theta2_global
-            };
-        }
-
-
-        /**
-         * Handles user input on the slider.
-         */
-        function handleSliderInput(e) {
-            pause();
-            const newStep = parseInt(e.target.value, 10);
-            drawState(newStep); 
-        }
-        
-        function playFrame() {
-            if (isAutoPlaying) {
-                pause(); 
-            }
-            isLooping = false;
-            
-            if (currentStep < cumulativeStates.length - 1) {
-                currentStep++;
-                drawState(currentStep);
-            }
-        }
-        
-        /**
-         * Jumps to a specific step, cancels animation, and draws the final state.
-         */
-        function drawState(index) {
-            cancelAnimation(); 
-            currentStep = index;
-            const state = cumulativeStates[index];
-            if (!state) return;
-
-            clearCanvas();
-            drawGrid();
-            drawTrace();
-            drawArm(state.p0, state.p1, state.p2);
-            
-            updateUIForStep(index);
-        }
-
-        /**
-         * Updates all UI elements (slider, info box, highlight) for a given step index.
-         */
-        function updateUIForStep(index) {
-            const state = cumulativeStates[index];
-            if (!state) return;
-            
-            commandSlider.value = index;
-            stepDisplay.textContent = `Step: ${index} / ${cumulativeStates.length - 1}`;
-        }
-
-        /**
-         * Clears the canvas.
-         */
         function clearCanvas() {
             ctx.save();
             ctx.resetTransform();
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.restore(); 
+            ctx.restore();
         }
 
-        /**
-         * Draws a grid and axes.
-         */
         function drawGrid() {
-            const maxRange = L1 + L2;
-            const lineWidth = 1 / worldScale; 
+            const max = L1 + L2;
+            const lw = 1 / worldScale;
+            
+            ctx.strokeStyle = document.body.getAttribute('data-theme') === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+            ctx.lineWidth = lw;
+            
+            ctx.beginPath(); ctx.arc(0,0,L1,0,2*Math.PI); ctx.stroke();
+            ctx.beginPath(); ctx.arc(0,0,max,0,2*Math.PI); ctx.stroke();
             
             ctx.beginPath();
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-            ctx.lineWidth = lineWidth;
-            ctx.arc(0, 0, L1, 0, 2 * Math.PI);
-            ctx.stroke();
-            
-            ctx.beginPath();
-            ctx.arc(0, 0, maxRange, 0, 2 * Math.PI);
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-            ctx.lineWidth = lineWidth;
-            ctx.moveTo(-maxRange * 1.1, 0);
-            ctx.lineTo(maxRange * 1.1, 0);
-            ctx.moveTo(0, -maxRange * 1.1);
-            ctx.lineTo(0, maxRange * 1.1);
+            ctx.moveTo(-max*1.1, 0); ctx.lineTo(max*1.1, 0);
+            ctx.moveTo(0, -max*1.1); ctx.lineTo(0, max*1.1);
             ctx.stroke();
         }
 
-        /**
-         * Draws the trace from the pre-calculated tracePath.
-         */
         function drawTrace() {
-            if (tracePath.length < 2) return;
-
-            const traceWidth = 2 / worldScale;
-            
+            if(tracePath.length < 2) return;
             ctx.beginPath();
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)'; 
-            ctx.lineWidth = traceWidth;
-            
+            ctx.strokeStyle = document.body.getAttribute('data-theme') === 'dark' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.3)';
+            ctx.lineWidth = 2 / worldScale;
             ctx.moveTo(tracePath[0].x, tracePath[0].y);
-
-            for (let i = 1; i < tracePath.length; i++) {
-                ctx.lineTo(tracePath[i].x, tracePath[i].y);
-            }
-            
+            for(let i=1; i<tracePath.length; i++) ctx.lineTo(tracePath[i].x, tracePath[i].y);
             ctx.stroke();
         }
 
-        /**
-         * Draws the arm segments and joints.
-         */
         function drawArm(p0, p1, p2) {
-            const armWidth = 6 / worldScale;
-            const jointRadius = 8 / worldScale;
+            const w = 6 / worldScale;
+            const r = 8 / worldScale;
             
-            ctx.beginPath();
-            ctx.moveTo(p0.x, p0.y);
-            ctx.lineTo(p1.x, p1.y);
-            ctx.strokeStyle = '#6366f1';
-            ctx.lineWidth = armWidth;
-            ctx.lineCap = 'round';
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.moveTo(p1.x, p1.y);
-            ctx.lineTo(p2.x, p2.y);
-            ctx.strokeStyle = '#06b6d4';
-            ctx.lineWidth = armWidth;
-            ctx.lineCap = 'round';
-            ctx.stroke();
-
-            ctx.fillStyle = 'white';
-            ctx.beginPath();
-            ctx.arc(p0.x, p0.y, jointRadius, 0, 2 * Math.PI); 
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(p1.x, p1.y, jointRadius, 0, 2 * Math.PI); 
-            ctx.fill();
+            // Limbs
+            ctx.lineWidth = w; ctx.lineCap = 'round';
+            ctx.strokeStyle = '#d2b48c'; // Primary color
+            ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
             
-            ctx.fillStyle = '#f43f5e';
-            ctx.beginPath();
-            ctx.arc(p2.x, p2.y, jointRadius, 0, 2 * Math.PI);
-            ctx.fill();
-        }
-        
-        /**
-         * Factored out interpolation logic to be reusable.
-         */
-        function getInterpolatedState(from, to, progress) {
-            const theta1_rad = lerp(from.theta1_rad, to.theta1_rad, progress);
-            const theta_bend_rad = lerp(from.theta_bend_rad, to.theta_bend_rad, progress);
-            
-            const p0 = from.p0; 
-            const p1 = {
-                x: p0.x + L1 * Math.cos(theta1_rad),
-                y: p0.y + L1 * Math.sin(theta1_rad)
-            };
-            const theta2_global_rad = theta1_rad + theta_bend_rad;
-            const p2 = {
-                x: p1.x + L2 * Math.cos(theta2_global_rad),
-                y: p1.y + L2 * Math.sin(theta2_global_rad)
-            };
+            ctx.strokeStyle = '#b08d5c'; // Secondary color
+            ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
 
-            return { p0, p1, p2 };
+            // Joints
+            ctx.fillStyle = '#fff';
+            ctx.beginPath(); ctx.arc(p0.x, p0.y, r, 0, 2*Math.PI); ctx.fill();
+            ctx.beginPath(); ctx.arc(p1.x, p1.y, r, 0, 2*Math.PI); ctx.fill();
+            
+            ctx.fillStyle = '#d2b48c';
+            ctx.beginPath(); ctx.arc(p2.x, p2.y, r, 0, 2*Math.PI); ctx.fill();
         }
 
-        /**
-         * Draws an interpolated state during animation.
-         */
-        function drawInterpolatedState(from, to, progress) {
-            const state = getInterpolatedState(from, to, progress);
+        function drawState(idx) {
+            cancelAnimation();
+            currentStep = idx;
+            const state = cumulativeStates[idx];
+            if(!state) return;
             
             clearCanvas();
             drawGrid();
             drawTrace();
             drawArm(state.p0, state.p1, state.p2);
+            
+            slider.value = idx;
+            stepDisp.textContent = `Step: ${idx} / ${cumulativeStates.length-1}`;
         }
-        
-        // --- Playback Controls ---
+
+        function drawInterpolatedState(from, to, prog) {
+            const t1 = lerp(from.theta1_rad, to.theta1_rad, prog);
+            const tb = lerp(from.theta_bend_rad, to.theta_bend_rad, prog);
+            
+            const p0 = from.p0;
+            const p1 = { x: p0.x + L1*Math.cos(t1), y: p0.y + L1*Math.sin(t1) };
+            const t2 = t1 + tb;
+            const p2 = { x: p1.x + L2*Math.cos(t2), y: p1.y + L2*Math.sin(t2) };
+            
+            clearCanvas();
+            drawGrid();
+            drawTrace();
+            drawArm(p0, p1, p2);
+        }
+
+        // --- KINEMATICS & CONVERTER ---
+
+        function getShortestRotation(raw, last) {
+            let diff = (raw - last) / (2*Math.PI);
+            let offset = Math.round(diff);
+            return raw - (offset * 2 * Math.PI);
+        }
+
+        function calculateIK(x, y, lastBase=0, lastElbow=0) {
+            let D = Math.hypot(x, y);
+            const maxR = L1 + L2;
+            let cx = x, cy = y;
+            
+            if(D > maxR) { cx = x*maxR/D; cy = y*maxR/D; D = maxR; }
+            
+            const lastT1 = -lastBase / STEPS_PER_RAD;
+            const lastBend = (-lastElbow / STEPS_PER_RAD) - (GEAR_RATIO * lastT1);
+
+            let finalT1, finalBend;
+
+            if (D < 0.1) {
+                finalBend = lastBend > 0 ? Math.PI : -Math.PI;
+                let rawT1 = (D < 1e-6) ? lastT1 : Math.atan2(y,x);
+                finalT1 = getShortestRotation(rawT1, lastT1);
+                cx=0; cy=0;
+            } else {
+                let cosBend = (D*D - L1*L1 - L2*L2) / (2*L1*L2);
+                cosBend = Math.max(-1, Math.min(1, cosBend));
+                
+                // Sol 1
+                const bend1 = -Math.acos(cosBend);
+                const k1_1 = L1 + L2 * Math.cos(bend1);
+                const k2_1 = L2 * Math.sin(bend1);
+                const rawT1_1 = Math.atan2(cy, cx) - Math.atan2(k2_1, k1_1);
+                const t1_1 = getShortestRotation(rawT1_1, lastT1);
+                
+                // Sol 2
+                const bend2 = Math.acos(cosBend);
+                const k1_2 = L1 + L2 * Math.cos(bend2);
+                const k2_2 = L2 * Math.sin(bend2);
+                const rawT1_2 = Math.atan2(cy, cx) - Math.atan2(k2_2, k1_2);
+                const t1_2 = getShortestRotation(rawT1_2, lastT1);
+
+                // Steps
+                const b1 = -t1_1 * STEPS_PER_RAD;
+                const e1 = -(bend1 + GEAR_RATIO*t1_1) * STEPS_PER_RAD;
+                const b2 = -t1_2 * STEPS_PER_RAD;
+                const e2 = -(bend2 + GEAR_RATIO*t1_2) * STEPS_PER_RAD;
+
+                const cost1 = Math.abs(b1-lastBase) + Math.abs(e1-lastElbow);
+                const cost2 = Math.abs(b2-lastBase) + Math.abs(e2-lastElbow);
+
+                if(cost1 <= cost2) { finalT1=t1_1; finalBend=bend1; }
+                else { finalT1=t1_2; finalBend=bend2; }
+            }
+
+            const alpha = finalT1;
+            const beta = finalBend + (GEAR_RATIO * alpha);
+            return { 
+                base_steps: -alpha * STEPS_PER_RAD,
+                elbow_steps: -beta * STEPS_PER_RAD,
+                clamped_x: cx, clamped_y: cy
+            };
+        }
+
+        function calculateFK(p0, b, e) {
+            const a = -b / STEPS_PER_RAD;
+            const beta = -e / STEPS_PER_RAD;
+            const t1 = a;
+            const tb = beta - (GEAR_RATIO * a);
+            const t2 = t1 + tb;
+            
+            const p1 = { x: p0.x + L1*Math.cos(t1), y: p0.y + L1*Math.sin(t1) };
+            const p2 = { x: p1.x + L2*Math.cos(t2), y: p1.y + L2*Math.sin(t2) };
+            
+            return { p0, p1, p2, target_base_steps: b, target_elbow_steps: e, theta1_rad: t1, theta_bend_rad: tb };
+        }
+
+        function convertGCode() {
+            const text = document.getElementById('gcodeConverterInput').value;
+            const lines = text.split('\n');
+            const format = document.querySelector('input[name="gcodeFormat"]:checked').value;
+            const res = parseFloat(document.getElementById('linearResolution').value) || 1.0;
+            
+            let coords = [];
+            for(let line of lines) {
+                line = line.trim();
+                if(!line) continue;
+                
+                let x, y;
+                if(format === 'cartesian') {
+                    const m = line.match(/G1\s+X(-?[\d.]+)\s+Y(-?[\d.]+)/i);
+                    if(m) { x = parseFloat(m[1]); y = parseFloat(m[2]); coords.push({x,y}); }
+                } else {
+                    const m = line.match(/G1\s+R(-?[\d.]+)\s+A(-?[\d.]+)/i);
+                    if(m) {
+                         let r = parseFloat(m[1]);
+                         let deg = parseFloat(m[2]);
+                         let rad = deg * (Math.PI/180);
+                         r = Math.abs(r);
+                         coords.push({ x: r*Math.cos(rad), y: r*Math.sin(rad) });
+                    }
+                }
+            }
+
+            if(coords.length === 0) { alert("No valid G-Code found."); return; }
+
+            // Interpolate
+            let interp = [coords[0]];
+            for(let i=0; i<coords.length-1; i++) {
+                const p1 = coords[i], p2 = coords[i+1];
+                const dist = Math.hypot(p2.x-p1.x, p2.y-p1.y);
+                const steps = Math.max(1, Math.ceil(dist/res));
+                for(let j=1; j<=steps; j++) {
+                    let t = j/steps;
+                    interp.push({ x: lerp(p1.x,p2.x,t), y: lerp(p1.y,p2.y,t) });
+                }
+            }
+
+            // Convert IK
+            let genCmds = [];
+            let prevB = 0, prevE = 0;
+            
+            // Setup start pos
+            const start = calculateIK(interp[0].x, interp[0].y, 0, 0);
+            prevB = start.base_steps; prevE = start.elbow_steps;
+
+            const delay = document.getElementById('stepDelayInput').value;
+
+            for(let i=1; i<interp.length; i++) {
+                const ik = calculateIK(interp[i].x, interp[i].y, prevB, prevE);
+                const rb = Math.round(ik.base_steps - prevB);
+                const re = Math.round(ik.elbow_steps - prevE);
+                
+                if(rb!==0 || re!==0) genCmds.push({elbow:re, base:rb, delay:delay});
+                
+                prevB = ik.base_steps; prevE = ik.elbow_steps;
+            }
+
+            // Smooth
+            const sens = parseFloat(document.getElementById('smoothingSensitivity').value);
+            let smoothed = genCmds;
+            let lastLen = -1;
+            
+            while(smoothed.length !== lastLen) {
+                lastLen = smoothed.length;
+                smoothed = smoothCommands(smoothed, sens);
+            }
+
+            // Output
+            document.getElementById('commandsInput').value = smoothed.map(c => `G1 ${c.elbow} ${c.base} ${c.delay}`).join('\n');
+            loadCommands();
+        }
+
+        function smoothCommands(cmds, sensitivity) {
+            if(cmds.length === 0) return [];
+            const out = [];
+            let curr = {...cmds[0]};
+
+            for(let i=1; i<cmds.length; i++) {
+                const next = cmds[i];
+                let combine = false;
+
+                if(curr.delay == next.delay) {
+                     // Check signs match
+                     const sB1 = Math.sign(curr.base), sB2 = Math.sign(next.base);
+                     const sE1 = Math.sign(curr.elbow), sE2 = Math.sign(next.elbow);
+                     
+                     if(curr.base === 0 && next.base === 0 && sE1 === sE2) combine = true;
+                     else if(curr.elbow === 0 && next.elbow === 0 && sB1 === sB2) combine = true;
+                     else if(curr.base !== 0 && next.base !== 0 && curr.elbow !== 0 && next.elbow !== 0) {
+                         const r1 = curr.elbow/curr.base; 
+                         const r2 = next.elbow/next.base;
+                         if(Math.abs(r1-r2) < sensitivity && sB1===sB2) combine = true;
+                     }
+                }
+
+                if(combine) {
+                    curr.elbow += next.elbow;
+                    curr.base += next.base;
+                } else {
+                    out.push(curr);
+                    curr = {...next};
+                }
+            }
+            out.push(curr);
+            return out;
+        }
+
+        // --- SIMULATION LOAD ---
+        function loadCommands() {
+            pause();
+            const text = document.getElementById('commandsInput').value;
+            commands = text.split('\n').filter(l=>l.trim().startsWith('G1')).map(l => {
+                const p = l.trim().substring(2).trim().split(/\s+/).map(Number);
+                return { elbow: p[0]||0, base: p[1]||0, step_delay_us: p[2]||1000 };
+            });
+
+            cumulativeStates = [];
+            const p0 = {x:0, y:0};
+            cumulativeStates.push(calculateFK(p0, 0, 0));
+            
+            let tb=0, te=0;
+            for(let c of commands) {
+                tb += c.base; te += c.elbow;
+                const s = calculateFK(p0, tb, te);
+                s.command = c;
+                cumulativeStates.push(s);
+            }
+
+            tracePath = [];
+            if(cumulativeStates.length > 1) {
+                tracePath.push(cumulativeStates[0].p2);
+                for(let i=0; i<cumulativeStates.length-1; i++) {
+                    const from = cumulativeStates[i], to = cumulativeStates[i+1];
+                    const max = Math.max(Math.abs(to.target_base_steps-from.target_base_steps), Math.abs(to.target_elbow_steps-from.target_elbow_steps));
+                    const segs = Math.max(20, Math.ceil(max/100));
+                    for(let j=1; j<=segs; j++) {
+                        const t = j/segs;
+                        const t1 = lerp(from.theta1_rad, to.theta1_rad, t);
+                        const tb = lerp(from.theta_bend_rad, to.theta_bend_rad, t);
+                        const t2 = t1 + tb;
+                        const p1 = { x: L1*Math.cos(t1), y: L1*Math.sin(t1) };
+                        tracePath.push({ x: p1.x + L2*Math.cos(t2), y: p1.y + L2*Math.sin(t2) });
+                    }
+                }
+            }
+
+            slider.max = cumulativeStates.length - 1;
+            slider.value = 0;
+            slider.disabled = cumulativeStates.length <= 1;
+            drawState(0);
+        }
+
+        function playFrame() {
+            if(isAutoPlaying) pause();
+            isLooping = false;
+            if(currentStep < cumulativeStates.length-1) {
+                currentStep++;
+                drawState(currentStep);
+            }
+        }
 
         function playFullAnimation() {
-            if (isAutoPlaying) return;
-            
-            if (currentStep >= cumulativeStates.length - 1) {
+            if(isAutoPlaying) return;
+            if(currentStep >= cumulativeStates.length-1) {
                 currentStep = 0;
                 drawState(0);
             }
-            
             isAutoPlaying = true;
-            playNextCommand();
+            playNext();
         }
-        
-        function cancelAnimation() {
-            if (animationFrameId) {
-                cancelAnimationFrame(animationFrameId);
-                animationFrameId = null;
-            }
-        }
-        
+
         function pause() {
-            isAutoPlaying = false;
-            isLooping = false; 
+            isAutoPlaying = false; isLooping = false;
             cancelAnimation();
         }
-        
-        function playLoop() {
-            if (isAutoPlaying) {
-                pause(); 
-            }
-            isLooping = true;
-            currentStep = 0; 
-            drawState(0);
-            playFullAnimation();
+
+        function cancelAnimation() {
+            if(animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId=null; }
         }
 
-        /**
-         * Kicks off the animation to the next step.
-         */
-        function playNextCommand() {
-            if (!isAutoPlaying) {
-                return; 
-            }
-            
-            if (currentStep >= cumulativeStates.length - 1) {
-                if (isLooping) {
-                    currentStep = 0; 
-                    drawState(0); 
-                    
-                    setTimeout(playFullAnimation, 50);
-                    return;
-                } else {
-                    isAutoPlaying = false; 
-                    return;
-                }
-            }
-            
-            animationFromState = cumulativeStates[currentStep];
-            animationToState = cumulativeStates[currentStep + 1];
-            animationStartTime = performance.now();
-            
-            currentStep++;
-            
-            const currentCommand = animationToState.command;
-            
-            const { elbow, base, step_delay_us } = currentCommand;
-            const max_steps = Math.max(Math.abs(elbow), Math.abs(base));
-            
-            let duration_ms = (max_steps * step_delay_us) / 1000.0;
-            if (duration_ms === 0) duration_ms = 1; 
-            
-            commandSlider.value = currentStep;
-            stepDisplay.textContent = `Step: ${currentStep} / ${cumulativeStates.length - 1}`;
-            
-            animationFrameId = requestAnimationFrame((t) => animateStep(t, duration_ms));
-        }
-
-        /**
-         * The main animation loop, driven by requestAnimationFrame.
-         */
-        function animateStep(timestamp, duration_ms) {
-            const elapsed = timestamp - animationStartTime;
-            let progress = elapsed / duration_ms;
-
-            if (progress >= 1) {
-                progress = 1;
-                drawState(currentStep); 
-                
-                if (isAutoPlaying) {
-                    playNextCommand(); 
-                }
-            } else {
-                drawInterpolatedState(animationFromState, animationToState, progress);
-                animationFrameId = requestAnimationFrame((t) => animateStep(t, duration_ms));
-            }
-        }
-
-        // --- Utilities ---
-        function debounce(func, wait) {
-            let timeout;
-            return function executedFunction(...args) {
-                const later = () => {
-                    clearTimeout(timeout);
-                    func(...args);
-                };
-                clearTimeout(timeout);
-                timeout = setTimeout(later, wait);
-            };
-        }
-
-        /**
-         * Custom modal for alerts.
-         */
-        function showModal(message) {
-            let modal = document.getElementById('alert-modal');
-            if (modal) {
-                modal.querySelector('p').textContent = message;
-                modal.style.display = 'flex';
+        function playNext() {
+            if(!isAutoPlaying) return;
+            if(currentStep >= cumulativeStates.length-1) {
+                if(isLooping) { currentStep=0; drawState(0); setTimeout(playFullAnimation, 50); }
+                else isAutoPlaying = false;
                 return;
             }
 
-            modal = document.createElement('div');
-            modal.id = 'alert-modal';
-            modal.className = 'fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50';
+            animationFromState = cumulativeStates[currentStep];
+            animationToState = cumulativeStates[currentStep+1];
+            animationStartTime = performance.now();
+            currentStep++;
+
+            const c = animationToState.command;
+            const steps = Math.max(Math.abs(c.elbow), Math.abs(c.base));
+            let dur = (steps * c.step_delay_us) / 1000.0;
+            if(dur===0) dur=1;
+
+            slider.value = currentStep;
+            stepDisp.textContent = `Step: ${currentStep} / ${cumulativeStates.length-1}`;
             
-            const modalContent = document.createElement('div');
-            modalContent.className = 'bg-gray-800 p-6 rounded-lg shadow-xl text-gray-200 max-w-sm w-full mx-4';
-            
-            const modalTitle = document.createElement('h3');
-            modalTitle.className = 'text-lg font-medium text-white mb-2';
-            modalTitle.textContent = 'Conversion Notice';
-            
-            const modalText = document.createElement('p');
-            modalText.className = 'text-sm mb-4';
-            modalText.textContent = message;
-            
-            const closeButton = document.createElement('button');
-            closeButton.className = 'w-full text-white font-semibold py-2 px-4 rounded-lg transition duration-200';
-            closeButton.textContent = 'OK';
-            
-            closeButton.onclick = () => {
-                modal.style.display = 'none';
-            };
-            
-            modalContent.appendChild(modalTitle);
-            modalContent.appendChild(modalText);
-            modalContent.appendChild(closeButton);
-            modal.appendChild(modalContent);
-            
-            document.body.appendChild(modal);
+            animationFrameId = requestAnimationFrame(t => animate(t, dur));
         }
 
+        function animate(time, dur) {
+            const elapsed = time - animationStartTime;
+            let p = elapsed / dur;
+            if(p >= 1) {
+                drawState(currentStep);
+                if(isAutoPlaying) playNext();
+            } else {
+                drawInterpolatedState(animationFromState, animationToState, p);
+                animationFrameId = requestAnimationFrame(t => animate(t, dur));
+            }
+        }
 
-        // --- Start the App ---
+        // --- SIDEBAR ---
+        function openNav() {
+            document.getElementById("mySidebar").style.width = "200px";
+            if(window.innerWidth>900) document.querySelector(".main-content").style.marginLeft = "200px";
+        }
+        function closeNav() {
+            document.getElementById("mySidebar").style.width = "0";
+            document.querySelector(".main-content").style.marginLeft = "0";
+        }
+        function toggleDarkMode() {
+            const b = document.body;
+            const n = b.getAttribute('data-theme')==='dark'?'light':'dark';
+            b.setAttribute('data-theme', n); localStorage.setItem('theme', n);
+            document.getElementById('themeIcon').textContent = n==='dark'?'🌙':'☀️';
+            drawState(currentStep); // Redraw canvas colors
+        }
+
         init();
-    });
-</script>
+    </script>
 </body>
 </html>
