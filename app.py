@@ -122,7 +122,7 @@ class GCodeRunner(threading.Thread):
         while self.is_running and self.line_index < num_commands:
             
             # Wait up to 10 seconds for the 'Done' signal
-            if self.handshake_event.wait(timeout=10):
+            if self.handshake_event.wait(timeout=3600):
                 self.handshake_event.clear() # Clear the signal for the next command
                 
                 # Send the next command
