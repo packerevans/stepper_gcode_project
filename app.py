@@ -207,7 +207,63 @@ def reboot():
     except Exception as e:
         log_message(f"Reboot error: {e}")
         return jsonify(success=False, message=f"Reboot command failed: {e}"), 500
+
+@app.route("/update_firmware", methods=["POST"])
+def update_firmware():
+    """
+    Disconnects Serial, Compiles & Uploads Arduino Code, Reconnects Serial.
+    """
+    global arduino, arduino_connected
     
+    log_message("FIRMWARE UPDATE STARTED...")
+    
+    # 1. Disconnect Serial to free the port
+    if arduino and arduino.is_open:
+        arduino.close()
+    arduino_connected = False
+    log_message("Serial port disconnected for upload.")
+
+    try:
+        # 2. Run Compile Command
+        log_message("Compiling firmware...")
+        # Note: using --clean to ensure a fresh build
+        compile_cmd = [
+            "/usr/local/bin/arduino-cli", "compile", # Path might need adjustment if not in /usr/local/bin
+            "--fqbn", "arduino:avr:uno",
+            "/home/pacpi/Desktop/stepper_gcode_project/Sand"
+        ]
+        # Check if arduino-cli is just in 'bin' or global path.
+        # If 'arduino-cli' works in terminal, just use "arduino-cli" below:
+        subprocess.run(["arduino-cli", "compile", "--fqbn", "arduino:avr:uno", "/home/pacpi/Desktop/stepper_gcode_project/Sand"], check=True, capture_output=True, text=True)
+
+        # 3. Run Upload Command
+        log_message("Uploading firmware...")
+        subprocess.run(["arduino-cli", "upload", "-p", "/dev/ttyACM0", "--fqbn", "arduino:avr:uno", "/home/pacpi/Desktop/stepper_gcode_project/Sand"], check=True, capture_output=True, text=True)
+        
+        log_message("Firmware updated successfully!")
+        success_msg = "Firmware updated."
+
+    except subprocess.CalledProcessError as e:
+        log_message(f"UPDATE FAILED: {e.stderr}")
+        success_msg = f"Update Failed: {e.stderr[:50]}..."
+        # Don't return yet, we need to reconnect!
+    except Exception as e:
+        log_message(f"UPDATE ERROR: {str(e)}")
+        success_msg = f"Error: {str(e)}"
+
+    # 4. Reconnect Serial
+    try:
+        log_message("Reconnecting serial...")
+        time.sleep(2) # Wait for Arduino to reboot
+        arduino = serial.Serial('/dev/ttyACM0', 9600, timeout=0.1)
+        arduino_connected = True
+        # Restart reader thread
+        threading.Thread(target=read_from_serial, daemon=True).start()
+        log_message("Serial reconnected.")
+    except Exception as e:
+        log_message(f"FAILED TO RECONNECT SERIAL: {e}")
+    
+    return jsonify(success=True, message=success_msg)
 # ---------------- APP ROUTES ----------------
     
 @app.route("/")
