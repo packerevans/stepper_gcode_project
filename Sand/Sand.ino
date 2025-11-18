@@ -159,7 +159,7 @@ void executeNextCommand() {
   Serial.println("Done");
 }
 
-// -------------------- MOVE BOTH MOTORS --------------------
+// -------------------- MOVE BOTH MOTORS (UPDATED) --------------------
 void moveBothMotors(long armSteps, long baseSteps, int delayUs) {
   // Enable motors
   digitalWrite(enPin, LOW);
@@ -179,13 +179,24 @@ void moveBothMotors(long armSteps, long baseSteps, int delayUs) {
   float baseProgress = 0;
 
   for (long i = 0; i < maxSteps; i++) {
-    handleSerial(); // allow mid-move PAUSE commands
+    handleSerial(); // Check for pause commands
 
-    if (paused) {
-      digitalWrite(enPin, HIGH);
+    // --- CHANGED LOGIC START ---
+    // Instead of 'return' (which skips the rest of the line), 
+    // we loop here forever until unpaused.
+    while (paused) {
+      digitalWrite(enPin, HIGH); // Disable motors to keep cool
       Serial.println("Movement paused mid-execution.");
-      return;
+      delay(500); // Small delay to stop serial flooding
+      handleSerial(); // Keep checking for RESUME
+      
+      // If we resumed, re-enable motors and break this while loop
+      if (!paused) {
+         digitalWrite(enPin, LOW);
+         Serial.println("Resuming movement...");
+      }
     }
+    // --- CHANGED LOGIC END ---
 
     armProgress += armRatio;
     baseProgress += baseRatio;
