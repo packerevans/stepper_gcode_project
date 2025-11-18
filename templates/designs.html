@@ -61,20 +61,16 @@
     }
 
     /* --- Button Positions FIX --- */
-    /* Ensure .openbtn (Menu) stays small and fixed in the corner */
     .openbtn {
         font-size: 26px; cursor: pointer; background-color: var(--color-primary);
         color: var(--color-text); padding: 10px 18px; border: none;
         border-radius: 6px; position: fixed;
         top: 15px; left: 15px; z-index: 1100; box-shadow: 0 2px 5px var(--color-shadow);
         transition: background-color 0.2s, box-shadow 0.2s;
-        /* CRITICAL: Ensure width/height are set to auto */
         width: auto; 
         height: auto;
     }
 
-    /* --- Theme Toggle Button FIX --- */
-    /* Ensure #themeToggle stays small and fixed in the corner */
     #themeToggle {
         position: fixed; 
         top: 15px; 
@@ -87,7 +83,6 @@
         z-index: 1200;
         transition: background 0.3s, color 0.3s, border-color 0.3s;
         font-size: 14px; 
-        /* CRITICAL: Ensure width/height are set to auto */
         width: auto; 
         height: auto;
     }
@@ -96,7 +91,6 @@
         margin-left: 0; transition: margin-left 0.3s; padding: 20px;
         max-width: 1200px; 
         margin: 0 auto;
-        /* Add top margin to prevent content from hiding behind fixed buttons */
         padding-top: 60px; 
     }
 
@@ -135,29 +129,17 @@
         text-align: center;
         font-weight: 600;
         transition: opacity 0.3s, background-color 0.3s, color 0.3s;
-        opacity: 0; /* Hidden by default */
+        opacity: 0;
         min-height: 40px; 
         line-height: 1.5;
     }
-    .status-success {
-        background-color: #d4edda;
-        color: #155724;
-    }
-    .status-error {
-        background-color: #f8d7da;
-        color: #721c24;
-    }
-    body[data-theme='dark'] .status-success {
-        background-color: #14521f;
-        color: #d4edda;
-    }
-    body[data-theme='dark'] .status-error {
-        background-color: #630c17;
-        color: #f8d7da;
-    }
+    .status-success { background-color: #d4edda; color: #155724; }
+    .status-error { background-color: #f8d7da; color: #721c24; }
+    body[data-theme='dark'] .status-success { background-color: #14521f; color: #d4edda; }
+    body[data-theme='dark'] .status-error { background-color: #630c17; color: #f8d7da; }
 
 
-    /* --- NEW: Design Grid Styles --- */
+    /* --- Design Grid Styles --- */
     .design-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -172,6 +154,11 @@
         display: flex;
         flex-direction: column;
         transition: box-shadow 0.2s;
+    }
+
+    /* Helper class for background loading */
+    .design-card.hidden-card {
+        display: none;
     }
 
     .design-card:hover {
@@ -202,14 +189,14 @@
         text-overflow: ellipsis;
     }
 
-    /* --- Button Style --- */
+    /* --- Buttons --- */
     button {
         background-color: var(--color-primary);    
         color: var(--color-text);
         border: none; padding: 12px 25px; border-radius: 8px; font-size: 16px;
         cursor: pointer; transition: background-color 0.2s, box-shadow 0.2s;
         font-weight: 600;
-        width: 100%; /* Default width for card buttons */
+        width: 100%; 
         margin-top: auto; 
     }
 
@@ -219,8 +206,23 @@
     }
     
     .action-buttons button {
-         width: auto; /* Override to allow inline buttons */
+         width: auto; 
          flex-grow: 1;
+    }
+
+    /* --- Show More Container --- */
+    #show-more-container {
+        text-align: center;
+        margin-top: 40px;
+        margin-bottom: 40px;
+    }
+    
+    #btn-show-more {
+        width: auto;
+        min-width: 200px;
+        padding: 15px 40px;
+        font-size: 1.1rem;
+        display: none; /* Hidden by default until background loads */
     }
     
     /* --- Mobile Responsiveness --- */
@@ -247,50 +249,37 @@
         .action-buttons {
             flex-direction: column;
         }
-        /* Ensure fixed buttons are positioned relative to the viewport on mobile */
         .openbtn, #themeToggle {
             top: 10px;
             width: auto;
             height: auto;
         }
-        .openbtn {
-            left: 10px;
-            right: auto;
-        }
-        #themeToggle {
-            right: 10px;
-            left: auto;
-        }
+        .openbtn { left: 10px; right: auto; }
+        #themeToggle { right: 10px; left: auto; }
     }
 </style>
     
 </head>
 <body data-theme="light">
-    <!-- Sidebar -->
     <div id="mySidebar" class="sidebar">
         <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
-        <!-- UPDATED: Links swapped as Designs is now / -->
         <a href="/">Designs</a> 
         <a href="/controls">Controls</a>
         <a href="/led_controls">Led Controls</a>
         <a href="/terminal">Terminal</a>
     </div>
 
-    <!-- Header Buttons -->
     <button class="openbtn" onclick="openNav()">☰</button>
     <button id="themeToggle" onclick="toggleDarkMode()">
         <span id="themeIcon">☀️</span>
     </button>
 
-    <!-- Main Content -->
     <div class="main-content">
         <img src="/static/sand.png" alt="Sand Table Header" class="header-image">
         <h1>Design Library</h1>
         
-        <!-- NEW: Status Banner -->
         <div id="status-banner"></div>
 
-        <!-- NEW: Control Panel -->
         <div class="control-panel">
             <h2>Queue Management</h2>
             <div class="action-buttons">
@@ -300,22 +289,24 @@
             </div>
         </div>
 
-        <!-- Design Grid -->
         <div id="designGridContainer" class="design-grid">
             <div id="loading-indicator">Loading designs...</div>
             <div id="error-message" class="card" style="display:none; text-align:center;">
                 No designs found. Check the 'templates/designs' folder.
             </div>
         </div>
+
+        <div id="show-more-container">
+            <button id="btn-show-more" onclick="revealHiddenDesigns()">Show All Designs</button>
+        </div>
     </div>
 
 <script>
     // --- Configuration ---
-    // Get the base URL dynamically to handle various deployment environments (like ngrok/blob)
     const BASE_URL = `${window.location.protocol}//${window.location.host}`;
 
     // ######################################################################
-    // ##  START: KINEMATIC SIMULATOR LOGIC (Used for generating previews)
+    // ##  START: KINEMATIC SIMULATOR LOGIC 
     // ######################################################################
 
     const L1 = 101.3; 
@@ -455,7 +446,6 @@
             const p = tracePath[i];
             
             const canvasX = canvasCenterX + (p.x - drawCenterX) * scale;
-            // Invert Y axis for drawing
             const canvasY = canvasCenterY + (p.y - drawCenterY) * -scale; 
 
             if (i === 0) {
@@ -479,13 +469,10 @@
     const statusBanner = document.getElementById('status-banner');
 
     // --- Utility Functions ---
-
     function showStatus(message, isSuccess = true) {
         statusBanner.textContent = message;
         statusBanner.className = isSuccess ? 'status-success' : 'status-error';
         statusBanner.style.opacity = '1';
-
-        // Auto-hide after 5 seconds
         setTimeout(() => {
             statusBanner.style.opacity = '0';
         }, 5000);
@@ -511,34 +498,36 @@
     }
 
     // --- Queue Management Buttons ---
-    function clearQueue() {
-        sendCommand('CLEAR', 'Command queue cleared.');
-    }
+    function clearQueue() { sendCommand('CLEAR', 'Command queue cleared.'); }
+    function pauseDesign() { sendCommand('PAUSE', 'Sand table paused.'); }
+    function resumeDesign() { sendCommand('RESUME', 'Sand table resumed.'); }
 
-    function pauseDesign() {
-        sendCommand('PAUSE', 'Sand table paused.');
-    }
-
-    function resumeDesign() {
-        sendCommand('RESUME', 'Sand table resumed.');
+    // --- RECENT FILES LOGIC (LocalStorage) ---
+    function markAsRecent(filename) {
+        let recents = JSON.parse(localStorage.getItem('recentDesigns') || '[]');
+        // Remove if exists to avoid duplicates
+        recents = recents.filter(f => f !== filename);
+        // Add to top
+        recents.unshift(filename);
+        // Keep only last 20
+        if (recents.length > 20) recents = recents.slice(0, 20);
+        localStorage.setItem('recentDesigns', JSON.stringify(recents));
     }
 
     // --- Design Execution ---
     async function runDesign(filename) {
+        markAsRecent(filename); // Save preference
+
         const baseName = filename.replace('.txt', '');
         const txtPath = `${BASE_URL}/designs/${baseName}.txt`;
         
         showStatus(`Fetching commands for ${filename}...`, true);
 
         try {
-            // 1. Fetch the G-code content
             const response = await fetch(txtPath);
-            if (!response.ok) {
-                throw new Error(`Failed to fetch file. Status: ${response.status}`);
-            }
+            if (!response.ok) throw new Error(`Failed to fetch file. Status: ${response.status}`);
             const gcode = await response.text();
 
-            // 2. Send the entire block to the server's handshaking endpoint
             const sendResponse = await fetch(`${BASE_URL}/send_gcode_block`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -548,9 +537,9 @@
             const sendData = await sendResponse.json();
             
             if (sendData.success) {
-                showStatus(`Successfully started design: ${filename}. (Handshaking enabled)`, true);
+                showStatus(`Started design: ${filename}`, true);
             } else {
-                showStatus(`Failed to start job: ${sendData.error || 'Unknown server error.'}`, false);
+                showStatus(`Failed to start job: ${sendData.error}`, false);
             }
 
         } catch (error) {
@@ -558,99 +547,102 @@
         }
     }
 
-    /**
-     * Tries to load a .png preview. If it fails, generates one from .txt.
-     */
+    // --- Preview Loader ---
     function loadPreview(filename) {
         const canvas = document.getElementById(`canvas-${filename}`);
         if (!canvas) return;
         
         const ctx = canvas.getContext('2d');
         const baseName = filename.replace('.txt', '');
-        
-        // Use the absolute paths
         const pngPath = `${BASE_URL}/designs/${baseName}.png`; 
         const txtPath = `${BASE_URL}/designs/${baseName}.txt`; 
 
-        // Draw white background initially
         ctx.fillStyle = 'white';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
-        // 1. Try to load the .png first
         const img = new Image();
         img.src = pngPath;
 
         img.onload = () => {
-            // SUCCESS: Draw the loaded image onto the canvas
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         };
 
         img.onerror = () => {
-            // FAILURE: Generate from .txt file
             fetch(txtPath)
                 .then(response => {
-                    if (!response.ok) {
-                        // If we can't get the file, log and draw a generic error
-                        throw new Error(`File not found: ${txtPath}`);
-                    }
+                    if (!response.ok) throw new Error(`File not found`);
                     return response.text();
                 })
                 .then(commandText => {
-                    // Generate and render the trace
                     const tracePath = generateTracePathFromText(commandText);
                     drawTraceOnCanvas(canvas, tracePath);
                 })
                 .catch(err => {
                     console.error(`Failed to generate preview for ${filename}:`, err);
-                    // Draw an error message on the canvas
                     ctx.fillStyle = 'white';
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
                     ctx.fillStyle = 'red';
                     ctx.font = '16px sans-serif';
                     ctx.textAlign = 'center';
-                    ctx.fillText('Error', canvas.width / 2, canvas.height / 2 - 10);
-                    ctx.fillText('File Missing', canvas.width / 2, canvas.height / 2 + 10);
+                    ctx.fillText('Preview Error', canvas.width / 2, canvas.height / 2);
                 });
         };
     }
     
-    /**
-     * Main function to fetch the list of designs from the server.
-     */
     async function fetchDesignList() {
-        // Fetch the list from the new API endpoint
         const response = await fetch(`${BASE_URL}/api/designs`);
-        
-        if (!response.ok) {
-            throw new Error(`Server status: ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`Server status: ${response.status}`);
         return response.json();
     }
 
-    /**
-     * Loads the entire design library grid.
-     */
+    function revealHiddenDesigns() {
+        const hiddenCards = document.querySelectorAll('.design-card.hidden-card');
+        hiddenCards.forEach(card => {
+            card.classList.remove('hidden-card');
+        });
+        document.getElementById('btn-show-more').style.display = 'none';
+    }
+
+    // --- MAIN LOAD LOGIC (OPTIMIZED) ---
     async function loadDesignLibrary() {
         const gridContainer = document.getElementById('designGridContainer');
         const loadingIndicator = document.getElementById('loading-indicator');
         const errorMessage = document.getElementById('error-message');
+        const showMoreBtn = document.getElementById('btn-show-more');
         
         loadingIndicator.style.display = 'block';
         errorMessage.style.display = 'none';
         gridContainer.innerHTML = ''; 
 
         try {
-            const designFiles = await fetchDesignList();
+            let designFiles = await fetchDesignList();
             
             if (designFiles.length === 0) {
                 errorMessage.style.display = 'block';
                 return;
             }
 
-            for (const filename of designFiles) {
+            // --- SORT BY RECENT ---
+            const recents = JSON.parse(localStorage.getItem('recentDesigns') || '[]');
+            designFiles.sort((a, b) => {
+                const idxA = recents.indexOf(a);
+                const idxB = recents.indexOf(b);
+                if (idxA !== -1 && idxB !== -1) return idxA - idxB; // Both recent: maintain order
+                if (idxA !== -1) return -1; // A is recent -> top
+                if (idxB !== -1) return 1;  // B is recent -> top
+                return 0; // Neither recent -> keep server order
+            });
+
+            // --- BATCH RENDERING ---
+            // Phase 1: Render Top 3 Immediately
+            const TOP_COUNT = 3;
+            const firstBatch = designFiles.slice(0, TOP_COUNT);
+            const restFiles = designFiles.slice(TOP_COUNT);
+
+            // Function to create card HTML
+            const createCard = (filename, isHidden) => {
                 const card = document.createElement('div');
-                card.className = 'design-card';
-                
+                card.className = `design-card ${isHidden ? 'hidden-card' : ''}`;
                 const canvasSize = 400; 
                 card.innerHTML = `
                     <canvas id="canvas-${filename}" width="${canvasSize}" height="${canvasSize}"></canvas>
@@ -659,21 +651,48 @@
                         <button onclick="runDesign('${filename}')">Run Design</button>
                     </div>
                 `;
-                gridContainer.appendChild(card);
-                
-                loadPreview(filename);
+                return card;
+            };
+
+            // Render First Batch
+            firstBatch.forEach(file => {
+                gridContainer.appendChild(createCard(file, false));
+                loadPreview(file);
+            });
+
+            // Hide Loading Indicator immediately after first batch
+            loadingIndicator.style.display = 'none';
+
+            // Phase 2: Render Rest in Background (Delayed)
+            if (restFiles.length > 0) {
+                // Show the "Show More" button now, logic will work once they populate
+                showMoreBtn.style.display = 'inline-block';
+                showMoreBtn.innerText = `Show ${restFiles.length} More Designs`;
+
+                // Use setTimeout to unblock the UI thread while the first 3 paint
+                setTimeout(() => {
+                    restFiles.forEach(file => {
+                        const card = createCard(file, true); // Create as hidden
+                        gridContainer.appendChild(card);
+                        // Load preview calculation in background
+                        // We delay this slightly per card to prevent freezing if calculation is heavy
+                        setTimeout(() => loadPreview(file), 0);
+                    });
+                }, 100); 
             }
-            
+
         } catch (error) {
             console.error("Failed to fetch design list:", error);
             errorMessage.style.display = 'block';
-            errorMessage.innerHTML = `<p>Error fetching designs: ${error.message}. Is your server running?</p>`;
+            errorMessage.innerHTML = `<p>Error fetching designs: ${error.message}</p>`;
         } finally {
-             loadingIndicator.style.display = 'none';
+            if (document.getElementById('designGridContainer').children.length === 0) {
+                 loadingIndicator.style.display = 'none';
+            }
         }
     }
     
-    // --- Sidebar Functions (Copied) ---
+    // --- Sidebar Functions ---
     function openNav() {
         document.getElementById("mySidebar").style.width = "200px";
         const main = document.querySelector(".main-content");
@@ -686,7 +705,7 @@
         if (main) main.style.marginLeft = "0";
     }
 
-    // --- Dark Mode Toggle (Copied) ---
+    // --- Dark Mode ---
     function updateThemeIcon(theme) {
         document.getElementById('themeIcon').textContent = theme === 'dark' ? '🌙' : '☀️';
     }
@@ -701,15 +720,12 @@
         updateThemeIcon(newTheme);
     }
 
-
     // --- Initialization ---
     document.addEventListener('DOMContentLoaded', () => {
-        // Load theme from local storage
         const savedTheme = localStorage.getItem('theme') || 'light';
         document.body.setAttribute('data-theme', savedTheme);
         updateThemeIcon(savedTheme);
 
-        // Start loading the design library
         loadDesignLibrary();
     });
 </script>
