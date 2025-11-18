@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify, Response, url_for, send_from_directory
 import serial, threading, time, subprocess
 import os  # <-- Make sure this import is here
+import re
 import asyncio
 import ble_controller # Import the BLE handler
 
@@ -351,6 +352,11 @@ def process_and_send_gcode(gcode_block):
     runner.start()
 
 
+# In app.py
+
+import re # Make sure to import re at the top of your file
+
+# ... [Existing imports and code] ...
 @app.route("/send_gcode_block", methods=["POST"])
 def send_gcode_block_route():
     """
@@ -358,6 +364,8 @@ def send_gcode_block_route():
     """
     data = request.json
     gcode_block = data.get("gcode")
+    # Get speed override (default to None if not provided)
+    speed_override = data.get("speed_override")
 
     if not gcode_block:
         return jsonify(success=False, error="No G-code received."), 400
@@ -365,16 +373,38 @@ def send_gcode_block_route():
     if not arduino_connected:
          return jsonify(success=False, error="Arduino not connected."), 500
 
-    # Check if a job is already running (prevent multiple simultaneous runs)
+    # Check if a job is already running
     global current_gcode_runner
     if current_gcode_runner and current_gcode_runner.is_alive():
         return jsonify(success=False, error="Another design is currently running. Wait for it to finish."), 503
 
+    # --- SPEED OVERRIDE LOGIC ---
+    if speed_override:
+        new_block = []
+        for line in gcode_block.split('\n'):
+            line = line.strip()
+            if line.startswith('G1'):
+                # Find parts: G1, Step1, Step2, [Speed]
+                parts = line.split()
+                if len(parts) >= 3:
+                    # Reconstruct the line: G1 <val1> <val2> <NEW_SPEED>
+                    # We keep parts[0] (G1), parts[1] (Steps1), parts[2] (Steps2)
+                    # And append the override speed
+                    new_line = f"{parts[0]} {parts[1]} {parts[2]} {speed_override}"
+                    new_block.append(new_line)
+                else:
+                    new_block.append(line)
+            else:
+                new_block.append(line)
+        
+        # Replace the original block with the modified one
+        gcode_block = "\n".join(new_block)
+        log_message(f"Speed override applied: {speed_override}µs")
+
     # Start the handshaking runner
     process_and_send_gcode(gcode_block)
 
-    # Return an immediate success message to the browser
-    return jsonify(success=True, message="G-code block received and is being sent (handshaking).")
+    return jsonify(success=True, message="G-code block received and started.")
 
 # --- NEW: ENDPOINT FOR MANUAL STEP-BY-STEP ---
 @app.route("/send_single_gcode_line", methods=["POST"])
