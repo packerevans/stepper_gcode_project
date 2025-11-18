@@ -13,7 +13,7 @@
             --color-primary: #d2b48c; /* Khaki/Tan */
             --color-secondary: #b08d5c; /* Darker Tan */
             --color-background: #f0f0f0; 
-            --color-surface: #ffffff; 
+            --color-surface: #ffffff; /* White for control boxes */
             --color-text: #333333;
             --color-shadow: rgba(0, 0, 0, 0.08);
             --border-radius: 12px;
@@ -21,7 +21,7 @@
 
         body[data-theme='dark'] {
             --color-background: #1e1e1e;
-            --color-surface: #2c2c2c;
+            --color-surface: #2c2c2c; /* Darker surface for dark mode */
             --color-text: #e0e0e0;
             --color-shadow: rgba(255, 255, 255, 0.08);
         }
@@ -80,28 +80,15 @@
             font-weight: 300; color: var(--color-secondary);
         }
 
-        /* --- Control Cards --- */
+        /* --- Control Cards (now all white) --- */
         .control-section {
-            background-color: var(--color-surface); padding: 25px;
+            background-color: var(--color-surface); /* Reverted to white */
+            color: var(--color-text); /* Ensure text is readable */
+            padding: 25px;
             border-radius: var(--border-radius); box-shadow: 0 4px 8px var(--color-shadow);
             margin-bottom: 25px; text-align: center;
         }
-
-        /* --- THE BROWN BOX (Connection) --- */
-        .connection-card {
-            background-color: var(--color-primary) !important;
-            color: #333 !important; /* Force dark text on the khaki background */
-        }
-        /* Force buttons inside brown box to be white so they stand out */
-        .connection-card button {
-            background-color: var(--color-surface);
-            color: var(--color-text); 
-        }
-        .connection-card button:hover {
-            background-color: #fff; /* Brighter white on hover */
-            transform: translateY(-1px);
-        }
-
+        
         /* --- Status Indicators --- */
         .status-row {
             display: flex; justify-content: center; align-items: center;
@@ -187,7 +174,7 @@
 
         <h1>LED Controller</h1>
 
-        <div class="control-section connection-card">
+        <div class="control-section">
             <div class="status-row">
                 <div style="display:flex; align-items:center; gap:8px;">
                     <div class="indicator" id="connIndicator"></div>
@@ -204,16 +191,16 @@
             <h2>Select Color</h2>
             
             <div class="color-wrapper">
-                <input type="color" id="colorPicker" value="#ff0000" oninput="handleColorInput()">
+                <input type="color" id="colorPicker" value="#ffffff" oninput="handleColorInput()">
                 <p style="color: var(--color-text); opacity: 0.7; margin-top:-10px;">Tap circle to change</p>
             </div>
 
             <div style="margin-top: 30px; border-top: 1px solid var(--color-shadow); padding-top: 20px;">
-                <h3>Shared Favorites</h3>
+                <h3>Your Favorite Whites</h3>
                 <div class="favorites-grid" id="favGrid">
                     <div style="padding:10px;">Loading...</div>
                 </div>
-                <button onclick="saveCurrentToFavorite()" style="margin-top:20px;">Save This Color</button>
+                <button onclick="saveCurrentToFavorite()" style="margin-top:20px;">Save This White</button>
             </div>
         </div>
 
@@ -226,6 +213,11 @@
     <script>
         let isConnected = false;
         let debounceTimer;
+
+        // --- CONFIGURATION ---
+        const MAX_FAVS = 3; 
+        // Default white/soft colors
+        const DEFAULT_FAVS = ["#ffffff", "#f0f0f0", "#e0e0e0"]; 
 
         // --- COLOR LOGIC ---
         function hexToRgb(hex) {
@@ -255,41 +247,40 @@
             handleColorInput(); // Trigger send
         }
 
-        // --- API: FAVORITES ---
-        async function loadFavorites() {
-            try {
-                const res = await fetch("/api/favorites");
-                const favs = await res.json();
-                
-                const container = document.getElementById('favGrid');
-                container.innerHTML = '';
-                
-                favs.forEach(color => {
-                    const circle = document.createElement('div');
-                    circle.className = 'fav-circle';
-                    circle.style.backgroundColor = color;
-                    circle.onclick = () => applyFavorite(color);
-                    container.appendChild(circle);
-                });
-            } catch (e) {
-                console.error("Failed to load favorites");
-            }
+        // --- LOCAL FAVORITES SYSTEM ---
+        function loadFavorites() {
+            const container = document.getElementById('favGrid');
+            container.innerHTML = '';
+            
+            // Load from local storage, or use defaults
+            let favs = JSON.parse(localStorage.getItem('ledLocalFavs'));
+            if (!favs || favs.length === 0) favs = [...DEFAULT_FAVS]; // Copy default array
+            
+            favs.forEach(color => {
+                const circle = document.createElement('div');
+                circle.className = 'fav-circle';
+                circle.style.backgroundColor = color;
+                circle.onclick = () => applyFavorite(color);
+                container.appendChild(circle);
+            });
         }
 
-        async function saveCurrentToFavorite() {
-            const color = document.getElementById('colorPicker').value;
-            logToTerminal(`Saving ${color} to global favorites...`);
+        function saveCurrentToFavorite() {
+            const current = document.getElementById('colorPicker').value;
+            let favs = JSON.parse(localStorage.getItem('ledLocalFavs')) || [...DEFAULT_FAVS];
             
-            try {
-                await fetch("/api/favorites", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ color: color })
-                });
-                loadFavorites(); // Reload UI
-            } catch (e) {
-                logToTerminal("Error saving favorite.", "error");
+            // Add to front, remove duplicates
+            if (favs.includes(current)) {
+                favs = favs.filter(c => c !== current); // Remove if exists
             }
+            favs.unshift(current); // Add to beginning
+            
+            // Keep only top MAX_FAVS
+            favs = favs.slice(0, MAX_FAVS);
+            
+            localStorage.setItem('ledLocalFavs', JSON.stringify(favs));
+            loadFavorites(); // Reload UI
+            logToTerminal(`Saved color ${current} to your favorites.`);
         }
 
         // --- COMMUNICATIONS ---
@@ -323,9 +314,7 @@
                  logToTerminal("Connect Bluetooth first!", "error");
                  return;
              }
-             // Just send toggle command, let Python handle logic
              const btn = document.getElementById('powerBtn');
-             // Simple toggle guess
              const isOff = btn.innerText.includes("OFF"); 
              sendCommand(isOff ? "POWER:OFF" : "POWER:ON");
         }
@@ -348,7 +337,7 @@
             
             ind.style.backgroundColor = connected ? "#28a745" : "#dc3545"; // Green/Red
             txt.textContent = connected ? "CONNECTED" : "DISCONNECTED";
-            txt.style.color = connected ? "#fff" : "#333"; // Adjust for brown background
+            txt.style.color = connected ? "#333" : "#333"; // Keep dark text
             btn.textContent = connected ? "Disconnect" : "Connect";
             
             if(connected) logToTerminal("Device Connected.");
