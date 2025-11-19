@@ -3,7 +3,7 @@ import threading
 from bleak import BleakClient, BleakScanner
 from typing import Optional, Callable
 
-# --- Configuration ---
+# --- Configuration (Verified from your Screenshot) ---
 ADDRESS = "BE:67:00:44:05:61"
 WRITE_UUID = "0000fff3-0000-1000-8000-00805f9b34fb"
 
@@ -17,7 +17,7 @@ log_callback: Optional[Callable[[str], None]] = None
 
 def log(msg: str):
     """Sends logs to the standard print AND the web terminal if connected."""
-    print(msg) # Print to server console
+    print(f"[BLE] {msg}") 
     if log_callback:
         log_callback(f"[BLE] {msg}")
 
@@ -61,18 +61,19 @@ async def ensure_connection():
     if is_connected():
         return True
 
-    log(f"Scanning for device {ADDRESS} (Timeout 5s)...")
+    log(f"Scanning for {ADDRESS}...")
     try:
-        device = await BleakScanner.find_device_by_address(ADDRESS, timeout=5.0)
+        # Timeout increased to 10s for better reliability
+        device = await BleakScanner.find_device_by_address(ADDRESS, timeout=10.0)
         
         if not device:
-            log(f"Device {ADDRESS} not found. Is it powered on?")
+            log(f"Device not found. Is it powered on?")
             return False
 
-        log("Device found. Connecting...")
-        client = BleakClient(device, timeout=10.0) 
+        log("Device found! Connecting...")
+        client = BleakClient(device, timeout=15.0) 
         await client.connect()
-        log("Connection Successful!")
+        log("Connected successfully!")
         return True
     except Exception as e:
         log(f"Connection Failed: {e}")
@@ -97,7 +98,7 @@ async def send_raw_command(data: bytearray, name: str):
     global command_lock
     
     if command_lock is None:
-        log("Error: System starting up, please wait.")
+        log("System starting up, please wait...")
         return False
 
     async with command_lock:
@@ -107,7 +108,7 @@ async def send_raw_command(data: bytearray, name: str):
 
         try:
             await client.write_gatt_char(WRITE_UUID, data)
-            log(f"Sent Command: {name}")
+            log(f"Sent: {name}")
             return True
         except Exception as e:
             log(f"Write Failed ({name}): {e}")
@@ -117,7 +118,6 @@ async def send_raw_command(data: bytearray, name: str):
 # --- Public Handlers ---
 
 async def handle_command(cmd: str):
-    log(f"Processing request: {cmd}")
     if cmd == "CONNECT":
         await ensure_connection()
     elif cmd == "DISCONNECT":
@@ -127,7 +127,7 @@ async def handle_command(cmd: str):
 
 async def send_led_command(r: int, g: int, b: int, brightness: int):
     data = create_rgb_command(r, g, b, brightness)
-    await send_raw_command(data, f"RGB({r},{g},{b})")
+    await send_raw_command(data, f"Color RGB({r},{g},{b})")
 
 # --- Background Loop ---
 
