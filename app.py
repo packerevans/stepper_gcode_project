@@ -20,13 +20,14 @@ lock = threading.Lock()
 
 def log_message(msg):
     """Adds a message to the serial log thread-safely."""
-    timestamp = time.strftime("[%H:%M:%S] ") # Shortened time for cleaner UI
+    timestamp = time.strftime("[%H:%M:%S] ")
     with lock:
         serial_log.append(timestamp + msg)
         if len(serial_log) > 200:
             serial_log.pop(0)
 
 # *** NEW: CONNECT BLE LOGS TO FLASK ***
+# This allows Bluetooth messages to appear in your HTML terminal
 ble_controller.set_logger(log_message)
 
 # === SERIAL SETUP ===
@@ -39,7 +40,6 @@ try:
     arduino_connected = True
 except Exception as e:
     print(f"WARNING: Arduino not connected: {e}") 
-    # We still log this so it appears in the terminal
     log_message(f"Arduino Init Failed: {e}")
 
 # Background reader thread
