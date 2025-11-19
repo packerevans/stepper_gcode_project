@@ -8,7 +8,6 @@ import ble_controller
 app = Flask(__name__)
 app.secret_key = 'your_super_secret_key' 
 
-# === NGROK HEADER FIX ===
 @app.after_request
 def apply_ngrok_header(response: Response):
     response.headers["ngrok-skip-browser-warning"] = "true"
@@ -26,8 +25,7 @@ def log_message(msg):
         if len(serial_log) > 200:
             serial_log.pop(0)
 
-# *** NEW: CONNECT BLE LOGS TO FLASK ***
-# This allows Bluetooth messages to appear in your HTML terminal
+# CONNECT BLE LOGS TO FLASK
 ble_controller.set_logger(log_message)
 
 # === SERIAL SETUP ===
@@ -42,7 +40,6 @@ except Exception as e:
     print(f"WARNING: Arduino not connected: {e}") 
     log_message(f"Arduino Init Failed: {e}")
 
-# Background reader thread
 def read_from_serial():
     global current_gcode_runner
     while arduino_connected:
@@ -59,7 +56,6 @@ def read_from_serial():
             log_message(f"SERIAL ERROR: {e}")
             time.sleep(1)
 
-# Global reference to the current G-code thread runner instance
 current_gcode_runner = None
 
 class GCodeRunner(threading.Thread):
@@ -164,11 +160,9 @@ def reboot():
 def update_firmware():
     global arduino, arduino_connected
     log_message("FIRMWARE UPDATE STARTED...")
-    
     if arduino and arduino.is_open:
         arduino.close()
     arduino_connected = False
-    
     try:
         log_message("Compiling...")
         subprocess.run(["arduino-cli", "compile", "--fqbn", "arduino:avr:uno", "/home/pacpi/Desktop/stepper_gcode_project/Sand"], check=True, capture_output=True, text=True)
@@ -178,7 +172,6 @@ def update_firmware():
     except Exception as e:
         log_message(f"UPDATE ERROR: {str(e)}")
         success_msg = f"Error: {str(e)}"
-
     try:
         time.sleep(2) 
         arduino = serial.Serial('/dev/ttyACM0', 9600, timeout=0.1)
@@ -187,7 +180,6 @@ def update_firmware():
         log_message("Serial reconnected.")
     except Exception as e:
         log_message(f"FAILED TO RECONNECT SERIAL: {e}")
-    
     return jsonify(success=True, message=success_msg)
 
 # ---------------- APP ROUTES ----------------
@@ -290,6 +282,11 @@ def send_single_gcode_line_route():
 def send_command():
     data = request.json
     cmd = data.get("command")
+    
+    # *** FIX: LOGGING ADDED HERE ***
+    # This forces a log into the terminal so you KNOW the button worked.
+    log_message(f"WEB RECEIVED: {cmd}")
+
     if not cmd: return jsonify(success=False)
 
     try:
@@ -310,7 +307,6 @@ def send_command():
             log_message(f"Sent: {cmd}")
             return jsonify(success=True)
         
-        # Fallback if logs are needed even when disconnected
         log_message(f"Command '{cmd}' ignored (No Connection).")
         return jsonify(success=False, error="No device connected."), 500
 
@@ -324,7 +320,6 @@ def get_status():
 
 @app.route("/terminal/logs")
 def get_logs():
-    # Allows logs to be fetched even if Arduino isn't connected
     with lock:
         return jsonify(list(serial_log))
 
