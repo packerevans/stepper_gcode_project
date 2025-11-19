@@ -1,6 +1,6 @@
 import asyncio
 import threading
-from bleak import BleakClient
+from bleak import BleakClient, BleakScanner
 from typing import Optional
 
 # --- Configuration ---
@@ -9,7 +9,8 @@ WRITE_UUID = "0000fff3-0000-1000-8000-00805f9b34fb"
 
 # --- State Management ---
 client: Optional[BleakClient] = None
-command_lock = asyncio.Lock()
+# WE DO NOT create the lock here. We must create it inside the thread loop.
+command_lock: Optional[asyncio.Lock] = None 
 loop = asyncio.new_event_loop()
 
 # --- Helper: Byte Generation ---
@@ -36,21 +37,34 @@ COMMANDS = {
 def is_connected() -> bool:
     """Checks if the client exists and is actually connected."""
     global client
-    return client is not None and client.is_connected
+    # Safety check to ensure we don't crash accessing property on None
+    if client is None:
+        return False
+    try:
+        return client.is_connected
+    except:
+        return False
 
 async def ensure_connection():
     """
-    Tries to connect. If already connected, returns True immediately.
-    If not, tries to connect. Returns True/False based on success.
+    Tries to connect. Includes a scan to help Linux/Pi find the device.
     """
     global client
     if is_connected():
         return True
 
-    print(f"BLE: Connecting to {ADDRESS}...")
+    print(f"BLE: Looking for {ADDRESS}...")
     try:
-        # Create new client instance
-        client = BleakClient(ADDRESS, timeout=5.0) # 5s timeout prevents hanging
+        # Fix for Raspberry Pi: Scan for the device first to wake up BlueZ
+        device = await BleakScanner.find_device_by_address(ADDRESS, timeout=5.0)
+        
+        if not device:
+            print(f"BLE: Device {ADDRESS} not found during scan.")
+            return False
+
+        print(f"BLE: Device found, connecting...")
+        # Create new client instance using the found device object
+        client = BleakClient(device, timeout=10.0) 
         await client.connect()
         print(f"BLE: Connected!")
         return True
@@ -76,6 +90,13 @@ async def send_raw_command(data: bytearray, name: str):
     """
     The core logic: Connect -> Send -> Handle Errors.
     """
+    global command_lock
+    
+    # Safety: If the lock hasn't been created by the thread yet, wait slightly
+    if command_lock is None:
+        print("BLE: System starting up, waiting for lock...")
+        return False
+
     # 1. Ensure Lock (prevents commands crashing into each other)
     async with command_lock:
         # 2. Ensure Connection
@@ -109,13 +130,16 @@ async def send_led_command(r: int, g: int, b: int, brightness: int):
     await send_raw_command(data, f"RGB({r},{g},{b})")
 
 # --- Background Loop ---
-# We do NOT run a permanent while True loop anymore.
-# We only keep the Event Loop alive to process requests as they come in.
 
 def start_ble_loop():
     """Starts the asyncio loop in a background thread."""
     def run_loop(loop_ref):
         asyncio.set_event_loop(loop_ref)
+        
+        # IMPORTANT FIX: Create the lock INSIDE the running loop thread
+        global command_lock
+        command_lock = asyncio.Lock()
+        
         loop_ref.run_forever()
 
     t = threading.Thread(target=run_loop, args=(loop,), daemon=True)
