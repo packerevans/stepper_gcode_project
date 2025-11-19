@@ -1,7 +1,7 @@
 import asyncio
 import threading
 from bleak import BleakClient, BleakScanner
-from typing import Optional
+from typing import Optional, Callable
 
 # --- Configuration ---
 ADDRESS = "BE:67:00:44:05:61"
@@ -9,9 +9,22 @@ WRITE_UUID = "0000fff3-0000-1000-8000-00805f9b34fb"
 
 # --- State Management ---
 client: Optional[BleakClient] = None
-# ERROR FIX: Do not create the lock here. We must create it inside the thread.
 command_lock: Optional[asyncio.Lock] = None 
 loop = asyncio.new_event_loop()
+
+# Logger callback placeholder
+log_callback: Optional[Callable[[str], None]] = None
+
+def log(msg: str):
+    """Sends logs to the standard print AND the web terminal if connected."""
+    print(msg) # Print to server console
+    if log_callback:
+        log_callback(f"[BLE] {msg}")
+
+def set_logger(callback):
+    """Called by app.py to hook up the web terminal."""
+    global log_callback
+    log_callback = callback
 
 # --- Helper: Byte Generation ---
 def create_rgb_command(r: int, g: int, b: int, brightness: int) -> bytearray:
@@ -35,7 +48,6 @@ COMMANDS = {
 # --- Connection Logic ---
 
 def is_connected() -> bool:
-    """Checks if the client exists and is actually connected."""
     global client
     if client is None:
         return False
@@ -45,29 +57,25 @@ def is_connected() -> bool:
         return False
 
 async def ensure_connection():
-    """
-    Tries to connect. Includes a scan to help Linux/Pi find the device.
-    """
     global client
     if is_connected():
         return True
 
-    print(f"BLE: Looking for {ADDRESS}...")
+    log(f"Scanning for device {ADDRESS} (Timeout 5s)...")
     try:
-        # PI FIX: Scan for the device first to wake up the Bluetooth adapter
         device = await BleakScanner.find_device_by_address(ADDRESS, timeout=5.0)
         
         if not device:
-            print(f"BLE: Device {ADDRESS} not found during scan.")
+            log(f"Device {ADDRESS} not found. Is it powered on?")
             return False
 
-        print(f"BLE: Device found, connecting...")
+        log("Device found. Connecting...")
         client = BleakClient(device, timeout=10.0) 
         await client.connect()
-        print(f"BLE: Connected!")
+        log("Connection Successful!")
         return True
     except Exception as e:
-        print(f"BLE: Connection Failed - {e}")
+        log(f"Connection Failed: {e}")
         client = None
         return False
 
@@ -75,10 +83,11 @@ async def disconnect_client():
     global client
     if client:
         try:
+            log("Disconnecting...")
             await client.disconnect()
-            print("BLE: Disconnected.")
+            log("Disconnected.")
         except Exception as e:
-            print(f"BLE: Error during disconnect - {e}")
+            log(f"Error during disconnect: {e}")
         finally:
             client = None
 
@@ -87,31 +96,28 @@ async def disconnect_client():
 async def send_raw_command(data: bytearray, name: str):
     global command_lock
     
-    # Safety check: wait for lock to be created by the thread
     if command_lock is None:
-        print("BLE: Error - System still starting up.")
+        log("Error: System starting up, please wait.")
         return False
 
-    # 1. Ensure Lock (prevents commands crashing into each other)
     async with command_lock:
-        # 2. Ensure Connection
         if not await ensure_connection():
-            print(f"BLE: Could not send '{name}' - Device not reachable.")
+            log(f"Cannot send '{name}' - Device unreachable.")
             return False
 
-        # 3. Write Data
         try:
             await client.write_gatt_char(WRITE_UUID, data)
-            print(f"BLE: Sent {name}")
+            log(f"Sent Command: {name}")
             return True
         except Exception as e:
-            print(f"BLE: Write Failed ({name}) - {e}")
+            log(f"Write Failed ({name}): {e}")
             await disconnect_client() 
             return False
 
-# --- Public Handlers (Called by Flask) ---
+# --- Public Handlers ---
 
 async def handle_command(cmd: str):
+    log(f"Processing request: {cmd}")
     if cmd == "CONNECT":
         await ensure_connection()
     elif cmd == "DISCONNECT":
@@ -126,19 +132,14 @@ async def send_led_command(r: int, g: int, b: int, brightness: int):
 # --- Background Loop ---
 
 def start_ble_loop():
-    """Starts the asyncio loop in a background thread."""
     def run_loop(loop_ref):
         asyncio.set_event_loop(loop_ref)
-        
-        # IMPORTANT FIX: Create the lock INSIDE the running loop thread
         global command_lock
         command_lock = asyncio.Lock()
-        
         loop_ref.run_forever()
 
     t = threading.Thread(target=run_loop, args=(loop,), daemon=True)
     t.start()
     print("BLE: Background thread running.")
 
-# Start immediately
 start_ble_loop()
