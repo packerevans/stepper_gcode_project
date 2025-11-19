@@ -13,17 +13,20 @@
             --color-primary: #d2b48c; /* Khaki/Tan */
             --color-secondary: #b08d5c; /* Darker Tan */
             --color-background: #f0f0f0; 
-            --color-surface: #ffffff; /* White for control boxes */
+            --color-surface: #ffffff; 
             --color-text: #333333;
             --color-shadow: rgba(0, 0, 0, 0.08);
+            --color-terminal-bg: #1e1e1e;
+            --color-terminal-text: #00ff00;
             --border-radius: 12px;
         }
 
         body[data-theme='dark'] {
             --color-background: #1e1e1e;
-            --color-surface: #2c2c2c; /* Darker surface for dark mode */
+            --color-surface: #2c2c2c;
             --color-text: #e0e0e0;
             --color-shadow: rgba(255, 255, 255, 0.08);
+            --color-terminal-bg: #000000;
         }
         
         body {
@@ -80,10 +83,10 @@
             font-weight: 300; color: var(--color-secondary);
         }
 
-        /* --- Control Cards (now all white) --- */
+        /* --- Control Cards --- */
         .control-section {
-            background-color: var(--color-surface); /* Reverted to white */
-            color: var(--color-text); /* Ensure text is readable */
+            background-color: var(--color-surface);
+            color: var(--color-text);
             padding: 25px;
             border-radius: var(--border-radius); box-shadow: 0 4px 8px var(--color-shadow);
             margin-bottom: 25px; text-align: center;
@@ -109,6 +112,9 @@
         }
         button:hover {
             background-color: var(--color-secondary); box-shadow: 0 2px 5px var(--color-shadow);
+        }
+        button:disabled {
+            background-color: #ccc; cursor: not-allowed;
         }
         
         /* --- Color Picker UI --- */
@@ -143,15 +149,14 @@
         .terminal {
             background: var(--color-terminal-bg); color: var(--color-terminal-text);
             font-family: 'Consolas', 'Courier New', monospace; padding: 15px;
-            border-radius: 8px; width: 100%; height: 120px; overflow-y: auto;
+            border-radius: 8px; width: 100%; height: 150px; overflow-y: auto;
             font-size: 12px; border: 1px solid var(--color-shadow);
-            text-align: left; box-sizing: border-box;
+            text-align: left; box-sizing: border-box; white-space: pre-wrap;
         }
 
         @media (max-width: 600px) {
             .status-row { flex-direction: column; gap: 15px; }
             button { width: 100%; }
-            .connection-card { padding: 20px; }
         }
     </style>
 </head>
@@ -197,26 +202,24 @@
 
             <div style="margin-top: 30px; border-top: 1px solid var(--color-shadow); padding-top: 20px;">
                 <h3>Your Favorite Whites</h3>
-                <div class="favorites-grid" id="favGrid">
-                    <div style="padding:10px;">Loading...</div>
-                </div>
+                <div class="favorites-grid" id="favGrid"></div>
                 <button onclick="saveCurrentToFavorite()" style="margin-top:20px;">Save This White</button>
             </div>
         </div>
 
         <div class="control-section" style="padding:15px;">
-            <h3 style="margin-top:0; font-size: 1em; opacity: 0.6;">System Log</h3>
-            <div class="terminal" id="terminal">Ready.</div>
+            <h3 style="margin-top:0; font-size: 1em; opacity: 0.6;">System Log (Live)</h3>
+            <div class="terminal" id="terminal">Loading logs...</div>
         </div>
     </div>
 
     <script>
         let isConnected = false;
         let debounceTimer;
+        let logInterval;
 
         // --- CONFIGURATION ---
         const MAX_FAVS = 3; 
-        // Default white/soft colors
         const DEFAULT_FAVS = ["#ffffff", "#f0f0f0", "#e0e0e0"]; 
 
         // --- COLOR LOGIC ---
@@ -229,32 +232,28 @@
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(() => {
                 sendCurrentState();
-            }, 200); // 200ms debounce
+            }, 200);
         }
 
         async function sendCurrentState() {
             if (!isConnected) return; 
             const hex = document.getElementById('colorPicker').value;
             const rgb = hexToRgb(hex);
-            
-            // Hardcoded brightness: 16 (Max)
-            const cmd = `LED:${rgb.r},${rgb.g},${rgb.b},16`;
-            await sendCommand(cmd, false); 
+            // Send color with full brightness (16)
+            await sendCommand(`LED:${rgb.r},${rgb.g},${rgb.b},16`, false); 
         }
 
         async function applyFavorite(hex) {
             document.getElementById('colorPicker').value = hex;
-            handleColorInput(); // Trigger send
+            handleColorInput(); 
         }
 
-        // --- LOCAL FAVORITES SYSTEM ---
+        // --- FAVORITES SYSTEM ---
         function loadFavorites() {
             const container = document.getElementById('favGrid');
             container.innerHTML = '';
-            
-            // Load from local storage, or use defaults
             let favs = JSON.parse(localStorage.getItem('ledLocalFavs'));
-            if (!favs || favs.length === 0) favs = [...DEFAULT_FAVS]; // Copy default array
+            if (!favs || favs.length === 0) favs = [...DEFAULT_FAVS];
             
             favs.forEach(color => {
                 const circle = document.createElement('div');
@@ -268,24 +267,15 @@
         function saveCurrentToFavorite() {
             const current = document.getElementById('colorPicker').value;
             let favs = JSON.parse(localStorage.getItem('ledLocalFavs')) || [...DEFAULT_FAVS];
-            
-            // Add to front, remove duplicates
-            if (favs.includes(current)) {
-                favs = favs.filter(c => c !== current); // Remove if exists
-            }
-            favs.unshift(current); // Add to beginning
-            
-            // Keep only top MAX_FAVS
+            if (favs.includes(current)) favs = favs.filter(c => c !== current);
+            favs.unshift(current);
             favs = favs.slice(0, MAX_FAVS);
-            
             localStorage.setItem('ledLocalFavs', JSON.stringify(favs));
-            loadFavorites(); // Reload UI
-            logToTerminal(`Saved color ${current} to your favorites.`);
+            loadFavorites();
         }
 
         // --- COMMUNICATIONS ---
         async function sendCommand(cmd, logIt = true) {
-            if (logIt) logToTerminal(`Sending: ${cmd}`);
             try {
                 const res = await fetch("/send", {
                     method: "POST",
@@ -293,30 +283,54 @@
                     body: JSON.stringify({ command: cmd })
                 });
                 const data = await res.json();
-                if (!data.success && logIt) logToTerminal(`Error: ${data.error}`, 'error');
+                // We rely on the terminal polling to see the result now
             } catch (e) {
-                logToTerminal(`Network Error`, 'error');
+                console.error("Network Error", e);
             }
         }
 
         async function toggleConnection() {
             const btn = document.getElementById("connBtn");
+            const txt = document.getElementById("connStatusText");
+            
             btn.disabled = true;
-            const cmd = isConnected ? "DISCONNECT" : "CONNECT";
-            logToTerminal(`Requesting ${cmd}...`);
-            await sendCommand(cmd);
-            setTimeout(pollStatus, 1000); 
-            setTimeout(() => btn.disabled = false, 2000);
+            
+            if (!isConnected) {
+                txt.textContent = "Attempting Connection...";
+                txt.style.color = "#d4a017"; // Orange/Yellow
+                await sendCommand("CONNECT");
+                
+                // Poll rapidly for 10 seconds to catch the connection
+                let checks = 0;
+                const rapidPoll = setInterval(async () => {
+                    await pollStatus();
+                    checks++;
+                    if(isConnected || checks > 10) {
+                        clearInterval(rapidPoll);
+                        btn.disabled = false;
+                        if(!isConnected) {
+                             txt.textContent = "DISCONNECTED (Timeout)";
+                             txt.style.color = "#333";
+                        }
+                    }
+                }, 1000);
+            } else {
+                await sendCommand("DISCONNECT");
+                setTimeout(pollStatus, 1000);
+                setTimeout(() => btn.disabled = false, 2000);
+            }
+            
+            fetchLogs(); // Update terminal immediately
         }
 
         function togglePower() {
              if(!isConnected) {
-                 logToTerminal("Connect Bluetooth first!", "error");
+                 alert("Please connect to Bluetooth first.");
                  return;
              }
              const btn = document.getElementById('powerBtn');
-             const isOff = btn.innerText.includes("OFF"); 
-             sendCommand(isOff ? "POWER:OFF" : "POWER:ON");
+             // Toggle based on assumed state or just send toggle command
+             sendCommand("POWER:ON"); // In future, check state
         }
 
         async function pollStatus() {
@@ -335,21 +349,24 @@
             const txt = document.getElementById("connStatusText");
             const btn = document.getElementById("connBtn");
             
-            ind.style.backgroundColor = connected ? "#28a745" : "#dc3545"; // Green/Red
+            ind.style.backgroundColor = connected ? "#28a745" : "#dc3545"; 
             txt.textContent = connected ? "CONNECTED" : "DISCONNECTED";
-            txt.style.color = connected ? "#333" : "#333"; // Keep dark text
+            txt.style.color = "#333";
             btn.textContent = connected ? "Disconnect" : "Connect";
-            
-            if(connected) logToTerminal("Device Connected.");
-            else logToTerminal("Device Disconnected.");
+            btn.disabled = false;
         }
 
-        function logToTerminal(msg, type='info') {
-            const term = document.getElementById("terminal");
-            const time = new Date().toLocaleTimeString();
-            const color = type === 'error' ? 'red' : 'inherit';
-            term.innerHTML += `<div style="color:${color}">[${time}] ${msg}</div>`;
-            term.scrollTop = term.scrollHeight;
+        async function fetchLogs() {
+            try {
+                const res = await fetch("/terminal/logs");
+                const logs = await res.json();
+                const term = document.getElementById("terminal");
+                // Simple join. For better performance, you might want to diff.
+                term.innerHTML = logs.join("\n");
+                term.scrollTop = term.scrollHeight;
+            } catch (e) {
+                console.log("Log fetch error", e);
+            }
         }
 
         // --- INIT ---
@@ -375,8 +392,15 @@
             document.getElementById('themeIcon').textContent = savedTheme === 'dark' ? '🌙' : '☀️';
 
             loadFavorites();
+            
+            // Poll status every 3 seconds
             setInterval(pollStatus, 3000);
+            
+            // Poll logs every 2 seconds
+            setInterval(fetchLogs, 2000);
+            
             pollStatus();
+            fetchLogs();
         });
     </script>
 </body>
