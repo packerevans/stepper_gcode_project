@@ -9,7 +9,7 @@ WRITE_UUID = "0000fff3-0000-1000-8000-00805f9b34fb"
 
 # --- State Management ---
 client: Optional[BleakClient] = None
-# WE DO NOT create the lock here. We must create it inside the thread loop.
+# ERROR FIX: Do not create the lock here. We must create it inside the thread.
 command_lock: Optional[asyncio.Lock] = None 
 loop = asyncio.new_event_loop()
 
@@ -37,7 +37,6 @@ COMMANDS = {
 def is_connected() -> bool:
     """Checks if the client exists and is actually connected."""
     global client
-    # Safety check to ensure we don't crash accessing property on None
     if client is None:
         return False
     try:
@@ -55,7 +54,7 @@ async def ensure_connection():
 
     print(f"BLE: Looking for {ADDRESS}...")
     try:
-        # Fix for Raspberry Pi: Scan for the device first to wake up BlueZ
+        # PI FIX: Scan for the device first to wake up the Bluetooth adapter
         device = await BleakScanner.find_device_by_address(ADDRESS, timeout=5.0)
         
         if not device:
@@ -63,7 +62,6 @@ async def ensure_connection():
             return False
 
         print(f"BLE: Device found, connecting...")
-        # Create new client instance using the found device object
         client = BleakClient(device, timeout=10.0) 
         await client.connect()
         print(f"BLE: Connected!")
@@ -87,14 +85,11 @@ async def disconnect_client():
 # --- Command Sending ---
 
 async def send_raw_command(data: bytearray, name: str):
-    """
-    The core logic: Connect -> Send -> Handle Errors.
-    """
     global command_lock
     
-    # Safety: If the lock hasn't been created by the thread yet, wait slightly
+    # Safety check: wait for lock to be created by the thread
     if command_lock is None:
-        print("BLE: System starting up, waiting for lock...")
+        print("BLE: Error - System still starting up.")
         return False
 
     # 1. Ensure Lock (prevents commands crashing into each other)
@@ -111,7 +106,6 @@ async def send_raw_command(data: bytearray, name: str):
             return True
         except Exception as e:
             print(f"BLE: Write Failed ({name}) - {e}")
-            # If write fails, assume connection is dead
             await disconnect_client() 
             return False
 
