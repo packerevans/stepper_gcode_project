@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Packers Sand Table Control</title>
     
-    <!-- Icons -->
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
 
@@ -98,8 +97,7 @@
         }
 
         h1 { color: var(--color-secondary); margin-bottom: 15px; font-weight: 300; text-align: center; font-size: 1.8rem; }
-        /* Removed .subtitle style */
-
+        
         /* --- Status Banner --- */
         #status-banner {
             width: 100%; max-width: 700px; padding: 12px; border-radius: var(--border-radius); margin-bottom: 15px;
@@ -183,7 +181,6 @@
 </head>
 <body data-theme="light">
 
-    <!-- SIDEBAR MENU -->
     <div id="mySidebar" class="sidebar">
         <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
         <a href="/">Designs</a> 
@@ -193,18 +190,14 @@
         <a href="/terminal">Terminal</a>
     </div>
 
-    <!-- Fixed Menu Button -->
     <button class="openbtn" onclick="openNav()">☰</button>
     
-    <!-- Fixed Theme Toggle -->
     <button id="themeToggle" onclick="toggleTheme()">
         <span id="themeIcon">☀️</span>
     </button>
 
-    <!-- MAIN CONTENT -->
     <div class="main-content">
         <h1>Machine Drawing Pad</h1>
-        <!-- Subtitle Removed -->
 
         <div id="status-banner"></div>
 
@@ -226,17 +219,20 @@
                 <span id="smoothVal">2px</span>
             </div>
 
-            <!-- Top Row Controls -->
+            <div class="slider-control">
+                <label>Symmetry</label>
+                <input type="range" id="symSlider" min="1" max="12" value="1" step="1" title="Mirrors drawing radially">
+                <span id="symVal">1x</span>
+            </div>
+
             <div class="btn-group">
                 <button onclick="undoLastStroke()" class="secondary square-btn" title="Undo">↶</button>
                 <button onclick="clearCanvas()" class="secondary">Clear</button>
                 <button onclick="generateCode()">Generate Code</button>
             </div>
 
-            <!-- Hidden Textarea -->
             <textarea id="stepsOutput" class="hidden-output"></textarea>
 
-            <!-- Export Section -->
             <div class="export-container">
                 <label style="color:var(--color-secondary);">Export</label>
                 <div class="btn-group">
@@ -244,7 +240,6 @@
                     <button onclick="sendToTable()">🚀 Send to Table</button>
                 </div>
                 
-                <!-- Queue Controls -->
                 <div class="btn-group tight" style="margin-top:5px;">
                     <button class="secondary" style="font-size:12px; padding:8px;" onclick="sendCommandSimple('PAUSE')">Pause</button>
                     <button class="secondary" style="font-size:12px; padding:8px;" onclick="sendCommandSimple('RESUME')">Resume</button>
@@ -298,6 +293,12 @@
 
             document.getElementById('smoothSlider').addEventListener('input', (e) => {
                 document.getElementById('smoothVal').textContent = e.target.value + 'px';
+            });
+
+            // NEW LISTENER FOR SYMMETRY
+            document.getElementById('symSlider').addEventListener('input', (e) => {
+                document.getElementById('symVal').textContent = e.target.value + 'x';
+                render(); // Re-render to show new symmetry immediately
             });
 
             requestAnimationFrame(animateLoop);
@@ -399,11 +400,23 @@
             ctx.restore();
         }
 
+        // Helper to rotate points for drawing/generating
+        function rotatePoint(x, y, angleRad) {
+            const cos = Math.cos(angleRad);
+            const sin = Math.sin(angleRad);
+            return {
+                x: x * cos - y * sin,
+                y: x * sin + y * cos
+            };
+        }
+
         function render() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             drawGrid();
 
-            // Sim Layer (Gray)
+            const symCount = parseInt(document.getElementById('symSlider').value);
+
+            // Sim Layer (Gray) - Already fully generated, just draw it
             if(simulatedPath.length > 0 && fadeLevel > 0.01) {
                 ctx.save();
                 const opacity = fadeLevel * 0.8; 
@@ -420,22 +433,32 @@
                 ctx.restore();
             }
 
-            // Drawing Layer (Color)
+            // Drawing Layer (Color) - Apply Symmetry Here
             if(rawPoints.length > 0) {
                 ctx.save();
                 const opacity = 1.0 - (fadeLevel * 0.9);
                 ctx.globalAlpha = opacity;
-                ctx.beginPath();
-                ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--color-secondary');
                 ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-                let isNextMove = true;
-                for(let p of rawPoints) {
-                    if(p.type === 'break') { isNextMove = true; continue; }
-                    const px = mmToPx(p.x, p.y);
-                    if(isNextMove) { ctx.moveTo(px.x, px.y); isNextMove = false; } 
-                    else { ctx.lineTo(px.x, px.y); }
+                ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--color-secondary');
+
+                // Loop through symmetry axes
+                for(let s = 0; s < symCount; s++) {
+                    const angle = s * (Math.PI * 2 / symCount);
+                    
+                    ctx.beginPath();
+                    let isNextMove = true;
+                    for(let p of rawPoints) {
+                        if(p.type === 'break') { isNextMove = true; continue; }
+                        
+                        // Rotate the point mathmatically
+                        const rP = rotatePoint(p.x, p.y, angle);
+                        const px = mmToPx(rP.x, rP.y);
+
+                        if(isNextMove) { ctx.moveTo(px.x, px.y); isNextMove = false; } 
+                        else { ctx.lineTo(px.x, px.y); }
+                    }
+                    ctx.stroke();
                 }
-                ctx.stroke();
                 ctx.restore(); 
             }
         }
@@ -586,13 +609,35 @@
             targetFadeLevel = 1.0;
 
             const inputSmoothDist = parseFloat(document.getElementById('smoothSlider').value);
+            const symCount = parseInt(document.getElementById('symSlider').value); // GET SYMMETRY
+
             const delay = 1000; 
             const smoothingSensitivity = 0.000001; 
             
+            // 1. EXPAND RAW POINTS BASED ON SYMMETRY
+            let expandedPoints = [];
+            
+            for(let s = 0; s < symCount; s++) {
+                const angle = s * (Math.PI * 2 / symCount);
+                
+                for(let p of rawPoints) {
+                    if(p.type === 'break') {
+                        expandedPoints.push({type: 'break'});
+                    } else {
+                        const rP = rotatePoint(p.x, p.y, angle);
+                        expandedPoints.push({ x: rP.x, y: rP.y, type: 'point' });
+                    }
+                }
+                // Add a break between rotations to force path reset logic
+                if(s < symCount - 1) expandedPoints.push({type: 'break'});
+            }
+
+            // 2. PROCESS INTO SEGMENTS (Standard Logic)
             let segments = [];
             let currentSegment = [];
             let lastP = null;
-            for(let p of rawPoints) {
+
+            for(let p of expandedPoints) {
                 if(p.type === 'break') {
                     if(currentSegment.length > 0) segments.push(currentSegment);
                     currentSegment = []; lastP = null; continue;
@@ -604,13 +649,33 @@
             if(currentSegment.length > 0) segments.push(currentSegment);
             if(segments.length === 0) return;
 
+            // 3. LINK SEGMENTS VIA PERIMETER
             let augmentedPoints = [];
             const entryPoint = getClosestPerimeterPoint(segments[0][0]);
             augmentedPoints.push(entryPoint);
-            for(let i=0; i<segments.length; i++) augmentedPoints = augmentedPoints.concat(segments[i]);
+            
+            for(let i=0; i<segments.length; i++) {
+                // If not the first segment, we need to travel from prev end to next start
+                if(i > 0) {
+                    const prevEnd = segments[i-1][segments[i-1].length-1];
+                    const nextStart = segments[i][0];
+                    
+                    // Travel via perimeter to avoid dragging through sand
+                    const pExit = getClosestPerimeterPoint(prevEnd);
+                    const pEntry = getClosestPerimeterPoint(nextStart);
+                    augmentedPoints.push(pExit);
+                    // Optional: Add intermediate perimeter points if needed (arc), 
+                    // but linear move along edge is usually fine for sand tables
+                    augmentedPoints.push(pEntry);
+                }
+                // Add the actual drawing segment
+                augmentedPoints = augmentedPoints.concat(segments[i]);
+            }
+            
             const exitPoint = getClosestPerimeterPoint(segments[segments.length-1][segments[segments.length-1].length-1]);
             augmentedPoints.push(exitPoint);
 
+            // 4. INTERPOLATE
             let interp = [augmentedPoints[0]];
             for(let i=0; i<augmentedPoints.length-1; i++) {
                 const p1 = augmentedPoints[i], p2 = augmentedPoints[i+1];
@@ -622,13 +687,11 @@
                 }
             }
 
+            // 5. IK & GCODE GENERATION
             let genCmds = [];
             let prevB = 0, prevE = 0;
             const start = calculateIK(interp[0].x, interp[0].y, 0, 0);
 
-            // --- MODIFIED SECTION: DO NOT GENERATE TRAVEL MOVE ---
-            // We calculate the Start position to set up the relative steps (prevB, prevE)
-            // but we DO NOT push a command to move from (0,0) to Start.
             prevB = start.base_steps; 
             prevE = start.elbow_steps;
 
@@ -649,19 +712,15 @@
 
             document.getElementById('stepsOutput').value = smoothed.map(c => `G1 ${c.elbow} ${c.base} ${c.delay}`).join('\n');
             
-            // Pass the 'start' IK state to the simulation so it knows where to begin drawing
             simulateFromSteps(smoothed, start);
         }
 
-        // Updated Simulation function to accept startState
         function simulateFromSteps(stepsList, startState) {
             simulatedPath = [];
-            // Initialize current angle state to the start of the drawing
             let currentB = startState ? startState.base_steps : 0;
             let currentE = startState ? startState.elbow_steps : 0;
             const p0 = {x:0, y:0}; 
 
-            // Add initial point to simulation path
             const startFK = calculateFK(p0, currentB, currentE);
             simulatedPath.push(startFK.p2);
 
