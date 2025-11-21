@@ -467,8 +467,23 @@
             const rect = canvas.getBoundingClientRect();
             return { x: e.clientX - rect.left, y: e.clientY - rect.top };
         }
-        function pxToMm(px, py) { return { x: (px - origin.x) / scale, y: -(py - origin.y) / scale }; }
-        function mmToPx(mx, my) { return { x: origin.x + (mx * scale), y: origin.y - (my * scale) }; }
+                // --- COORDINATE CONVERSION (UPDATED) ---
+        // We added a Negative (-) sign to the X calculations below.
+        // This flips the internal math so the machine draws mirrored, fixing backwards text.
+
+        function pxToMm(px, py) { 
+            return { 
+                x: -(px - origin.x) / scale, // Added negative sign here
+                y: -(py - origin.y) / scale 
+            }; 
+        }
+
+        function mmToPx(mx, my) { 
+            return { 
+                x: origin.x - (mx * scale),  // Changed + to - here to match
+                y: origin.y - (my * scale) 
+            }; 
+        }
 
         function startDraw(e) {
             isDrawing = true;
