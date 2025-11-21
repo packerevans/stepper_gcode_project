@@ -4,289 +4,184 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Packers Sand Table Control</title>
-    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
-    <link rel="apple-touch-icon" sizes="512x512" href="{{ url_for('static', filename='icons/icon-512.png') }}">
     
-  <style>
-    /* --- Root Variables (Light Mode) --- */
-    :root {
-        --color-primary: #d2b48c; /* Khaki/Tan (Button/Sidebar Background) */
-        --color-secondary: #b08d5c; /* Darker Tan (Button Hover/Accent) */
-        --color-background: #f0f0f0; /* Light Gray Background */
-        --color-surface: #ffffff; /* White Card/Container Background */
-        --color-text: #333333;
-        --color-shadow: rgba(0, 0, 0, 0.08);
-        --color-icon: #000000;
-        
-        /* Terminal Colors (Light) */
-        --color-terminal-bg: #e9e9e9;
-        --color-terminal-text: #333333;
-        --color-terminal-prompt: #008080; /* Teal/Cyan */
-        
-        --border-radius: 12px;
-    }
+    <!-- Icons (using paths from your index.html) -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
 
-    /* --- Dark Mode Variables --- */
-    body[data-theme='dark'] {
-        --color-background: #1e1e1e;
-        --color-surface: #2c2c2c;
-        --color-text: #e0e0e0;
-        --color-shadow: rgba(255, 255, 255, 0.08);
-        --color-icon: #ffffff;
-        
-        /* Terminal Colors (Dark) */
-        --color-terminal-bg: #1a1a1a;
-        --color-terminal-text: #cccccc;
-        --color-terminal-prompt: #98fb98; /* Pale Green */
-    }
-    
-    /* --- Base Styles --- */
-    body {
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        background: var(--color-background);
-        color: var(--color-text);
-        padding: 0;
-        margin: 0;
-        transition: background 0.3s, color 0.3s;
-    }
-
-    /* --- Sidebar & Header --- */
-    .sidebar {
-        height: 100%; width: 0; position: fixed; top: 0; left: 0;
-        background-color: var(--color-primary); overflow-x: hidden;
-        transition: 0.3s; padding-top: 60px; z-index: 1000;
-        box-shadow: 2px 0 5px var(--color-shadow);
-    }
-
-    .sidebar a {
-        padding: 15px 24px; text-decoration: none; font-size: 18px;
-        color: var(--color-text); display: block; transition: 0.2s;
-        font-weight: 500;
-    }
-
-    .sidebar a:hover {
-        background-color: var(--color-secondary);
-        color: var(--color-surface);
-    }
-
-    .openbtn {
-        font-size: 26px; cursor: pointer; background-color: var(--color-primary);
-        color: var(--color-text); padding: 10px 20px; border: none;
-        border-radius: 0 0 var(--border-radius) 0; position: fixed;
-        top: 0; left: 0; z-index: 1100; box-shadow: 0 2px 5px var(--color-shadow);
-    }
-    
-    /* --- Theme Toggle Button --- */
-    #themeToggle {
-        position: fixed; top: 15px; right: 15px; background: var(--color-surface);
-        color: var(--color-icon); border: 1px solid var(--color-icon);
-        padding: 8px 15px; border-radius: 20px; z-index: 1200;
-        transition: background 0.3s, color 0.3s, border-color 0.3s;
-    }
-    
-    .main-content {
-        margin-left: 0; transition: margin-left 0.3s; padding: 20px;
-        max-width: 800px; margin: 0 auto;
-    }
-
-    h1 {
-        text-align: center; margin-top: 20px; margin-bottom: 30px;
-        font-weight: 300; color: var(--color-secondary);
-    }
-
-    .header-image {
-        width: 100%; max-height: 250px; object-fit: cover;
-        border-radius: var(--border-radius); margin-bottom: 30px;
-        box-shadow: 0 4px 15px var(--color-shadow);
-    }
-    
-    /* --- Main Control Container --- */
-    .control-panel {
-        background-color: var(--color-surface); padding: 30px;
-        border-radius: var(--border-radius); box-shadow: 0 4px 10px var(--color-shadow);
-        margin-bottom: 30px;
-    }
-
-    /* --- Buttons --- */
-    button {
-        background-color: var(--color-primary); 
-        color: var(--color-text);
-        border: none; padding: 12px 25px; border-radius: 8px; font-size: 16px;
-        cursor: pointer; transition: background-color 0.2s, box-shadow 0.2s;
-        font-weight: 600;
-    }
-
-    button:hover {
-        background-color: var(--color-secondary); box-shadow: 0 2px 8px var(--color-shadow);
-    }
-
-    .action-buttons {
-        display: flex; justify-content: center; gap: 20px;
-        margin-top: 20px; margin-bottom: 10px;
-    }
-    
-    /* --- Sliders and Input Grid (Desktop) --- */
-    .slider-section h2 {
-        margin-top: 0; padding-bottom: 15px;
-    }
-
-    .slider-container {
-        /* Label | Slider | Value Input | Button */
-        display: grid;
-        grid-template-columns: 80px 1fr 100px 100px; 
-        align-items: center;
-        margin-bottom: 15px;
-        gap: 15px;
-    }
-
-    /* Override for sliders with no button */
-    .slider-container.no-button {
-        grid-template-columns: 80px 1fr 100px;
-    }
-
-    .slider-container label {
-        font-weight: 600; font-size: 15px;
-    }
-    
-    /* Input Field next to slider */
-    .slider-input {
-        padding: 8px 5px; font-size: 14px; border: 1px solid #ccc;
-        border-radius: 6px; text-align: right; background: var(--color-background);
-        color: var(--color-text); transition: background 0.3s, color 0.3s, border-color 0.3s;
-    }
-    body[data-theme='dark'] .slider-input {
-         border-color: #444;
-    }
-
-    input[type="range"] {
-        -webkit-appearance: none; appearance: none; height: 6px;
-        background: #ddd; border-radius: 5px; cursor: pointer;
-        transition: background 0.3s;
-    }
-    body[data-theme='dark'] input[type="range"] {
-         background: #555;
-    }
-
-    input[type="range"]::-webkit-slider-thumb {
-        -webkit-appearance: none; appearance: none; width: 18px; height: 18px;
-        border-radius: 50%; background: var(--color-secondary); cursor: pointer;
-        box-shadow: 0 0 5px var(--color-shadow);
-    }
-
-    /* --- Terminal --- */
-    .terminal {
-        background: var(--color-terminal-bg); color: var(--color-terminal-text);
-        font-family: 'Consolas', 'Courier New', monospace; padding: 15px;
-        border-radius: 8px; width: 100%; height: 200px; overflow-y: auto;
-        font-size: 14px; border: 1px solid var(--color-shadow);
-        white-space: pre-wrap; box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.2);
-        transition: background 0.3s, color 0.3s;
-    }
-    
-    .terminal .prompt { color: var(--color-terminal-prompt); font-weight: bold; }
-    .terminal .response { color: var(--color-terminal-text); }
-
-
-    /* ---------------------------------------------------------------------- */
-    /* --- MOBILE RESPONSIVENESS (Sand Table Controls) --- */
-    /* ---------------------------------------------------------------------- */
-    @media (max-width: 600px) {
-        .main-content {
-            padding: 10px;
-        }
-        .header-image {
-            max-height: 120px;
-            margin-bottom: 15px;
-        }
-        h1, h2 {
-            font-size: 1.5em;
-            margin-bottom: 15px;
-        }
-        
-        /* Reconfigure the slider grid for mobile */
-        .slider-container {
-            /* 2 columns total: left for label/input, right for button */
-            grid-template-columns: 1fr 100px; 
-            grid-template-rows: auto auto auto; /* 3 rows: Header/Input/Button */
-            gap: 5px 10px;
-            padding: 10px 0;
-            border-bottom: 1px dashed var(--color-shadow);
+    <style>
+        /* --- Root Variables --- */
+        :root {
+            --color-primary: #d2b48c; /* Khaki/Tan */
+            --color-secondary: #b08d5c; /* Darker Tan */
+            --color-background: #f0f0f0; 
+            --color-surface: #ffffff; 
+            --color-text: #333333;
+            --color-shadow: rgba(0, 0, 0, 0.08);
+            --border-radius: 12px;
+            --color-input-bg: #f9f9f9;
+            --color-input-border: #ccc;
         }
 
-        /* Override for sliders with no button on mobile */
-        .slider-container.no-button {
-            grid-template-columns: 1fr;
-            /* Rows: Label, Input, Slider */
-            grid-template-rows: auto auto auto; 
-            gap: 5px;
-        }
-        
-        /* Label and Number Input on the top left */
-        .slider-container label {
-            grid-column: 1 / 2;
-            grid-row: 1 / 2;
-            align-self: flex-start;
-            font-size: 14px;
-        }
-        .slider-input {
-            grid-column: 1 / 2;
-            grid-row: 2 / 3;
-            text-align: left;
-            padding: 8px;
+        body[data-theme='dark'] {
+            --color-background: #1e1e1e;
+            --color-surface: #2c2c2c;
+            --color-text: #e0e0e0;
+            --color-shadow: rgba(255, 255, 255, 0.08);
+            --color-input-bg: #333;
+            --color-input-border: #555;
         }
 
-        /* Ensure label/input on no-button sliders take full width */
-        .slider-container.no-button label,
-        .slider-container.no-button .slider-input {
-            grid-column: 1 / 2;
-        }
-
-        /* Button on the top right */
-        .slider-container button {
-            grid-column: 2 / 3;
-            grid-row: 1 / 3;
-            height: 100%; /* Make button tall to span label and input */
-            width: 100%;
-            padding: 5px;
-            font-size: 14px;
-            
-            background-color: var(--color-primary); 
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--color-background);
             color: var(--color-text);
+            margin: 0; padding: 0; /* Reset padding for sidebar */
+            transition: background 0.3s, color 0.3s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
         }
 
-        /* The Range Slider spans the full width below the button/labels */
-        input[type="range"] {
-            grid-column: 1 / 3; /* Spans both columns */
-            grid-row: 3 / 4;
+        /* --- Sidebar & Nav (From index.html) --- */
+        .sidebar {
+            height: 100%; width: 0; position: fixed; top: 0; left: 0;
+            background-color: var(--color-primary); overflow-x: hidden;
+            transition: 0.3s; padding-top: 60px; z-index: 1000;
+            box-shadow: 2px 0 5px var(--color-shadow);
+        }
+        .sidebar a {
+            padding: 15px 24px; text-decoration: none; font-size: 18px;
+            color: var(--color-text); display: block; transition: 0.2s; font-weight: 500;
+        }
+        .sidebar a:hover { background-color: var(--color-secondary); color: var(--color-surface); }
+
+        .openbtn {
+            font-size: 26px; cursor: pointer; background-color: var(--color-primary);
+            color: var(--color-text); padding: 10px 20px; border: none;
+            border-radius: 0 0 var(--border-radius) 0; position: fixed;
+            top: 0; left: 0; z-index: 1100; box-shadow: 0 2px 5px var(--color-shadow);
+        }
+
+        #themeToggle {
+            position: fixed; top: 15px; right: 15px; background: var(--color-surface);
+            color: var(--color-text); border: 1px solid var(--color-text);
+            padding: 8px; border-radius: 50%; z-index: 1200;
+            width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+            transition: background 0.3s; cursor: pointer;
+        }
+
+        /* --- Main Content Wrapper --- */
+        .main-content {
+            margin-left: 0; transition: margin-left 0.3s; 
+            padding: 20px; padding-top: 60px;
+            width: 100%; max-width: 600px;
+            display: flex; flex-direction: column; align-items: center;
+            box-sizing: border-box;
+        }
+
+        h1 { color: var(--color-secondary); margin-bottom: 5px; font-weight: 300; text-align: center; }
+        p.subtitle { opacity: 0.7; margin-bottom: 20px; font-size: 0.9rem; text-align: center; }
+
+        /* --- Status Banner (From designs.html) --- */
+        #status-banner {
+            width: 100%; padding: 12px; border-radius: var(--border-radius); margin-bottom: 20px;
+            text-align: center; font-weight: 600; opacity: 0; transition: opacity 0.3s;
+            min-height: 20px; line-height: 1.5; pointer-events: none;
+        }
+        .status-success { background-color: #d4edda; color: #155724; }
+        .status-error { background-color: #f8d7da; color: #721c24; }
+        body[data-theme='dark'] .status-success { background-color: #14521f; color: #d4edda; }
+        body[data-theme='dark'] .status-error { background-color: #630c17; color: #f8d7da; }
+
+
+        /* --- Card Layout --- */
+        .card {
+            background: var(--color-surface);
+            padding: 25px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 10px var(--color-shadow);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
             width: 100%;
-            margin-top: 5px;
         }
 
-        /* Ensure range on no-button slider only spans its one column */
-        .slider-container.no-button input[type="range"] {
-            grid-column: 1 / 2;
+        /* --- Drawing Area --- */
+        .canvas-wrapper {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1/1;
+            border-radius: 50%; 
+            border: 4px solid var(--color-primary);
+            overflow: hidden;
+            background: #fff;
+            cursor: crosshair;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.1);
         }
+
+        body[data-theme='dark'] .canvas-wrapper {
+            background: #222;
+            border-color: var(--color-secondary);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* --- Controls --- */
+        label { font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
         
-        /* Ensure terminal looks good */
-        .terminal {
-            height: 150px;
-            font-size: 12px;
+        /* Hidden textarea for clipboard copy */
+        .hidden-output {
+            position: absolute;
+            left: -9999px;
+            opacity: 0;
         }
+
+        button {
+            background-color: var(--color-primary); color: var(--color-text);
+            border: none; padding: 12px; border-radius: 8px; font-size: 15px;
+            cursor: pointer; transition: 0.2s; font-weight: 600; width: 100%;
+            box-shadow: 0 2px 5px var(--color-shadow);
+        }
+        button:hover { background-color: var(--color-secondary); transform: translateY(-1px); }
         
-        /* Action buttons below the sliders */
-        .action-buttons button {
-            /* Override grid button styles to make these look normal */
-            width: auto;
-            height: auto;
-            padding: 12px 25px;
-            grid-column: auto;
-            grid-row: auto;
+        /* Secondary Button Style */
+        button.secondary { background-color: transparent; border: 2px solid var(--color-primary); color: var(--color-text); }
+        button.secondary:hover { background-color: var(--color-primary); color: var(--color-text); }
+
+        /* Square Button (Undo) */
+        button.square-btn {
+            width: 48px; flex-shrink: 0; font-size: 24px; padding: 0;
+            display: flex; align-items: center; justify-content: center; line-height: 1;
         }
-    }
-</style>
-    
+
+        /* Export Area */
+        .export-container {
+            margin-top: 10px; padding: 15px;
+            border: 2px dashed var(--color-input-border);
+            border-radius: var(--border-radius);
+            display: flex; flex-direction: column; gap: 10px;
+        }
+
+        .btn-group { display: flex; gap: 10px; }
+        .btn-group.tight { gap: 5px; }
+
+        .slider-control {
+            display: flex; align-items: center; gap: 10px;
+            font-size: 14px;
+        }
+        input[type="range"] { flex-grow: 1; accent-color: var(--color-secondary); }
+
+    </style>
 </head>
 <body data-theme="light">
+
+    <!-- SIDEBAR MENU -->
     <div id="mySidebar" class="sidebar">
         <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
         <a href="/controls">Controls</a>
@@ -296,171 +191,491 @@
     </div>
 
     <button class="openbtn" onclick="openNav()">☰</button>
-    <button id="themeToggle" onclick="toggleDarkMode()">
+    <button id="themeToggle" onclick="toggleTheme()">
         <span id="themeIcon">☀️</span>
     </button>
 
+    <!-- MAIN CONTENT -->
     <div class="main-content">
-        <img src="{{ url_for('static', filename='sand.png') }}" alt="Sand Table Header" class="header-image">
-        <h1>Sand Table Controls</h1>
-        
-        <div class="control-panel">
+        <h1>Machine Drawing Pad</h1>
+        <p class="subtitle">Draw freehand. Code interpolation set to 7.0mm.</p>
+
+        <div id="status-banner"></div>
+
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <label>Workspace (~203mm)</label>
+                <span id="coordDisplay" style="font-family:monospace; font-size:12px;">X: 0, Y: 0</span>
+            </div>
             
-            <div class="slider-section">
-                <h2>Absolute Position / Speed</h2>
-                
-                <div class="slider-container no-button">
-                    <label for="armSlider">ARM POS</label>
-                    <input type="range" id="armSlider" min="-3200" max="3200" value="0" oninput="updateInputValue('armSlider', 'armInput')">
-                    <input type="number" id="armInput" class="slider-input" value="0" oninput="updateSliderValue('armSlider', 'armInput')">
+            <div class="canvas-wrapper" id="canvasContainer">
+                <canvas id="drawCanvas"></canvas>
+            </div>
+
+            <div class="slider-control">
+                <label>Smoothing</label>
+                <input type="range" id="smoothSlider" min="1" max="10" value="2" title="Higher values reduce point count">
+                <span id="smoothVal">2px</span>
+            </div>
+
+            <!-- Top Row Controls -->
+            <div class="btn-group">
+                <button onclick="undoLastStroke()" class="secondary square-btn" title="Undo">↶</button>
+                <button onclick="clearCanvas()" class="secondary">Clear</button>
+                <button onclick="generateCode()">Generate Code</button>
+            </div>
+
+            <!-- Hidden Textarea -->
+            <textarea id="stepsOutput" class="hidden-output"></textarea>
+
+            <!-- Export Section -->
+            <div class="export-container">
+                <label style="color:var(--color-secondary);">Export</label>
+                <div class="btn-group">
+                    <button onclick="copyToClipboard('stepsOutput')">📋 Copy Code</button>
+                    <button onclick="sendToTable()">🚀 Send to Table</button>
                 </div>
                 
-                <div class="slider-container no-button">
-                    <label for="baseSlider">BASE POS</label>
-                    <input type="range" id="baseSlider" min="-3200" max="3200" value="0" oninput="updateInputValue('baseSlider', 'baseInput')">
-                    <input type="number" id="baseInput" class="slider-input" value="0" oninput="updateSliderValue('baseSlider', 'baseInput')">
-                </div>
-                
-                <div class="slider-container no-button">
-                    <label for="speedSlider">SPEED</label>
-                    <input type="range" id="speedSlider" min="500" max="5000" value="1000" oninput="updateInputValue('speedSlider', 'speedInput')">
-                    <input type="number" id="speedInput" class="slider-input" value="1000" oninput="updateSliderValue('speedSlider', 'speedInput')">
+                <!-- Queue Controls (Added for convenience) -->
+                <div class="btn-group tight" style="margin-top:5px;">
+                    <button class="secondary" style="font-size:12px; padding:8px;" onclick="sendCommandSimple('PAUSE')">Pause</button>
+                    <button class="secondary" style="font-size:12px; padding:8px;" onclick="sendCommandSimple('RESUME')">Resume</button>
+                    <button class="secondary" style="font-size:12px; padding:8px;" onclick="sendCommandSimple('CLEAR')">Clear Queue</button>
                 </div>
             </div>
 
-            <div class="action-buttons">
-                <button onclick="sendG1Command()"> Send Command </button>
-                <button onclick="sendCommand('PAUSE')">PAUSE</button>
-                <button onclick="sendCommand('RESUME')">RESUME</button>
-            </div>
-            
         </div>
-        
-        <h2>Live Terminal Log</h2>
-        <div id="terminal" class="terminal"></div>
     </div>
 
     <script>
-        // --- Sidebar Functions ---
-        function openNav() {
-            document.getElementById("mySidebar").style.width = "200px";
-            document.querySelector(".main-content").style.marginLeft = "200px";
+        // --- CONFIGURATION ---
+        const L1 = 101.3; 
+        const L2 = 101.3; 
+        const MAX_REACH = L1 + L2;
+        const GEAR_RATIO = 9 / 8; 
+        const STEPS_PER_DEG = 3200 / 360;
+        const STEPS_PER_RAD = STEPS_PER_DEG * (180 / Math.PI);
+        const LINEAR_RESOLUTION = 7.0; // mm
+        
+        // Assume base URL is root
+        const BASE_URL = window.location.origin;
+
+        // --- STATE ---
+        let isDrawing = false;
+        let rawPoints = [];
+        let simulatedPath = [];
+        let animFrameId = null;
+        let fadeLevel = 0; 
+        let targetFadeLevel = 0;
+        const canvas = document.getElementById('drawCanvas');
+        const ctx = canvas.getContext('2d');
+        let scale = 1; 
+        let origin = { x: 0, y: 0 };
+
+        // --- INITIALIZATION ---
+        function init() {
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            canvas.addEventListener('mousedown', startDraw);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', endDraw);
+            canvas.addEventListener('mouseleave', endDraw);
+            canvas.addEventListener('touchstart', (e) => { e.preventDefault(); startDraw(e.touches[0]); });
+            canvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(e.touches[0]); });
+            canvas.addEventListener('touchend', endDraw);
+
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.body.setAttribute('data-theme', savedTheme);
+            document.getElementById('themeToggle').textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+
+            document.getElementById('smoothSlider').addEventListener('input', (e) => {
+                document.getElementById('smoothVal').textContent = e.target.value + 'px';
+            });
+
+            requestAnimationFrame(animateLoop);
         }
 
+        // --- UI LOGIC ---
+        function openNav() {
+            document.getElementById("mySidebar").style.width = "200px";
+            if(window.innerWidth > 600) document.querySelector(".main-content").style.marginLeft = "200px";
+        }
         function closeNav() {
             document.getElementById("mySidebar").style.width = "0";
             document.querySelector(".main-content").style.marginLeft = "0";
         }
-
-        // --- Dark Mode Toggle ---
-        function updateThemeIcon(theme) {
-            document.getElementById('themeIcon').textContent = theme === 'dark' ? '🌙' : '☀️';
+        function toggleTheme() {
+            const b = document.body;
+            const n = b.getAttribute('data-theme')==='dark'?'light':'dark';
+            b.setAttribute('data-theme', n); localStorage.setItem('theme', n);
+            document.getElementById('themeToggle').textContent = n==='dark'?'🌙':'☀️';
+            render();
         }
 
-        function toggleDarkMode() {
-            const body = document.body;
-            const currentTheme = body.getAttribute('data-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            
-            body.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
-            updateThemeIcon(newTheme);
-        }
-        
-        // --- Slider & Input Synchronization and Clamping ---
-        function updateInputValue(sliderId, inputId) {
-            // Slider changes, update input field
-            const slider = document.getElementById(sliderId);
-            const input = document.getElementById(inputId);
-            input.value = slider.value;
+        function showStatus(message, isSuccess = true) {
+            const banner = document.getElementById('status-banner');
+            banner.textContent = message;
+            banner.className = isSuccess ? 'status-success' : 'status-error';
+            banner.style.opacity = '1';
+            setTimeout(() => { banner.style.opacity = '0'; }, 5000);
         }
 
-        // MODIFIED: This function now clamps the slider but NOT the input box
-        function updateSliderValue(sliderId, inputId) {
-            // Input field changes, update slider
-            const slider = document.getElementById(sliderId);
-            const input = document.getElementById(inputId);
-            
-            let val = parseInt(input.value);
-            const min = parseInt(slider.min);
-            const max = parseInt(slider.max);
+        // --- NETWORK LOGIC ---
+        async function sendToTable() {
+            const code = document.getElementById('stepsOutput').value;
+            if (!code) { alert("Generate code first!"); return; }
 
-            let sliderVal;
-            if (isNaN(val)) {
-                // If input is empty or invalid, set slider to its minimum
-                sliderVal = min;
-            } else {
-                // Clamp the value *only for the slider*
-                sliderVal = Math.max(min, Math.min(max, val));
+            showStatus("Sending...", true);
+            try {
+                const response = await fetch(`${BASE_URL}/send_gcode_block`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ 
+                        gcode: code,
+                        speed_override: 1000 // Pass default or make selectable if needed
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) showStatus("Sent successfully!", true);
+                else showStatus("Error: " + data.error, false);
+
+            } catch (e) {
+                showStatus("Network Error: " + e.message, false);
             }
-            
-            slider.value = sliderVal;
-            // We NO LONGER update input.value, so it keeps what the user typed
         }
 
-        // --- Terminal Logger ---
-        function appendToTerminal(text, isCommand = false) {
-            const term = document.getElementById("terminal");
-            const line = document.createElement("div");
-            
-            if (isCommand) {
-                line.innerHTML = `<span class="prompt">[${new Date().toLocaleTimeString()}] > </span><span class="response">${text}</span>`;
-            } else {
-                line.innerHTML = `<span class="response">[${new Date().toLocaleTimeString()}] ${text}</span>`;
-            }
-            
-            term.appendChild(line);
-            term.scrollTop = term.scrollHeight; 
-        }
-
-        // --- Backend Command Sending ---
-        function sendCommand(cmd) {
-            fetch("/send", {
+        // Simple helper for Pause/Resume/Clear
+        function sendCommandSimple(cmd) {
+            fetch(`${BASE_URL}/send`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ command: cmd })
             })
-            .then(response => response.json())
-            .then(data => {
-                appendToTerminal(cmd, true);
-                if (data.success) {
-                    appendToTerminal(`Response: Success.`);
-                } else {
-                    appendToTerminal(`Response Error: ${data.error || 'Unknown Error'}`, false);
-                }
+            .then(r => r.json())
+            .then(d => {
+                if(d.success) showStatus(cmd + " sent", true);
+                else showStatus("Error: " + d.error, false);
             })
-            .catch(error => {
-                appendToTerminal(cmd, true);
-                appendToTerminal(`Network Error: ${error.message}`, false);
-            });
-        }
-        
-        // Function to send the combined G1 command
-        function sendG1Command() {
-            // This reads from the input boxes, which have no limits
-            const arm = document.getElementById('armInput').value;
-            const base = document.getElementById('baseInput').value;
-            const speed = document.getElementById('speedInput').value;
-            
-            // Format: G1 <ARM> <BASE> <SPEED>
-            const cmd = `G1 ${arm} ${base} ${speed}`;
-            sendCommand(cmd);
+            .catch(e => showStatus("Error: " + e.message, false));
         }
 
-        // --- Initialization ---
-        document.addEventListener('DOMContentLoaded', () => {
-            // Load theme from local storage
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            document.body.setAttribute('data-theme', savedTheme);
-            updateThemeIcon(savedTheme);
+        // --- ANIMATION & DRAWING ---
+        function animateLoop() {
+            const speed = 0.1; 
+            if(Math.abs(fadeLevel - targetFadeLevel) > 0.001) {
+                fadeLevel += (targetFadeLevel - fadeLevel) * speed;
+                render();
+            } else {
+                fadeLevel = targetFadeLevel;
+            }
+            requestAnimationFrame(animateLoop);
+        }
 
-            // Ensure initial input values match sliders
-            updateInputValue('armSlider', 'armInput');
-            updateInputValue('baseSlider', 'baseInput');
-            updateInputValue('speedSlider', 'speedInput');
+        function resizeCanvas() {
+            const container = document.getElementById('canvasContainer');
+            const size = container.clientWidth;
+            canvas.width = size;
+            canvas.height = size;
+            origin = { x: size / 2, y: size / 2 };
+            scale = (size / 2) / (MAX_REACH * 1.05); 
+            render();
+        }
+
+        function drawGrid() {
+            ctx.save();
+            ctx.translate(origin.x, origin.y);
+            ctx.fillStyle = '#d2b48c';
+            ctx.beginPath(); ctx.arc(0,0, 4, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle = document.body.getAttribute('data-theme') === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+            ctx.beginPath(); ctx.arc(0,0, L1 * scale, 0, Math.PI*2); ctx.stroke();
+            ctx.restore();
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawGrid();
+
+            // Sim Layer (Gray)
+            if(simulatedPath.length > 0 && fadeLevel > 0.01) {
+                ctx.save();
+                const opacity = fadeLevel * 0.8; 
+                ctx.strokeStyle = document.body.getAttribute('data-theme') === 'dark' ? `rgba(255,255,255,${opacity})` : `rgba(0,0,0,${opacity})`;
+                ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+                ctx.beginPath();
+                const start = mmToPx(simulatedPath[0].x, simulatedPath[0].y);
+                ctx.moveTo(start.x, start.y);
+                for(let i=1; i<simulatedPath.length; i++) {
+                    const p = mmToPx(simulatedPath[i].x, simulatedPath[i].y);
+                    ctx.lineTo(p.x, p.y);
+                }
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // Drawing Layer (Color)
+            if(rawPoints.length > 0) {
+                ctx.save();
+                const opacity = 1.0 - (fadeLevel * 0.9);
+                ctx.globalAlpha = opacity;
+                ctx.beginPath();
+                ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--color-secondary');
+                ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+                let isNextMove = true;
+                for(let p of rawPoints) {
+                    if(p.type === 'break') { isNextMove = true; continue; }
+                    const px = mmToPx(p.x, p.y);
+                    if(isNextMove) { ctx.moveTo(px.x, px.y); isNextMove = false; } 
+                    else { ctx.lineTo(px.x, px.y); }
+                }
+                ctx.stroke();
+                ctx.restore(); 
+            }
+        }
+
+        function getPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        }
+        function pxToMm(px, py) { return { x: (px - origin.x) / scale, y: -(py - origin.y) / scale }; }
+        function mmToPx(mx, my) { return { x: origin.x + (mx * scale), y: origin.y - (my * scale) }; }
+
+        function startDraw(e) {
+            isDrawing = true;
+            targetFadeLevel = 0; 
+            document.getElementById('stepsOutput').value = '';
+            const pos = getPos(e); addPoint(pos.x, pos.y); render();
+        }
+        function draw(e) {
+            if (!isDrawing) return;
+            const pos = getPos(e); const mm = pxToMm(pos.x, pos.y);
+            document.getElementById('coordDisplay').textContent = `X: ${mm.x.toFixed(1)}, Y: ${mm.y.toFixed(1)}`;
+            addPoint(pos.x, pos.y); render();
+        }
+        function endDraw() { if(isDrawing) { isDrawing = false; rawPoints.push({type: 'break'}); } }
+        function addPoint(px, py) {
+            const mm = pxToMm(px, py);
+            const dist = Math.hypot(mm.x, mm.y);
+            if(dist > MAX_REACH) { const ratio = MAX_REACH / dist; mm.x *= ratio; mm.y *= ratio; }
+            rawPoints.push({ x: mm.x, y: mm.y, type: 'point' });
+        }
+
+        function undoLastStroke() {
+            targetFadeLevel = 0; document.getElementById('stepsOutput').value = '';
+            if(rawPoints.length > 0 && rawPoints[rawPoints.length-1].type === 'break') rawPoints.pop();
+            while(rawPoints.length > 0) {
+                if(rawPoints[rawPoints.length - 1].type === 'break') break;
+                rawPoints.pop();
+            }
+            render();
+        }
+
+        function clearCanvas() {
+            targetFadeLevel = 0; simulatedPath = []; rawPoints = [];
+            document.getElementById('stepsOutput').value = ''; render();
+        }
+
+        // --- KINEMATICS & GENERATION ---
+        function getShortestRotation(raw, last) {
+            let diff = (raw - last) / (2*Math.PI);
+            let offset = Math.round(diff);
+            return raw - (offset * 2 * Math.PI);
+        }
+
+        function calculateIK(x, y, lastBase=0, lastElbow=0) {
+            let D = Math.hypot(x, y);
+            const maxR = L1 + L2;
+            let cx = x, cy = y;
+            if(D > maxR) { cx = x*maxR/D; cy = y*maxR/D; D = maxR; }
             
-            appendToTerminal("System ready. Controls initialized.", false);
-        });
+            const lastT1 = -lastBase / STEPS_PER_RAD;
+            // Note: script.html logic for bending is: -elbow/steps - gear*t1
+            const lastBend = (-lastElbow / STEPS_PER_RAD) - (GEAR_RATIO * lastT1);
+            let finalT1, finalBend;
+
+            if (D < 0.1) {
+                finalBend = lastBend > 0 ? Math.PI : -Math.PI;
+                let rawT1 = (D < 1e-6) ? lastT1 : Math.atan2(y,x);
+                finalT1 = getShortestRotation(rawT1, lastT1);
+                cx=0; cy=0;
+            } else {
+                let cosBend = (D*D - L1*L1 - L2*L2) / (2*L1*L2);
+                cosBend = Math.max(-1, Math.min(1, cosBend));
+                
+                const bend1 = -Math.acos(cosBend);
+                const k1_1 = L1 + L2 * Math.cos(bend1);
+                const k2_1 = L2 * Math.sin(bend1);
+                const rawT1_1 = Math.atan2(cy, cx) - Math.atan2(k2_1, k1_1);
+                const t1_1 = getShortestRotation(rawT1_1, lastT1);
+                
+                const bend2 = Math.acos(cosBend);
+                const k1_2 = L1 + L2 * Math.cos(bend2);
+                const k2_2 = L2 * Math.sin(bend2);
+                const rawT1_2 = Math.atan2(cy, cx) - Math.atan2(k2_2, k1_2);
+                const t1_2 = getShortestRotation(rawT1_2, lastT1);
+
+                const b1 = -t1_1 * STEPS_PER_RAD;
+                const e1 = -(bend1 + GEAR_RATIO*t1_1) * STEPS_PER_RAD;
+                const b2 = -t1_2 * STEPS_PER_RAD;
+                const e2 = -(bend2 + GEAR_RATIO*t1_2) * STEPS_PER_RAD;
+
+                const cost1 = Math.abs(b1-lastBase) + Math.abs(e1-lastElbow);
+                const cost2 = Math.abs(b2-lastBase) + Math.abs(e2-lastElbow);
+
+                if(cost1 <= cost2) { finalT1=t1_1; finalBend=bend1; }
+                else { finalT1=t1_2; finalBend=bend2; }
+            }
+
+            const alpha = finalT1;
+            const beta = finalBend + (GEAR_RATIO * alpha);
+            return { 
+                base_steps: -alpha * STEPS_PER_RAD,
+                elbow_steps: -beta * STEPS_PER_RAD,
+                clamped_x: cx, clamped_y: cy
+            };
+        }
+
+        function calculateFK(p0, b, e) {
+            const a = -b / STEPS_PER_RAD;
+            const beta = -e / STEPS_PER_RAD;
+            const t1 = a;
+            const tb = beta - (GEAR_RATIO * a);
+            const t2 = t1 + tb;
+            const p1 = { x: p0.x + L1*Math.cos(t1), y: p0.y + L1*Math.sin(t1) };
+            const p2 = { x: p1.x + L2*Math.cos(t2), y: p1.y + L2*Math.sin(t2) };
+            return { p2 };
+        }
+
+        function smoothCommands(cmds, sensitivity) {
+            if(cmds.length === 0) return [];
+            const out = [];
+            let curr = {...cmds[0]};
+            for(let i=1; i<cmds.length; i++) {
+                const next = cmds[i];
+                let combine = false;
+                if(curr.delay == next.delay) {
+                     const sB1 = Math.sign(curr.base), sB2 = Math.sign(next.base);
+                     const sE1 = Math.sign(curr.elbow), sE2 = Math.sign(next.elbow);
+                     if(curr.base === 0 && next.base === 0 && sE1 === sE2) combine = true;
+                     else if(curr.elbow === 0 && next.elbow === 0 && sB1 === sB2) combine = true;
+                     else if(curr.base !== 0 && next.base !== 0 && curr.elbow !== 0 && next.elbow !== 0) {
+                         const r1 = curr.elbow/curr.base; 
+                         const r2 = next.elbow/next.base;
+                         if(Math.abs(r1-r2) < sensitivity && sB1===sB2) combine = true;
+                     }
+                }
+                if(combine) { curr.elbow += next.elbow; curr.base += next.base; } 
+                else { out.push(curr); curr = {...next}; }
+            }
+            out.push(curr);
+            return out;
+        }
+
+        const lerp = (a, b, t) => a + (b - a) * t;
+
+        function getClosestPerimeterPoint(target) {
+            const dist = Math.hypot(target.x, target.y);
+            if(dist === 0) return { x: MAX_REACH, y: 0 };
+            const ratio = MAX_REACH / dist;
+            return { x: target.x * ratio, y: target.y * ratio };
+        }
+
+        function generateCode() {
+            if(rawPoints.length === 0) { alert("Draw something first!"); return; }
+            targetFadeLevel = 1.0;
+
+            const inputSmoothDist = parseFloat(document.getElementById('smoothSlider').value);
+            const delay = 1000; 
+            const smoothingSensitivity = 0.000001; 
+            
+            let segments = [];
+            let currentSegment = [];
+            let lastP = null;
+            for(let p of rawPoints) {
+                if(p.type === 'break') {
+                    if(currentSegment.length > 0) segments.push(currentSegment);
+                    currentSegment = []; lastP = null; continue;
+                }
+                if(!lastP) { currentSegment.push(p); lastP = p; continue; }
+                const d = Math.hypot(p.x - lastP.x, p.y - lastP.y);
+                if(d >= inputSmoothDist) { currentSegment.push(p); lastP = p; }
+            }
+            if(currentSegment.length > 0) segments.push(currentSegment);
+            if(segments.length === 0) return;
+
+            let augmentedPoints = [];
+            const entryPoint = getClosestPerimeterPoint(segments[0][0]);
+            augmentedPoints.push(entryPoint);
+            for(let i=0; i<segments.length; i++) augmentedPoints = augmentedPoints.concat(segments[i]);
+            const exitPoint = getClosestPerimeterPoint(segments[segments.length-1][segments[segments.length-1].length-1]);
+            augmentedPoints.push(exitPoint);
+
+            let interp = [augmentedPoints[0]];
+            for(let i=0; i<augmentedPoints.length-1; i++) {
+                const p1 = augmentedPoints[i], p2 = augmentedPoints[i+1];
+                const dist = Math.hypot(p2.x-p1.x, p2.y-p1.y);
+                const steps = Math.max(1, Math.ceil(dist/LINEAR_RESOLUTION));
+                for(let j=1; j<=steps; j++) {
+                    let t = j/steps;
+                    interp.push({ x: lerp(p1.x,p2.x,t), y: lerp(p1.y,p2.y,t) });
+                }
+            }
+
+            let genCmds = [];
+            let prevB = 0, prevE = 0;
+            const start = calculateIK(interp[0].x, interp[0].y, 0, 0);
+            let dE = Math.round(start.elbow_steps - prevE);
+            let dB = Math.round(start.base_steps - prevB);
+            if(dE !== 0 || dB !== 0) genCmds.push({elbow:dE, base:dB, delay:delay});
+            prevB = start.base_steps; prevE = start.elbow_steps;
+
+            for(let i=1; i<interp.length; i++) {
+                const ik = calculateIK(interp[i].x, interp[i].y, prevB, prevE);
+                const rb = Math.round(ik.base_steps - prevB);
+                const re = Math.round(ik.elbow_steps - prevE);
+                if(rb!==0 || re!==0) genCmds.push({elbow:re, base:rb, delay:delay});
+                prevB = ik.base_steps; prevE = ik.elbow_steps;
+            }
+
+            let smoothed = genCmds;
+            let lastLen = -1;
+            while(smoothed.length !== lastLen) {
+                lastLen = smoothed.length;
+                smoothed = smoothCommands(smoothed, smoothingSensitivity);
+            }
+
+            document.getElementById('stepsOutput').value = smoothed.map(c => `G1 ${c.elbow} ${c.base} ${c.delay}`).join('\n');
+            simulateFromSteps(smoothed);
+        }
+
+        function simulateFromSteps(stepsList) {
+            simulatedPath = [];
+            let currentB = 0, currentE = 0;
+            const p0 = {x:0, y:0}; 
+            for(let s of stepsList) {
+                currentB += s.base; currentE += s.elbow;
+                const result = calculateFK(p0, currentB, currentE);
+                simulatedPath.push(result.p2); 
+            }
+        }
+
+        function copyToClipboard(id) {
+            const el = document.getElementById(id);
+            if(!el.value) { alert("Nothing to copy yet! Draw and Generate first."); return; }
+            el.select();
+            document.execCommand('copy');
+            const btn = document.querySelector('button[onclick^="copyToClipboard"]');
+            const originalText = btn.textContent;
+            btn.textContent = "✅ Copied!";
+            btn.style.backgroundColor = "var(--color-secondary)";
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.style.backgroundColor = "var(--color-primary)";
+            }, 1000);
+        }
+
+        init();
     </script>
 </body>
 </html>
