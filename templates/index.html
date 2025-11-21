@@ -58,13 +58,24 @@
         }
         .sidebar a:hover { background-color: var(--color-secondary); color: var(--color-surface); }
 
-        /* --- FIXED: Floating Menu Button (Top Left) --- */
+        /* --- Square Menu Button (Top Left) --- */
         .openbtn {
-            font-size: 24px; cursor: pointer; background-color: var(--color-primary);
-            color: var(--color-text); padding: 10px 15px; border: none;
-            border-radius: 8px; position: fixed;
-            top: 15px; left: 15px; /* Positioned clearly in top left */
-            z-index: 1100; box-shadow: 0 2px 5px var(--color-shadow);
+            font-size: 20px; 
+            cursor: pointer; 
+            background-color: var(--color-primary);
+            color: var(--color-text); 
+            border: none; 
+            border-radius: 8px; 
+            position: fixed;
+            top: 15px; left: 15px; 
+            z-index: 1100; 
+            box-shadow: 0 2px 5px var(--color-shadow);
+            width: 45px; 
+            height: 45px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            padding: 0;
             line-height: 1;
         }
 
@@ -79,14 +90,15 @@
         /* --- Main Content Wrapper --- */
         .main-content {
             margin-left: 0; transition: margin-left 0.3s; 
-            padding: 80px 15px 20px 15px; /* Top padding accounts for header buttons */
+            /* Reduced top padding from 80px to 60px */
+            padding: 60px 15px 20px 15px; 
             width: 100%; 
             display: flex; flex-direction: column; align-items: center;
             box-sizing: border-box;
         }
 
-        h1 { color: var(--color-secondary); margin-bottom: 5px; font-weight: 300; text-align: center; font-size: 1.8rem; }
-        p.subtitle { opacity: 0.7; margin-bottom: 20px; font-size: 0.9rem; text-align: center; }
+        h1 { color: var(--color-secondary); margin-bottom: 15px; font-weight: 300; text-align: center; font-size: 1.8rem; }
+        /* Removed .subtitle style */
 
         /* --- Status Banner --- */
         #status-banner {
@@ -108,50 +120,31 @@
             display: flex;
             flex-direction: column;
             gap: 15px;
-            /* FIXED: Responsive Width logic */
-            width: 100%; 
-            max-width: 700px; /* Wider on desktop */
+            width: 100%; max-width: 700px; 
             box-sizing: border-box;
         }
 
         /* --- Drawing Area --- */
         .canvas-container-outer {
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            padding: 10px 0;
+            width: 100%; display: flex; justify-content: center; padding: 10px 0;
         }
 
         .canvas-wrapper {
             position: relative;
-            /* FIXED: Ensure it takes full width available but maintains square aspect */
-            width: 100%; 
-            max-width: 100%;
-            aspect-ratio: 1 / 1; /* Forces square shape */
-            border-radius: 50%; 
-            border: 4px solid var(--color-primary);
-            overflow: hidden;
-            background: #fff;
-            cursor: crosshair;
-            box-shadow: inset 0 0 20px rgba(0,0,0,0.1);
-            touch-action: none; /* Prevent scrolling while drawing */
+            width: 100%; max-width: 100%; aspect-ratio: 1 / 1;
+            border-radius: 50%; border: 4px solid var(--color-primary);
+            overflow: hidden; background: #fff; cursor: crosshair;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.1); touch-action: none; 
         }
 
         body[data-theme='dark'] .canvas-wrapper {
-            background: #222;
-            border-color: var(--color-secondary);
+            background: #222; border-color: var(--color-secondary);
         }
 
-        canvas {
-            display: block;
-            width: 100%;
-            height: 100%;
-        }
+        canvas { display: block; width: 100%; height: 100%; }
 
         /* --- Controls --- */
         label { font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
-        
-        /* Hidden textarea */
         .hidden-output { position: absolute; left: -9999px; opacity: 0; }
 
         button {
@@ -162,17 +155,14 @@
         }
         button:hover { background-color: var(--color-secondary); transform: translateY(-1px); }
         
-        /* Secondary Button Style */
         button.secondary { background-color: transparent; border: 2px solid var(--color-primary); color: var(--color-text); }
         button.secondary:hover { background-color: var(--color-primary); color: var(--color-text); }
 
-        /* Square Button (Undo) */
         button.square-btn {
             width: 48px; flex-shrink: 0; font-size: 24px; padding: 0;
             display: flex; align-items: center; justify-content: center; line-height: 1;
         }
 
-        /* Export Area */
         .export-container {
             margin-top: 10px; padding: 15px;
             border: 2px dashed var(--color-input-border);
@@ -213,7 +203,7 @@
     <!-- MAIN CONTENT -->
     <div class="main-content">
         <h1>Machine Drawing Pad</h1>
-        <p class="subtitle">Draw freehand. Code interpolation set to 7.0mm.</p>
+        <!-- Subtitle Removed -->
 
         <div id="status-banner"></div>
 
@@ -291,23 +281,14 @@
         // --- INITIALIZATION ---
         function init() {
             resizeCanvas();
-            // Listen for window resize to fix "zoom" issues
-            window.addEventListener('resize', () => {
-                resizeCanvas();
-            });
+            window.addEventListener('resize', () => { resizeCanvas(); });
             
             canvas.addEventListener('mousedown', startDraw);
             canvas.addEventListener('mousemove', draw);
             canvas.addEventListener('mouseup', endDraw);
             canvas.addEventListener('mouseleave', endDraw);
-            canvas.addEventListener('touchstart', (e) => { 
-                if(e.cancelable) e.preventDefault(); 
-                startDraw(e.touches[0]); 
-            }, {passive: false});
-            canvas.addEventListener('touchmove', (e) => { 
-                if(e.cancelable) e.preventDefault(); 
-                draw(e.touches[0]); 
-            }, {passive: false});
+            canvas.addEventListener('touchstart', (e) => { if(e.cancelable) e.preventDefault(); startDraw(e.touches[0]); }, {passive: false});
+            canvas.addEventListener('touchmove', (e) => { if(e.cancelable) e.preventDefault(); draw(e.touches[0]); }, {passive: false});
             canvas.addEventListener('touchend', endDraw);
 
             const savedTheme = localStorage.getItem('theme') || 'light';
@@ -399,15 +380,9 @@
 
         function resizeCanvas() {
             const container = document.getElementById('canvasContainer');
-            // Use bounding client rect to get precise sub-pixel rendering size
             const rect = container.getBoundingClientRect();
             const size = rect.width; 
-
-            // Force square manually in JS to prevent aspect ratio glitching
-            // although CSS aspect-ratio handles most cases.
-            canvas.width = size;
-            canvas.height = size; 
-
+            canvas.width = size; canvas.height = size; 
             origin = { x: size / 2, y: size / 2 };
             scale = (size / 2) / (MAX_REACH * 1.05); 
             render();
@@ -531,27 +506,22 @@
             } else {
                 let cosBend = (D*D - L1*L1 - L2*L2) / (2*L1*L2);
                 cosBend = Math.max(-1, Math.min(1, cosBend));
-                
                 const bend1 = -Math.acos(cosBend);
                 const k1_1 = L1 + L2 * Math.cos(bend1);
                 const k2_1 = L2 * Math.sin(bend1);
                 const rawT1_1 = Math.atan2(cy, cx) - Math.atan2(k2_1, k1_1);
                 const t1_1 = getShortestRotation(rawT1_1, lastT1);
-                
                 const bend2 = Math.acos(cosBend);
                 const k1_2 = L1 + L2 * Math.cos(bend2);
                 const k2_2 = L2 * Math.sin(bend2);
                 const rawT1_2 = Math.atan2(cy, cx) - Math.atan2(k2_2, k1_2);
                 const t1_2 = getShortestRotation(rawT1_2, lastT1);
-
                 const b1 = -t1_1 * STEPS_PER_RAD;
                 const e1 = -(bend1 + GEAR_RATIO*t1_1) * STEPS_PER_RAD;
                 const b2 = -t1_2 * STEPS_PER_RAD;
                 const e2 = -(bend2 + GEAR_RATIO*t1_2) * STEPS_PER_RAD;
-
                 const cost1 = Math.abs(b1-lastBase) + Math.abs(e1-lastElbow);
                 const cost2 = Math.abs(b2-lastBase) + Math.abs(e2-lastElbow);
-
                 if(cost1 <= cost2) { finalT1=t1_1; finalBend=bend1; }
                 else { finalT1=t1_2; finalBend=bend2; }
             }
@@ -654,10 +624,12 @@
             let genCmds = [];
             let prevB = 0, prevE = 0;
             const start = calculateIK(interp[0].x, interp[0].y, 0, 0);
-            let dE = Math.round(start.elbow_steps - prevE);
-            let dB = Math.round(start.base_steps - prevB);
-            if(dE !== 0 || dB !== 0) genCmds.push({elbow:dE, base:dB, delay:delay});
-            prevB = start.base_steps; prevE = start.elbow_steps;
+
+            // --- MODIFIED SECTION: DO NOT GENERATE TRAVEL MOVE ---
+            // We calculate the Start position to set up the relative steps (prevB, prevE)
+            // but we DO NOT push a command to move from (0,0) to Start.
+            prevB = start.base_steps; 
+            prevE = start.elbow_steps;
 
             for(let i=1; i<interp.length; i++) {
                 const ik = calculateIK(interp[i].x, interp[i].y, prevB, prevE);
@@ -675,13 +647,23 @@
             }
 
             document.getElementById('stepsOutput').value = smoothed.map(c => `G1 ${c.elbow} ${c.base} ${c.delay}`).join('\n');
-            simulateFromSteps(smoothed);
+            
+            // Pass the 'start' IK state to the simulation so it knows where to begin drawing
+            simulateFromSteps(smoothed, start);
         }
 
-        function simulateFromSteps(stepsList) {
+        // Updated Simulation function to accept startState
+        function simulateFromSteps(stepsList, startState) {
             simulatedPath = [];
-            let currentB = 0, currentE = 0;
+            // Initialize current angle state to the start of the drawing
+            let currentB = startState ? startState.base_steps : 0;
+            let currentE = startState ? startState.elbow_steps : 0;
             const p0 = {x:0, y:0}; 
+
+            // Add initial point to simulation path
+            const startFK = calculateFK(p0, currentB, currentE);
+            simulatedPath.push(startFK.p2);
+
             for(let s of stepsList) {
                 currentB += s.base; currentE += s.elbow;
                 const result = calculateFK(p0, currentB, currentE);
