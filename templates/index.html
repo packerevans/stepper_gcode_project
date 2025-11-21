@@ -609,7 +609,7 @@
             targetFadeLevel = 1.0;
 
             const inputSmoothDist = parseFloat(document.getElementById('smoothSlider').value);
-            const symCount = parseInt(document.getElementById('symSlider').value); // GET SYMMETRY
+            const symCount = parseInt(document.getElementById('symSlider').value);
 
             const delay = 1000; 
             const smoothingSensitivity = 0.000001; 
@@ -628,7 +628,7 @@
                         expandedPoints.push({ x: rP.x, y: rP.y, type: 'point' });
                     }
                 }
-                // Add a break between rotations to force path reset logic
+                // Add a break between rotations to separate the segments logic
                 if(s < symCount - 1) expandedPoints.push({type: 'break'});
             }
 
@@ -649,29 +649,24 @@
             if(currentSegment.length > 0) segments.push(currentSegment);
             if(segments.length === 0) return;
 
-            // 3. LINK SEGMENTS VIA PERIMETER
+            // 3. LINK SEGMENTS (DIRECT CONNECT)
+            // We keep the entry/exit to perimeter so it doesn't drag to the start,
+            // but between segments, we connect directly.
             let augmentedPoints = [];
+            
+            // Calculate entry from perimeter to the very first point
             const entryPoint = getClosestPerimeterPoint(segments[0][0]);
             augmentedPoints.push(entryPoint);
             
             for(let i=0; i<segments.length; i++) {
-                // If not the first segment, we need to travel from prev end to next start
-                if(i > 0) {
-                    const prevEnd = segments[i-1][segments[i-1].length-1];
-                    const nextStart = segments[i][0];
-                    
-                    // Travel via perimeter to avoid dragging through sand
-                    const pExit = getClosestPerimeterPoint(prevEnd);
-                    const pEntry = getClosestPerimeterPoint(nextStart);
-                    augmentedPoints.push(pExit);
-                    // Optional: Add intermediate perimeter points if needed (arc), 
-                    // but linear move along edge is usually fine for sand tables
-                    augmentedPoints.push(pEntry);
-                }
-                // Add the actual drawing segment
+                // DIRECT CONNECTION:
+                // We simply concatenate the segments. The interpolation step (Step 4)
+                // will automatically draw a line from the last point of segment[i-1]
+                // to the first point of segment[i].
                 augmentedPoints = augmentedPoints.concat(segments[i]);
             }
             
+            // Calculate exit to perimeter from the very last point
             const exitPoint = getClosestPerimeterPoint(segments[segments.length-1][segments[segments.length-1].length-1]);
             augmentedPoints.push(exitPoint);
 
@@ -714,6 +709,7 @@
             
             simulateFromSteps(smoothed, start);
         }
+
 
         function simulateFromSteps(stepsList, startState) {
             simulatedPath = [];
