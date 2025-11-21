@@ -205,6 +205,10 @@ def led_controls():
 @app.route("/script")
 def script():
     return render_template("script.html")
+    
+@app.route("/AI_builder")
+def AI_builder():
+    return render_template("AI_builder.html")
 
 @app.route("/designs")
 def designs():
