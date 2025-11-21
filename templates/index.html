@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Packers Sand Table Control</title>
     
-    <!-- Icons (using paths from your index.html) -->
+    <!-- Icons -->
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
 
@@ -36,15 +36,16 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: var(--color-background);
             color: var(--color-text);
-            margin: 0; padding: 0; /* Reset padding for sidebar */
+            margin: 0; padding: 0;
             transition: background 0.3s, color 0.3s;
             display: flex;
             flex-direction: column;
             align-items: center;
             min-height: 100vh;
+            overflow-x: hidden; /* Prevent horizontal scroll */
         }
 
-        /* --- Sidebar & Nav (From index.html) --- */
+        /* --- Sidebar & Nav --- */
         .sidebar {
             height: 100%; width: 0; position: fixed; top: 0; left: 0;
             background-color: var(--color-primary); overflow-x: hidden;
@@ -57,11 +58,14 @@
         }
         .sidebar a:hover { background-color: var(--color-secondary); color: var(--color-surface); }
 
+        /* --- FIXED: Floating Menu Button (Top Left) --- */
         .openbtn {
-            font-size: 26px; cursor: pointer; background-color: var(--color-primary);
-            color: var(--color-text); padding: 10px 20px; border: none;
-            border-radius: 0 0 var(--border-radius) 0; position: fixed;
-            top: 0; left: 0; z-index: 1100; box-shadow: 0 2px 5px var(--color-shadow);
+            font-size: 24px; cursor: pointer; background-color: var(--color-primary);
+            color: var(--color-text); padding: 10px 15px; border: none;
+            border-radius: 8px; position: fixed;
+            top: 15px; left: 15px; /* Positioned clearly in top left */
+            z-index: 1100; box-shadow: 0 2px 5px var(--color-shadow);
+            line-height: 1;
         }
 
         #themeToggle {
@@ -75,18 +79,18 @@
         /* --- Main Content Wrapper --- */
         .main-content {
             margin-left: 0; transition: margin-left 0.3s; 
-            padding: 20px; padding-top: 60px;
-            width: 100%; max-width: 600px;
+            padding: 80px 15px 20px 15px; /* Top padding accounts for header buttons */
+            width: 100%; 
             display: flex; flex-direction: column; align-items: center;
             box-sizing: border-box;
         }
 
-        h1 { color: var(--color-secondary); margin-bottom: 5px; font-weight: 300; text-align: center; }
+        h1 { color: var(--color-secondary); margin-bottom: 5px; font-weight: 300; text-align: center; font-size: 1.8rem; }
         p.subtitle { opacity: 0.7; margin-bottom: 20px; font-size: 0.9rem; text-align: center; }
 
-        /* --- Status Banner (From designs.html) --- */
+        /* --- Status Banner --- */
         #status-banner {
-            width: 100%; padding: 12px; border-radius: var(--border-radius); margin-bottom: 20px;
+            width: 100%; max-width: 700px; padding: 12px; border-radius: var(--border-radius); margin-bottom: 15px;
             text-align: center; font-weight: 600; opacity: 0; transition: opacity 0.3s;
             min-height: 20px; line-height: 1.5; pointer-events: none;
         }
@@ -95,30 +99,42 @@
         body[data-theme='dark'] .status-success { background-color: #14521f; color: #d4edda; }
         body[data-theme='dark'] .status-error { background-color: #630c17; color: #f8d7da; }
 
-
         /* --- Card Layout --- */
         .card {
             background: var(--color-surface);
-            padding: 25px;
+            padding: 20px;
             border-radius: var(--border-radius);
             box-shadow: 0 4px 10px var(--color-shadow);
             display: flex;
             flex-direction: column;
             gap: 15px;
-            width: 100%;
+            /* FIXED: Responsive Width logic */
+            width: 100%; 
+            max-width: 700px; /* Wider on desktop */
+            box-sizing: border-box;
         }
 
         /* --- Drawing Area --- */
+        .canvas-container-outer {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            padding: 10px 0;
+        }
+
         .canvas-wrapper {
             position: relative;
-            width: 100%;
-            aspect-ratio: 1/1;
+            /* FIXED: Ensure it takes full width available but maintains square aspect */
+            width: 100%; 
+            max-width: 100%;
+            aspect-ratio: 1 / 1; /* Forces square shape */
             border-radius: 50%; 
             border: 4px solid var(--color-primary);
             overflow: hidden;
             background: #fff;
             cursor: crosshair;
             box-shadow: inset 0 0 20px rgba(0,0,0,0.1);
+            touch-action: none; /* Prevent scrolling while drawing */
         }
 
         body[data-theme='dark'] .canvas-wrapper {
@@ -135,12 +151,8 @@
         /* --- Controls --- */
         label { font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
         
-        /* Hidden textarea for clipboard copy */
-        .hidden-output {
-            position: absolute;
-            left: -9999px;
-            opacity: 0;
-        }
+        /* Hidden textarea */
+        .hidden-output { position: absolute; left: -9999px; opacity: 0; }
 
         button {
             background-color: var(--color-primary); color: var(--color-text);
@@ -190,7 +202,10 @@
         <a href="/terminal">Terminal</a>
     </div>
 
+    <!-- Fixed Menu Button -->
     <button class="openbtn" onclick="openNav()">☰</button>
+    
+    <!-- Fixed Theme Toggle -->
     <button id="themeToggle" onclick="toggleTheme()">
         <span id="themeIcon">☀️</span>
     </button>
@@ -208,8 +223,10 @@
                 <span id="coordDisplay" style="font-family:monospace; font-size:12px;">X: 0, Y: 0</span>
             </div>
             
-            <div class="canvas-wrapper" id="canvasContainer">
-                <canvas id="drawCanvas"></canvas>
+            <div class="canvas-container-outer">
+                <div class="canvas-wrapper" id="canvasContainer">
+                    <canvas id="drawCanvas"></canvas>
+                </div>
             </div>
 
             <div class="slider-control">
@@ -236,7 +253,7 @@
                     <button onclick="sendToTable()">🚀 Send to Table</button>
                 </div>
                 
-                <!-- Queue Controls (Added for convenience) -->
+                <!-- Queue Controls -->
                 <div class="btn-group tight" style="margin-top:5px;">
                     <button class="secondary" style="font-size:12px; padding:8px;" onclick="sendCommandSimple('PAUSE')">Pause</button>
                     <button class="secondary" style="font-size:12px; padding:8px;" onclick="sendCommandSimple('RESUME')">Resume</button>
@@ -257,7 +274,6 @@
         const STEPS_PER_RAD = STEPS_PER_DEG * (180 / Math.PI);
         const LINEAR_RESOLUTION = 7.0; // mm
         
-        // Assume base URL is root
         const BASE_URL = window.location.origin;
 
         // --- STATE ---
@@ -275,14 +291,23 @@
         // --- INITIALIZATION ---
         function init() {
             resizeCanvas();
-            window.addEventListener('resize', resizeCanvas);
+            // Listen for window resize to fix "zoom" issues
+            window.addEventListener('resize', () => {
+                resizeCanvas();
+            });
             
             canvas.addEventListener('mousedown', startDraw);
             canvas.addEventListener('mousemove', draw);
             canvas.addEventListener('mouseup', endDraw);
             canvas.addEventListener('mouseleave', endDraw);
-            canvas.addEventListener('touchstart', (e) => { e.preventDefault(); startDraw(e.touches[0]); });
-            canvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(e.touches[0]); });
+            canvas.addEventListener('touchstart', (e) => { 
+                if(e.cancelable) e.preventDefault(); 
+                startDraw(e.touches[0]); 
+            }, {passive: false});
+            canvas.addEventListener('touchmove', (e) => { 
+                if(e.cancelable) e.preventDefault(); 
+                draw(e.touches[0]); 
+            }, {passive: false});
             canvas.addEventListener('touchend', endDraw);
 
             const savedTheme = localStorage.getItem('theme') || 'light';
@@ -333,7 +358,7 @@
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ 
                         gcode: code,
-                        speed_override: 1000 // Pass default or make selectable if needed
+                        speed_override: 1000 
                     })
                 });
                 
@@ -346,7 +371,6 @@
             }
         }
 
-        // Simple helper for Pause/Resume/Clear
         function sendCommandSimple(cmd) {
             fetch(`${BASE_URL}/send`, {
                 method: "POST",
@@ -375,9 +399,15 @@
 
         function resizeCanvas() {
             const container = document.getElementById('canvasContainer');
-            const size = container.clientWidth;
+            // Use bounding client rect to get precise sub-pixel rendering size
+            const rect = container.getBoundingClientRect();
+            const size = rect.width; 
+
+            // Force square manually in JS to prevent aspect ratio glitching
+            // although CSS aspect-ratio handles most cases.
             canvas.width = size;
-            canvas.height = size;
+            canvas.height = size; 
+
             origin = { x: size / 2, y: size / 2 };
             scale = (size / 2) / (MAX_REACH * 1.05); 
             render();
@@ -490,7 +520,6 @@
             if(D > maxR) { cx = x*maxR/D; cy = y*maxR/D; D = maxR; }
             
             const lastT1 = -lastBase / STEPS_PER_RAD;
-            // Note: script.html logic for bending is: -elbow/steps - gear*t1
             const lastBend = (-lastElbow / STEPS_PER_RAD) - (GEAR_RATIO * lastT1);
             let finalT1, finalBend;
 
