@@ -266,6 +266,7 @@
         let isDrawing = false;
         let rawPoints = [];
         let simulatedPath = [];
+        let currentStrokeStart = null; // Stores start point of current stroke for targeting
         let animFrameId = null;
         let fadeLevel = 0; 
         let targetFadeLevel = 0;
@@ -295,10 +296,9 @@
                 document.getElementById('smoothVal').textContent = e.target.value + 'px';
             });
 
-            // NEW LISTENER FOR SYMMETRY
             document.getElementById('symSlider').addEventListener('input', (e) => {
                 document.getElementById('symVal').textContent = e.target.value + 'x';
-                render(); // Re-render to show new symmetry immediately
+                render(); 
             });
 
             requestAnimationFrame(animateLoop);
@@ -400,7 +400,6 @@
             ctx.restore();
         }
 
-        // Helper to rotate points for drawing/generating
         function rotatePoint(x, y, angleRad) {
             const cos = Math.cos(angleRad);
             const sin = Math.sin(angleRad);
@@ -416,7 +415,26 @@
 
             const symCount = parseInt(document.getElementById('symSlider').value);
 
-            // Sim Layer (Gray) - Already fully generated, just draw it
+            // --- DRAW TARGET MARKER ---
+            // If drawing & symmetry active, show connection target
+            if (isDrawing && currentStrokeStart && symCount > 1) {
+                const stepAngle = (Math.PI * 2 / symCount);
+                
+                // Calculate where the NEXT start point is
+                const targetMm = rotatePoint(currentStrokeStart.x, currentStrokeStart.y, stepAngle);
+                const targetPx = mmToPx(targetMm.x, targetMm.y);
+
+                ctx.save();
+                ctx.beginPath();
+                // Draw hollow black circle
+                ctx.arc(targetPx.x, targetPx.y, 8, 0, Math.PI * 2); 
+                ctx.strokeStyle = "#000000"; 
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // Sim Layer
             if(simulatedPath.length > 0 && fadeLevel > 0.01) {
                 ctx.save();
                 const opacity = fadeLevel * 0.8; 
@@ -433,7 +451,7 @@
                 ctx.restore();
             }
 
-            // Drawing Layer (Color) - Apply Symmetry Here
+            // Drawing Layer
             if(rawPoints.length > 0) {
                 ctx.save();
                 const opacity = 1.0 - (fadeLevel * 0.9);
@@ -441,7 +459,6 @@
                 ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
                 ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--color-secondary');
 
-                // Loop through symmetry axes
                 for(let s = 0; s < symCount; s++) {
                     const angle = s * (Math.PI * 2 / symCount);
                     
@@ -450,7 +467,6 @@
                     for(let p of rawPoints) {
                         if(p.type === 'break') { isNextMove = true; continue; }
                         
-                        // Rotate the point mathmatically
                         const rP = rotatePoint(p.x, p.y, angle);
                         const px = mmToPx(rP.x, rP.y);
 
@@ -467,20 +483,18 @@
             const rect = canvas.getBoundingClientRect();
             return { x: e.clientX - rect.left, y: e.clientY - rect.top };
         }
-                // --- COORDINATE CONVERSION (UPDATED) ---
-        // We added a Negative (-) sign to the X calculations below.
-        // This flips the internal math so the machine draws mirrored, fixing backwards text.
-
+        
+        // Inverted coords for mirroring text
         function pxToMm(px, py) { 
             return { 
-                x: -(px - origin.x) / scale, // Added negative sign here
+                x: -(px - origin.x) / scale, 
                 y: -(py - origin.y) / scale 
             }; 
         }
 
         function mmToPx(mx, my) { 
             return { 
-                x: origin.x - (mx * scale),  // Changed + to - here to match
+                x: origin.x - (mx * scale),  
                 y: origin.y - (my * scale) 
             }; 
         }
@@ -489,15 +503,31 @@
             isDrawing = true;
             targetFadeLevel = 0; 
             document.getElementById('stepsOutput').value = '';
-            const pos = getPos(e); addPoint(pos.x, pos.y); render();
+            
+            const pos = getPos(e); 
+            const mm = pxToMm(pos.x, pos.y);
+            currentStrokeStart = { x: mm.x, y: mm.y }; // Capture start point
+
+            addPoint(pos.x, pos.y); 
+            render();
         }
+
         function draw(e) {
             if (!isDrawing) return;
             const pos = getPos(e); const mm = pxToMm(pos.x, pos.y);
             document.getElementById('coordDisplay').textContent = `X: ${mm.x.toFixed(1)}, Y: ${mm.y.toFixed(1)}`;
             addPoint(pos.x, pos.y); render();
         }
-        function endDraw() { if(isDrawing) { isDrawing = false; rawPoints.push({type: 'break'}); } }
+
+        function endDraw() { 
+            if(isDrawing) { 
+                isDrawing = false; 
+                rawPoints.push({type: 'break'}); 
+                currentStrokeStart = null; // Reset target
+                render(); // Clear target
+            } 
+        }
+
         function addPoint(px, py) {
             const mm = pxToMm(px, py);
             const dist = Math.hypot(mm.x, mm.y);
@@ -629,12 +659,9 @@
             const delay = 1000; 
             const smoothingSensitivity = 0.000001; 
             
-            // 1. EXPAND RAW POINTS BASED ON SYMMETRY
             let expandedPoints = [];
-            
             for(let s = 0; s < symCount; s++) {
                 const angle = s * (Math.PI * 2 / symCount);
-                
                 for(let p of rawPoints) {
                     if(p.type === 'break') {
                         expandedPoints.push({type: 'break'});
@@ -643,15 +670,12 @@
                         expandedPoints.push({ x: rP.x, y: rP.y, type: 'point' });
                     }
                 }
-                // Add a break between rotations to separate the segments logic
                 if(s < symCount - 1) expandedPoints.push({type: 'break'});
             }
 
-            // 2. PROCESS INTO SEGMENTS (Standard Logic)
             let segments = [];
             let currentSegment = [];
             let lastP = null;
-
             for(let p of expandedPoints) {
                 if(p.type === 'break') {
                     if(currentSegment.length > 0) segments.push(currentSegment);
@@ -664,28 +688,17 @@
             if(currentSegment.length > 0) segments.push(currentSegment);
             if(segments.length === 0) return;
 
-            // 3. LINK SEGMENTS (DIRECT CONNECT)
-            // We keep the entry/exit to perimeter so it doesn't drag to the start,
-            // but between segments, we connect directly.
             let augmentedPoints = [];
-            
-            // Calculate entry from perimeter to the very first point
             const entryPoint = getClosestPerimeterPoint(segments[0][0]);
             augmentedPoints.push(entryPoint);
             
             for(let i=0; i<segments.length; i++) {
-                // DIRECT CONNECTION:
-                // We simply concatenate the segments. The interpolation step (Step 4)
-                // will automatically draw a line from the last point of segment[i-1]
-                // to the first point of segment[i].
                 augmentedPoints = augmentedPoints.concat(segments[i]);
             }
             
-            // Calculate exit to perimeter from the very last point
             const exitPoint = getClosestPerimeterPoint(segments[segments.length-1][segments[segments.length-1].length-1]);
             augmentedPoints.push(exitPoint);
 
-            // 4. INTERPOLATE
             let interp = [augmentedPoints[0]];
             for(let i=0; i<augmentedPoints.length-1; i++) {
                 const p1 = augmentedPoints[i], p2 = augmentedPoints[i+1];
@@ -697,7 +710,6 @@
                 }
             }
 
-            // 5. IK & GCODE GENERATION
             let genCmds = [];
             let prevB = 0, prevE = 0;
             const start = calculateIK(interp[0].x, interp[0].y, 0, 0);
@@ -721,10 +733,8 @@
             }
 
             document.getElementById('stepsOutput').value = smoothed.map(c => `G1 ${c.elbow} ${c.base} ${c.delay}`).join('\n');
-            
             simulateFromSteps(smoothed, start);
         }
-
 
         function simulateFromSteps(stepsList, startState) {
             simulatedPath = [];
