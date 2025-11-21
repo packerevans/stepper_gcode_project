@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Packers Sand Table Control</title>
+    
+    <!-- Icons -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
+
+    <style>
+        /* --- Root Variables --- */
+        :root {
+            --color-primary: #d2b48c; /* Khaki/Tan */
+            --color-secondary: #b08d5c; /* Darker Tan */
+            --color-background: #f0f0f0; 
+            --color-surface: #ffffff; 
+            --color-text: #333333;
+            --color-shadow: rgba(0, 0, 0, 0.08);
+            --border-radius: 12px;
+            --color-input-bg: #f9f9f9;
+            --color-input-border: #ccc;
+        }
+
+        body[data-theme='dark'] {
+            --color-background: #1e1e1e;
+            --color-surface: #2c2c2c;
+            --color-text: #e0e0e0;
+            --color-shadow: rgba(255, 255, 255, 0.08);
+            --color-input-bg: #333;
+            --color-input-border: #555;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--color-background);
+            color: var(--color-text);
+            margin: 0; padding: 0;
+            transition: background 0.3s, color 0.3s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* --- Sidebar & Nav --- */
+        .sidebar {
+            height: 100%; width: 0; position: fixed; top: 0; left: 0;
+            background-color: var(--color-primary); overflow-x: hidden;
+            transition: 0.3s; padding-top: 60px; z-index: 1000;
+            box-shadow: 2px 0 5px var(--color-shadow);
+        }
+        .sidebar a {
+            padding: 15px 24px; text-decoration: none; font-size: 18px;
+            color: var(--color-text); display: block; transition: 0.2s; font-weight: 500;
+        }
+        .sidebar a:hover { background-color: var(--color-secondary); color: var(--color-surface); }
+
+        .openbtn {
+            font-size: 20px; cursor: pointer; background-color: var(--color-primary);
+            color: var(--color-text); border: none; border-radius: 8px; 
+            position: fixed; top: 15px; left: 15px; z-index: 1100; 
+            box-shadow: 0 2px 5px var(--color-shadow); width: 45px; height: 45px; 
+            display: flex; align-items: center; justify-content: center; padding: 0; line-height: 1;
+        }
+
+        #themeToggle {
+            position: fixed; top: 15px; right: 15px; background: var(--color-surface);
+            color: var(--color-text); border: 1px solid var(--color-text);
+            padding: 8px; border-radius: 50%; z-index: 1200;
+            width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+            transition: background 0.3s; cursor: pointer;
+        }
+
+        /* --- Main Content Wrapper --- */
+        .main-content {
+            margin-left: 0; transition: margin-left 0.3s; 
+            padding: 60px 15px 20px 15px; width: 100%; 
+            display: flex; flex-direction: column; align-items: center; box-sizing: border-box;
+        }
+
+        h1 { color: var(--color-secondary); margin-bottom: 15px; font-weight: 300; text-align: center; font-size: 1.8rem; }
+
+        /* --- Status Banner --- */
+        #status-banner {
+            width: 100%; max-width: 700px; padding: 12px; border-radius: var(--border-radius); margin-bottom: 15px;
+            text-align: center; font-weight: 600; opacity: 0; transition: opacity 0.3s;
+            min-height: 20px; line-height: 1.5; pointer-events: none;
+        }
+        .status-success { background-color: #d4edda; color: #155724; }
+        .status-error { background-color: #f8d7da; color: #721c24; }
+        body[data-theme='dark'] .status-success { background-color: #14521f; color: #d4edda; }
+        body[data-theme='dark'] .status-error { background-color: #630c17; color: #f8d7da; }
+
+        /* --- Card Layout --- */
+        .card {
+            background: var(--color-surface); padding: 20px;
+            border-radius: var(--border-radius); box-shadow: 0 4px 10px var(--color-shadow);
+            display: flex; flex-direction: column; gap: 15px;
+            width: 100%; max-width: 700px; box-sizing: border-box;
+        }
+
+        /* --- AI Input Area --- */
+        .ai-controls {
+            display: flex; gap: 10px; margin-bottom: 5px;
+        }
+        textarea.prompt-input {
+            flex-grow: 1; padding: 12px; border-radius: 8px;
+            border: 2px solid var(--color-input-border);
+            background-color: var(--color-input-bg); color: var(--color-text);
+            font-family: inherit; resize: none; height: 50px;
+        }
+        textarea.prompt-input:focus { outline: none; border-color: var(--color-secondary); }
+
+        /* --- Drawing Area --- */
+        .canvas-container-outer {
+            width: 100%; display: flex; justify-content: center; padding: 10px 0; position: relative;
+        }
+
+        .canvas-wrapper {
+            position: relative; width: 100%; max-width: 100%; aspect-ratio: 1 / 1;
+            border-radius: 50%; border: 4px solid var(--color-primary);
+            overflow: hidden; background: #fff; 
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.1);
+        }
+
+        body[data-theme='dark'] .canvas-wrapper { background: #222; border-color: var(--color-secondary); }
+
+        canvas { display: block; width: 100%; height: 100%; }
+
+        /* --- Loading Overlay --- */
+        .loader-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.8); display: flex; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 10;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s;
+            border-radius: 50%;
+        }
+        body[data-theme='dark'] .loader-overlay { background: rgba(0,0,0,0.8); }
+        
+        .spinner {
+            width: 40px; height: 40px; border: 4px solid var(--color-primary);
+            border-top-color: transparent; border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* --- Controls --- */
+        label { font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .hidden-output { position: absolute; left: -9999px; opacity: 0; }
+
+        button {
+            background-color: var(--color-primary); color: var(--color-text);
+            border: none; padding: 12px; border-radius: 8px; font-size: 15px;
+            cursor: pointer; transition: 0.2s; font-weight: 600; width: 100%;
+            box-shadow: 0 2px 5px var(--color-shadow);
+        }
+        button:hover { background-color: var(--color-secondary); transform: translateY(-1px); }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        
+        button.secondary { background-color: transparent; border: 2px solid var(--color-primary); color: var(--color-text); }
+        button.secondary:hover { background-color: var(--color-primary); color: var(--color-text); }
+
+        button.generate-btn {
+            background-color: var(--color-secondary); color: #fff;
+            width: auto; padding: 0 25px;
+        }
+
+        .export-container {
+            margin-top: 10px; padding: 15px;
+            border: 2px dashed var(--color-input-border);
+            border-radius: var(--border-radius);
+            display: flex; flex-direction: column; gap: 10px;
+        }
+
+        .btn-group { display: flex; gap: 10px; }
+        .btn-group.tight { gap: 5px; }
+
+    </style>
+</head>
+<body data-theme="light">
+
+    <!-- SIDEBAR MENU -->
+    <div id="mySidebar" class="sidebar">
+        <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
+        <a href="/controls">Controls</a>
+        <a href="/">Designs</a> 
+        <a href="/led_controls">Led Controls</a>
+        <a href="/terminal">Terminal</a>
+    </div>
+
+    <button class="openbtn" onclick="openNav()">☰</button>
+    <button id="themeToggle" onclick="toggleTheme()">
+        <span id="themeIcon">☀️</span>
+    </button>
+
+    <!-- MAIN CONTENT -->
+    <div class="main-content">
+        <h1>AI Art Generator</h1>
+
+        <div id="status-banner"></div>
+
+        <div class="card">
+            <!-- AI Input -->
+            <div>
+                <label>Describe your design</label>
+                <div class="ai-controls">
+                    <textarea id="promptInput" class="prompt-input" placeholder="e.g., A simple geometric fox head"></textarea>
+                    <button id="generateBtn" class="generate-btn" onclick="handleGenerate()">✨ Generate</button>
+                </div>
+            </div>
+
+            <!-- Canvas Area -->
+            <div class="canvas-container-outer">
+                <div class="canvas-wrapper" id="canvasContainer">
+                    <canvas id="drawCanvas"></canvas>
+                    <div id="loader" class="loader-overlay">
+                        <div class="spinner"></div>
+                        <p style="margin-top:10px; font-size:12px;">Dreaming & Tracing...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <label>Workspace (~203mm)</label>
+                <span id="pointCount" style="font-family:monospace; font-size:12px;">Points: 0</span>
+            </div>
+
+            <!-- Hidden Textarea for Code -->
+            <textarea id="stepsOutput" class="hidden-output"></textarea>
+
+            <!-- Export Section -->
+            <div class="export-container">
+                <label style="color:var(--color-secondary);">Control & Export</label>
+                <div class="btn-group">
+                    <button onclick="copyToClipboard('stepsOutput')">📋 Copy Code</button>
+                    <button onclick="sendToTable()">🚀 Send to Table</button>
+                </div>
+                
+                <!-- Queue Controls -->
+                <div class="btn-group tight" style="margin-top:5px;">
+                    <button class="secondary" style="font-size:12px; padding:8px;" onclick="sendCommandSimple('PAUSE')">Pause</button>
+                    <button class="secondary" style="font-size:12px; padding:8px;" onclick="sendCommandSimple('RESUME')">Resume</button>
+                    <button class="secondary" style="font-size:12px; padding:8px;" onclick="sendCommandSimple('CLEAR')">Clear Queue</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const L1 = 101.3; 
+        const L2 = 101.3; 
+        const MAX_REACH = L1 + L2;
+        const GEAR_RATIO = 9 / 8; 
+        const STEPS_PER_DEG = 3200 / 360;
+        const STEPS_PER_RAD = STEPS_PER_DEG * (180 / Math.PI);
+        const LINEAR_RESOLUTION = 7.0; 
+        const BASE_URL = window.location.origin;
+        const apiKey = ""; // Provided by environment
+
+        // --- STATE ---
+        let rawPoints = [];
+        let simulatedPath = [];
+        let animFrameId = null;
+        let fadeLevel = 1.0; // Always show simulation in this mode
+        const canvas = document.getElementById('drawCanvas');
+        const ctx = canvas.getContext('2d');
+        let scale = 1; 
+        let origin = { x: 0, y: 0 };
+
+        // --- INITIALIZATION ---
+        function init() {
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.body.setAttribute('data-theme', savedTheme);
+            document.getElementById('themeToggle').textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+
+            requestAnimationFrame(animateLoop);
+        }
+
+        // --- AI GENERATION & PROCESSING ---
+        async function handleGenerate() {
+            const promptText = document.getElementById('promptInput').value;
+            if(!promptText) { alert("Please enter a prompt"); return; }
+
+            setLoading(true);
+            showStatus("Generating image...", true);
+
+            try {
+                // 1. Generate Image with Gemini
+                const enhancedPrompt = `simple continuous line art of ${promptText}, black lines on white background, high contrast, no shading, thick lines, minimalist vector style`;
+                
+                // UPDATED: Use imagen-4.0-generate-001
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        instances: [{ prompt: enhancedPrompt }],
+                        parameters: { sampleCount: 1 }
+                    })
+                });
+
+                if (!response.ok) {
+                    const errText = await response.text();
+                    throw new Error(`API Error: ${response.status} - ${errText}`);
+                }
+
+                const data = await response.json();
+                if(!data.predictions || !data.predictions[0]) throw new Error("No image generated");
+                
+                const base64 = data.predictions[0].bytesBase64Encoded;
+                const img = new Image();
+                img.src = `data:image/png;base64,${base64}`;
+                
+                await new Promise(r => img.onload = r);
+
+                // 2. Trace Image to Paths
+                showStatus("Tracing path...", true);
+                const points = traceImage(img);
+                
+                if(points.length === 0) throw new Error("Could not trace path");
+
+                // 3. Update State & Generate Code
+                rawPoints = points; // Points are already in mm relative to center
+                document.getElementById('pointCount').textContent = `Points: ${rawPoints.length}`;
+                generateCode(); // This will populate simulatedPath and stepsOutput
+                
+                showStatus("Design Ready!", true);
+
+            } catch (e) {
+                console.error(e);
+                showStatus("Error: " + e.message, false);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function setLoading(isLoading) {
+            const loader = document.getElementById('loader');
+            const btn = document.getElementById('generateBtn');
+            if(isLoading) {
+                loader.style.opacity = '1';
+                loader.style.pointerEvents = 'auto';
+                btn.disabled = true;
+            } else {
+                loader.style.opacity = '0';
+                loader.style.pointerEvents = 'none';
+                btn.disabled = false;
+            }
+        }
+
+        // --- TRACING ALGORITHM (Client-Side) ---
+        function traceImage(img) {
+            // 1. Draw to hidden canvas to read pixels
+            const tempCanvas = document.createElement('canvas');
+            const size = 500; // Internal processing resolution
+            tempCanvas.width = size;
+            tempCanvas.height = size;
+            const tCtx = tempCanvas.getContext('2d');
+            tCtx.drawImage(img, 0, 0, size, size);
+            
+            const imgData = tCtx.getImageData(0, 0, size, size);
+            const data = imgData.data;
+            const width = imgData.width;
+            const height = imgData.height;
+
+            // 2. Simple Edge Detection / Thresholding
+            // Store black pixels in a Set for quick lookup
+            const blackPixels = new Set();
+            for(let i=0; i<data.length; i+=4) {
+                const avg = (data[i] + data[i+1] + data[i+2]) / 3;
+                if(avg < 128) { // Threshold for black
+                    const idx = i/4;
+                    const x = idx % width;
+                    const y = Math.floor(idx / width);
+                    // Basic edge check: only keep if it has a white neighbor (outline effect)
+                    blackPixels.add(`${x},${y}`);
+                }
+            }
+
+            if(blackPixels.size === 0) return [];
+
+            // 3. Greedy Neighbor Linking (Connect the dots)
+            // Convert Set to Array for processing
+            let remaining = [];
+            blackPixels.forEach(k => {
+                const [x,y] = k.split(',').map(Number);
+                remaining.push({x,y});
+            });
+
+            // Downsample to reduce point count significantly before sorting
+            // This acts as a crude simplification
+            remaining = remaining.filter((_, i) => i % 3 === 0); 
+
+            if(remaining.length === 0) return [];
+
+            const orderedPath = [];
+            let current = remaining.pop();
+            orderedPath.push(current);
+
+            // While points remain, find the nearest neighbor
+            // This creates a "Traveling Salesperson" approximation for a continuous line
+            while(remaining.length > 0) {
+                let nearestIdx = -1;
+                let minDistSq = Infinity;
+                
+                // Optimization: Only search a subset if array is huge, or use spatial hasing
+                // For < 5000 points, brute force is okay in JS ~50-100ms
+                for(let i=0; i<remaining.length; i++) {
+                    const dx = remaining[i].x - current.x;
+                    const dy = remaining[i].y - current.y;
+                    const dSq = dx*dx + dy*dy;
+                    if(dSq < minDistSq) {
+                        minDistSq = dSq;
+                        nearestIdx = i;
+                        if(dSq < 2) break; // Optimization: Close enough, take it
+                    }
+                }
+
+                if(nearestIdx !== -1) {
+                    current = remaining[nearestIdx];
+                    
+                    // If distance is huge, it's a jump (travel move). 
+                    // Sand table draws everything, so we just add it. 
+                    // Ideally we interpolate logic, but simple append works for continuous look.
+                    orderedPath.push(current);
+                    
+                    // Swap-pop for performance
+                    remaining[nearestIdx] = remaining[remaining.length-1];
+                    remaining.pop();
+                } else {
+                    break;
+                }
+            }
+
+            // 4. Convert Pixel Coords to mm
+            // 0,0 is center. Max reach is ~203mm. 
+            // Image 0,0 is top-left.
+            const mmPath = orderedPath.map(p => {
+                // Normalize 0..1
+                let nx = p.x / size;
+                let ny = p.y / size;
+                
+                // Center 0,0
+                nx = (nx - 0.5) * 2; // -1 to 1
+                ny = (ny - 0.5) * 2; // -1 to 1
+                
+                // Scale to Sand Table (leave 5% margin)
+                // Flip Y because canvas Y is down, standard cartesian Y is up
+                return {
+                    x: nx * (MAX_REACH * 0.95),
+                    y: -ny * (MAX_REACH * 0.95)
+                };
+            });
+
+            // 5. Simplify (Ramer-Douglas-Peucker light)
+            // Remove collinear points to reduce command count
+            const simplified = [];
+            simplified.push(mmPath[0]);
+            for(let i=1; i<mmPath.length-1; i++) {
+                const prev = simplified[simplified.length-1];
+                const curr = mmPath[i];
+                const dist = Math.hypot(curr.x-prev.x, curr.y-prev.y);
+                if(dist > 1.5) { // 1.5mm minimum segment
+                    simplified.push(curr);
+                }
+            }
+            simplified.push(mmPath[mmPath.length-1]);
+
+            return simplified;
+        }
+
+        // --- KINEMATICS & GENERATION (Reused) ---
+        function getShortestRotation(raw, last) {
+            let diff = (raw - last) / (2*Math.PI);
+            let offset = Math.round(diff);
+            return raw - (offset * 2 * Math.PI);
+        }
+
+        function calculateIK(x, y, lastBase=0, lastElbow=0) {
+            let D = Math.hypot(x, y);
+            const maxR = L1 + L2;
+            let cx = x, cy = y;
+            if(D > maxR) { cx = x*maxR/D; cy = y*maxR/D; D = maxR; }
+            
+            const lastT1 = -lastBase / STEPS_PER_RAD;
+            const lastBend = (-lastElbow / STEPS_PER_RAD) - (GEAR_RATIO * lastT1);
+            let finalT1, finalBend;
+
+            if (D < 0.1) {
+                finalBend = lastBend > 0 ? Math.PI : -Math.PI;
+                let rawT1 = (D < 1e-6) ? lastT1 : Math.atan2(y,x);
+                finalT1 = getShortestRotation(rawT1, lastT1);
+                cx=0; cy=0;
+            } else {
+                let cosBend = (D*D - L1*L1 - L2*L2) / (2*L1*L2);
+                cosBend = Math.max(-1, Math.min(1, cosBend));
+                const bend1 = -Math.acos(cosBend);
+                const k1_1 = L1 + L2 * Math.cos(bend1);
+                const k2_1 = L2 * Math.sin(bend1);
+                const rawT1_1 = Math.atan2(cy, cx) - Math.atan2(k2_1, k1_1);
+                const t1_1 = getShortestRotation(rawT1_1, lastT1);
+                const bend2 = Math.acos(cosBend);
+                const k1_2 = L1 + L2 * Math.cos(bend2);
+                const k2_2 = L2 * Math.sin(bend2);
+                const rawT1_2 = Math.atan2(cy, cx) - Math.atan2(k2_2, k1_2);
+                const t1_2 = getShortestRotation(rawT1_2, lastT1);
+                const b1 = -t1_1 * STEPS_PER_RAD;
+                const e1 = -(bend1 + GEAR_RATIO*t1_1) * STEPS_PER_RAD;
+                const b2 = -t1_2 * STEPS_PER_RAD;
+                const e2 = -(bend2 + GEAR_RATIO*t1_2) * STEPS_PER_RAD;
+                const cost1 = Math.abs(b1-lastBase) + Math.abs(e1-lastElbow);
+                const cost2 = Math.abs(b2-lastBase) + Math.abs(e2-lastElbow);
+                if(cost1 <= cost2) { finalT1=t1_1; finalBend=bend1; }
+                else { finalT1=t1_2; finalBend=bend2; }
+            }
+
+            const alpha = finalT1;
+            const beta = finalBend + (GEAR_RATIO * alpha);
+            return { 
+                base_steps: -alpha * STEPS_PER_RAD,
+                elbow_steps: -beta * STEPS_PER_RAD,
+                clamped_x: cx, clamped_y: cy
+            };
+        }
+
+        function calculateFK(p0, b, e) {
+            const a = -b / STEPS_PER_RAD;
+            const beta = -e / STEPS_PER_RAD;
+            const t1 = a;
+            const tb = beta - (GEAR_RATIO * a);
+            const t2 = t1 + tb;
+            const p1 = { x: p0.x + L1*Math.cos(t1), y: p0.y + L1*Math.sin(t1) };
+            const p2 = { x: p1.x + L2*Math.cos(t2), y: p1.y + L2*Math.sin(t2) };
+            return { p2 };
+        }
+
+        function smoothCommands(cmds, sensitivity) {
+            if(cmds.length === 0) return [];
+            const out = [];
+            let curr = {...cmds[0]};
+            for(let i=1; i<cmds.length; i++) {
+                const next = cmds[i];
+                let combine = false;
+                if(curr.delay == next.delay) {
+                     const sB1 = Math.sign(curr.base), sB2 = Math.sign(next.base);
+                     const sE1 = Math.sign(curr.elbow), sE2 = Math.sign(next.elbow);
+                     if(curr.base === 0 && next.base === 0 && sE1 === sE2) combine = true;
+                     else if(curr.elbow === 0 && next.elbow === 0 && sB1 === sB2) combine = true;
+                     else if(curr.base !== 0 && next.base !== 0 && curr.elbow !== 0 && next.elbow !== 0) {
+                         const r1 = curr.elbow/curr.base; 
+                         const r2 = next.elbow/next.base;
+                         if(Math.abs(r1-r2) < sensitivity && sB1===sB2) combine = true;
+                     }
+                }
+                if(combine) { curr.elbow += next.elbow; curr.base += next.base; } 
+                else { out.push(curr); curr = {...next}; }
+            }
+            out.push(curr);
+            return out;
+        }
+
+        const lerp = (a, b, t) => a + (b - a) * t;
+
+        function getClosestPerimeterPoint(target) {
+            const dist = Math.hypot(target.x, target.y);
+            if(dist === 0) return { x: MAX_REACH, y: 0 };
+            const ratio = MAX_REACH / dist;
+            return { x: target.x * ratio, y: target.y * ratio };
+        }
+
+        function generateCode() {
+            if(rawPoints.length === 0) return;
+            const delay = 1000; 
+            const smoothingSensitivity = 0.000001; 
+            
+            // Use rawPoints directly as the path
+            let augmentedPoints = [];
+            
+            // Start at nearest perimeter
+            const entryPoint = getClosestPerimeterPoint(rawPoints[0]);
+            augmentedPoints.push(entryPoint);
+            augmentedPoints = augmentedPoints.concat(rawPoints);
+            // Exit nearest perimeter
+            const exitPoint = getClosestPerimeterPoint(rawPoints[rawPoints.length-1]);
+            augmentedPoints.push(exitPoint);
+
+            let interp = [augmentedPoints[0]];
+            for(let i=0; i<augmentedPoints.length-1; i++) {
+                const p1 = augmentedPoints[i], p2 = augmentedPoints[i+1];
+                const dist = Math.hypot(p2.x-p1.x, p2.y-p1.y);
+                const steps = Math.max(1, Math.ceil(dist/LINEAR_RESOLUTION));
+                for(let j=1; j<=steps; j++) {
+                    let t = j/steps;
+                    interp.push({ x: lerp(p1.x,p2.x,t), y: lerp(p1.y,p2.y,t) });
+                }
+            }
+
+            let genCmds = [];
+            let prevB = 0, prevE = 0;
+            const start = calculateIK(interp[0].x, interp[0].y, 0, 0);
+            prevB = start.base_steps; 
+            prevE = start.elbow_steps;
+
+            for(let i=1; i<interp.length; i++) {
+                const ik = calculateIK(interp[i].x, interp[i].y, prevB, prevE);
+                const rb = Math.round(ik.base_steps - prevB);
+                const re = Math.round(ik.elbow_steps - prevE);
+                if(rb!==0 || re!==0) genCmds.push({elbow:re, base:rb, delay:delay});
+                prevB = ik.base_steps; prevE = ik.elbow_steps;
+            }
+
+            let smoothed = genCmds;
+            let lastLen = -1;
+            while(smoothed.length !== lastLen) {
+                lastLen = smoothed.length;
+                smoothed = smoothCommands(smoothed, smoothingSensitivity);
+            }
+
+            document.getElementById('stepsOutput').value = smoothed.map(c => `G1 ${c.elbow} ${c.base} ${c.delay}`).join('\n');
+            simulateFromSteps(smoothed, start);
+        }
+
+        function simulateFromSteps(stepsList, startState) {
+            simulatedPath = [];
+            let currentB = startState ? startState.base_steps : 0;
+            let currentE = startState ? startState.elbow_steps : 0;
+            const p0 = {x:0, y:0}; 
+
+            const startFK = calculateFK(p0, currentB, currentE);
+            simulatedPath.push(startFK.p2);
+
+            for(let s of stepsList) {
+                currentB += s.base; currentE += s.elbow;
+                const result = calculateFK(p0, currentB, currentE);
+                simulatedPath.push(result.p2); 
+            }
+        }
+
+        // --- UI HELPERS ---
+        function openNav() {
+            document.getElementById("mySidebar").style.width = "200px";
+            if(window.innerWidth > 600) document.querySelector(".main-content").style.marginLeft = "200px";
+        }
+        function closeNav() {
+            document.getElementById("mySidebar").style.width = "0";
+            document.querySelector(".main-content").style.marginLeft = "0";
+        }
+        function toggleTheme() {
+            const b = document.body;
+            const n = b.getAttribute('data-theme')==='dark'?'light':'dark';
+            b.setAttribute('data-theme', n); localStorage.setItem('theme', n);
+            document.getElementById('themeToggle').textContent = n==='dark'?'🌙':'☀️';
+            render();
+        }
+
+        function showStatus(message, isSuccess = true) {
+            const banner = document.getElementById('status-banner');
+            banner.textContent = message;
+            banner.className = isSuccess ? 'status-success' : 'status-error';
+            banner.style.opacity = '1';
+            setTimeout(() => { banner.style.opacity = '0'; }, 5000);
+        }
+
+        async function sendToTable() {
+            const code = document.getElementById('stepsOutput').value;
+            if (!code) { alert("Generate code first!"); return; }
+            showStatus("Sending...", true);
+            try {
+                const response = await fetch(`${BASE_URL}/send_gcode_block`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ gcode: code, speed_override: 1000 })
+                });
+                const data = await response.json();
+                if (data.success) showStatus("Sent successfully!", true);
+                else showStatus("Error: " + data.error, false);
+            } catch (e) { showStatus("Network Error: " + e.message, false); }
+        }
+
+        function sendCommandSimple(cmd) {
+            fetch(`${BASE_URL}/send`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ command: cmd })
+            })
+            .then(r => r.json()).then(d => {
+                if(d.success) showStatus(cmd + " sent", true);
+                else showStatus("Error: " + d.error, false);
+            }).catch(e => showStatus("Error: " + e.message, false));
+        }
+
+        function copyToClipboard(id) {
+            const el = document.getElementById(id);
+            if(!el.value) { alert("Nothing to copy yet!"); return; }
+            el.select(); document.execCommand('copy');
+            const btn = document.querySelector('button[onclick^="copyToClipboard"]');
+            const old = btn.textContent; btn.textContent = "✅ Copied!";
+            setTimeout(() => btn.textContent = old, 1000);
+        }
+
+        // --- RENDERING ---
+        function animateLoop() { render(); requestAnimationFrame(animateLoop); }
+
+        function resizeCanvas() {
+            const c = document.getElementById('canvasContainer');
+            const size = c.getBoundingClientRect().width;
+            canvas.width = size; canvas.height = size;
+            origin = { x: size / 2, y: size / 2 };
+            scale = (size / 2) / (MAX_REACH * 1.05);
+            render();
+        }
+
+        function drawGrid() {
+            ctx.save();
+            ctx.translate(origin.x, origin.y);
+            ctx.fillStyle = '#d2b48c'; ctx.beginPath(); ctx.arc(0,0, 4, 0, 2*Math.PI); ctx.fill();
+            ctx.strokeStyle = document.body.getAttribute('data-theme') === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+            ctx.beginPath(); ctx.arc(0,0, L1 * scale, 0, 2*Math.PI); ctx.stroke();
+            ctx.restore();
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawGrid();
+            if(simulatedPath.length > 0) {
+                ctx.save();
+                const opacity = 0.8;
+                ctx.strokeStyle = document.body.getAttribute('data-theme') === 'dark' ? `rgba(255,255,255,${opacity})` : `rgba(0,0,0,${opacity})`;
+                ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+                ctx.beginPath();
+                const start = mmToPx(simulatedPath[0].x, simulatedPath[0].y);
+                ctx.moveTo(start.x, start.y);
+                for(let i=1; i<simulatedPath.length; i++) {
+                    const p = mmToPx(simulatedPath[i].x, simulatedPath[i].y);
+                    ctx.lineTo(p.x, p.y);
+                }
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        function mmToPx(mx, my) { return { x: origin.x + (mx * scale), y: origin.y - (my * scale) }; }
+
+        init();
+    </script>
+</body>
+</html>
