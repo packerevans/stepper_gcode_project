@@ -5,6 +5,8 @@ import re
 import asyncio
 import wifi_tools 
 import ble_controller 
+import socket  # Ensure this is imported at the top
+
 
 app = Flask(__name__)
 app.secret_key = 'your_super_secret_key' 
@@ -119,6 +121,21 @@ if arduino_connected:
 
 
 # ---------------- UTILITY ROUTES ----------------
+
+@app.route("/wifi_setup")
+def wifi_setup_page():
+    networks = wifi_tools.get_wifi_networks()
+    current_ip = get_current_ip()
+    
+    # Get the hostname (e.g., "sandtable")
+    hostname = socket.gethostname()
+    
+    return render_template(
+        "wifi_setup.html", 
+        networks=networks, 
+        ip_address=current_ip, 
+        hostname=hostname  # <--- Pass it here
+    )
 @app.route("/wifi_setup")
 def wifi_setup_page():
     # Use wifi_tools.get_wifi_networks() instead of just get_wifi_networks()
