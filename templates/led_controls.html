@@ -53,14 +53,14 @@
             top: 0; left: 0; z-index: 1100; box-shadow: 0 2px 5px var(--color-shadow);
         }
         
-        /* UPDATED: Fixed Theme Toggle to be a perfect circle */
+        /* UPDATED: Added min-width: 0 to override global button styles */
         #themeToggle {
             position: fixed; top: 15px; right: 15px; background: var(--color-surface);
             color: var(--color-text); border: 1px solid var(--color-text);
-            /* Removed padding to strictly control size */
             padding: 0; 
             border-radius: 50%; z-index: 1200;
-            width: 45px; height: 45px; /* Fixed equal width/height */
+            width: 45px; height: 45px; 
+            min-width: 0; /* <--- THIS FIXES THE OVAL ISSUE */
             display: flex; align-items: center; justify-content: center;
             transition: background 0.3s;
             cursor: pointer;
@@ -106,7 +106,7 @@
             background-color: var(--color-primary); color: var(--color-text);
             border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer;
             font-size: 16px; transition: 0.2s ease-in-out; font-weight: 600;
-            min-width: 120px;
+            min-width: 120px; /* This was causing the oval shape on the toggle */
         }
         button:hover {
             background-color: var(--color-secondary); box-shadow: 0 2px 5px var(--color-shadow);
@@ -218,13 +218,12 @@
         const DEFAULT_FAVS = ["#ffffff", "#f0f0f0", "#e0e0e0"]; 
         
         // --- COLOR CALIBRATION ---
-        // Adjust these values to fix the "Blueish" tint of your LEDs.
-        // 1.0 = 100% strength, 0.8 = 80% strength.
-        // We reduce Blue significantly to make "White" look like real white.
+        // Adjust these values if your white is still too blue or too green.
+        // Lower numbers mean LESS of that color.
         const CALIBRATION = {
-            r: 1.0,  // Red (Keep full)
-            g: 0.9,  // Green (Reduce slightly)
-            b: 0.75  // Blue (Reduce significantly to fix cool-white tint)
+            r: 1.0,  // Red (100%)
+            g: 0.9,  // Green (90% - reduced slightly)
+            b: 0.75  // Blue (75% - reduced heavily to fix blue tint)
         };
 
         function hexToRgb(hex) {
