@@ -14,7 +14,34 @@
 </head>
 <body>
     <div class="card">
-        <h2>Wi-Fi Setup</h2>
+        <div class="card">
+    <h2>Wi-Fi Setup</h2>
+    
+    <div style="background: #eef; color: #333; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 5px solid #d2b48c;">
+        <p style="margin:0; font-size: 0.9rem;"><strong>Current Hotspot Address:</strong> {{ ip_address }}:5000</p>
+        <hr style="border: 0; border-top: 1px solid #ccc; margin: 10px 0;">
+        <p style="margin:0; font-size: 0.9rem;">Once connected to home Wi-Fi, access this table at:</p>
+        <h3 style="margin: 5px 0 0 0; color: #d2b48c;">http://{{ hostname }}.local:5000</h3>
+    </div>
+
+    <div id="network-list">
+        {% for net in networks %}
+        ```
+
+### How it works for the user:
+
+1.  **The User connects** to your "SandTableSetup" hotspot.
+2.  **They see the page:**
+    > **Current Hotspot Address:** 10.42.0.1:5000
+    >
+    > **Once connected to home Wi-Fi, access this table at:**
+    > **[http://sandtable.local:5000](http://sandtable.local:5000)**
+3.  **They enter their Wi-Fi credentials.**
+4.  **The Pi reboots** and connects to their home router.
+5.  **The User** disconnects from the hotspot, reconnects to their home Wi-Fi, and types `http://sandtable.local:5000` to start drawing.
+
+### Next Step for You
+Would you like me to help you write the **JavaScript for the "Connect" button** so that when the user clicks it, it shows a loading spinner and then displays a "Success! Reconnecting..." message before the Pi reboots?
         <p>Select a network to connect the Sand Table to the internet.</p>
         
         <div id="network-list">
