@@ -16,7 +16,7 @@ bool paused = true;
 int motorSpeed = 1000;  // default µs delay
 
 // -------------------- QUEUE CONFIG --------------------
-const int MAX_QUEUE_SIZE = 20;
+const int MAX_QUEUE_SIZE = 40;
 
 struct GCommand {
   long armSteps;
