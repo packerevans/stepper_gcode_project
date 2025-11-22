@@ -126,8 +126,6 @@ if arduino_connected:
 def wifi_setup_page():
     networks = wifi_tools.get_wifi_networks()
     current_ip = get_current_ip()
-    
-    # Get the hostname (e.g., "sandtable")
     hostname = socket.gethostname()
     
     return render_template(
