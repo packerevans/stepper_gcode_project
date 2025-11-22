@@ -136,11 +136,6 @@ def wifi_setup_page():
         ip_address=current_ip, 
         hostname=hostname  # <--- Pass it here
     )
-@app.route("/wifi_setup")
-def wifi_setup_page():
-    # Use wifi_tools.get_wifi_networks() instead of just get_wifi_networks()
-    networks = wifi_tools.get_wifi_networks() 
-    return render_template("wifi_setup.html", networks=networks)
 
 @app.route("/api/configure_wifi", methods=["POST"])
 def configure_wifi():
