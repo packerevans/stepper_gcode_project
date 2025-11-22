@@ -118,7 +118,32 @@ if arduino_connected:
 
 
 # ---------------- UTILITY ROUTES ----------------
+@app.route("/wifi_setup")
+def wifi_setup_page():
+    # Only allow this page to be loaded; logic to restrict access could go here
+    networks = get_wifi_networks()
+    return render_template("wifi_setup.html", networks=networks)
 
+@app.route("/api/configure_wifi", methods=["POST"])
+def configure_wifi():
+    data = request.json
+    ssid = data.get("ssid")
+    password = data.get("password")
+    
+    if not ssid:
+        return jsonify(success=False, message="No SSID provided")
+
+    log_message(f"Attempting to connect to {ssid}...")
+    success, msg = connect_to_wifi(ssid, password)
+    
+    if success:
+        # Optional: Trigger a reboot after 5 seconds so the connection takes over
+        def reboot_later():
+            time.sleep(5)
+            subprocess.run(["sudo", "reboot"])
+        threading.Thread(target=reboot_later).start()
+        
+    return jsonify(success=success, message=msg)
 @app.route("/check_password", methods=["POST"])
 def check_password_route():
     data = request.json
