@@ -15,8 +15,6 @@
             --color-surface: #ffffff; 
             --color-text: #333333;
             --color-shadow: rgba(0, 0, 0, 0.08);
-            --color-terminal-bg: #1e1e1e;
-            --color-terminal-text: #00ff00;
             --border-radius: 12px;
         }
 
@@ -25,7 +23,6 @@
             --color-surface: #2c2c2c;
             --color-text: #e0e0e0;
             --color-shadow: rgba(255, 255, 255, 0.08);
-            --color-terminal-bg: #000000;
         }
         
         body {
@@ -56,12 +53,17 @@
             top: 0; left: 0; z-index: 1100; box-shadow: 0 2px 5px var(--color-shadow);
         }
         
+        /* UPDATED: Fixed Theme Toggle to be a perfect circle */
         #themeToggle {
             position: fixed; top: 15px; right: 15px; background: var(--color-surface);
             color: var(--color-text); border: 1px solid var(--color-text);
-            padding: 8px; border-radius: 50%; z-index: 1200;
-            width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+            /* Removed padding to strictly control size */
+            padding: 0; 
+            border-radius: 50%; z-index: 1200;
+            width: 45px; height: 45px; /* Fixed equal width/height */
+            display: flex; align-items: center; justify-content: center;
             transition: background 0.3s;
+            cursor: pointer;
         }
         
         .main-content {
@@ -140,11 +142,13 @@
         .fav-circle:hover { transform: scale(1.1); border-color: var(--color-primary); }
         
         .terminal {
-            background: var(--color-terminal-bg); color: var(--color-terminal-text);
+            background: #ffffff; 
+            color: #000000;
             font-family: 'Consolas', 'Courier New', monospace; padding: 15px;
             border-radius: 8px; width: 100%; height: 150px; overflow-y: auto;
-            font-size: 12px; border: 1px solid var(--color-shadow);
+            font-size: 13px; border: 1px solid #ccc;
             text-align: left; box-sizing: border-box; white-space: pre-wrap;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
         }
 
         @media (max-width: 600px) {
@@ -203,7 +207,7 @@
 
         <div class="control-section" style="padding:15px;">
             <h3 style="margin-top:0; font-size: 1em; opacity: 0.6;">System Log (Live)</h3>
-            <div class="terminal" id="terminal">Connecting to log stream...</div>
+            <div class="terminal" id="terminal">Loading...</div>
         </div>
     </div>
 
@@ -212,6 +216,16 @@
         let debounceTimer;
         const MAX_FAVS = 3; 
         const DEFAULT_FAVS = ["#ffffff", "#f0f0f0", "#e0e0e0"]; 
+        
+        // --- COLOR CALIBRATION ---
+        // Adjust these values to fix the "Blueish" tint of your LEDs.
+        // 1.0 = 100% strength, 0.8 = 80% strength.
+        // We reduce Blue significantly to make "White" look like real white.
+        const CALIBRATION = {
+            r: 1.0,  // Red (Keep full)
+            g: 0.9,  // Green (Reduce slightly)
+            b: 0.75  // Blue (Reduce significantly to fix cool-white tint)
+        };
 
         function hexToRgb(hex) {
             const bigint = parseInt(hex.slice(1), 16);
@@ -226,11 +240,16 @@
         }
 
         async function sendCurrentState() {
-            // FIX: Removed the "if (!isConnected) return;" line.
-            // Now you can send commands even if the UI status is bugged.
             const hex = document.getElementById('colorPicker').value;
-            const rgb = hexToRgb(hex);
-            await sendCommand(`LED:${rgb.r},${rgb.g},${rgb.b},16`, false); 
+            const rawRgb = hexToRgb(hex);
+            
+            // Apply Calibration
+            const r = Math.floor(rawRgb.r * CALIBRATION.r);
+            const g = Math.floor(rawRgb.g * CALIBRATION.g);
+            const b = Math.floor(rawRgb.b * CALIBRATION.b);
+
+            // Send corrected values to the strip
+            await sendCommand(`LED:${r},${g},${b},16`, false); 
         }
 
         async function applyFavorite(hex) {
@@ -287,7 +306,6 @@
                 txt.style.color = "#d4a017"; 
                 await sendCommand("CONNECT");
                 
-                // Fast poll to catch the update
                 let checks = 0;
                 const rapidPoll = setInterval(async () => {
                     await pollStatus();
@@ -317,8 +335,6 @@
             try {
                 const res = await fetch("/status");
                 const data = await res.json();
-                
-                // Only update UI if status actually changed to prevent flicker
                 if (isConnected !== data.connected) {
                     isConnected = data.connected;
                     updateStatusUI(isConnected);
@@ -342,8 +358,23 @@
             try {
                 const res = await fetch("/terminal/logs");
                 const logs = await res.json();
+                
+                const relevantKeywords = ["LED", "Power", "Connect", "Disconnect", "Error", "Serial"];
+                
+                const filteredLogs = logs.filter(line => {
+                    if (line.includes("GET /") || line.includes("POST /") || line.includes("HTTP/1.1")) {
+                        return false;
+                    }
+                    return relevantKeywords.some(keyword => line.toUpperCase().includes(keyword.toUpperCase()));
+                });
+
                 const term = document.getElementById("terminal");
-                term.innerHTML = logs.join("\n");
+                
+                if(filteredLogs.length === 0) {
+                    term.innerHTML = "<span style='opacity:0.5; font-style:italic'>Waiting for commands...</span>";
+                } else {
+                    term.innerHTML = filteredLogs.join("\n");
+                }
                 term.scrollTop = term.scrollHeight;
             } catch (e) {
                 console.log("Log fetch error", e);
