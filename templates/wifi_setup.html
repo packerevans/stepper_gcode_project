@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sand Table Setup</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: sans-serif; background: #222; color: #ddd; padding: 20px; }
+        .card { background: #333; padding: 20px; border-radius: 10px; max-width: 400px; margin: 0 auto; }
+        input, select, button { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 5px; border: none; }
+        button { background: #d2b48c; font-weight: bold; cursor: pointer; }
+        .network-item { padding: 10px; border-bottom: 1px solid #444; cursor: pointer; }
+        .network-item:hover { background: #444; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>Wi-Fi Setup</h2>
+        <p>Select a network to connect the Sand Table to the internet.</p>
+        
+        <div id="network-list">
+            {% for net in networks %}
+            <div class="network-item" onclick="selectNetwork('{{net.ssid}}')">
+                <strong>{{net.ssid}}</strong> ({{net.signal}}%)
+            </div>
+            {% endfor %}
+        </div>
+
+        <div id="credentials" style="display:none; margin-top:20px;">
+            <h3 id="selected-ssid"></h3>
+            <input type="password" id="password" placeholder="Wi-Fi Password">
+            <button onclick="connect()">Connect</button>
+            <button onclick="location.reload()" style="background:#555; color:white;">Cancel</button>
+        </div>
+    </div>
+
+    <script>
+        let selectedSSID = "";
+
+        function selectNetwork(ssid) {
+            selectedSSID = ssid;
+            document.getElementById('network-list').style.display = 'none';
+            document.getElementById('credentials').style.display = 'block';
+            document.getElementById('selected-ssid').innerText = ssid;
+        }
+
+        async function connect() {
+            const pass = document.getElementById('password').value;
+            const btn = document.querySelector('button');
+            btn.innerText = "Connecting...";
+            btn.disabled = true;
+
+            const res = await fetch('/api/configure_wifi', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ ssid: selectedSSID, password: pass })
+            });
+            
+            const data = await res.json();
+            alert(data.message);
+            if(data.success) {
+                alert("Rebooting! Connect your device to the new Wi-Fi network.");
+            } else {
+                location.reload();
+            }
+        }
+    </script>
+</body>
+</html>
