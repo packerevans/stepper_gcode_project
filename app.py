@@ -60,6 +60,18 @@ def read_from_serial():
             time.sleep(1)
 
 current_gcode_runner = None
+def get_current_ip():
+    try:
+        # We don't actually connect, just check how we WOULD route to the internet
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(0)
+        # This doesn't send data, just checks the routing table
+        s.connect(('10.254.254.254', 1)) 
+        ip = s.getsockname()[0]
+        s.close()
+    except Exception:
+        ip = '127.0.0.1'
+    return ip
 
 class GCodeRunner(threading.Thread):
     def __init__(self, gcode_block):
