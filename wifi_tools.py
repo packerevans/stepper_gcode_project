@@ -1,5 +1,5 @@
-# Add this import at the top
 import subprocess
+import time
 
 def get_wifi_networks():
     """Scans for available Wi-Fi networks using nmcli."""
@@ -29,6 +29,37 @@ def get_wifi_networks():
     except Exception as e:
         print(f"Wifi Scan Error: {e}")
         return []
+
+def get_saved_networks():
+    """Returns a list of saved Wi-Fi connection profiles."""
+    try:
+        # List connections: Name, Type
+        result = subprocess.run(
+            ["sudo", "nmcli", "-t", "-f", "NAME,TYPE", "connection", "show"],
+            capture_output=True, text=True
+        )
+        saved = []
+        for line in result.stdout.split('\n'):
+            if "802-11-wireless" in line:
+                name = line.split(':')[0]
+                # Filter out the Hotspot itself so you don't delete it!
+                if name not in ["Hotspot", "SandTableSetup"]: 
+                    saved.append(name)
+        return saved
+    except Exception as e:
+        return []
+
+def forget_network(ssid):
+    """Deletes a saved connection profile."""
+    try:
+        # Don't allow deleting the hotspot config
+        if ssid in ["Hotspot", "SandTableSetup"]:
+            return False, "Cannot delete the Hotspot profile."
+            
+        subprocess.run(["sudo", "nmcli", "connection", "delete", ssid], check=True)
+        return True, f"Forgot {ssid}"
+    except Exception as e:
+        return False, str(e)
 
 def connect_to_wifi(ssid, password):
     """Tells NetworkManager to connect to a new network."""
