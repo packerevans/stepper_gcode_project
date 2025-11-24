@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, Response, url_for, send_from_directory
+from flask import Flask, render_template, request, jsonify, Response, url_for, send_from_directory, redirect
 import serial, threading, time, subprocess
 import os
 import re
@@ -60,6 +60,7 @@ def read_from_serial():
             time.sleep(1)
 
 current_gcode_runner = None
+
 def get_current_ip():
     try:
         # We don't actually connect, just check how we WOULD route to the internet
@@ -144,7 +145,7 @@ def wifi_setup_page():
         "wifi_setup.html", 
         networks=networks, 
         ip_address=current_ip, 
-        hostname=hostname  # <--- Pass it here
+        hostname=hostname
     )
 
 @app.route("/api/configure_wifi", methods=["POST"])
@@ -157,16 +158,17 @@ def configure_wifi():
         return jsonify(success=False, message="No SSID provided")
 
     log_message(f"Attempting to connect to {ssid}...")
-    success, msg = connect_to_wifi(ssid, password)
+    success, msg = wifi_tools.connect_to_wifi(ssid, password) # Ensure we use the imported module
     
     if success:
-        # Optional: Trigger a reboot after 5 seconds so the connection takes over
+        # Trigger a reboot after 5 seconds so the connection takes over
         def reboot_later():
             time.sleep(5)
             subprocess.run(["sudo", "reboot"])
         threading.Thread(target=reboot_later).start()
         
     return jsonify(success=success, message=msg)
+
 @app.route("/check_password", methods=["POST"])
 def check_password_route():
     data = request.json
@@ -234,6 +236,15 @@ def update_firmware():
     
 @app.route("/")
 def index():
+    # 1. Get the current IP to see how we are connected
+    current_ip = get_current_ip()
+    
+    # 2. Check if we are on the Hotspot IP (Usually 10.42.0.1 or 192.168.4.1)
+    if current_ip == "10.42.0.1" or current_ip == "192.168.4.1":
+        # If yes, FORCE them to the setup page
+        return redirect(url_for('wifi_setup_page'))
+
+    # 3. Otherwise (if on Home Wi-Fi), show the normal controls
     return render_template("designs.html")
 
 @app.route("/controls")
@@ -335,8 +346,6 @@ def send_command():
     data = request.json
     cmd = data.get("command")
     
-    # *** FIX: LOGGING ADDED HERE ***
-    # This forces a log into the terminal so you KNOW the button worked.
     log_message(f"WEB RECEIVED: {cmd}")
 
     if not cmd: return jsonify(success=False)
