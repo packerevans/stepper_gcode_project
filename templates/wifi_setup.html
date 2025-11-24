@@ -4,59 +4,55 @@
     <title>Sand Table Setup</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { font-family: sans-serif; background: #222; color: #ddd; padding: 20px; }
-        .card { background: #333; padding: 20px; border-radius: 10px; max-width: 400px; margin: 0 auto; }
-        input, select, button { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 5px; border: none; }
-        button { background: #d2b48c; font-weight: bold; cursor: pointer; }
-        .network-item { padding: 10px; border-bottom: 1px solid #444; cursor: pointer; }
-        .network-item:hover { background: #444; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #222; color: #ddd; padding: 20px; display: flex; justify-content: center; }
+        .card { background: #333; padding: 25px; border-radius: 12px; width: 100%; max-width: 400px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        h2 { margin-top: 0; color: #d2b48c; text-align: center; }
+        
+        /* Status Box */
+        .status-box { background: #eef; color: #333; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 5px solid #d2b48c; font-size: 0.9rem; }
+        .status-box h3 { margin: 5px 0 0 0; color: #d2b48c; font-size: 1.1rem; }
+
+        /* Form Elements */
+        input, button { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 6px; border: none; box-sizing: border-box; }
+        input { background: #444; color: white; border: 1px solid #555; }
+        button { background: #d2b48c; color: #222; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 1rem; }
+        button:hover { background: #b08d5c; }
+        button.cancel { background: #555; color: white; }
+        button.cancel:hover { background: #666; }
+
+        /* Network List */
+        .network-item { padding: 12px; border-bottom: 1px solid #444; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .network-item:hover { background: #444; border-radius: 4px; }
+        .signal { color: #888; font-size: 0.8rem; }
     </style>
 </head>
 <body>
     <div class="card">
-        <div class="card">
-    <h2>Wi-Fi Setup</h2>
-    
-    <div style="background: #eef; color: #333; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 5px solid #d2b48c;">
-        <p style="margin:0; font-size: 0.9rem;"><strong>Current Hotspot Address:</strong> {{ ip_address }}:5000</p>
-        <hr style="border: 0; border-top: 1px solid #ccc; margin: 10px 0;">
-        <p style="margin:0; font-size: 0.9rem;">Once connected to home Wi-Fi, access this table at:</p>
-        <h3 style="margin: 5px 0 0 0; color: #d2b48c;">http://{{ hostname }}.local:5000</h3>
-    </div>
+        <h2>Wi-Fi Setup</h2>
+        
+        <div class="status-box">
+            <p style="margin:0;"><strong>Current Hotspot Address:</strong> {{ ip_address }}:5000</p>
+            <hr style="border: 0; border-top: 1px solid #ccc; margin: 10px 0;">
+            <p style="margin:0;">Once connected to home Wi-Fi, access this table at:</p>
+            <h3>http://{{ hostname }}.local:5000</h3>
+        </div>
 
-    <div id="network-list">
-        {% for net in networks %}
-        ```
-
-### How it works for the user:
-
-1.  **The User connects** to your "SandTableSetup" hotspot.
-2.  **They see the page:**
-    > **Current Hotspot Address:** 10.42.0.1:5000
-    >
-    > **Once connected to home Wi-Fi, access this table at:**
-    > **[http://sandtable.local:5000](http://sandtable.local:5000)**
-3.  **They enter their Wi-Fi credentials.**
-4.  **The Pi reboots** and connects to their home router.
-5.  **The User** disconnects from the hotspot, reconnects to their home Wi-Fi, and types `http://sandtable.local:5000` to start drawing.
-
-### Next Step for You
-Would you like me to help you write the **JavaScript for the "Connect" button** so that when the user clicks it, it shows a loading spinner and then displays a "Success! Reconnecting..." message before the Pi reboots?
-        <p>Select a network to connect the Sand Table to the internet.</p>
+        <p style="text-align: center; margin-bottom: 20px;">Select a network to connect the Sand Table to the internet.</p>
         
         <div id="network-list">
             {% for net in networks %}
             <div class="network-item" onclick="selectNetwork('{{net.ssid}}')">
-                <strong>{{net.ssid}}</strong> ({{net.signal}}%)
+                <strong>{{net.ssid}}</strong> 
+                <span class="signal">{{net.signal}}%</span>
             </div>
             {% endfor %}
         </div>
 
         <div id="credentials" style="display:none; margin-top:20px;">
-            <h3 id="selected-ssid"></h3>
+            <h3 id="selected-ssid" style="color: white; text-align: center;"></h3>
             <input type="password" id="password" placeholder="Wi-Fi Password">
             <button onclick="connect()">Connect</button>
-            <button onclick="location.reload()" style="background:#555; color:white;">Cancel</button>
+            <button class="cancel" onclick="location.reload()">Cancel</button>
         </div>
     </div>
 
@@ -73,21 +69,31 @@ Would you like me to help you write the **JavaScript for the "Connect" button** 
         async function connect() {
             const pass = document.getElementById('password').value;
             const btn = document.querySelector('button');
+            const originalText = btn.innerText;
+            
             btn.innerText = "Connecting...";
             btn.disabled = true;
 
-            const res = await fetch('/api/configure_wifi', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ ssid: selectedSSID, password: pass })
-            });
-            
-            const data = await res.json();
-            alert(data.message);
-            if(data.success) {
-                alert("Rebooting! Connect your device to the new Wi-Fi network.");
-            } else {
-                location.reload();
+            try {
+                const res = await fetch('/api/configure_wifi', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ ssid: selectedSSID, password: pass })
+                });
+                
+                const data = await res.json();
+                
+                if(data.success) {
+                    alert("Success! The table is rebooting.\n\nConnect your phone back to your Home Wi-Fi, wait 30 seconds, then go to http://{{ hostname }}.local:5000");
+                } else {
+                    alert("Connection Failed: " + data.message);
+                    btn.innerText = originalText;
+                    btn.disabled = false;
+                }
+            } catch (e) {
+                alert("Error sending command: " + e);
+                btn.innerText = originalText;
+                btn.disabled = false;
             }
         }
     </script>
