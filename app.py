@@ -138,27 +138,29 @@ if arduino_connected:
 @app.route("/wifi_setup")
 def wifi_setup_page():
     networks = wifi_tools.get_wifi_networks()
+    saved_networks = wifi_tools.get_saved_networks() # <--- NEW LINE
     current_ip = get_current_ip()
     hostname = socket.gethostname()
     
     return render_template(
         "wifi_setup.html", 
         networks=networks, 
+        saved_networks=saved_networks, # <--- PASS IT HERE
         ip_address=current_ip, 
         hostname=hostname
     )
-
-@app.route("/api/configure_wifi", methods=["POST"])
-def configure_wifi():
+@app.route("/api/forget_wifi", methods=["POST"])
+def forget_wifi_route():
     data = request.json
     ssid = data.get("ssid")
-    password = data.get("password")
     
     if not ssid:
         return jsonify(success=False, message="No SSID provided")
 
-    log_message(f"Attempting to connect to {ssid}...")
-    success, msg = wifi_tools.connect_to_wifi(ssid, password) # Ensure we use the imported module
+    log_message(f"Forgetting network: {ssid}...")
+    success, msg = wifi_tools.forget_network(ssid)
+    
+    return jsonify(success=success, message=msg)
     
     if success:
         # Trigger a reboot after 5 seconds so the connection takes over
