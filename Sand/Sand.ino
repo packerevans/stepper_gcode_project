@@ -1,4 +1,9 @@
-// -------------------- MOTOR PIN DEFINITIONS --------------------
+// ==========================================
+//      ARDUINO SAND TABLE FIRMWARE
+//      Optimized for Flow Control (Credit System)
+// ==========================================
+
+// --- MOTOR PIN DEFINITIONS ---
 const int dirBase = 9;
 const int stepBase = 8;
 
@@ -7,16 +12,17 @@ const int stepArm = 10;
 
 const int enPin = 3;
 
+// Microstepping Pins
 const int ms1 = 4;
 const int ms2 = 5;
 const int ms3 = 6;
 
-// -------------------- STATE VARIABLES --------------------
+// --- STATE VARIABLES ---
 bool paused = true;
-int motorSpeed = 1000;  // default µs delay
 
-// -------------------- QUEUE CONFIG --------------------
-const int MAX_QUEUE_SIZE = 60;
+// --- QUEUE CONFIGURATION ---
+// 50 is the safe limit for Arduino Uno RAM
+const int MAX_QUEUE_SIZE = 50; 
 
 struct GCommand {
   long armSteps;
@@ -25,11 +31,11 @@ struct GCommand {
 };
 
 GCommand queue[MAX_QUEUE_SIZE];
-int queueHead = 0; // next to execute
-int queueTail = 0; // next to fill
+int queueHead = 0;
+int queueTail = 0;
 int queueCount = 0;
 
-// -------------------- SETUP --------------------
+// --- SETUP ---
 void setup() {
   Serial.begin(9600);
 
@@ -39,6 +45,7 @@ void setup() {
   pinMode(dirArm, OUTPUT);
   pinMode(enPin, OUTPUT);
 
+  // Microstepping Setup (High/High/High = 1/16th Step typically)
   pinMode(ms1, OUTPUT);
   pinMode(ms2, OUTPUT);
   pinMode(ms3, OUTPUT);
@@ -48,12 +55,14 @@ void setup() {
 
   digitalWrite(dirBase, HIGH);
   digitalWrite(dirArm, HIGH);
-  digitalWrite(enPin, HIGH);
+  digitalWrite(enPin, HIGH); // Start disabled (High = Off)
 
-  Serial.println("System initialized. Waiting for G-code commands.");
+  // SIGNAL TO PYTHON WE ARE ALIVE
+  // The F() macro keeps this string in Flash memory to save RAM
+  Serial.println(F("READY")); 
 }
 
-// -------------------- MAIN LOOP --------------------
+// --- MAIN LOOP ---
 void loop() {
   handleSerial();
 
@@ -62,109 +71,96 @@ void loop() {
   }
 }
 
-// -------------------- SERIAL HANDLER --------------------
+// --- SERIAL HANDLING ---
 void handleSerial() {
-  if (!Serial.available()) return;
+  // Process ALL available data in the buffer to prevent lag
+  while (Serial.available() > 0) {
+    String cmd = Serial.readStringUntil('\n');
+    cmd.trim();
 
-  String cmd = Serial.readStringUntil('\n');
-  cmd.trim();
+    if (cmd.length() == 0) continue;
 
-  if (cmd.equalsIgnoreCase("PAUSE")) {
-    paused = true;
-    digitalWrite(enPin, HIGH);
-    Serial.println("Paused. Motors OFF.");
-    return;
-  }
-
-  if (cmd.equalsIgnoreCase("RESUME")) {
-    paused = false;
-    digitalWrite(enPin, LOW);
-    Serial.println("Resumed. Motors ON.");
-    return;
-  }
-
-  if (cmd.equalsIgnoreCase("CLEAR")) {
-    queueHead = queueTail = queueCount = 0;
-    Serial.println("Command queue cleared.");
-    return;
-  }
-
-  // -------------------- G1 Command Parsing --------------------
-  if (cmd.startsWith("G1")) {
-    long armSteps = 0;
-    long baseSteps = 0;
-    int speed = 1000;
-
-    // Example: G1 -3200 3200 5000
-    int firstSpace = cmd.indexOf(' ');
-    if (firstSpace > 0) {
-      String params = cmd.substring(firstSpace + 1);
-      params.trim();
-
-      int space1 = params.indexOf(' ');
-      int space2 = params.indexOf(' ', space1 + 1);
-
-      if (space1 != -1 && space2 != -1) {
-        armSteps = params.substring(0, space1).toInt();
-        baseSteps = params.substring(space1 + 1, space2).toInt();
-        speed = params.substring(space2 + 1).toInt();
-      }
+    // IMMEDIATE COMMANDS (Bypass Queue)
+    if (cmd.equalsIgnoreCase("PAUSE")) {
+      paused = true;
+      digitalWrite(enPin, HIGH);
+      Serial.println(F("Paused"));
+      return; 
     }
-
-    enqueueCommand(armSteps, baseSteps, speed);
+    else if (cmd.equalsIgnoreCase("RESUME")) {
+      paused = false;
+      digitalWrite(enPin, LOW);
+      Serial.println(F("Resumed"));
+      return;
+    }
+    else if (cmd.equalsIgnoreCase("CLEAR")) {
+      queueHead = queueTail = queueCount = 0;
+      Serial.println(F("Cleared"));
+      return;
+    }
+    
+    // G-CODE COMMANDS (G1)
+    if (cmd.startsWith("G1")) {
+      parseAndEnqueue(cmd);
+    }
   }
 }
 
-// -------------------- QUEUE FUNCTIONS --------------------
-void enqueueCommand(long arm, long base, int spd) {
+void parseAndEnqueue(String cmd) {
+  // Expected Format: G1 <ArmSteps> <BaseSteps> <SpeedUs>
+  long armSteps = 0;
+  long baseSteps = 0;
+  int speed = 1000;
+
+  int firstSpace = cmd.indexOf(' ');
+  if (firstSpace > 0) {
+    String params = cmd.substring(firstSpace + 1);
+    
+    int space1 = params.indexOf(' ');
+    int space2 = params.indexOf(' ', space1 + 1);
+
+    if (space1 != -1) {
+       armSteps = params.substring(0, space1).toInt();
+       if (space2 != -1) {
+         baseSteps = params.substring(space1 + 1, space2).toInt();
+         speed = params.substring(space2 + 1).toInt();
+       } else {
+         baseSteps = params.substring(space1 + 1).toInt();
+       }
+    }
+  }
+
+  // Add to Queue
   if (queueCount >= MAX_QUEUE_SIZE) {
-    Serial.println("Queue full. Command ignored.");
+    Serial.println(F("ERROR:OVERFLOW")); 
     return;
   }
 
-  queue[queueTail].armSteps = arm;
-  queue[queueTail].baseSteps = base;
-  queue[queueTail].speed = spd;
+  queue[queueTail].armSteps = armSteps;
+  queue[queueTail].baseSteps = baseSteps;
+  queue[queueTail].speed = speed;
 
   queueTail = (queueTail + 1) % MAX_QUEUE_SIZE;
   queueCount++;
-
-  Serial.print("Queued G1 command: ");
-  Serial.print(arm);
-  Serial.print(" ");
-  Serial.print(base);
-  Serial.print(" ");
-  Serial.println(spd);
-
-  if (paused) {
-    Serial.println("(Paused — will execute later)");
-  }
 }
 
-bool dequeueCommand(GCommand &cmd) {
-  if (queueCount == 0) return false;
-
-  cmd = queue[queueHead];
-  queueHead = (queueHead + 1) % MAX_QUEUE_SIZE;
-  queueCount--;
-  return true;
-}
-
-// -------------------- EXECUTION --------------------
+// --- EXECUTION ---
 void executeNextCommand() {
-  GCommand cmd;
-  if (!dequeueCommand(cmd)) return;
+  GCommand cmd = queue[queueHead];
+  queueHead = (queueHead + 1) % MAX_QUEUE_SIZE;
+  queueCount--; 
 
   moveBothMotors(cmd.armSteps, cmd.baseSteps, cmd.speed);
-  Serial.println("Done");
+
+  // CRITICAL: Tell Python we finished one move so it can send one more
+  // This is the "Credit Return" signal
+  Serial.println(F("Done")); 
 }
 
-// -------------------- MOVE BOTH MOTORS (UPDATED) --------------------
+// --- MOTOR MOVEMENT ---
 void moveBothMotors(long armSteps, long baseSteps, int delayUs) {
-  // Enable motors
-  digitalWrite(enPin, LOW);
+  digitalWrite(enPin, LOW); // Enable motors
 
-  // Direction setup
   digitalWrite(dirArm, (armSteps >= 0) ? HIGH : LOW);
   digitalWrite(dirBase, (baseSteps >= 0) ? HIGH : LOW);
 
@@ -179,24 +175,17 @@ void moveBothMotors(long armSteps, long baseSteps, int delayUs) {
   float baseProgress = 0;
 
   for (long i = 0; i < maxSteps; i++) {
-    handleSerial(); // Check for pause commands
+    // CHECK FOR PAUSE MID-MOVE
+    // This ensures that if you hit "Pause", it stops instantly,
+    // not after the current line finishes.
+    if (Serial.available()) handleSerial();
 
-    // --- CHANGED LOGIC START ---
-    // Instead of 'return' (which skips the rest of the line), 
-    // we loop here forever until unpaused.
     while (paused) {
-      digitalWrite(enPin, HIGH); // Disable motors to keep cool
-      Serial.println("Movement paused mid-execution.");
-      delay(500); // Small delay to stop serial flooding
-      handleSerial(); // Keep checking for RESUME
-      
-      // If we resumed, re-enable motors and break this while loop
-      if (!paused) {
-         digitalWrite(enPin, LOW);
-         Serial.println("Resuming movement...");
-      }
+      digitalWrite(enPin, HIGH); // Disable motors to reduce heat
+      delay(200);
+      handleSerial(); // Check for RESUME
+      if (!paused) digitalWrite(enPin, LOW); // Re-enable
     }
-    // --- CHANGED LOGIC END ---
 
     armProgress += armRatio;
     baseProgress += baseRatio;
@@ -211,14 +200,14 @@ void moveBothMotors(long armSteps, long baseSteps, int delayUs) {
       baseProgress -= 1.0;
     }
   }
-
-  digitalWrite(enPin, HIGH); // disable motors after move
+  // Note: Motors remain enabled here for holding torque between queued moves.
+  // They are only disabled if the queue empties or we pause.
 }
 
-// -------------------- STEP PULSE --------------------
 void pulsePin(int pin, int delayUs) {
   digitalWrite(pin, HIGH);
   delayMicroseconds(delayUs);
   digitalWrite(pin, LOW);
   delayMicroseconds(delayUs);
 }
+
