@@ -1,761 +1,827 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bulk G-Code Converter</title>
-    
-    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
-    <link rel="apple-touch-icon" sizes="512x512" href="{{ url_for('static', filename='icons/icon-512.png') }}">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bulk G-Code Converter</title>
+<style>
+/* --- Root Variables --- */
+:root {
+    --color-primary: #d2b48c; /* Khaki/Tan */
+    --color-secondary: #b08d5c; /* Darker Tan */
+    --color-background: #f0f0f0;
+    --color-surface: #ffffff;
+    --color-text: #333333;
+    --color-shadow: rgba(0, 0, 0, 0.08);
+    --border-radius: 12px;
+    /* Input Colors */
+    --color-input-bg: #f9f9f9;
+    --color-input-border: #ccc;
+}
 
-    <style>
-        /* --- Root Variables --- */
-        :root {
-            --color-primary: #d2b48c; /* Khaki/Tan */
-            --color-secondary: #b08d5c; /* Darker Tan */
-            --color-background: #f0f0f0; 
-            --color-surface: #ffffff; 
-            --color-text: #333333;
-            --color-shadow: rgba(0, 0, 0, 0.08);
-            --border-radius: 12px;
-            
-            /* Input Colors */
-            --color-input-bg: #f9f9f9;
-            --color-input-border: #ccc;
-        }
+body[data-theme='dark'] {
+    --color-background: #1e1e1e;
+    --color-surface: #2c2c2c;
+    --color-text: #e0e0e0;
+    --color-shadow: rgba(255, 255, 255, 0.08);
+    --color-input-bg: #333;
+    --color-input-border: #555;
+}
 
-        body[data-theme='dark'] {
-            --color-background: #1e1e1e;
-            --color-surface: #2c2c2c;
-            --color-text: #e0e0e0;
-            --color-shadow: rgba(255, 255, 255, 0.08);
-            --color-input-bg: #333;
-            --color-input-border: #555;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: var(--color-background);
-            color: var(--color-text);
-            padding: 0; margin: 0;
-            transition: background 0.3s, color 0.3s;
-        }
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: var(--color-background);
+    color: var(--color-text);
+    padding: 0; margin: 0;
+    transition: background 0.3s, color 0.3s;
+}
 
-        /* --- Sidebar & Nav --- */
-        .sidebar {
-            height: 100%; width: 0; position: fixed; top: 0; left: 0;
-            background-color: var(--color-primary); overflow-x: hidden;
-            transition: 0.3s; padding-top: 60px; z-index: 1000;
-            box-shadow: 2px 0 5px var(--color-shadow);
-        }
-        .sidebar a {
-            padding: 15px 24px; text-decoration: none; font-size: 18px;
-            color: var(--color-text); display: block; transition: 0.2s; font-weight: 500;
-        }
-        .sidebar a:hover { background-color: var(--color-secondary); color: var(--color-surface); }
+/* --- Sidebar & Nav --- */
+.sidebar {
+    height: 100%; width: 0; position: fixed; top: 0; left: 0;
+    background-color: var(--color-primary);
+    overflow-x: hidden;
+    transition: 0.3s; padding-top: 60px; z-index: 1000;
+    box-shadow: 2px 0 5px var(--color-shadow);
+}
 
-        .openbtn {
-            font-size: 26px; cursor: pointer; background-color: var(--color-primary);
-            color: var(--color-text); padding: 10px 20px; border: none;
-            border-radius: 0 0 var(--border-radius) 0; position: fixed;
-            top: 0; left: 0; z-index: 1100; box-shadow: 0 2px 5px var(--color-shadow);
-        }
-        
-        #themeToggle {
-            position: fixed; top: 15px; right: 15px; background: var(--color-surface);
-            color: var(--color-text); border: 1px solid var(--color-text);
-            padding: 8px; border-radius: 50%; z-index: 1200;
-            width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
-            transition: background 0.3s; cursor: pointer;
-        }
+.sidebar a {
+    padding: 15px 24px; text-decoration: none;
+    font-size: 18px;
+    color: var(--color-text); display: block; transition: 0.2s; font-weight: 500;
+}
 
-        .main-content {
-            margin-left: 0; transition: margin-left 0.3s; padding: 20px;
-            max-width: 1200px; margin: 0 auto; padding-top: 70px;
-        }
+.sidebar a:hover { background-color: var(--color-secondary); color: var(--color-surface); }
 
-        h1 {
-            text-align: center; margin-bottom: 10px;
-            font-weight: 300; color: var(--color-secondary);
-        }
-        p.subtitle {
-            text-align: center; color: var(--color-text); opacity: 0.7; margin-bottom: 30px;
-        }
+.openbtn {
+    font-size: 26px;
+    cursor: pointer; background-color: var(--color-primary);
+    color: var(--color-text); padding: 10px 20px; border: none;
+    border-radius: 0 0 var(--border-radius) 0; position: fixed;
+    top: 0; left: 0; z-index: 1100; box-shadow: 0 2px 5px var(--color-shadow);
+}
 
-        /* --- Layout Grid --- */
-        .grid-container {
-            display: grid;
-            grid-template-columns: 1fr 2fr; /* 1/3 left, 2/3 right */
-            gap: 25px;
-        }
+#themeToggle {
+    position: fixed; top: 15px; right: 15px; background: var(--color-surface);
+    color: var(--color-text); border: 1px solid var(--color-text);
+    padding: 8px; border-radius: 50%; z-index: 1200;
+    width: 40px; height: 40px; display: flex; align-items: center;
+    justify-content: center;
+    transition: background 0.3s; cursor: pointer;
+}
 
-        /* --- Cards --- */
-        .card {
-            background-color: var(--color-surface); padding: 25px;
-            border-radius: var(--border-radius); box-shadow: 0 4px 10px var(--color-shadow);
-            display: flex; flex-direction: column; gap: 15px;
-        }
+.main-content {
+    margin-left: 0; transition: margin-left 0.3s; padding: 20px;
+    max-width: 1200px; margin: 0 auto;
+    padding-top: 70px;
+}
 
-        /* --- Form Elements --- */
-        label { font-weight: 600; font-size: 14px; margin-bottom: 5px; display: block; }
-        
-        textarea {
-            width: 100%; padding: 10px; border-radius: 8px;
-            border: 1px solid var(--color-input-border);
-            background-color: var(--color-input-bg); color: var(--color-text);
-            font-family: 'Consolas', monospace; font-size: 13px;
-            resize: vertical; box-sizing: border-box;
-        }
+h1 {
+    text-align: center; margin-bottom: 10px;
+    font-weight: 300; color: var(--color-secondary);
+}
 
-        input[type="number"] {
-            width: 100%; padding: 8px; border-radius: 6px;
-            border: 1px solid var(--color-input-border);
-            background-color: var(--color-input-bg); color: var(--color-text);
-            box-sizing: border-box;
-        }
+p.subtitle {
+    text-align: center; color: var(--color-text); opacity: 0.7; margin-bottom: 30px;
+}
 
-        /* --- Radio Buttons --- */
-        .radio-group { display: flex; gap: 15px; margin-bottom: 10px; }
-        .radio-item { display: flex; align-items: center; gap: 5px; cursor: pointer; font-size: 14px; }
+/* Layout Grid */
+.grid-container {
+    display: grid;
+    grid-template-columns: 1fr 2fr; /* 1/3 left, 2/3 right */
+    gap: 25px;
+}
 
-        /* --- Buttons --- */
-        button {
-            background-color: var(--color-primary); color: var(--color-text);
-            border: none; padding: 12px; border-radius: 8px; font-size: 15px;
-            cursor: pointer; transition: 0.2s; font-weight: 600; width: 100%;
-            box-shadow: 0 2px 5px var(--color-shadow);
-        }
-        button:hover {
-            background-color: var(--color-secondary);
-            transform: translateY(-1px);
-        }
-        button:disabled { opacity: 0.6; cursor: not-allowed; }
+/* --- Cards --- */
+.card {
+    background-color: var(--color-surface);
+    padding: 25px;
+    border-radius: var(--border-radius); box-shadow: 0 4px 10px var(--color-shadow);
+    display: flex; flex-direction: column; gap: 15px;
+}
 
-        /* --- Playback Controls --- */
-        .playback-bar {
-            display: flex; align-items: center; gap: 10px;
-            background: var(--color-background); padding: 10px; border-radius: 8px;
-        }
-        .playback-btn { width: 40px; height: 40px; padding: 0; display: flex; justify-content: center; align-items: center; }
-        
-        input[type="range"] {
-            flex-grow: 1; height: 6px; border-radius: 5px;
-            background: #ccc; outline: none; -webkit-appearance: none;
-        }
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%;
-            background: var(--color-secondary); cursor: pointer;
-        }
+/* --- Form Elements */
+label { font-weight: 600; font-size: 14px; margin-bottom: 5px; display: block; }
 
-        /* --- Canvas --- */
-        canvas {
-            width: 100%; aspect-ratio: 1/1; display: block;
-            background-color: #fff; border-radius: 8px;
-            border: 1px solid var(--color-input-border);
-            transition: background-color 0.3s, border-color 0.3s, box-shadow 0.3s;
-        }
+textarea {
+    width: 100%; padding: 10px; border-radius: 8px;
+    border: 1px solid var(--color-input-border);
+    background-color: var(--color-input-bg); color: var(--color-text);
+    font-family: 'Consolas', monospace; font-size: 13px;
+    resize: vertical; box-sizing: border-box;
+}
 
-        /* *** DARK MODE CANVAS OVERRIDE *** */
-        /* Makes the simulation area pop in dark mode */
-        body[data-theme='dark'] canvas {
-            background-color: #222; /* Distinct dark background */
-            border: 2px solid var(--color-secondary); /* Highlight border */
-            box-shadow: inset 0 0 15px rgba(0,0,0,0.5); /* Inner depth shadow */
-        }
+input[type="number"] {
+    width: 100%;
+    padding: 8px; border-radius: 6px;
+    border: 1px solid var(--color-input-border);
+    background-color: var(--color-input-bg); color: var(--color-text);
+    box-sizing: border-box;
+}
 
-        /* --- Param Grid --- */
-        .param-grid {
-            display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;
-        }
+/* --- Radio Buttons --- */
+.radio-group { display: flex; gap: 15px; margin-bottom: 10px; }
+.radio-item { display: flex; align-items: center; gap: 5px; cursor: pointer; font-size: 14px; }
 
-        /* --- Mobile --- */
-        @media (max-width: 900px) {
-            .grid-container { grid-template-columns: 1fr; }
-            .param-grid { grid-template-columns: 1fr; }
-        }
-    </style>
+/* --- Buttons --- */
+button {
+    background-color: var(--color-primary); color: var(--color-text);
+    border: none; padding: 12px;
+    border-radius: 8px; font-size: 15px;
+    cursor: pointer; transition: 0.2s; font-weight: 600; width: 100%;
+    box-shadow: 0 2px 5px var(--color-shadow);
+}
+
+button:hover {
+    background-color: var(--color-secondary);
+    transform: translateY(-1px);
+}
+
+button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Playback Controls */
+.playback-bar {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--color-background); padding: 10px; border-radius: 8px;
+}
+.playback-btn { width: 40px; height: 40px; padding: 0; display: flex; justify-content: center; align-items: center; }
+
+input[type="range"] {
+    flex-grow: 1; height: 6px;
+    border-radius: 5px;
+    background: #ccc; outline: none; -webkit-appearance: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%;
+    background: var(--color-secondary);
+    cursor: pointer;
+}
+
+/* --- Canvas */
+canvas {
+    width: 100%; aspect-ratio: 1/1; display: block;
+    background-color: #fff; border-radius: 8px;
+    border: 1px solid var(--color-input-border);
+    transition: background-color 0.3s, border-color 0.3s, box-shadow 0.3s;
+}
+
+/* DARK MODE CANVAS OVERRIDE */
+body[data-theme='dark'] canvas {
+    background-color: #222;
+    border: 2px solid var(--color-secondary);
+    box-shadow: inset 0 0 15px rgba(0,0,0,0.5);
+}
+
+/* --- Param Grid --- */
+.param-grid {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;
+}
+
+/* -- Mobile -- */
+@media (max-width: 900px) {
+    .grid-container { grid-template-columns: 1fr; }
+    .param-grid { grid-template-columns: 1fr; }
+}
+</style>
 </head>
+
 <body data-theme="light">
 
-    <div id="mySidebar" class="sidebar">
-        <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
-        <a href="/">Designs</a> 
-        <a href="/controls">Drawing</a>
-        <a href="{{ url_for('led_controls') }}">LED Controls</a>
-        <a href="{{ url_for('AI_builder') }}">AI Builder</a>
-        <a href="/terminal">Terminal</a>
-    </div>
+<div id="mySidebar" class="sidebar">
+    <a href="javascript:void(0)" onclick="closeNav()">× Close</a>
+    <a href="/">Designs</a>
+    <a href="/controls">Drawing</a>
+    <a href="/led_controls">LED Controls</a>
+    <a href="/ai_builder">AI Builder</a>
+    <a href="/terminal">Terminal</a>
+</div>
 
-    <button class="openbtn" onclick="openNav()">☰</button>
-    <button id="themeToggle" onclick="toggleDarkMode()">
-        <span id="themeIcon">☀️</span>
-    </button>
+<button class="openbtn" onclick="openNav()">☰</button>
 
-    <div class="main-content">
-        <h1>Simulator & Converter</h1>
-        <p class="subtitle">Convert Cartesian/Polar Coordinates to Arm G-Code</p>
+<button id="themeToggle" onclick="toggleDarkMode()">
+    <span id="themeIcon">🌗</span>
+</button>
 
-        <div class="grid-container">
-            
-            <div class="card">
-                <div>
-                    <label>Input Format</label>
-                    <div class="radio-group">
-                        <label class="radio-item">
-                            <input type="radio" name="gcodeFormat" value="cartesian" checked> Cartesian (X,Y)
-                        </label>
-                        <label class="radio-item">
-                            <input type="radio" name="gcodeFormat" value="polar"> Polar (R,A)
-                        </label>
-                    </div>
-                </div>
+<div class="main-content">
+    <h1>Simulator & Converter</h1>
+    <p class="subtitle">Convert Cartesian/Polar Coordinates to Arm G-Code</p>
 
-                <div>
-                    <label for="gcodeConverterInput">1. Paste Coordinates</label>
-                    <textarea id="gcodeConverterInput" rows="6" placeholder="G1 X100 Y50&#10;G1 X0 Y0">G1 X203.2 Y0
-G1 X0 Y0
-G1 X0 Y203.2
-G1 X0 Y0
-G1 X203.2 Y0</textarea>
-                </div>
-
-                <div class="param-grid">
-                    <div>
-                        <label>Delay (μs)</label>
-                        <input type="number" id="stepDelayInput" value="1000">
-                    </div>
-                    <div>
-                        <label>Smooth (ε)</label>
-                        <input type="number" id="smoothingSensitivity" value="0.000001" step="0.000001">
-                    </div>
-                    <div>
-                        <label>Res. (mm)</label>
-                        <input type="number" id="linearResolution" value="1.0" step="0.1">
-                    </div>
-                </div>
-
-                <button id="convertGCodeBtn">Convert, Smooth & Load</button>
-
-                <hr style="border:0; border-top:1px solid var(--color-shadow); width:100%;">
-
-                <div>
-                    <label for="commandsInput">2. Arm Commands (Output)</label>
-                    <textarea id="commandsInput" rows="6" placeholder="Generated commands will appear here...">G1 0 400 1000
-G1 0 800 1000
-G1 400 800 500
-G1 400 400 500
-G1 0 0 200
-G1 -800 0 1000
-G1 -800 -800 1000
-G1 0 -800 500
-G1 0 0 200</textarea>
-                </div>
-
-                <button id="loadCommandsBtn">Reset Simulation</button>
-            </div>
-
-            <div class="card" style="justify-content: start;">
-                <div style="position:relative;">
-                    <canvas id="armCanvas" width="600" height="600"></canvas>
-                    <div id="stepDisplay" style="position:absolute; top:10px; left:10px; background:rgba(255,255,255,0.8); padding:4px 8px; border-radius:4px; font-size:12px; font-family:monospace; color:black;">Step: 0 / 0</div>
-                </div>
-
-                <div class="playback-bar">
-                    <button id="playBtn" class="playback-btn" title="Step Forward">▶</button>
-                    <button id="playLoopBtn" class="playback-btn" title="Loop">🔁</button>
-                    <button id="pauseBtn" class="playback-btn" title="Pause">⏸</button>
-                    <input id="commandSlider" type="range" min="0" max="0" value="0">
+    <div class="grid-container">
+        <div class="card">
+            <div>
+                <label>Input Format</label>
+                <div class="radio-group">
+                    <label class="radio-item">
+                        <input type="radio" name="gcodeFormat" value="cartesian" checked> Cartesian (X,Y)
+                    </label>
+                    <label class="radio-item">
+                        <input type="radio" name="gcodeFormat" value="polar"> Polar (R,A)
+                    </label>
                 </div>
             </div>
 
+            <div>
+                <label for="gcodeConverterInput">1. Paste Coordinates</label>
+                <textarea id="gcodeConverterInput" rows="6" placeholder="G1 X100 Y50&#10;G1 X0 Y0">G1 X225.351 Y1.281
+G1 X232.821 Y3.358
+G1 X240.051 Y6.156
+G1 X225.351 Y1.281</textarea>
+            </div>
+
+            <div class="param-grid">
+                <div>
+                    <label>Delay (µs)</label>
+                    <input type="number" id="stepDelayInput" value="1000">
+                </div>
+                <div>
+                    <label>Smooth</label>
+                    <input type="number" id="smoothingSensitivity" value="0.00001" step="0.00001">
+                </div>
+                <div>
+                    <label>Res. (mm)</label>
+                    <input type="number" id="linearResolution" value="1.0" step="0.1">
+                </div>
+            </div>
+
+            <button id="convertGCodeBtn">Convert, Smooth & Load</button>
+
+            <hr style="border:0; border-top:1px solid var(--color-shadow); width: 100%;">
+
+            <div>
+                <label for="commandsInput">2. Arm Commands (Output)</label>
+                <textarea id="commandsInput" rows="6" placeholder="Generated commands will appear here..."></textarea>
+            </div>
+
+            <button id="loadCommandsBtn">Reset Simulation</button>
+        </div>
+
+        <div class="card" style="justify-content: start;">
+            <div style="position:relative;">
+                <canvas id="armCanvas" width="600" height="600"></canvas>
+                <div id="stepDisplay" style="position:absolute; top: 10px; left:10px; background:rgba(255,255,255,0.8); padding: 4px 8px; border-radius:4px; font-size:12px; font-family:monospace; color:black;">Step: 0/0</div>
+            </div>
+
+            <div class="playback-bar">
+                <button id="playBtn" class="playback-btn" title="Step Forward">▶</button>
+                <button id="playLoopBtn" class="playback-btn" title="Loop">⟳</button>
+                <button id="pauseBtn" class="playback-btn" title="Pause">⏸</button>
+                <input id="commandSlider" type="range" min="0" max="0" value="0">
+            </div>
         </div>
     </div>
+</div>
 
-    <script>
-        // --- CONFIGURATION ---
-        const L1 = 101.3; 
-        const L2 = 101.3; 
-        const GEAR_RATIO = 9 / 8; 
-        const STEPS_PER_DEG = 3200 / 360;
-        const STEPS_PER_RAD = STEPS_PER_DEG * (180 / Math.PI);
+<script>
+// --- CONFIGURATION ---
+const L1 = 101.3;
+const L2 = 101.3;
+const GEAR_RATIO = 9/8;
+const STEPS_PER_DEG = 3200/360;
+const STEPS_PER_RAD = STEPS_PER_DEG * (180 / Math.PI);
 
-        // --- STATE ---
-        let commands = [];
-        let cumulativeStates = [];
-        let currentStep = 0;
-        let isAutoPlaying = false;
-        let isLooping = false;
-        let animationFrameId = null;
-        let animationStartTime = 0;
-        let animationFromState = null;
-        let animationToState = null;
-        let origin = { x: 0, y: 0 };
-        let worldScale = 1;
-        let tracePath = [];
-        const lerp = (a, b, t) => a + (b - a) * t;
+// --- STATE ---
+let commands = [];
+let cumulativeStates = [];
+let currentStep = 0;
+let isAutoPlaying = false;
+let isLooping = false;
+let animationFrameId = null;
+let animationStartTime = 0;
+let animationFromState = null;
+let animationToState = null;
+let origin = {x: 0, y: 0 };
+let worldScale = 1;
+let tracePath = [];
 
-        // --- DOM ---
-        const canvas = document.getElementById('armCanvas');
-        const ctx = canvas.getContext('2d');
-        const slider = document.getElementById('commandSlider');
-        const stepDisp = document.getElementById('stepDisplay');
+// Utility
+const lerp = (a, b, t) => a + (b - a) * t;
 
-        // --- INIT ---
-        function init() {
-            // UI Logic
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            document.body.setAttribute('data-theme', savedTheme);
-            document.getElementById('themeIcon').textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+// --- DOM ---
+const canvas = document.getElementById('armCanvas');
+const ctx = canvas.getContext('2d');
+const slider = document.getElementById('commandSlider');
+const stepDisp = document.getElementById('stepDisplay');
 
-            // Listeners
-            document.getElementById('loadCommandsBtn').addEventListener('click', loadCommands);
-            document.getElementById('convertGCodeBtn').addEventListener('click', convertGCode);
-            
-            slider.addEventListener('input', (e) => {
-                isLooping = false; 
-                pause();
-                drawState(parseInt(e.target.value));
-            });
+// --- INIT ---
+function init() {
+    // UI Logic
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.body.setAttribute('data-theme', savedTheme);
+    document.getElementById('themeIcon').textContent = savedTheme === 'dark' ? '☀️' : '🌗';
 
-            document.getElementById('playBtn').addEventListener('click', () => {
-                isLooping = false;
-                playFrame();
-            });
+    // Listeners
+    document.getElementById('loadCommandsBtn').addEventListener('click', loadCommands);
+    document.getElementById('convertGCodeBtn').addEventListener('click', convertGCode);
 
-            document.getElementById('playLoopBtn').addEventListener('click', () => {
-                if(isAutoPlaying) pause();
-                isLooping = true;
-                currentStep = 0;
-                drawState(0);
-                playFullAnimation();
-            });
+    slider.addEventListener('input', (e) => {
+        isLooping = false;
+        pause();
+        drawState(parseInt(e.target.value));
+    });
 
-            document.getElementById('pauseBtn').addEventListener('click', pause);
-            window.addEventListener('resize', () => { resizeCanvas(); if(cumulativeStates.length) drawState(currentStep); });
+    document.getElementById('playBtn').addEventListener('click', () => {
+        isLooping = false;
+        playFrame();
+    });
 
-            resizeCanvas();
-            loadCommands();
-        }
+    document.getElementById('playLoopBtn').addEventListener('click', () => {
+        if(isAutoPlaying) pause();
+        isLooping = true;
+        currentStep = 0;
+        drawState(0);
+        playFullAnimation();
+    });
 
-        // --- CANVAS ---
-        function resizeCanvas() {
-            const parent = canvas.parentElement;
-            const size = parent.clientWidth;
-            canvas.width = size;
-            canvas.height = size;
+    document.getElementById('pauseBtn').addEventListener('click', pause);
 
-            origin.x = size / 2;
-            origin.y = size / 2;
-            
-            const maxReach = (L1 + L2) * 1.1;
-            worldScale = size / (maxReach * 2);
+    window.addEventListener('resize', () => { 
+        resizeCanvas(); 
+        if(cumulativeStates.length) drawState(currentStep); 
+    });
 
-            ctx.resetTransform();
-            ctx.translate(origin.x, origin.y);
-            ctx.scale(worldScale, -worldScale);
-        }
+    resizeCanvas();
+    loadCommands();
+}
 
-        function clearCanvas() {
-            ctx.save();
-            ctx.resetTransform();
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.restore();
-        }
+// --- CANVAS ---
+function resizeCanvas() {
+    const parent = canvas.parentElement;
+    const size = parent.clientWidth;
+    canvas.width = size;
+    canvas.height = size;
+    origin.x = size / 2;
+    origin.y = size / 2;
+    
+    // Max reach plus padding
+    const maxReach = (L1 + L2) * 1.1;
+    worldScale = size / (maxReach * 2);
+    
+    ctx.resetTransform();
+    ctx.translate(origin.x, origin.y);
+    ctx.scale(worldScale, -worldScale);
+}
 
-        function drawGrid() {
-            const max = L1 + L2;
-            const lw = 1 / worldScale;
-            
-            ctx.strokeStyle = document.body.getAttribute('data-theme') === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
-            ctx.lineWidth = lw;
-            
-            ctx.beginPath(); ctx.arc(0,0,L1,0,2*Math.PI); ctx.stroke();
-            ctx.beginPath(); ctx.arc(0,0,max,0,2*Math.PI); ctx.stroke();
-            
-            ctx.beginPath();
-            ctx.moveTo(-max*1.1, 0); ctx.lineTo(max*1.1, 0);
-            ctx.moveTo(0, -max*1.1); ctx.lineTo(0, max*1.1);
-            ctx.stroke();
-        }
+function clearCanvas() {
+    ctx.save();
+    ctx.resetTransform();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+}
 
-        function drawTrace() {
-            if(tracePath.length < 2) return;
-            ctx.beginPath();
-            ctx.strokeStyle = document.body.getAttribute('data-theme') === 'dark' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.3)';
-            ctx.lineWidth = 2 / worldScale;
-            ctx.moveTo(tracePath[0].x, tracePath[0].y);
-            for(let i=1; i<tracePath.length; i++) ctx.lineTo(tracePath[i].x, tracePath[i].y);
-            ctx.stroke();
-        }
+function drawGrid() {
+    const max = L1 + L2;
+    const lw = 1 / worldScale;
+    
+    ctx.strokeStyle = document.body.getAttribute('data-theme') === 'dark' ? 
+        'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+    ctx.lineWidth = lw;
 
-        function drawArm(p0, p1, p2) {
-            const w = 6 / worldScale;
-            const r = 8 / worldScale;
-            
-            // ** UPDATED: Joint Color (Same for all) **
-            const jointColor = '#b08d5c'; // Secondary Tan
-            
-            // Limbs
-            ctx.lineWidth = w; ctx.lineCap = 'round';
-            ctx.strokeStyle = '#d2b48c'; // Primary color
-            ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
-            
-            ctx.strokeStyle = '#b08d5c'; // Secondary color
-            ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0,0,L1,0,2*Math.PI); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0,0,max,0,2*Math.PI); ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.moveTo(-max*1.1, 0); ctx.lineTo(max*1.1, 0);
+    ctx.moveTo(0, -max*1.1); ctx.lineTo(0, max*1.1);
+    ctx.stroke();
+}
 
-            // Joints (Unified Color)
-            ctx.fillStyle = jointColor;
-            ctx.beginPath(); ctx.arc(p0.x, p0.y, r, 0, 2*Math.PI); ctx.fill();
-            ctx.beginPath(); ctx.arc(p1.x, p1.y, r, 0, 2*Math.PI); ctx.fill();
-            ctx.beginPath(); ctx.arc(p2.x, p2.y, r, 0, 2*Math.PI); ctx.fill();
-        }
+function drawTrace() {
+    if(tracePath.length < 2) return;
+    
+    ctx.beginPath();
+    ctx.strokeStyle = document.body.getAttribute('data-theme') === 'dark' ? 
+        'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = 2 / worldScale;
+    
+    ctx.moveTo(tracePath[0].x, tracePath[0].y);
+    for(let i=1; i<tracePath.length; i++) ctx.lineTo(tracePath[i].x, tracePath[i].y);
+    ctx.stroke();
+}
 
-        function drawState(idx) {
-            cancelAnimation();
-            currentStep = idx;
-            const state = cumulativeStates[idx];
-            if(!state) return;
-            
-            clearCanvas();
-            drawGrid();
-            drawTrace();
-            drawArm(state.p0, state.p1, state.p2);
-            
-            slider.value = idx;
-            stepDisp.textContent = `Step: ${idx} / ${cumulativeStates.length-1}`;
-        }
+function drawArm(p0, p1, p2) {
+    const w = 6 / worldScale;
+    const r = 8 / worldScale;
+    const jointColor = '#b08d5c'; // Secondary Tan
 
-        function drawInterpolatedState(from, to, prog) {
-            const t1 = lerp(from.theta1_rad, to.theta1_rad, prog);
-            const tb = lerp(from.theta_bend_rad, to.theta_bend_rad, prog);
-            
-            const p0 = from.p0;
-            const p1 = { x: p0.x + L1*Math.cos(t1), y: p0.y + L1*Math.sin(t1) };
-            const t2 = t1 + tb;
-            const p2 = { x: p1.x + L2*Math.cos(t2), y: p1.y + L2*Math.sin(t2) };
-            
-            clearCanvas();
-            drawGrid();
-            drawTrace();
-            drawArm(p0, p1, p2);
-        }
+    // Limbs
+    ctx.lineWidth = w; 
+    ctx.lineCap = 'round';
+    
+    ctx.strokeStyle = '#d2b48c'; // Primary color
+    ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
+    
+    ctx.strokeStyle = '#b08d5c'; // Secondary color
+    ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
 
-        // --- KINEMATICS & CONVERTER ---
+    // Joints
+    ctx.fillStyle = jointColor;
+    ctx.beginPath(); ctx.arc(p0.x, p0.y, r, 0, 2*Math.PI); ctx.fill();
+    ctx.beginPath(); ctx.arc(p1.x, p1.y, r, 0, 2*Math.PI); ctx.fill();
+    ctx.beginPath(); ctx.arc(p2.x, p2.y, r, 0, 2*Math.PI); ctx.fill();
+}
 
-        function getShortestRotation(raw, last) {
-            let diff = (raw - last) / (2*Math.PI);
-            let offset = Math.round(diff);
-            return raw - (offset * 2 * Math.PI);
-        }
+function drawState(idx) {
+    cancelAnimation();
+    currentStep = idx;
+    const state = cumulativeStates[idx];
+    if(!state) return;
 
-        function calculateIK(x, y, lastBase=0, lastElbow=0) {
-            let D = Math.hypot(x, y);
-            const maxR = L1 + L2;
-            let cx = x, cy = y;
-            
-            if(D > maxR) { cx = x*maxR/D; cy = y*maxR/D; D = maxR; }
-            
-            const lastT1 = -lastBase / STEPS_PER_RAD;
-            const lastBend = (-lastElbow / STEPS_PER_RAD) - (GEAR_RATIO * lastT1);
+    clearCanvas();
+    drawGrid();
+    drawTrace();
+    drawArm(state.p0, state.p1, state.p2);
+    
+    slider.value = idx;
+    stepDisp.textContent = `Step: ${idx} / ${cumulativeStates.length-1}`;
+}
 
-            let finalT1, finalBend;
+function drawInterpolatedState(from, to, prog) {
+    const t1 = lerp(from.theta1_rad, to.theta1_rad, prog);
+    const tb = lerp(from.theta_bend_rad, to.theta_bend_rad, prog);
+    
+    const p0 = from.p0;
+    const p1 = {x: p0.x + L1*Math.cos(t1), y: p0.y + L1*Math.sin(t1) };
+    const t2 = t1 + tb;
+    const p2 = {x: p1.x + L2*Math.cos(t2), y: p1.y + L2*Math.sin(t2) };
 
-            if (D < 0.1) {
-                finalBend = lastBend > 0 ? Math.PI : -Math.PI;
-                let rawT1 = (D < 1e-6) ? lastT1 : Math.atan2(y,x);
-                finalT1 = getShortestRotation(rawT1, lastT1);
-                cx=0; cy=0;
-            } else {
-                let cosBend = (D*D - L1*L1 - L2*L2) / (2*L1*L2);
-                cosBend = Math.max(-1, Math.min(1, cosBend));
+    clearCanvas();
+    drawGrid();
+    drawTrace();
+    drawArm(p0, p1, p2);
+}
+
+// --- KINEMATICS & CONVERTER ---
+
+function getShortestRotation(raw, last) {
+    let diff = (raw - last) / (2*Math.PI);
+    let offset = Math.round(diff);
+    return raw - (offset * 2 * Math.PI);
+}
+
+function calculateIK(x, y, lastBase = 0, lastElbow = 0) {
+    let D = Math.hypot(x, y);
+    const maxR = L1 + L2;
+    let cx = x, cy = y;
+
+    if(D > maxR) { 
+        cx = x * maxR / D; 
+        cy = y * maxR / D; 
+        D = maxR; 
+    }
+
+    const lastT1 = -lastBase / STEPS_PER_RAD;
+    const lastBend = (-lastElbow / STEPS_PER_RAD) - (GEAR_RATIO * lastT1);
+
+    let finalT1, finalBend;
+
+    if (D < 0.1) {
+        // Singularity at center
+        finalBend = lastBend > 0 ? Math.PI : -Math.PI;
+        let rawT1 = (D < 1e-6) ? lastT1 : Math.atan2(y,x);
+        finalT1 = getShortestRotation(rawT1, lastT1);
+        cx=0; cy=0;
+    } else {
+        let cosBend = (D*D - L1*L1 - L2*L2) / (2*L1*L2);
+        cosBend = Math.max(-1, Math.min(1, cosBend));
+
+        // Solution 1
+        const bend1 = Math.acos(cosBend);
+        const k1_1 = L1 + L2 * Math.cos(bend1);
+        const k2_1 = L2 * Math.sin(bend1);
+        const rawT1_1 = Math.atan2(cy, cx) - Math.atan2(k2_1, k1_1);
+        const t1_1 = getShortestRotation(rawT1_1, lastT1);
+
+        // Solution 2
+        const bend2 = -Math.acos(cosBend);
+        const k1_2 = L1 + L2 * Math.cos(bend2);
+        const k2_2 = L2 * Math.sin(bend2);
+        const rawT1_2 = Math.atan2(cy, cx) - Math.atan2(k2_2, k1_2);
+        const t1_2 = getShortestRotation(rawT1_2, lastT1);
+
+        // Convert to Steps to check 'cost' (distance from previous state)
+        const b1 = -t1_1 * STEPS_PER_RAD;
+        const e1 = -(bend1 + GEAR_RATIO * t1_1) * STEPS_PER_RAD;
+        
+        const b2 = -t1_2 * STEPS_PER_RAD;
+        const e2 = -(bend2 + GEAR_RATIO * t1_2) * STEPS_PER_RAD;
+
+        const cost1 = Math.abs(b1 - lastBase) + Math.abs(e1 - lastElbow);
+        const cost2 = Math.abs(b2 - lastBase) + Math.abs(e2 - lastElbow);
+
+        if(cost1 <= cost2) { finalT1 = t1_1; finalBend = bend1; }
+        else { finalT1 = t1_2; finalBend = bend2; }
+    }
+
+    const alpha = finalT1;
+    const beta = finalBend + (GEAR_RATIO * alpha);
+    
+    return {
+        base_steps: -alpha * STEPS_PER_RAD,
+        elbow_steps: -beta * STEPS_PER_RAD,
+        clamped_x: cx, clamped_y: cy
+    };
+}
+
+function calculateFK(p0, b, e) {
+    const a = -b / STEPS_PER_RAD;
+    const beta = -e / STEPS_PER_RAD;
+    
+    const t1 = a;
+    const tb = beta - (GEAR_RATIO * a);
+    const t2 = t1 + tb;
+
+    const p1 = {x: p0.x + L1*Math.cos(t1), y: p0.y + L1*Math.sin(t1) };
+    const p2 = {x: p1.x + L2*Math.cos(t2), y: p1.y + L2*Math.sin(t2) };
+    
+    return { 
+        p0, p1, p2, 
+        target_base_steps: b, 
+        target_elbow_steps: e, 
+        theta1_rad: t1, 
+        theta_bend_rad: tb 
+    };
+}
+
+// --- MAIN CONVERTER FUNCTION (UPDATED FOR SANDIFY OFFSET) ---
+function convertGCode() {
+    const text = document.getElementById('gcodeConverterInput').value;
+    const lines = text.split('\n');
+    const format = document.querySelector('input[name="gcodeFormat"]:checked').value;
+    const res = parseFloat(document.getElementById('linearResolution').value) || 1.0;
+    
+    // --- TABLE CONFIGURATION ---
+    // Sandify often outputs 0 -> Diameter (0 -> 405.2). 
+    // We subtract radius to shift center to (0,0) for the Arm.
+    const tableRadius = 202.6; 
+
+    let coords = [];
+
+    for(let line of lines) {
+        line = line.trim();
+        if(!line) continue;
+
+        if(format === 'cartesian') {
+            const m = line.match(/G1\s+X(-?[\d.]+)\s+Y(-?[\d.]+)/i);
+            if(m) { 
+                let rawX = parseFloat(m[1]); 
+                let rawY = parseFloat(m[2]); 
                 
-                // Sol 1
-                const bend1 = -Math.acos(cosBend);
-                const k1_1 = L1 + L2 * Math.cos(bend1);
-                const k2_1 = L2 * Math.sin(bend1);
-                const rawT1_1 = Math.atan2(cy, cx) - Math.atan2(k2_1, k1_1);
-                const t1_1 = getShortestRotation(rawT1_1, lastT1);
+                // SHIFT ORIGIN
+                // Sandify (Corner Origin) -> Arm (Center Origin)
+                let x = rawX - tableRadius;
+                let y = rawY - tableRadius;
                 
-                // Sol 2
-                const bend2 = Math.acos(cosBend);
-                const k1_2 = L1 + L2 * Math.cos(bend2);
-                const k2_2 = L2 * Math.sin(bend2);
-                const rawT1_2 = Math.atan2(cy, cx) - Math.atan2(k2_2, k1_2);
-                const t1_2 = getShortestRotation(rawT1_2, lastT1);
-
-                // Steps
-                const b1 = -t1_1 * STEPS_PER_RAD;
-                const e1 = -(bend1 + GEAR_RATIO*t1_1) * STEPS_PER_RAD;
-                const b2 = -t1_2 * STEPS_PER_RAD;
-                const e2 = -(bend2 + GEAR_RATIO*t1_2) * STEPS_PER_RAD;
-
-                const cost1 = Math.abs(b1-lastBase) + Math.abs(e1-lastElbow);
-                const cost2 = Math.abs(b2-lastBase) + Math.abs(e2-lastElbow);
-
-                if(cost1 <= cost2) { finalT1=t1_1; finalBend=bend1; }
-                else { finalT1=t1_2; finalBend=bend2; }
+                coords.push({x,y}); 
             }
+        } else {
+            // Polar
+            const m = line.match(/G1\s+R(-?[\d.]+)\s+A(-?[\d.]+)/i);
+            if(m) {
+                let r = parseFloat(m[1]);
+                let deg = parseFloat(m[2]);
+                let rad = deg * (Math.PI/180);
+                r = Math.abs(r);
+                coords.push({x: r*Math.cos(rad), y: r*Math.sin(rad) });
+            }
+        }
+    }
 
-            const alpha = finalT1;
-            const beta = finalBend + (GEAR_RATIO * alpha);
-            return { 
-                base_steps: -alpha * STEPS_PER_RAD,
-                elbow_steps: -beta * STEPS_PER_RAD,
-                clamped_x: cx, clamped_y: cy
-            };
+    if(coords.length === 0) { alert("No valid G-Code found."); return; }
+
+    // Interpolate
+    let interp = [coords[0]];
+    for(let i=0; i<coords.length-1; i++) {
+        const p1 = coords[i], p2 = coords[i+1];
+        const dist = Math.hypot(p2.x-p1.x, p2.y-p1.y);
+        const steps = Math.max(1, Math.ceil(dist/res));
+
+        for(let j=1; j<=steps; j++) {
+            let t = j/steps;
+            interp.push({x: lerp(p1.x,p2.x,t), y: lerp(p1.y,p2.y,t) });
+        }
+    }
+
+    // Convert IK
+    let genCmds = [];
+    let prevB = 0, prevE = 0;
+    
+    // Setup start pos (Jump from 0,0 to first point)
+    const start = calculateIK(interp[0].x, interp[0].y, 0, 0);
+    prevB = start.base_steps; 
+    prevE = start.elbow_steps;
+    
+    const delay = document.getElementById('stepDelayInput').value;
+
+    for(let i=1; i<interp.length; i++) {
+        const ik = calculateIK(interp[i].x, interp[i].y, prevB, prevE);
+        const rb = Math.round(ik.base_steps - prevB);
+        const re = Math.round(ik.elbow_steps - prevE);
+
+        if(rb !== 0 || re !== 0) {
+            genCmds.push({elbow:re, base:rb, delay:delay});
+        }
+        prevB = ik.base_steps; 
+        prevE = ik.elbow_steps;
+    }
+
+    // Smooth
+    const sens = parseFloat(document.getElementById('smoothingSensitivity').value);
+    let smoothed = genCmds;
+    let lastLen = -1;
+    while(smoothed.length !== lastLen) {
+        lastLen = smoothed.length;
+        smoothed = smoothCommands(smoothed, sens);
+    }
+
+    // Output
+    document.getElementById('commandsInput').value = smoothed.map(c => 
+        `G1 ${c.elbow} ${c.base} ${c.delay}`
+    ).join('\n');
+    
+    loadCommands();
+}
+
+function smoothCommands(cmds, sensitivity) {
+    if(cmds.length === 0) return [];
+    const out = [];
+    let curr = {...cmds[0]};
+
+    for(let i=1; i<cmds.length; i++) {
+        const next = cmds[i];
+        let combine = false;
+
+        if(curr.delay == next.delay) {
+            // Check signs match
+            const sB1 = Math.sign(curr.base), sB2 = Math.sign(next.base);
+            const sE1 = Math.sign(curr.elbow), sE2 = Math.sign(next.elbow);
+
+            if(curr.base === 0 && next.base === 0 && sE1 === sE2) combine = true;
+            else if(curr.elbow === 0 && next.elbow === 0 && sB1 === sB2) combine = true;
+            else if(curr.base !== 0 && next.base !== 0 && curr.elbow !== 0 && next.elbow !== 0) {
+                const r1 = curr.elbow / curr.base;
+                const r2 = next.elbow / next.base;
+                if(Math.abs(r1-r2) < sensitivity && sB1 === sB2) combine = true;
+            }
         }
 
-        function calculateFK(p0, b, e) {
-            const a = -b / STEPS_PER_RAD;
-            const beta = -e / STEPS_PER_RAD;
-            const t1 = a;
-            const tb = beta - (GEAR_RATIO * a);
-            const t2 = t1 + tb;
-            
-            const p1 = { x: p0.x + L1*Math.cos(t1), y: p0.y + L1*Math.sin(t1) };
-            const p2 = { x: p1.x + L2*Math.cos(t2), y: p1.y + L2*Math.sin(t2) };
-            
-            return { p0, p1, p2, target_base_steps: b, target_elbow_steps: e, theta1_rad: t1, theta_bend_rad: tb };
-        }
-
-        function convertGCode() {
-            const text = document.getElementById('gcodeConverterInput').value;
-            const lines = text.split('\n');
-            const format = document.querySelector('input[name="gcodeFormat"]:checked').value;
-            const res = parseFloat(document.getElementById('linearResolution').value) || 1.0;
-            
-            let coords = [];
-            for(let line of lines) {
-                line = line.trim();
-                if(!line) continue;
-                
-                let x, y;
-                if(format === 'cartesian') {
-                    const m = line.match(/G1\s+X(-?[\d.]+)\s+Y(-?[\d.]+)/i);
-                    if(m) { x = parseFloat(m[1]); y = parseFloat(m[2]); coords.push({x,y}); }
-                } else {
-                    const m = line.match(/G1\s+R(-?[\d.]+)\s+A(-?[\d.]+)/i);
-                    if(m) {
-                         let r = parseFloat(m[1]);
-                         let deg = parseFloat(m[2]);
-                         let rad = deg * (Math.PI/180);
-                         r = Math.abs(r);
-                         coords.push({ x: r*Math.cos(rad), y: r*Math.sin(rad) });
-                    }
-                }
-            }
-
-            if(coords.length === 0) { alert("No valid G-Code found."); return; }
-
-            // Interpolate
-            let interp = [coords[0]];
-            for(let i=0; i<coords.length-1; i++) {
-                const p1 = coords[i], p2 = coords[i+1];
-                const dist = Math.hypot(p2.x-p1.x, p2.y-p1.y);
-                const steps = Math.max(1, Math.ceil(dist/res));
-                for(let j=1; j<=steps; j++) {
-                    let t = j/steps;
-                    interp.push({ x: lerp(p1.x,p2.x,t), y: lerp(p1.y,p2.y,t) });
-                }
-            }
-
-            // Convert IK
-            let genCmds = [];
-            let prevB = 0, prevE = 0;
-            
-            // Setup start pos
-            const start = calculateIK(interp[0].x, interp[0].y, 0, 0);
-            prevB = start.base_steps; prevE = start.elbow_steps;
-
-            const delay = document.getElementById('stepDelayInput').value;
-
-            for(let i=1; i<interp.length; i++) {
-                const ik = calculateIK(interp[i].x, interp[i].y, prevB, prevE);
-                const rb = Math.round(ik.base_steps - prevB);
-                const re = Math.round(ik.elbow_steps - prevE);
-                
-                if(rb!==0 || re!==0) genCmds.push({elbow:re, base:rb, delay:delay});
-                
-                prevB = ik.base_steps; prevE = ik.elbow_steps;
-            }
-
-            // Smooth
-            const sens = parseFloat(document.getElementById('smoothingSensitivity').value);
-            let smoothed = genCmds;
-            let lastLen = -1;
-            
-            while(smoothed.length !== lastLen) {
-                lastLen = smoothed.length;
-                smoothed = smoothCommands(smoothed, sens);
-            }
-
-            // Output
-            document.getElementById('commandsInput').value = smoothed.map(c => `G1 ${c.elbow} ${c.base} ${c.delay}`).join('\n');
-            loadCommands();
-        }
-
-        function smoothCommands(cmds, sensitivity) {
-            if(cmds.length === 0) return [];
-            const out = [];
-            let curr = {...cmds[0]};
-
-            for(let i=1; i<cmds.length; i++) {
-                const next = cmds[i];
-                let combine = false;
-
-                if(curr.delay == next.delay) {
-                     // Check signs match
-                     const sB1 = Math.sign(curr.base), sB2 = Math.sign(next.base);
-                     const sE1 = Math.sign(curr.elbow), sE2 = Math.sign(next.elbow);
-                     
-                     if(curr.base === 0 && next.base === 0 && sE1 === sE2) combine = true;
-                     else if(curr.elbow === 0 && next.elbow === 0 && sB1 === sB2) combine = true;
-                     else if(curr.base !== 0 && next.base !== 0 && curr.elbow !== 0 && next.elbow !== 0) {
-                         const r1 = curr.elbow/curr.base; 
-                         const r2 = next.elbow/next.base;
-                         if(Math.abs(r1-r2) < sensitivity && sB1===sB2) combine = true;
-                     }
-                }
-
-                if(combine) {
-                    curr.elbow += next.elbow;
-                    curr.base += next.base;
-                } else {
-                    out.push(curr);
-                    curr = {...next};
-                }
-            }
+        if(combine) {
+            curr.elbow += next.elbow;
+            curr.base += next.base;
+        } else {
             out.push(curr);
-            return out;
+            curr = {...next};
         }
+    }
+    out.push(curr);
+    return out;
+}
 
-        // --- SIMULATION LOAD ---
-        function loadCommands() {
-            pause();
-            const text = document.getElementById('commandsInput').value;
-            commands = text.split('\n').filter(l=>l.trim().startsWith('G1')).map(l => {
-                const p = l.trim().substring(2).trim().split(/\s+/).map(Number);
-                return { elbow: p[0]||0, base: p[1]||0, step_delay_us: p[2]||1000 };
-            });
+// --- SIMULATION LOAD ---
+function loadCommands() {
+    pause();
+    const text = document.getElementById('commandsInput').value;
+    commands = text.split('\n').filter(l=>l.trim().startsWith('G1')).map(l => {
+        const p = l.trim().substring(2).trim().split(/\s+/).map(Number);
+        return { elbow: p[0]||0, base: p[1]||0, step_delay_us: p[2]||1000 };
+    });
 
-            cumulativeStates = [];
-            const p0 = {x:0, y:0};
-            cumulativeStates.push(calculateFK(p0, 0, 0));
+    cumulativeStates = [];
+    const p0 = {x:0, y:0};
+    cumulativeStates.push(calculateFK(p0, 0, 0));
+
+    let tb = 0, te = 0;
+    for(let c of commands) {
+        tb += c.base; 
+        te += c.elbow;
+        const s = calculateFK(p0, tb, te);
+        s.command = c;
+        cumulativeStates.push(s);
+    }
+
+    tracePath = [];
+    if(cumulativeStates.length > 1) {
+        tracePath.push(cumulativeStates[0].p2);
+        for(let i=0; i<cumulativeStates.length-1; i++) {
+            const from = cumulativeStates[i], to = cumulativeStates[i+1];
+            const max = Math.max(Math.abs(to.target_base_steps - from.target_base_steps), 
+                                 Math.abs(to.target_elbow_steps - from.target_elbow_steps));
             
-            let tb=0, te=0;
-            for(let c of commands) {
-                tb += c.base; te += c.elbow;
-                const s = calculateFK(p0, tb, te);
-                s.command = c;
-                cumulativeStates.push(s);
-            }
+            const segs = Math.max(2, Math.ceil(max/100)); // reduced fidelity for speed
 
-            tracePath = [];
-            if(cumulativeStates.length > 1) {
-                tracePath.push(cumulativeStates[0].p2);
-                for(let i=0; i<cumulativeStates.length-1; i++) {
-                    const from = cumulativeStates[i], to = cumulativeStates[i+1];
-                    const max = Math.max(Math.abs(to.target_base_steps-from.target_base_steps), Math.abs(to.target_elbow_steps-from.target_elbow_steps));
-                    const segs = Math.max(20, Math.ceil(max/100));
-                    for(let j=1; j<=segs; j++) {
-                        const t = j/segs;
-                        const t1 = lerp(from.theta1_rad, to.theta1_rad, t);
-                        const tb = lerp(from.theta_bend_rad, to.theta_bend_rad, t);
-                        const t2 = t1 + tb;
-                        const p1 = { x: L1*Math.cos(t1), y: L1*Math.sin(t1) };
-                        tracePath.push({ x: p1.x + L2*Math.cos(t2), y: p1.y + L2*Math.sin(t2) });
-                    }
-                }
-            }
-
-            slider.max = cumulativeStates.length - 1;
-            slider.value = 0;
-            slider.disabled = cumulativeStates.length <= 1;
-            drawState(0);
-        }
-
-        function playFrame() {
-            if(isAutoPlaying) pause();
-            isLooping = false;
-            if(currentStep < cumulativeStates.length-1) {
-                currentStep++;
-                drawState(currentStep);
+            for(let j=1; j<=segs; j++) {
+                const t = j/segs;
+                const t1 = lerp(from.theta1_rad, to.theta1_rad, t);
+                const tb = lerp(from.theta_bend_rad, to.theta_bend_rad, t);
+                const t2 = t1 + tb;
+                // Forward Kinematics for Trace
+                const p1 = {x: L1*Math.cos(t1), y: L1*Math.sin(t1) };
+                tracePath.push({x: p1.x + L2*Math.cos(t2), y: p1.y + L2*Math.sin(t2) });
             }
         }
+    }
 
-        function playFullAnimation() {
-            if(isAutoPlaying) return;
-            if(currentStep >= cumulativeStates.length-1) {
-                currentStep = 0;
-                drawState(0);
-            }
-            isAutoPlaying = true;
-            playNext();
+    slider.max = cumulativeStates.length - 1;
+    slider.value = 0;
+    slider.disabled = cumulativeStates.length <= 1;
+    drawState(0);
+}
+
+function playFrame() {
+    if(isAutoPlaying) pause();
+    isLooping = false;
+    if(currentStep < cumulativeStates.length-1) {
+        currentStep++;
+        drawState(currentStep);
+    }
+}
+
+function playFullAnimation() {
+    if(isAutoPlaying) return;
+    if(currentStep >= cumulativeStates.length-1) {
+        currentStep = 0;
+        drawState(0);
+    }
+    isAutoPlaying = true;
+    playNext();
+}
+
+function pause() {
+    isAutoPlaying = false; isLooping = false;
+    cancelAnimation();
+}
+
+function cancelAnimation() {
+    if(animationFrameId) { 
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null; 
+    }
+}
+
+function playNext() {
+    if(!isAutoPlaying) return;
+    if(currentStep >= cumulativeStates.length-1) {
+        if(isLooping) { 
+            currentStep = 0; 
+            drawState(0); 
+            setTimeout(playFullAnimation, 50);
+        } else {
+            isAutoPlaying = false;
         }
+        return;
+    }
 
-        function pause() {
-            isAutoPlaying = false; isLooping = false;
-            cancelAnimation();
-        }
+    animationFromState = cumulativeStates[currentStep];
+    animationToState = cumulativeStates[currentStep+1];
+    animationStartTime = performance.now();
+    currentStep++;
 
-        function cancelAnimation() {
-            if(animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId=null; }
-        }
+    const c = animationToState.command;
+    const steps = Math.max(Math.abs(c.elbow), Math.abs(c.base));
+    let dur = (steps * c.step_delay_us) / 1000.0;
+    if(dur === 0) dur = 1;
 
-        function playNext() {
-            if(!isAutoPlaying) return;
-            if(currentStep >= cumulativeStates.length-1) {
-                if(isLooping) { currentStep=0; drawState(0); setTimeout(playFullAnimation, 50); }
-                else isAutoPlaying = false;
-                return;
-            }
+    slider.value = currentStep;
+    stepDisp.textContent = `Step: ${currentStep} / ${cumulativeStates.length-1}`;
 
-            animationFromState = cumulativeStates[currentStep];
-            animationToState = cumulativeStates[currentStep+1];
-            animationStartTime = performance.now();
-            currentStep++;
+    animationFrameId = requestAnimationFrame(t => animate(t, dur));
+}
 
-            const c = animationToState.command;
-            const steps = Math.max(Math.abs(c.elbow), Math.abs(c.base));
-            let dur = (steps * c.step_delay_us) / 1000.0;
-            if(dur===0) dur=1;
+function animate(time, dur) {
+    const elapsed = time - animationStartTime;
+    let p = elapsed / dur;
 
-            slider.value = currentStep;
-            stepDisp.textContent = `Step: ${currentStep} / ${cumulativeStates.length-1}`;
-            
-            animationFrameId = requestAnimationFrame(t => animate(t, dur));
-        }
+    if(p >= 1) {
+        drawState(currentStep);
+        if(isAutoPlaying) playNext();
+    } else {
+        drawInterpolatedState(animationFromState, animationToState, p);
+        animationFrameId = requestAnimationFrame(t => animate(t, dur));
+    }
+}
 
-        function animate(time, dur) {
-            const elapsed = time - animationStartTime;
-            let p = elapsed / dur;
-            if(p >= 1) {
-                drawState(currentStep);
-                if(isAutoPlaying) playNext();
-            } else {
-                drawInterpolatedState(animationFromState, animationToState, p);
-                animationFrameId = requestAnimationFrame(t => animate(t, dur));
-            }
-        }
+// --- SIDEBAR ---
+function openNav() {
+    document.getElementById("mySidebar").style.width = "200px";
+    if(window.innerWidth > 900) 
+        document.querySelector(".main-content").style.marginLeft = "200px";
+}
 
-        // --- SIDEBAR ---
-        function openNav() {
-            document.getElementById("mySidebar").style.width = "200px";
-            if(window.innerWidth>900) document.querySelector(".main-content").style.marginLeft = "200px";
-        }
-        function closeNav() {
-            document.getElementById("mySidebar").style.width = "0";
-            document.querySelector(".main-content").style.marginLeft = "0";
-        }
-        function toggleDarkMode() {
-            const b = document.body;
-            const n = b.getAttribute('data-theme')==='dark'?'light':'dark';
-            b.setAttribute('data-theme', n); localStorage.setItem('theme', n);
-            document.getElementById('themeIcon').textContent = n==='dark'?'🌙':'☀️';
-            drawState(currentStep); // Redraw canvas colors
-        }
+function closeNav() {
+    document.getElementById("mySidebar").style.width = "0";
+    document.querySelector(".main-content").style.marginLeft = "0";
+}
 
-        init();
-    </script>
+function toggleDarkMode() {
+    const b = document.body;
+    const n = b.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    b.setAttribute('data-theme', n); 
+    localStorage.setItem('theme', n);
+    document.getElementById('themeIcon').textContent = n === 'dark' ? '☀️' : '🌗';
+    drawState(currentStep);
+}
+
+init();
+</script>
 </body>
 </html>
