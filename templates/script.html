@@ -329,19 +329,14 @@ const stepDisp = document.getElementById('stepDisplay');
 
 // --- INIT ---
 function init() {
-    // UI Logic
     const savedTheme = localStorage.getItem('theme') || 'light';
     document.body.setAttribute('data-theme', savedTheme);
     document.getElementById('themeIcon').textContent = savedTheme === 'dark' ? '☀️' : '🌗';
 
-    // Listeners
     document.getElementById('loadCommandsBtn').addEventListener('click', loadCommands);
     document.getElementById('convertGCodeBtn').addEventListener('click', convertGCode);
-    
-    // Auto Calibrate Listener
     document.getElementById('autoCalibrateBtn').addEventListener('click', autoCalibrate);
 
-    // File Upload Listener
     document.getElementById('fileInput').addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (!file) return;
@@ -534,7 +529,7 @@ function calculateFK(p0, b, e) {
     return { p0, p1, p2, target_base_steps: b, target_elbow_steps: e, theta1_rad: t1, theta_bend_rad: tb };
 }
 
-// --- AUTO CALIBRATION LOGIC UPDATE ---
+// --- AUTO CALIBRATION (FIXED TO USE ZERO SMOOTHING) ---
 function autoCalibrate() {
     const text = document.getElementById('gcodeConverterInput').value;
     if(!text.trim()) { alert("Please upload or paste G-Code first."); return; }
@@ -572,20 +567,16 @@ function autoCalibrate() {
     if(count === 0) return;
     const avgSegment = totalDist / count;
     
-    // IMPROVED LOGIC FOR PERFECT SMOOTHNESS:
     let recRes, recSmooth;
 
     if (avgSegment < 8.0) {
         // High Detail File (Sandify Spirals)
-        // STRATEGY: "Pass Through" Mode
-        // 1. Disable Interpolation: Set Res > Avg Segment so no new points are created.
-        // 2. Disable Smoothing: Set sensitivity to effectively zero to keep all 1800+ points.
-        
-        recRes = 50.0;         // Forces code to SKIP interpolation loop
-        recSmooth = 0.0000001; // Forces code to SKIP smoothing merge
+        // Resolution > Avg Segment (Disable Interpolation)
+        recRes = 50.0;         
+        // Smoothing = 0 (Disable Smoothing entirely)
+        recSmooth = 0; 
     } else {
-        // Low Detail File (Squares, Shapes)
-        // Needs Interpolation to curve gracefully
+        // Low Detail File (Shapes)
         recRes = 1.0;       
         recSmooth = 0.00001; 
     }
@@ -597,14 +588,12 @@ function autoCalibrate() {
     convertGCode();
 }
 
-// --- CONVERTER ---
+// --- CONVERTER (FIXED TO BYPASS SMOOTHING AT 0) ---
 function convertGCode() {
     const text = document.getElementById('gcodeConverterInput').value;
     const lines = text.split('\n');
     const format = document.querySelector('input[name="gcodeFormat"]:checked').value;
     const res = parseFloat(document.getElementById('linearResolution').value) || 1.0;
-    
-    // Center Offset
     const tableRadius = 202.6; 
 
     let coords = [];
@@ -665,10 +654,14 @@ function convertGCode() {
 
     const sens = parseFloat(document.getElementById('smoothingSensitivity').value);
     let smoothed = genCmds;
-    let lastLen = -1;
-    while(smoothed.length !== lastLen) {
-        lastLen = smoothed.length;
-        smoothed = smoothCommands(smoothed, sens);
+
+    // BYPASS LOGIC: Only smooth if sensitivity > 0
+    if (sens > 0) {
+        let lastLen = -1;
+        while(smoothed.length !== lastLen) {
+            lastLen = smoothed.length;
+            smoothed = smoothCommands(smoothed, sens);
+        }
     }
 
     document.getElementById('commandsInput').value = smoothed.map(c => 
@@ -850,5 +843,6 @@ function toggleDarkMode() {
 
 init();
 </script>
+
 </body>
 </html>
