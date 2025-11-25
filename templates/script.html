@@ -119,6 +119,12 @@ input[type="number"] {
     box-sizing: border-box;
 }
 
+/* File Upload Styling */
+input[type="file"] {
+    font-size: 14px;
+    color: var(--color-text);
+}
+
 /* --- Radio Buttons --- */
 .radio-group { display: flex; gap: 15px; margin-bottom: 10px; }
 .radio-item { display: flex; align-items: center; gap: 5px; cursor: pointer; font-size: 14px; }
@@ -221,12 +227,14 @@ body[data-theme='dark'] canvas {
                 </div>
             </div>
 
+            <div style="padding: 10px; background: var(--color-background); border-radius: 8px; border: 1px dashed var(--color-input-border);">
+                <label for="fileInput" style="margin-bottom:5px;">Upload G-Code File:</label>
+                <input type="file" id="fileInput" accept=".gcode,.txt,.nc">
+            </div>
+
             <div>
-                <label for="gcodeConverterInput">1. Paste Coordinates</label>
-                <textarea id="gcodeConverterInput" rows="6" placeholder="G1 X100 Y50&#10;G1 X0 Y0">G1 X225.351 Y1.281
-G1 X232.821 Y3.358
-G1 X240.051 Y6.156
-G1 X225.351 Y1.281</textarea>
+                <label for="gcodeConverterInput">1. Coordinates (Paste or Upload)</label>
+                <textarea id="gcodeConverterInput" rows="6" placeholder="G1 X100 Y50&#10;G1 X0 Y0"></textarea>
             </div>
 
             <div class="param-grid">
@@ -313,6 +321,18 @@ function init() {
     // Listeners
     document.getElementById('loadCommandsBtn').addEventListener('click', loadCommands);
     document.getElementById('convertGCodeBtn').addEventListener('click', convertGCode);
+
+    // --- FILE UPLOAD LISTENER ---
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('gcodeConverterInput').value = e.target.result;
+        };
+        reader.readAsText(file);
+    });
 
     slider.addEventListener('input', (e) => {
         isLooping = false;
