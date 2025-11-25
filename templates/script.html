@@ -296,14 +296,13 @@ body[data-theme='dark'] canvas {
     </div>
 </div>
 
-<script>
+    <script>
 // --- CONFIGURATION ---
 const L1 = 101.3;
 const L2 = 101.3;
 const GEAR_RATIO = 9/8;
 const STEPS_PER_DEG = 3200/360;
 const STEPS_PER_RAD = STEPS_PER_DEG * (180 / Math.PI);
-const TABLE_RADIUS = 202.6;
 
 // --- STATE ---
 let commands = [];
@@ -336,7 +335,15 @@ function init() {
 
     document.getElementById('loadCommandsBtn').addEventListener('click', loadCommands);
     document.getElementById('convertGCodeBtn').addEventListener('click', convertGCode);
-    document.getElementById('autoCalibrateBtn').addEventListener('click', autoCalibrate);
+    
+    // Auto Calibrate now triggers the Auto-Centering conversion directly
+    document.getElementById('autoCalibrateBtn').addEventListener('click', () => {
+        // Set High Fidelity Defaults
+        document.getElementById('linearResolution').value = "0.5"; // High res for smooth curves
+        document.getElementById('smoothingSensitivity').value = "0"; // No smoothing to keep shape accurate
+        document.getElementById('stepDelayInput').value = "800";
+        convertGCode();
+    });
 
     document.getElementById('fileInput').addEventListener('change', function(e) {
         const file = e.target.files[0];
@@ -478,8 +485,6 @@ function calculateIK(x, y, lastBase = 0, lastElbow = 0) {
     let D = Math.hypot(x, y);
     const maxR = L1 + L2;
     let cx = x, cy = y;
-    
-    // STRICT CLAMPING (Shouldn't be triggered if Auto-Scale works)
     if(D > maxR) { 
         cx = x * maxR / D; 
         cy = y * maxR / D; 
@@ -532,74 +537,17 @@ function calculateFK(p0, b, e) {
     return { p0, p1, p2, target_base_steps: b, target_elbow_steps: e, theta1_rad: t1, theta_bend_rad: tb };
 }
 
-// --- AUTO CALIBRATION ---
-function autoCalibrate() {
-    const text = document.getElementById('gcodeConverterInput').value;
-    if(!text.trim()) { alert("Please upload or paste G-Code first."); return; }
-    
-    const lines = text.split('\n');
-    const format = document.querySelector('input[name="gcodeFormat"]:checked').value;
-    let totalDist = 0;
-    let count = 0;
-    let lastP = null;
-
-    // Density Analysis
-    for(let line of lines) {
-        line = line.trim();
-        if(!line) continue;
-        let p = null;
-        if(format === 'cartesian') {
-            const m = line.match(/G1\s+X(-?[\d.]+)\s+Y(-?[\d.]+)/i);
-            if(m) p = {x: parseFloat(m[1]), y: parseFloat(m[2])};
-        } else {
-            const m = line.match(/G1\s+R(-?[\d.]+)\s+A(-?[\d.]+)/i);
-            if(m) {
-                let r = parseFloat(m[1]);
-                let rad = parseFloat(m[2]) * (Math.PI/180);
-                p = {x: r*Math.cos(rad), y: r*Math.sin(rad)};
-            }
-        }
-        if(p) {
-            if(lastP) {
-                totalDist += Math.hypot(p.x - lastP.x, p.y - lastP.y);
-                count++;
-            }
-            lastP = p;
-        }
-    }
-
-    if(count === 0) return;
-    const avgSegment = totalDist / count;
-    
-    let recRes, recSmooth;
-
-    // High Detail Logic (Spirals)
-    if (avgSegment < 8.0) {
-        recRes = 50.0; // Disable Interpolation
-        recSmooth = 0; // Disable Smoothing
-    } else {
-        recRes = 1.0;       
-        recSmooth = 0.00001; 
-    }
-
-    document.getElementById('linearResolution').value = recRes;
-    document.getElementById('smoothingSensitivity').value = recSmooth;
-    document.getElementById('stepDelayInput').value = "800";
-
-    convertGCode();
-}
-
-// --- CONVERTER WITH SMART CENTERING & SCALING ---
+// --- CONVERTER (AUTO-CENTERING LOGIC) ---
 function convertGCode() {
     const text = document.getElementById('gcodeConverterInput').value;
     const lines = text.split('\n');
     const format = document.querySelector('input[name="gcodeFormat"]:checked').value;
     const res = parseFloat(document.getElementById('linearResolution').value) || 1.0;
     
-    // 1. EXTRACT RAW POINTS
     let rawPoints = [];
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
 
+    // 1. READ ALL POINTS & FIND BOUNDS
     for(let line of lines) {
         line = line.trim();
         if(!line) continue;
@@ -607,9 +555,7 @@ function convertGCode() {
 
         if(format === 'cartesian') {
             const m = line.match(/G1\s+X(-?[\d.]+)\s+Y(-?[\d.]+)/i);
-            if(m) {
-                p = { x: parseFloat(m[1]), y: parseFloat(m[2]) };
-            }
+            if(m) { p = { x: parseFloat(m[1]), y: parseFloat(m[2]) }; }
         } else {
             const m = line.match(/G1\s+R(-?[\d.]+)\s+A(-?[\d.]+)/i);
             if(m) {
@@ -630,54 +576,41 @@ function convertGCode() {
 
     if(rawPoints.length === 0) { alert("No valid G-Code found."); return; }
 
-    // 2. CALCULATE CENTER & SCALE
-    // This fixes "Spacing" issues by forcing the pattern to fit exactly in the circle
-    // without being clamped at the edges.
+    // 2. CALCULATE EXACT CENTER
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;
-    
-    // Calculate max radius relative to the NEW center
-    let maxDist = 0;
-    for(let p of rawPoints) {
-        const d = Math.hypot(p.x - centerX, p.y - centerY);
-        if(d > maxDist) maxDist = d;
-    }
 
-    // Scaling Factor (Fit to Table Radius of 202.6)
-    // We slightly undershoot (0.99) to ensure floating point errors don't clamp it.
-    const scaleFactor = (TABLE_RADIUS * 0.99) / maxDist;
-
-    // 3. INTERPOLATE SCALED POINTS
+    // 3. RE-CENTER & INTERPOLATE
+    // We use the calculated center to shift the pattern to (0,0)
     let interp = [];
-    // Add first point scaled
+    
+    // Add start point
     interp.push({
-        x: (rawPoints[0].x - centerX) * scaleFactor,
-        y: (rawPoints[0].y - centerY) * scaleFactor
+        x: rawPoints[0].x - centerX, 
+        y: rawPoints[0].y - centerY
     });
 
     for(let i=0; i<rawPoints.length-1; i++) {
-        const p1Raw = rawPoints[i];
-        const p2Raw = rawPoints[i+1];
+        // Shift points relative to calculated center
+        const p1 = { x: rawPoints[i].x - centerX, y: rawPoints[i].y - centerY };
+        const p2 = { x: rawPoints[i+1].x - centerX, y: rawPoints[i+1].y - centerY };
 
-        // Apply Transform
-        const p1 = { x: (p1Raw.x - centerX) * scaleFactor, y: (p1Raw.y - centerY) * scaleFactor };
-        const p2 = { x: (p2Raw.x - centerX) * scaleFactor, y: (p2Raw.y - centerY) * scaleFactor };
-
-        const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-        
-        // If Res is high (50mm), this loop runs once (No Interpolation).
+        const dist = Math.hypot(p2.x-p1.x, p2.y-p1.y);
         const steps = Math.max(1, Math.ceil(dist/res));
 
         for(let j=1; j<=steps; j++) {
             let t = j/steps;
-            interp.push({x: lerp(p1.x,p2.x,t), y: lerp(p1.y,p2.y,t) });
+            interp.push({
+                x: lerp(p1.x, p2.x, t), 
+                y: lerp(p1.y, p2.y, t) 
+            });
         }
     }
 
-    // 4. IK CONVERSION
     let genCmds = [];
     let prevB = 0, prevE = 0;
     
+    // Jump to start
     const start = calculateIK(interp[0].x, interp[0].y, 0, 0);
     prevB = start.base_steps; 
     prevE = start.elbow_steps;
@@ -696,11 +629,10 @@ function convertGCode() {
         prevE = ik.elbow_steps;
     }
 
-    // 5. SMOOTHING
     const sens = parseFloat(document.getElementById('smoothingSensitivity').value);
     let smoothed = genCmds;
 
-    // Only smooth if sensitivity > 0
+    // BYPASS SMOOTHING IF 0
     if (sens > 0) {
         let lastLen = -1;
         while(smoothed.length !== lastLen) {
@@ -709,7 +641,6 @@ function convertGCode() {
         }
     }
 
-    // OUTPUT
     document.getElementById('commandsInput').value = smoothed.map(c => 
         `G1 ${c.elbow} ${c.base} ${c.delay}`
     ).join('\n');
