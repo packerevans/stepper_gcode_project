@@ -4,215 +4,228 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Packers Sand Table Designs</title>
-    
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
-    
-<style>
-    /* --- Root Variables (Light Mode) --- */
-    :root {
-        --color-primary: #d2b48c; /* Khaki/Tan */
-        --color-secondary: #b08d5c; /* Darker Tan */
-        --color-background: #f0f0f0; 
-        --color-surface: #ffffff; 
-        --color-text: #333333;
-        --color-shadow: rgba(0, 0, 0, 0.08);
-        --color-icon: #000000;
-        --border-radius: 12px;
-    }
+    <style>
+        /* --- Root Variables (Light Mode) --- */
+        :root {
+            --color-primary: #d2b48c; /* Khaki/Tan */
+            --color-secondary: #b08d5c; /* Darker Tan */
+            --color-background: #f0f0f0;
+            --color-surface: #ffffff;
+            --color-text: #333333;
+            --color-shadow: rgba(0, 0, 0, 0.08);
+            --color-icon: #000000;
+            --border-radius: 12px;
+        }
 
-    /* --- Dark Mode Variables --- */
-    body[data-theme='dark'] {
-        --color-background: #1e1e1e;
-        --color-surface: #2c2c2c;
-        --color-text: #e0e0e0;
-        --color-shadow: rgba(255, 255, 255, 0.08);
-        --color-icon: #ffffff;
-    }
-    
-    /* --- Base Styles --- */
-    body {
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        background: var(--color-background);
-        color: var(--color-text);
-        padding: 0; margin: 0;
-        transition: background 0.3s, color 0.3s;
-    }
+        /* --- Dark Mode Variables --- */
+        body[data-theme='dark'] {
+            --color-background: #1e1e1e;
+            --color-surface: #2c2c2c;
+            --color-text: #e0e0e0;
+            --color-shadow: rgba(255, 255, 255, 0.08);
+            --color-icon: #ffffff;
+        }
 
-    /* --- Sidebar & Header --- */
-    .sidebar {
-        height: 100%; width: 0; position: fixed; top: 0; left: 0;
-        background-color: var(--color-primary); overflow-x: hidden;
-        transition: 0.3s; padding-top: 60px; z-index: 1000;
-        box-shadow: 2px 0 5px var(--color-shadow);
-    }
-    .sidebar a {
-        padding: 15px 24px; text-decoration: none; font-size: 18px;
-        color: var(--color-text); display: block; transition: 0.2s; font-weight: 500;
-    }
-    .sidebar a:hover { background-color: var(--color-secondary); color: var(--color-surface); }
+        /* --- Base Styles --- */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--color-background);
+            color: var(--color-text);
+            padding: 0;
+            margin: 0;
+            transition: background 0.3s, color 0.3s;
+        }
 
-    .openbtn {
-        font-size: 26px; cursor: pointer; background-color: var(--color-primary);
-        color: var(--color-text); padding: 10px 18px; border: none;
-        border-radius: 6px; position: fixed; top: 15px; left: 15px; z-index: 1100; 
-        box-shadow: 0 2px 5px var(--color-shadow); width: auto; height: auto;
-    }
+        /* --- Sidebar & Header --- */
+        .sidebar {
+            height: 100%; width: 0; position: fixed;
+            top: 0; left: 0;
+            background-color: var(--color-primary); overflow-x: hidden;
+            transition: 0.3s; padding-top: 60px; z-index: 1000;
+            box-shadow: 2px 0 5px var(--color-shadow);
+        }
+        .sidebar a {
+            padding: 15px 24px;
+            text-decoration: none; font-size: 18px;
+            color: var(--color-text); display: block; transition: 0.2s; font-weight: 500;
+        }
+        .sidebar a:hover { background-color: var(--color-secondary); color: var(--color-surface); }
+        
+        .openbtn {
+            font-size: 26px; cursor: pointer; background-color: var(--color-primary);
+            color: var(--color-text); padding: 10px 18px; border: none;
+            border-radius: 6px; position: fixed; top: 15px;
+            left: 15px; z-index: 1100;
+            box-shadow: 0 2px 5px var(--color-shadow); width: auto; height: auto;
+        }
 
-    #themeToggle {
-        position: fixed; top: 15px; right: 15px; background: var(--color-surface);
-        color: var(--color-icon); border: 1px solid var(--color-icon);
-        padding: 6px 12px; border-radius: 20px; z-index: 1200;
-        transition: background 0.3s, color 0.3s, border-color 0.3s;
-        font-size: 14px; width: auto; height: auto;
-    }
-    
-    .main-content {
-        margin-left: 0; transition: margin-left 0.3s; padding: 20px;
-        max-width: 1200px; margin: 0 auto; padding-top: 60px; 
-    }
+        #themeToggle {
+            position: fixed; top: 15px;
+            right: 15px; background: var(--color-surface);
+            color: var(--color-icon); border: 1px solid var(--color-icon);
+            padding: 6px 12px; border-radius: 20px; z-index: 1200;
+            transition: background 0.3s, color 0.3s, border-color 0.3s;
+            font-size: 14px; width: auto; height: auto;
+        }
 
-    h1 {
-        text-align: center; margin-top: 20px; margin-bottom: 30px;
-        font-weight: 300; color: var(--color-secondary);
-    }
+        .main-content {
+            margin-left: 0; transition: margin-left 0.3s;
+            padding: 20px;
+            max-width: 1200px; margin: 0 auto; padding-top: 60px;
+        }
 
-    .header-image {
-        width: 100%; max-height: 250px; object-fit: cover;
-        border-radius: var(--border-radius); margin-bottom: 30px;
-        box-shadow: 0 4px 15px var(--color-shadow);
-    }
-    
-    /* --- Control / Status Panel --- */
-    .control-panel {
-        background-color: var(--color-surface); padding: 20px;
-        border-radius: var(--border-radius); box-shadow: 0 4px 10px var(--color-shadow);
-        margin-bottom: 30px;
-    }
-    
-    .controls-row {
-        display: flex; justify-content: center; align-items: center; 
-        gap: 20px; flex-wrap: wrap;
-    }
-    
-    .action-buttons {
-        display: flex; gap: 10px;
-    }
+        h1 {
+            text-align: center; margin-top: 20px; margin-bottom: 30px;
+            font-weight: 300; color: var(--color-secondary);
+        }
 
-    /* --- Status Banner --- */
-    #status-banner {
-        padding: 12px; border-radius: var(--border-radius); margin-bottom: 20px;
-        text-align: center; font-weight: 600; opacity: 0; transition: opacity 0.3s;
-        min-height: 40px; line-height: 1.5;
-    }
-    .status-success { background-color: #d4edda; color: #155724; }
-    .status-error { background-color: #f8d7da; color: #721c24; }
-    body[data-theme='dark'] .status-success { background-color: #14521f; color: #d4edda; }
-    body[data-theme='dark'] .status-error { background-color: #630c17; color: #f8d7da; }
+        .header-image {
+            width: 100%; max-height: 250px; object-fit: cover;
+            border-radius: var(--border-radius); margin-bottom: 30px;
+            box-shadow: 0 4px 15px var(--color-shadow);
+        }
 
-    /* --- Speed Dropdown --- */
-    select {
-        padding: 12px; border-radius: 8px; border: 1px solid #ccc;
-        background-color: var(--color-background); color: var(--color-text);
-        font-size: 16px; font-weight: 600; cursor: pointer;
-        min-width: 150px;
-    }
+        /* --- Control / Status Panel --- */
+        .control-panel {
+            background-color: var(--color-surface); padding: 20px;
+            border-radius: var(--border-radius); box-shadow: 0 4px 10px var(--color-shadow);
+            margin-bottom: 30px;
+        }
 
-    /* --- Design Grid Styles --- */
-    .design-grid {
-        display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 24px;
-    }
-    .design-card {
-        background-color: var(--color-surface); border-radius: var(--border-radius);
-        box-shadow: 0 4px 10px var(--color-shadow); overflow: hidden; 
-        display: flex; flex-direction: column; transition: box-shadow 0.2s;
-    }
-    .design-card.hidden-card { display: none; }
-    .design-card:hover { box-shadow: 0 8px 20px var(--color-shadow); }
-    
-    .design-card canvas {
-        width: 100%; aspect-ratio: 1 / 1; display: block; background-color: #fff; 
-    }
-    .design-card .card-content {
-        padding: 20px; display: flex; flex-direction: column; flex-grow: 1; 
-    }
-    .design-card h3 {
-        margin-top: 0; margin-bottom: 15px; font-weight: 600;
-        color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
+        .controls-row {
+            display: flex; justify-content: center; align-items: center;
+            gap: 20px; flex-wrap: wrap;
+        }
 
-    /* --- Buttons --- */
-    button {
-        background-color: var(--color-primary); color: var(--color-text);
-        border: none; padding: 12px 25px; border-radius: 8px; font-size: 16px;
-        cursor: pointer; transition: background-color 0.2s, box-shadow 0.2s;
-        font-weight: 600; width: 100%; margin-top: auto; 
-    }
-    button:hover { background-color: var(--color-secondary); box-shadow: 0 2px 8px var(--color-shadow); }
-    
-    .action-buttons button { width: auto; flex-grow: 1; }
+        .action-buttons { display: flex; gap: 10px; }
 
-    /* --- Show More Container --- */
-    #show-more-container {
-        text-align: center; margin-top: 40px; margin-bottom: 40px;
-    }
-    #btn-show-more {
-        width: auto; min-width: 200px; padding: 15px 40px;
-        font-size: 1.1rem; display: none; 
-    }
-    
-    /* --- Mobile Responsiveness --- */
-    @media (max-width: 600px) {
-        .main-content { padding: 10px; padding-top: 50px; }
-        .header-image { max-height: 120px; margin-bottom: 15px; }
-        h1 { font-size: 1.5em; margin-bottom: 15px; }
-        .design-grid { grid-template-columns: 1fr; gap: 15px; }
-        .design-card .card-content { padding: 15px; }
-        .controls-row { flex-direction: column; align-items: stretch; gap: 15px; }
-        .action-buttons { flex-direction: row; } /* Keep buttons side by side if they fit */
-        .openbtn, #themeToggle { top: 10px; width: auto; height: auto; }
-        .openbtn { left: 10px; right: auto; }
-        #themeToggle { right: 10px; left: auto; }
-    }
-</style>
-    
+        /* --- Status Banner --- */
+        #status-banner {
+            padding: 12px; border-radius: var(--border-radius); margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600; opacity: 0; transition: opacity 0.3s;
+            min-height: 40px; line-height: 1.5;
+        }
+        .status-success { background-color: #d4edda; color: #155724; }
+        .status-error { background-color: #f8d7da; color: #721c24; }
+        
+        body[data-theme='dark'] .status-success { background-color: #14521f; color: #d4edda; }
+        body[data-theme='dark'] .status-error { background-color: #630c17; color: #f8d7da; }
+
+        /* --- Speed Dropdown --- */
+        select {
+            padding: 12px; border-radius: 8px; border: 1px solid #ccc;
+            background-color: var(--color-background); color: var(--color-text);
+            font-size: 16px;
+            font-weight: 600; cursor: pointer;
+            min-width: 150px;
+        }
+
+        /* --- Design Grid Styles --- */
+        .design-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+        }
+
+        .design-card {
+            background-color: var(--color-surface); border-radius: var(--border-radius);
+            box-shadow: 0 4px 10px var(--color-shadow); overflow: hidden;
+            display: flex; flex-direction: column;
+            transition: box-shadow 0.2s;
+        }
+
+        .design-card.hidden-card { display: none; }
+        .design-card:hover { box-shadow: 0 8px 20px var(--color-shadow); }
+
+        .design-card canvas {
+            width: 100%; aspect-ratio: 1/1; display: block; background-color: #fff;
+        }
+
+        .design-card .card-content {
+            padding: 20px; display: flex; flex-direction: column; flex-grow: 1;
+        }
+
+        .design-card h3 {
+            margin-top: 0; margin-bottom: 5px; font-weight: 600;
+            color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        
+        .design-card .duration-label {
+            font-size: 0.9em; color: var(--color-secondary); margin-bottom: 15px; font-weight: 500;
+        }
+
+        /* --- Buttons --- */
+        button {
+            background-color: var(--color-primary); color: var(--color-text);
+            border: none; padding: 12px 25px; border-radius: 8px; font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.2s, box-shadow 0.2s;
+            font-weight: 600; width: 100%; margin-top: auto;
+        }
+        button:hover { background-color: var(--color-secondary); box-shadow: 0 2px 8px var(--color-shadow); }
+        .action-buttons button { width: auto; flex-grow: 1; }
+
+        /* --- Show More Container --- */
+        #show-more-container {
+            text-align: center; margin-top: 40px; margin-bottom: 40px;
+        }
+        #btn-show-more {
+            width: auto; min-width: 200px; padding: 15px 40px;
+            font-size: 1.1rem; display: none;
+        }
+
+        /* --- Mobile Responsiveness --- */
+        @media (max-width: 600px) {
+            .main-content { padding: 10px; padding-top: 50px; }
+            .header-image { max-height: 120px; margin-bottom: 15px; }
+            h1 { font-size: 1.5em; margin-bottom: 15px; }
+            .design-grid { grid-template-columns: 1fr; gap: 15px; }
+            .design-card .card-content { padding: 15px; }
+            .controls-row { flex-direction: column; align-items: stretch; gap: 15px; }
+            .action-buttons { flex-direction: row; }
+            .openbtn, #themeToggle { top: 10px; width: auto; height: auto; }
+            .openbtn { left: 10px; right: auto; }
+            #themeToggle { right: 10px; left: auto; }
+        }
+    </style>
 </head>
 <body data-theme="light">
+
     <div id="mySidebar" class="sidebar">
-        <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
-        <a href="/">Designs</a> 
+        <a href="javascript:void(0)" onclick="closeNav()">× Close</a>
+        <a href="/">Designs</a>
         <a href="/controls">Drawing</a>
-        <a href="{{ url_for('led_controls') }}">LED Controls</a>
-        <a href="{{ url_for('AI_builder') }}">AI Builder</a>
+        <a href="/led_controls">LED Controls</a>
+        <a href="/AI_builder">AI Builder</a>
         <a href="/terminal">Terminal</a>
     </div>
 
     <button class="openbtn" onclick="openNav()">☰</button>
+    
     <button id="themeToggle" onclick="toggleDarkMode()">
-        <span id="themeIcon">☀️</span>
+        <span id="themeIcon">🌙</span>
     </button>
 
     <div class="main-content">
         <img src="/static/sand.png" alt="Sand Table Header" class="header-image">
-        <h1>Design Library</h1>
         
+        <h1>Design Library</h1>
+
         <div id="status-banner"></div>
 
         <div class="control-panel">
             <h2 style="margin-top:0; text-align:center; margin-bottom:15px;">Controls</h2>
             <div class="controls-row">
-                
-                <div style="display:flex; flex-direction:column; gap:5px; flex:1;">
-                    <label style="font-weight:600; margin-left:5px;">Drawing Speed:</label>
+                <div style="display: flex; flex-direction:column; gap:5px; flex: 1;">
+                    <label style="font-weight:600; margin-left:5px;">Speed Multiplier:</label>
                     <select id="speedSelect">
-                        <option value="700">Fast (700µs)</option>
-                        <option value="1000" selected>Medium (1000µs)</option>
-                        <option value="2000">Slow (2000µs)</option>
-                        <option value="5000">Super Slow (5000µs)</option>
+                        <option value="0.5">Fast (2x Speed)</option>
+                        <option value="1.0" selected>Medium (Normal)</option>
+                        <option value="2.0">Slow (0.5x Speed)</option>
                     </select>
                 </div>
-
                 <div class="action-buttons" style="flex:2;">
                     <button onclick="clearQueue()">Clear Queue</button>
                     <button onclick="pauseDesign()">PAUSE</button>
@@ -233,299 +246,450 @@
         </div>
     </div>
 
-<script>
-    // --- Configuration ---
-    const BASE_URL = `${window.location.protocol}//${window.location.host}`;
+    <script>
+        // --- Configuration ---
+        const BASE_URL = `${window.location.protocol}//${window.location.host}`;
 
-    // ... [KEEP ALL KINEMATIC LOGIC EXACTLY THE SAME AS BEFORE] ...
-    // ... (Assume KINEMATIC LOGIC code block is here) ...
-    
-    // ######################################################################
-    // ##  RE-INSERT KINEMATIC LOGIC HERE IF YOU COPY/PASTE (For brevity)
-    // ##  (The preview logic doesn't change based on speed)
-    // ######################################################################
-     const L1 = 101.3; 
-    const L2 = 101.3; 
-    const GEAR_RATIO = 9 / 8; 
-    const STEPS_PER_DEG = 3200 / 360;
-    const STEPS_PER_RAD = STEPS_PER_DEG * (180 / Math.PI);
-    const lerp = (a, b, t) => a + (b - a) * t;
-    function calculateFK(p0, base_steps, elbow_steps) {
-        const alpha_rad = -base_steps / STEPS_PER_RAD;
-        const beta_rad = -elbow_steps / STEPS_PER_RAD;  
-        const theta1 = alpha_rad;
-        const theta_bend = beta_rad - (GEAR_RATIO * alpha_rad);
-        const theta2_global = theta1 + theta_bend;
-        const p1 = { x: p0.x + L1 * Math.cos(theta1), y: p0.y + L1 * Math.sin(theta1) };
-        const p2 = { x: p1.x + L2 * Math.cos(theta2_global), y: p1.y + L2 * Math.sin(theta2_global) };
-        return { p0, p1, p2, target_base_steps: base_steps, target_elbow_steps: elbow_steps, theta1_rad: theta1, theta_bend_rad: theta_bend, theta2_global_rad: theta2_global };
-    }
-    function getInterpolatedState(from, to, progress) {
-        const theta1_rad = lerp(from.theta1_rad, to.theta1_rad, progress);
-        const theta_bend_rad = lerp(from.theta_bend_rad, to.theta_bend_rad, progress);
-        const theta2_global_rad = lerp(from.theta2_global_rad, to.theta2_global_rad, progress);
-        const p0 = from.p0;
-        const p1 = { x: p0.x + L1 * Math.cos(theta1_rad), y: p0.y + L1 * Math.sin(theta1_rad) };
-        const p2 = { x: p1.x + L2 * Math.cos(theta2_global_rad), y: p1.y + L2 * Math.sin(theta2_global_rad) };
-        return { p0, p1, p2 };
-    }
-    function calculateAllStates(commands) {
-        let cumulativeStates = [];
-        let total_base_steps = 0;
-        let total_elbow_steps = 0;
-        const p0 = { x: 0, y: 0 }; 
-        cumulativeStates.push(calculateFK(p0, 0, 0));
-        for (const cmd of commands) {
-            total_base_steps += cmd.base;
-            total_elbow_steps += cmd.elbow;
-            const state = calculateFK(p0, total_base_steps, total_elbow_steps);
-            cumulativeStates.push(state);
+        // --- KINEMATIC LOGIC ---
+        // (Used for Generating Previews if PNG is missing)
+        const L1 = 101.3;
+        const L2 = 101.3;
+        const GEAR_RATIO = 9/8;
+        const STEPS_PER_DEG = 3200/360;
+        const STEPS_PER_RAD = STEPS_PER_DEG * (180 / Math.PI);
+
+        const lerp = (a, b, t) => a + (b - a) * t;
+
+        function calculateFK(p0, base_steps, elbow_steps) {
+            const alpha_rad = -base_steps / STEPS_PER_RAD;
+            const beta_rad = -elbow_steps / STEPS_PER_RAD;
+
+            const theta1 = alpha_rad;
+            const theta_bend = beta_rad - (GEAR_RATIO * alpha_rad);
+            const theta2_global = theta1 + theta_bend;
+
+            const p1 = { x: p0.x + L1 * Math.cos(theta1), y: p0.y + L1 * Math.sin(theta1) };
+            const p2 = { x: p1.x + L2 * Math.cos(theta2_global), y: p1.y + L2 * Math.sin(theta2_global) };
+
+            return { p0, p1, p2, target_base_steps: base_steps, target_elbow_steps: elbow_steps,
+                     theta1_rad: theta1, theta_bend_rad: theta_bend, theta2_global_rad: theta2_global };
         }
-        return cumulativeStates;
-    }
-    function calculateTracePath(cumulativeStates) {
-        let tracePath = [];
-        if (cumulativeStates.length < 2) return [];
-        tracePath.push(cumulativeStates[0].p2); 
-        for (let i = 0; i < cumulativeStates.length - 1; i++) {
-            const fromState = cumulativeStates[i];
-            const toState = cumulativeStates[i+1];
-            const base_delta = Math.abs(toState.target_base_steps - fromState.target_base_steps);
-            const elbow_delta = Math.abs(toState.target_elbow_steps - fromState.target_elbow_steps);
-            const max_step_delta = Math.max(base_delta, elbow_delta);
-            const stepsPerSegment = Math.max(20, Math.ceil(max_step_delta / 100));
-            for (let j = 1; j <= stepsPerSegment; j++) {
-                const progress = j / stepsPerSegment;
-                const interpolatedState = getInterpolatedState(fromState, toState, progress);
-                tracePath.push(interpolatedState.p2);
+
+        function getInterpolatedState(from, to, progress) {
+            const theta1_rad = lerp(from.theta1_rad, to.theta1_rad, progress);
+            const theta2_global_rad = lerp(from.theta2_global_rad, to.theta2_global_rad, progress);
+            
+            const p0 = from.p0;
+            const p1 = { x: p0.x + L1 * Math.cos(theta1_rad), y: p0.y + L1 * Math.sin(theta1_rad) };
+            const p2 = { x: p1.x + L2 * Math.cos(theta2_global_rad), y: p1.y + L2 * Math.sin(theta2_global_rad) };
+            
+            return { p0, p1, p2 };
+        }
+
+        function calculateAllStates(commands) {
+            let cumulativeStates = [];
+            let total_base_steps = 0;
+            let total_elbow_steps = 0;
+            const p0 = {x:0, y:0};
+
+            cumulativeStates.push(calculateFK(p0, 0, 0));
+
+            for (const cmd of commands) {
+                total_base_steps += cmd.base;
+                total_elbow_steps += cmd.elbow;
+                const state = calculateFK(p0, total_base_steps, total_elbow_steps);
+                cumulativeStates.push(state);
             }
+            return cumulativeStates;
         }
-        return tracePath;
-    }
-    function generateTracePathFromText(commandText) {
-        const commands = commandText.split('\n')
-            .filter(line => line.trim().toUpperCase().startsWith('G1'))
-            .map(line => {
-                const parts = line.trim().substring(2).trim().split(/\s+/).map(s => parseInt(s.trim(), 10));
-                return { 
-                    elbow: parts[0] || 0, 
-                    base: parts[1] || 0, 
-                    step_delay_us: parts[2] !== undefined ? parts[2] : 1000 
-                };
-            });
-        if (commands.length === 0) return [];
-        const cumulativeStates = calculateAllStates(commands);
-        return calculateTracePath(cumulativeStates);
-    }
-    function drawTraceOnCanvas(canvas, tracePath) {
-        const ctx = canvas.getContext('2d');
-        const width = canvas.width;
-        const height = canvas.height;
-        ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, width, height);
-        if (tracePath.length < 2) return;
-        let minX = tracePath[0].x, maxX = tracePath[0].x;
-        let minY = tracePath[0].y, maxY = tracePath[0].y;
-        for (const p of tracePath) {
-            if (p.x < minX) minX = p.x;
-            if (p.x > maxX) maxX = p.x;
-            if (p.y < minY) minY = p.y;
-            if (p.y > maxY) maxY = p.y;
-        }
-        const drawingWidth = (maxX - minX) || 1;
-        const drawingHeight = (maxY - minY) || 1;
-        const padding = 0.1;
-        const scale = Math.min(
-            width / drawingWidth,
-            height / drawingHeight
-        ) * (1 - padding);
-        const drawCenterX = (minX + maxX) / 2;
-        const drawCenterY = (minY + maxY) / 2;
-        const canvasCenterX = width / 2;
-        const canvasCenterY = height / 2;
-        ctx.beginPath();
-        ctx.strokeStyle = 'black';
-        ctx.lineWidth = 2;
-        ctx.lineJoin = 'round';
-        ctx.lineCap = 'round';
-        for (let i = 0; i < tracePath.length; i++) {
-            const p = tracePath[i];
-            const canvasX = canvasCenterX + (p.x - drawCenterX) * scale;
-            const canvasY = canvasCenterY + (p.y - drawCenterY) * -scale; 
-            if (i === 0) {
-                ctx.moveTo(canvasX, canvasY);
-            } else {
-                ctx.lineTo(canvasX, canvasY);
+
+        function calculateTracePath(cumulativeStates) {
+            let tracePath = [];
+            if (cumulativeStates.length < 2) return [];
+            
+            tracePath.push(cumulativeStates[0].p2);
+
+            for (let i = 0; i < cumulativeStates.length - 1; i++) {
+                const fromState = cumulativeStates[i];
+                const toState = cumulativeStates[i+1];
+                
+                const base_delta = Math.abs(toState.target_base_steps - fromState.target_base_steps);
+                const elbow_delta = Math.abs(toState.target_elbow_steps - fromState.target_elbow_steps);
+                
+                const max_step_delta = Math.max(base_delta, elbow_delta);
+                // Reduce resolution for previews to keep it fast
+                const stepsPerSegment = Math.max(5, Math.ceil(max_step_delta / 200)); 
+
+                for (let j = 1; j <= stepsPerSegment; j++) {
+                    const progress = j / stepsPerSegment;
+                    const interpolatedState = getInterpolatedState(fromState, toState, progress);
+                    tracePath.push(interpolatedState.p2);
+                }
             }
+            return tracePath;
         }
-        ctx.stroke();
-    }
+
+        function generateTracePathFromText(commandText) {
+            const commands = commandText.split('\n')
+                .filter(line => line.trim().toUpperCase().startsWith('G1'))
+                .map(line => {
+                    const parts = line.trim().substring(2).trim().split(/\s+/).map(s => parseInt(s.trim(), 10));
+                    return {
+                        elbow: parts[0] || 0,
+                        base: parts[1] || 0,
+                        step_delay_us: parts[2] !== undefined ? parts[2] : 1000
+                    };
+                });
+
+            if (commands.length === 0) return [];
+            const cumulativeStates = calculateAllStates(commands);
+            return calculateTracePath(cumulativeStates);
+        }
+
+        function drawTraceOnCanvas(canvas, tracePath) {
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, width, height);
+            
+            if (tracePath.length < 2) return;
+
+            let minX = tracePath[0].x, maxX = tracePath[0].x;
+            let minY = tracePath[0].y, maxY = tracePath[0].y;
+
+            for (const p of tracePath) {
+                if (p.x < minX) minX = p.x;
+                if (p.x > maxX) maxX = p.x;
+                if (p.y < minY) minY = p.y;
+                if (p.y > maxY) maxY = p.y;
+            }
+
+            const drawingWidth = (maxX - minX) || 1;
+            const drawingHeight = (maxY - minY) || 1;
+            const padding = 0.1;
+
+            const scale = Math.min(
+                width / drawingWidth,
+                height / drawingHeight
+            ) * (1 - padding);
+
+            const drawCenterX = (minX + maxX) / 2;
+            const drawCenterY = (minY + maxY) / 2;
+            const canvasCenterX = width / 2;
+            const canvasCenterY = height / 2;
+
+            ctx.beginPath();
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 1.5;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+
+            for (let i = 0; i < tracePath.length; i++) {
+                const p = tracePath[i];
+                const canvasX = canvasCenterX + (p.x - drawCenterX) * scale;
+                const canvasY = canvasCenterY + (p.y - drawCenterY) * -scale; // Flip Y
+
+                if (i === 0) ctx.moveTo(canvasX, canvasY);
+                else ctx.lineTo(canvasX, canvasY);
+            }
+            ctx.stroke();
+        }
 
 
-    // ######################################################################
-    // ##  START: PAGE UI & FETCH LOGIC
-    // ######################################################################
+        // --- PAGE UI & FETCH LOGIC ---
 
-    const statusBanner = document.getElementById('status-banner');
+        const statusBanner = document.getElementById('status-banner');
 
-    function showStatus(message, isSuccess = true) {
-        statusBanner.textContent = message;
-        statusBanner.className = isSuccess ? 'status-success' : 'status-error';
-        statusBanner.style.opacity = '1';
-        setTimeout(() => { statusBanner.style.opacity = '0'; }, 5000);
-    }
-    
-    function sendCommand(cmd, successMessage = "Command sent.") {
-        fetch(`${BASE_URL}/send`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ command: cmd })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) showStatus(successMessage, true);
-            else showStatus(`Failed: ${data.error}`, false);
-        })
-        .catch(error => showStatus(`Network Error: ${error.message}`, false));
-    }
+        function showStatus(message, isSuccess = true) {
+            statusBanner.textContent = message;
+            statusBanner.className = isSuccess ? 'status-success' : 'status-error';
+            statusBanner.style.opacity = '1';
+            setTimeout(() => { statusBanner.style.opacity = '0'; }, 5000);
+        }
 
-    function clearQueue() { sendCommand('CLEAR', 'Command queue cleared.'); }
-    function pauseDesign() { sendCommand('PAUSE', 'Sand table paused.'); }
-    function resumeDesign() { sendCommand('RESUME', 'Sand table resumed.'); }
-
-    function markAsRecent(filename) {
-        let recents = JSON.parse(localStorage.getItem('recentDesigns') || '[]');
-        recents = recents.filter(f => f !== filename);
-        recents.unshift(filename);
-        if (recents.length > 20) recents = recents.slice(0, 20);
-        localStorage.setItem('recentDesigns', JSON.stringify(recents));
-    }
-
-    // --- UPDATED RUN DESIGN FUNCTION ---
-    async function runDesign(filename) {
-        markAsRecent(filename); 
-
-        const baseName = filename.replace('.txt', '');
-        const txtPath = `${BASE_URL}/designs/${baseName}.txt`;
-        
-        // Get the selected speed override from the dropdown
-        const speedOverride = document.getElementById('speedSelect').value;
-
-        showStatus(`Fetching commands for ${filename}...`, true);
-
-        try {
-            const response = await fetch(txtPath);
-            if (!response.ok) throw new Error(`Failed to fetch file.`);
-            const gcode = await response.text();
-
-            // Send Gcode + Speed Override to the server
-            const sendResponse = await fetch(`${BASE_URL}/send_gcode_block`, {
+        function sendCommand(cmd, successMessage="Command sent.") {
+            fetch(`${BASE_URL}/send`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ 
-                    gcode: gcode,
-                    speed_override: speedOverride // <--- Sending Speed Here
-                })
-            });
-
-            const sendData = await sendResponse.json();
-            
-            if (sendData.success) {
-                showStatus(`Started design: ${filename} @ ${speedOverride}µs`, true);
-            } else {
-                showStatus(`Failed to start job: ${sendData.error}`, false);
-            }
-
-        } catch (error) {
-            showStatus(`Error running design: ${error.message}`, false);
+                body: JSON.stringify({ command: cmd })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.success) showStatus(successMessage, true);
+                else showStatus(`Failed: ${data.error}`, false);
+            })
+            .catch(error => showStatus(`Network Error: ${error.message}`, false));
         }
-    }
 
-    // ... [KEEP ALL PREVIEW & LOAD LOGIC THE SAME] ...
-    function loadPreview(filename) {
-        const canvas = document.getElementById(`canvas-${filename}`);
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        const baseName = filename.replace('.txt', '');
-        const pngPath = `${BASE_URL}/designs/${baseName}.png`; 
-        const txtPath = `${BASE_URL}/designs/${baseName}.txt`; 
-        ctx.fillStyle = 'white'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-        const img = new Image(); img.src = pngPath;
-        img.onload = () => { ctx.drawImage(img, 0, 0, canvas.width, canvas.height); };
-        img.onerror = () => {
-            fetch(txtPath).then(r => r.text()).then(t => {
-                const tracePath = generateTracePathFromText(t);
-                drawTraceOnCanvas(canvas, tracePath);
-            }).catch(err => {
-                ctx.fillStyle = 'red'; ctx.fillText('Preview Error', canvas.width/2, canvas.height/2);
-            });
-        };
-    }
-    async function fetchDesignList() {
-        const response = await fetch(`${BASE_URL}/api/designs`);
-        return response.json();
-    }
-    function revealHiddenDesigns() {
-        document.querySelectorAll('.design-card.hidden-card').forEach(c => c.classList.remove('hidden-card'));
-        document.getElementById('btn-show-more').style.display = 'none';
-    }
-    async function loadDesignLibrary() {
-        const grid = document.getElementById('designGridContainer');
-        const loader = document.getElementById('loading-indicator');
-        const errMsg = document.getElementById('error-message');
-        const moreBtn = document.getElementById('btn-show-more');
-        
-        loader.style.display = 'block'; errMsg.style.display = 'none'; grid.innerHTML = ''; 
-        try {
-            let files = await fetchDesignList();
-            if (files.length === 0) { errMsg.style.display = 'block'; return; }
+        function clearQueue() { sendCommand('CLEAR', 'Command queue cleared.'); }
+        function pauseDesign() { sendCommand('PAUSE', 'Sand table paused.'); }
+        function resumeDesign() { sendCommand('RESUME', 'Sand table resumed.'); }
 
-            const recents = JSON.parse(localStorage.getItem('recentDesigns') || '[]');
-            files.sort((a, b) => {
-                const idxA = recents.indexOf(a), idxB = recents.indexOf(b);
-                if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-                if (idxA !== -1) return -1; if (idxB !== -1) return 1;
-                return 0;
-            });
+        function markAsRecent(filename) {
+            let recents = JSON.parse(localStorage.getItem('recentDesigns') || '[]');
+            recents = recents.filter(f => f !== filename);
+            recents.unshift(filename);
+            if (recents.length > 20) recents = recents.slice(0, 20);
+            localStorage.setItem('recentDesigns', JSON.stringify(recents));
+        }
 
-            const TOP_COUNT = 3;
-            const first = files.slice(0, TOP_COUNT);
-            const rest = files.slice(TOP_COUNT);
-            const createCard = (f, h) => {
-                const c = document.createElement('div');
-                c.className = `design-card ${h ? 'hidden-card' : ''}`;
-                c.innerHTML = `<canvas id="canvas-${f}" width="400" height="400"></canvas><div class="card-content"><h3>${f}</h3><button onclick="runDesign('${f}')">Run Design</button></div>`;
-                return c;
-            };
+        // --- NEW TIME ESTIMATION LOGIC ---
+        // Calculates duration based on steps * delay
+        async function calculateDuration(filename) {
+            const txtPath = `${BASE_URL}/designs/${filename}`;
+            try {
+                const response = await fetch(txtPath);
+                if (!response.ok) return "?? min";
+                const text = await response.text();
+                
+                let totalTimeUs = 0;
+                let prevElbow = 0; // Assuming start at 0
+                let prevBase = 0;
 
-            first.forEach(f => { grid.appendChild(createCard(f, false)); loadPreview(f); });
-            loader.style.display = 'none';
+                const lines = text.split('\n');
+                for (let line of lines) {
+                    line = line.trim();
+                    if (!line.toUpperCase().startsWith('G1')) continue;
 
-            if (rest.length > 0) {
-                moreBtn.style.display = 'inline-block'; moreBtn.innerText = `Show ${rest.length} More Designs`;
-                setTimeout(() => {
-                    rest.forEach(f => { grid.appendChild(createCard(f, true)); setTimeout(() => loadPreview(f), 0); });
-                }, 100); 
+                    // Parse: G1 <Elbow> <Base> <Delay>
+                    // Remove G1, trim, split by spaces
+                    const parts = line.substring(2).trim().split(/\s+/);
+                    if (parts.length < 2) continue;
+
+                    const elbow = parseInt(parts[0]) || 0;
+                    const base = parseInt(parts[1]) || 0;
+                    const delay = parseInt(parts[2]) || 1000; // Default 1000us if missing
+
+                    // Calculate max delta steps (the motor that moves furthest dictates the time)
+                    const dElbow = Math.abs(elbow); // Files are relative or absolute? 
+                    // Note: Your kinematic logic implies absolute steps in 'calculateFK', 
+                    // but usually Gcode logic calculates delta for timing. 
+                    // Looking at `generateTracePathFromText`, it sums commands. 
+                    // *** CRITICAL: If the file contains RELATIVE steps (usually standard for sand tables), 
+                    // then the time is simply max(abs(elbow), abs(base)) * delay.
+                    // If absolute, we need to track previous. 
+                    // Based on `calculateAllStates`: "total_base_steps += cmd.base" 
+                    // This implies the file format is RELATIVE steps (G1 100 100 means move 100 steps).
+                    
+                    const maxSteps = Math.max(Math.abs(elbow), Math.abs(base));
+                    totalTimeUs += (maxSteps * delay);
+                }
+
+                // Convert microseconds to minutes
+                // us -> seconds (/1,000,000) -> minutes (/60)
+                const minutes = Math.ceil(totalTimeUs / 60000000);
+                return `${minutes} min`;
+
+            } catch (e) {
+                console.error("Error calculating time for " + filename, e);
+                return "?? min";
             }
-        } catch (e) { errMsg.style.display = 'block'; } 
-        finally { if (grid.children.length === 0) loader.style.display = 'none'; }
-    }
-    
-    // --- Sidebar/Theme ---
-    function openNav() { document.getElementById("mySidebar").style.width = "200px"; document.querySelector(".main-content").style.marginLeft = "200px"; }
-    function closeNav() { document.getElementById("mySidebar").style.width = "0"; document.querySelector(".main-content").style.marginLeft = "0"; }
-    function updateThemeIcon(t) { document.getElementById('themeIcon').textContent = t === 'dark' ? '🌙' : '☀️'; }
-    function toggleDarkMode() {
-        const b = document.body; const next = b.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-        b.setAttribute('data-theme', next); localStorage.setItem('theme', next); updateThemeIcon(next);
-    }
+        }
 
-    document.addEventListener('DOMContentLoaded', () => {
-        const savedTheme = localStorage.getItem('theme') || 'light';
-        document.body.setAttribute('data-theme', savedTheme); updateThemeIcon(savedTheme);
-        loadDesignLibrary();
-    });
-</script>
+        // --- UPDATED RUN DESIGN FUNCTION ---
+        // Applies the multiplier to the raw G-code before sending
+        async function runDesign(filename) {
+            markAsRecent(filename);
+            const baseName = filename.replace('.txt', '');
+            const txtPath = `${BASE_URL}/designs/${filename}`;
 
+            // Get the Multiplier (0.5, 1.0, 2.0)
+            const speedMultiplier = parseFloat(document.getElementById('speedSelect').value);
+            
+            showStatus(`Preparing ${filename}...`, true);
+
+            try {
+                const response = await fetch(txtPath);
+                if (!response.ok) throw new Error('Failed to fetch file.');
+                const originalGcode = await response.text();
+
+                // --- SCALE SPEEDS IN JAVASCRIPT ---
+                let modifiedGcodeLines = [];
+                const lines = originalGcode.split('\n');
+                
+                for(let line of lines) {
+                    let trimLine = line.trim();
+                    if(trimLine.toUpperCase().startsWith('G1')) {
+                        // Parse G1 E B D
+                        const parts = trimLine.substring(2).trim().split(/\s+/);
+                        const e = parts[0];
+                        const b = parts[1];
+                        let delay = parts.length > 2 ? parseInt(parts[2]) : 1000;
+                        
+                        // Apply Multiplier
+                        let newDelay = Math.round(delay * speedMultiplier);
+                        
+                        // Reconstruct Line
+                        modifiedGcodeLines.push(`G1 ${e} ${b} ${newDelay}`);
+                    } else {
+                        modifiedGcodeLines.push(trimLine);
+                    }
+                }
+                
+                const finalGcode = modifiedGcodeLines.join('\n');
+
+                // Send MODIFIED Gcode. We do NOT send 'speed_override' parameter, 
+                // so app.py uses the delay values we just wrote into the string.
+                const sendResponse = await fetch(`${BASE_URL}/send_gcode_block`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        gcode: finalGcode,
+                        speed_override: null // Let existing logic use the values in the text
+                    })
+                });
+
+                const sendData = await sendResponse.json();
+                
+                let speedLabel = "Medium";
+                if(speedMultiplier < 1.0) speedLabel = "Fast";
+                if(speedMultiplier > 1.0) speedLabel = "Slow";
+
+                if (sendData.success) {
+                    showStatus(`Started: ${filename} (${speedLabel})`, true);
+                } else {
+                    showStatus(`Failed: ${sendData.error}`, false);
+                }
+
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, false);
+            }
+        }
+
+        function loadPreview(filename) {
+            const canvas = document.getElementById(`canvas-${filename}`);
+            if (!canvas) return;
+
+            const baseName = filename.replace('.txt', '');
+            const pngPath = `${BASE_URL}/designs/${baseName}.png`;
+            const txtPath = `${BASE_URL}/designs/${baseName}.txt`;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = 'white'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const img = new Image();
+            img.src = pngPath;
+            img.onload = () => { ctx.drawImage(img, 0, 0, canvas.width, canvas.height); };
+            img.onerror = () => {
+                fetch(txtPath).then(r => r.text()).then(t => {
+                    const tracePath = generateTracePathFromText(t);
+                    drawTraceOnCanvas(canvas, tracePath);
+                }).catch(err => {
+                    ctx.fillStyle = '#f8d7da'; ctx.fillRect(0,0,canvas.width,canvas.height);
+                    ctx.fillStyle = '#721c24'; ctx.fillText('Error', 20, 20);
+                });
+            };
+        }
+
+        async function fetchDesignList() {
+            const response = await fetch(`${BASE_URL}/api/designs`);
+            return response.json();
+        }
+
+        function revealHiddenDesigns() {
+            document.querySelectorAll('.design-card.hidden-card').forEach(c => 
+                c.classList.remove('hidden-card'));
+            document.getElementById('btn-show-more').style.display = 'none';
+        }
+
+        async function loadDesignLibrary() {
+            const grid = document.getElementById('designGridContainer');
+            const loader = document.getElementById('loading-indicator');
+            const errMsg = document.getElementById('error-message');
+            const moreBtn = document.getElementById('btn-show-more');
+            
+            loader.style.display = 'block'; errMsg.style.display = 'none'; grid.innerHTML = '';
+
+            try {
+                let files = await fetchDesignList();
+                if (files.length === 0) { errMsg.style.display = 'block'; return; }
+
+                // Sort: Recent first
+                const recents = JSON.parse(localStorage.getItem('recentDesigns') || '[]');
+                files.sort((a, b) => {
+                    const idxA = recents.indexOf(a), idxB = recents.indexOf(b);
+                    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                    if (idxA !== -1) return -1;
+                    if (idxB !== -1) return 1;
+                    return 0;
+                });
+
+                const TOP_COUNT = 6; // Show a few more initially
+                const first = files.slice(0, TOP_COUNT);
+                const rest = files.slice(TOP_COUNT);
+
+                const createCard = (f, hidden) => {
+                    const c = document.createElement('div');
+                    c.className = `design-card ${hidden ? 'hidden-card' : ''}`;
+                    // Added duration-label span
+                    c.innerHTML = `
+                        <canvas id="canvas-${f}" width="400" height="400"></canvas>
+                        <div class="card-content">
+                            <h3>${f}</h3>
+                            <span id="time-${f}" class="duration-label">Calc time...</span>
+                            <button onclick="runDesign('${f}')">Run Design</button>
+                        </div>`;
+                    
+                    // Async: Calculate Time Estimate
+                    calculateDuration(f).then(timeStr => {
+                        const el = document.getElementById(`time-${f}`);
+                        if(el) el.textContent = "Est: " + timeStr;
+                    });
+                    
+                    return c;
+                };
+
+                first.forEach(f => { grid.appendChild(createCard(f, false)); loadPreview(f); });
+
+                if (rest.length > 0) {
+                    moreBtn.style.display = 'inline-block';
+                    moreBtn.innerText = `Show ${rest.length} More Designs`;
+                    
+                    // Delay loading the rest to keep UI snappy
+                    setTimeout(() => {
+                        rest.forEach(f => { 
+                            grid.appendChild(createCard(f, true)); 
+                            setTimeout(() => loadPreview(f), 0);
+                        });
+                    }, 100);
+                }
+
+            } catch (e) {
+                console.error(e);
+                errMsg.style.display = 'block';
+            } finally {
+                loader.style.display = 'none';
+            }
+        }
+
+        // --- Sidebar/Theme ---
+        function openNav() { 
+            document.getElementById("mySidebar").style.width = "200px";
+            document.querySelector(".main-content").style.marginLeft = "200px";
+        }
+        function closeNav() { 
+            document.getElementById("mySidebar").style.width = "0";
+            document.querySelector(".main-content").style.marginLeft = "0";
+        }
+        function updateThemeIcon(t) { document.getElementById('themeIcon').textContent = t === 'dark' ? '☀️' : '🌙'; }
+        
+        function toggleDarkMode() {
+            const b = document.body;
+            const next = b.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            b.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+            updateThemeIcon(next);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.body.setAttribute('data-theme', savedTheme);
+            updateThemeIcon(savedTheme);
+            loadDesignLibrary();
+        });
+
+    </script>
 </body>
 </html>
