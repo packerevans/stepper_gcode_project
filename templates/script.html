@@ -257,7 +257,7 @@ body[data-theme='dark'] canvas {
                 </div>
                 <div>
                     <label>Smooth</label>
-                    <input type="number" id="smoothingSensitivity" value="0.00001" step="0.00001">
+                    <input type="number" id="smoothingSensitivity" value="0.00001" step="0.0000001">
                 </div>
                 <div>
                     <label>Res. (mm)</label>
@@ -572,18 +572,20 @@ function autoCalibrate() {
     if(count === 0) return;
     const avgSegment = totalDist / count;
     
-    // IMPROVED LOGIC:
+    // IMPROVED LOGIC FOR PERFECT SMOOTHNESS:
     let recRes, recSmooth;
 
-    if (avgSegment < 10.0) {
+    if (avgSegment < 8.0) {
         // High Detail File (Sandify Spirals)
-        // Disable Interpolation by setting Resolution > Avg Segment
-        recRes = 12.0; 
-        // Minimal Smoothing to merge perfectly straight lines but keep detail
-        recSmooth = 0.0005; 
+        // STRATEGY: "Pass Through" Mode
+        // 1. Disable Interpolation: Set Res > Avg Segment so no new points are created.
+        // 2. Disable Smoothing: Set sensitivity to effectively zero to keep all 1800+ points.
+        
+        recRes = 50.0;         // Forces code to SKIP interpolation loop
+        recSmooth = 0.0000001; // Forces code to SKIP smoothing merge
     } else {
         // Low Detail File (Squares, Shapes)
-        // Interpolate finely to create smooth arm motion
+        // Needs Interpolation to curve gracefully
         recRes = 1.0;       
         recSmooth = 0.00001; 
     }
