@@ -3,10 +3,10 @@ import serial, threading, time, subprocess
 import os
 import re
 import asyncio
+import socket
+# Assuming these modules exist in your project folder
 import wifi_tools 
 import ble_controller 
-import socket  # Ensure this is imported at the top
-
 
 app = Flask(__name__)
 app.secret_key = 'your_super_secret_key' 
@@ -16,7 +16,7 @@ def apply_ngrok_header(response: Response):
     response.headers["ngrok-skip-browser-warning"] = "true"
     return response
 
-# === SERIAL LOGGING SETUP ===
+# === SERIAL LOGGING ===
 serial_log = []
 lock = threading.Lock()
 
@@ -28,21 +28,98 @@ def log_message(msg):
         if len(serial_log) > 200:
             serial_log.pop(0)
 
-# CONNECT BLE LOGS TO FLASK
+# Connect BLE logs to Flask logs
 ble_controller.set_logger(log_message)
 
-# === SERIAL SETUP ===
+# === SERIAL CONNECTION SETUP ===
 arduino = None
 arduino_connected = False
+current_gcode_runner = None
 
 try:
     arduino = serial.Serial('/dev/ttyACM0', 9600, timeout=0.1) 
-    time.sleep(2)
+    time.sleep(2) # Wait for Arduino reset
     arduino_connected = True
 except Exception as e:
     print(f"WARNING: Arduino not connected: {e}") 
     log_message(f"Arduino Init Failed: {e}")
 
+# === SMART G-CODE RUNNER (FLOW CONTROL) ===
+class GCodeRunner(threading.Thread):
+    def __init__(self, gcode_block):
+        super().__init__(daemon=True)
+        # Filter and store only G1 commands
+        self.lines = [
+            line.split(';')[0].strip() for line in gcode_block.split('\n') 
+            if line.split(';')[0].strip().upper().startswith('G1')
+        ]
+        self.total_lines = len(self.lines)
+        self.is_running = True
+        
+        # FLOW CONTROL CONFIGURATION
+        # Arduino has a buffer of 50. We fill to 40 to be safe.
+        self.ARDUINO_BUFFER_SIZE = 40  
+        self.credits = self.ARDUINO_BUFFER_SIZE 
+        self.lines_sent = 0
+        
+        # Thread Event: Used to pause sending when credits are 0
+        self.slot_available_event = threading.Event()
+
+    def process_incoming_serial(self, line):
+        """Called by the serial reader thread when Arduino speaks."""
+        line = line.strip().upper()
+        # "Done" means Arduino finished a move and has space for 1 more
+        if line == "DONE":
+            with lock:
+                self.credits += 1
+                self.slot_available_event.set() # Wake up the sender!
+
+    def send_line(self, line):
+        try:
+            with lock:
+                arduino.write((line + "\n").encode())
+            
+            # Optional: Log progress (can be noisy for large designs)
+            # log_message(f"Sent ({self.lines_sent+1}/{self.total_lines})")
+            
+            self.lines_sent += 1
+            self.credits -= 1 # Used one buffer slot
+            return True
+        except Exception as e:
+            log_message(f"SERIAL ERROR: {e}")
+            self.is_running = False
+            return False
+
+    def run(self):
+        global current_gcode_runner
+        current_gcode_runner = self
+        
+        log_message(f"Job Started: {self.total_lines} lines.")
+
+        while self.is_running and self.lines_sent < self.total_lines:
+            
+            # 1. CHECK CREDITS (Is Arduino full?)
+            if self.credits <= 0:
+                self.slot_available_event.clear()
+                # Wait for Arduino to say "Done" (timeout 10s to prevent hanging)
+                got_slot = self.slot_available_event.wait(timeout=10.0) 
+                if not got_slot:
+                    log_message("TIMEOUT: Arduino stopped responding.")
+                    break
+            
+            # 2. SEND COMMAND
+            if self.is_running:
+                next_line = self.lines[self.lines_sent]
+                if not self.send_line(next_line):
+                    break
+                
+                # Tiny sleep to let the serial bus breathe, but fast enough to keep buffer full
+                time.sleep(0.002) 
+
+        current_gcode_runner = None
+        log_message("Design Completed.")
+
+# === SERIAL READER THREAD ===
 def read_from_serial():
     global current_gcode_runner
     while arduino_connected:
@@ -50,23 +127,29 @@ def read_from_serial():
             if arduino.in_waiting > 0:
                 line = arduino.readline().decode(errors="ignore").strip()
                 if line:
-                    log_message(line)
-                    if current_gcode_runner and line.strip().upper() == "DONE":
-                        current_gcode_runner.handshake_event.set()       
+                    # Log everything from Arduino
+                    log_message(f"Ard: {line}") 
+                    
+                    # If we are running a job, pass the message to the runner
+                    # so it can count "Done" signals
+                    if current_gcode_runner:
+                        current_gcode_runner.process_incoming_serial(line)
             else:
                 time.sleep(0.01) 
         except Exception as e:
             log_message(f"SERIAL ERROR: {e}")
             time.sleep(1)
 
-current_gcode_runner = None
+if arduino_connected:
+    threading.Thread(target=read_from_serial, daemon=True).start()
+
+
+# === UTILITY FUNCTIONS ===
 
 def get_current_ip():
     try:
-        # We don't actually connect, just check how we WOULD route to the internet
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.settimeout(0)
-        # This doesn't send data, just checks the routing table
         s.connect(('10.254.254.254', 1)) 
         ip = s.getsockname()[0]
         s.close()
@@ -74,101 +157,31 @@ def get_current_ip():
         ip = '127.0.0.1'
     return ip
 
-class GCodeRunner(threading.Thread):
-    def __init__(self, gcode_block):
-        super().__init__(daemon=True)
-        self.gcode_block = gcode_block
-        self.handshake_event = threading.Event()
-        self.lines = [
-            line.split(';')[0].strip() for line in gcode_block.split('\n') 
-            if line.split(';')[0].strip().upper().startswith('G1')
-        ]
-        self.line_index = 0
-        self.is_running = True
+# === FLASK ROUTES ===
 
-    def send_line(self, line):
-        try:
-            with lock:
-                arduino.write((line + "\n").encode())
-            log_message(f"Sent line {self.line_index + 1}: {line}")
-            self.line_index += 1
-            return True
-        except Exception as e:
-            log_message(f"SERIAL ERROR while sending line: {e}")
-            self.is_running = False
-            return False
-
-    def run(self):
-        global current_gcode_runner
-        current_gcode_runner = self
-        num_commands = len(self.lines)
-        
-        PRIME_COUNT = 8 
-        log_message(f"Starting G-code: {num_commands} lines.")
-
-        for _ in range(PRIME_COUNT):
-            if self.is_running and self.line_index < num_commands:
-                self.send_line(self.lines[self.line_index])
-                time.sleep(0.05) 
-            else:
-                break 
-        
-        if self.is_running and self.line_index > 0:
-            time.sleep(0.1)
-
-        while self.is_running and self.line_index < num_commands:
-            if self.handshake_event.wait(timeout=None): 
-                self.handshake_event.clear()
-                if not self.send_line(self.lines[self.line_index]):
-                    break 
-            else:
-                log_message("TIMEOUT: Arduino failed to respond.")
-                self.is_running = False
-
-        current_gcode_runner = None
-        log_message("G-code finished.")
-
-
-if arduino_connected:
-    threading.Thread(target=read_from_serial, daemon=True).start()
-
-
-# ---------------- UTILITY ROUTES ----------------
+@app.route("/")
+def index():
+    current_ip = get_current_ip()
+    # Force setup if on Hotspot
+    if current_ip in ["10.42.0.1", "192.168.4.1"]:
+        return redirect(url_for('wifi_setup_page'))
+    return render_template("designs.html")
 
 @app.route("/wifi_setup")
 def wifi_setup_page():
     networks = wifi_tools.get_wifi_networks()
-    saved_networks = wifi_tools.get_saved_networks() # <--- NEW LINE
+    saved_networks = wifi_tools.get_saved_networks()
     current_ip = get_current_ip()
     hostname = socket.gethostname()
-    
-    return render_template(
-        "wifi_setup.html", 
-        networks=networks, 
-        saved_networks=saved_networks, # <--- PASS IT HERE
-        ip_address=current_ip, 
-        hostname=hostname
-    )
+    return render_template("wifi_setup.html", networks=networks, saved_networks=saved_networks, ip_address=current_ip, hostname=hostname)
+
 @app.route("/api/forget_wifi", methods=["POST"])
 def forget_wifi_route():
     data = request.json
     ssid = data.get("ssid")
-    
-    if not ssid:
-        return jsonify(success=False, message="No SSID provided")
-
-    log_message(f"Forgetting network: {ssid}...")
+    if not ssid: return jsonify(success=False, message="No SSID")
+    log_message(f"Forgetting: {ssid}")
     success, msg = wifi_tools.forget_network(ssid)
-    
-    return jsonify(success=success, message=msg)
-    
-    if success:
-        # Trigger a reboot after 5 seconds so the connection takes over
-        def reboot_later():
-            time.sleep(5)
-            subprocess.run(["sudo", "reboot"])
-        threading.Thread(target=reboot_later).start()
-        
     return jsonify(success=success, message=msg)
 
 @app.route("/check_password", methods=["POST"])
@@ -181,11 +194,14 @@ def check_password_route():
 @app.route("/shutdown", methods=["POST"])
 def shutdown():
     log_message("System shutting down...")
-    try:
-        subprocess.Popen(["sudo", "shutdown", "now"])
-        return jsonify(success=True)
-    except Exception as e:
-        return jsonify(success=False, message=str(e)), 500
+    subprocess.Popen(["sudo", "shutdown", "now"])
+    return jsonify(success=True)
+
+@app.route("/reboot", methods=["POST"])
+def reboot():
+    log_message("System rebooting...")
+    subprocess.Popen(["sudo", "reboot"])
+    return jsonify(success=True)
 
 @app.route("/pull", methods=["POST"])
 def git_pull():
@@ -197,15 +213,6 @@ def git_pull():
         return jsonify(success=True, message=output[:100])
     except Exception as e:
         log_message(f"Git Failed: {e}")
-        return jsonify(success=False, message=str(e)), 500
-
-@app.route("/reboot", methods=["POST"])
-def reboot():
-    log_message("System rebooting...")
-    try:
-        subprocess.Popen(["sudo", "reboot"])
-        return jsonify(success=True)
-    except Exception as e:
         return jsonify(success=False, message=str(e)), 500
 
 @app.route("/update_firmware", methods=["POST"])
@@ -224,6 +231,8 @@ def update_firmware():
     except Exception as e:
         log_message(f"UPDATE ERROR: {str(e)}")
         success_msg = f"Error: {str(e)}"
+    
+    # Reconnect
     try:
         time.sleep(2) 
         arduino = serial.Serial('/dev/ttyACM0', 9600, timeout=0.1)
@@ -232,97 +241,48 @@ def update_firmware():
         log_message("Serial reconnected.")
     except Exception as e:
         log_message(f"FAILED TO RECONNECT SERIAL: {e}")
+        
     return jsonify(success=True, message=success_msg)
 
-# ---------------- APP ROUTES ----------------
-    
-@app.route("/")
-def index():
-    # 1. Get the current IP to see how we are connected
-    current_ip = get_current_ip()
-    
-    # 2. Check if we are on the Hotspot IP (Usually 10.42.0.1 or 192.168.4.1)
-    if current_ip == "10.42.0.1" or current_ip == "192.168.4.1":
-        # If yes, FORCE them to the setup page
-        return redirect(url_for('wifi_setup_page'))
-
-    # 3. Otherwise (if on Home Wi-Fi), show the normal controls
-    return render_template("designs.html")
-
-@app.route("/controls")
-def controls():
-    if not arduino_connected:
-        return render_template("connect.html")
-    return render_template("index.html")
-
-@app.route("/terminal")
-def terminal():
-    return render_template("terminal.html")
-
-@app.route("/led_controls")
-def led_controls():
-    return render_template("led_controls.html")
-
-@app.route("/script")
-def script():
-    return render_template("script.html")
-    
-@app.route("/AI_builder")
-def AI_builder():
-    return render_template("AI_builder.html")
-
-@app.route("/designs")
-def designs():
-    return render_template("designs.html")
-
-@app.route('/designs/<path:filename>')
-def serve_design_file(filename):
-    return send_from_directory(os.path.join(app.root_path, 'templates', 'designs'), filename)
-
-@app.route('/api/designs')
-def list_designs():
-    try:
-        files = [f for f in os.listdir(os.path.join(app.root_path, 'templates', 'designs')) if f.endswith('.txt')]
-        return jsonify(files)
-    except Exception as e:
-        return jsonify(error=str(e)), 500
-
-# ---------------- COMMAND HANDLING ----------------
+# === COMMAND ROUTES ===
 
 @app.route("/send_gcode_block", methods=["POST"])
 def send_gcode_block_route():
     data = request.json
     gcode_block = data.get("gcode")
-    speed_override = data.get("speed_override")
+    speed_override = data.get("speed_override") 
 
     if not gcode_block: return jsonify(success=False, error="No G-code received."), 400
     if not arduino_connected: return jsonify(success=False, error="Arduino not connected."), 500
 
     global current_gcode_runner
     if current_gcode_runner and current_gcode_runner.is_alive():
-        return jsonify(success=False, error="Busy."), 503
+        return jsonify(success=False, error="Busy. Clear queue first."), 503
 
+    # Backward compatibility for Speed Override (if used by old controls)
+    # The new designs.html applies speed directly to the G-code string, so this might be null
     if speed_override:
         new_block = []
         for line in gcode_block.split('\n'):
-            line = line.strip()
-            if line.startswith('G1'):
+            if line.strip().startswith('G1'):
                 parts = line.split()
                 if len(parts) >= 3:
                     new_block.append(f"{parts[0]} {parts[1]} {parts[2]} {speed_override}")
-                else:
-                    new_block.append(line)
             else:
                 new_block.append(line)
         gcode_block = "\n".join(new_block)
-        log_message(f"Speed set to {speed_override}µs")
+        log_message(f"Speed override applied: {speed_override}µs")
 
-    process_and_send_gcode(gcode_block)
-    return jsonify(success=True, message="Started.")
+    # --- AUTO-RESUME FEATURE ---
+    # Ensure the table is not paused when starting a new design
+    with lock:
+        arduino.write(b"RESUME\n")
+    log_message("Auto-Resumed for new job.")
 
-def process_and_send_gcode(gcode_block):
+    # Start the job
     runner = GCodeRunner(gcode_block)
     runner.start()
+    return jsonify(success=True, message="Started.")
 
 @app.route("/send_single_gcode_line", methods=["POST"])
 def send_single_gcode_line_route():
@@ -347,7 +307,6 @@ def send_single_gcode_line_route():
 def send_command():
     data = request.json
     cmd = data.get("command")
-    
     log_message(f"WEB RECEIVED: {cmd}")
 
     if not cmd: return jsonify(success=False)
@@ -365,6 +324,24 @@ def send_command():
 
         # ARDUINO COMMANDS
         if arduino_connected:
+            # --- DEEP CLEAR FEATURE ---
+            if cmd == "CLEAR":
+                global current_gcode_runner
+                # 1. Kill the Python Thread so it stops sending
+                if current_gcode_runner and current_gcode_runner.is_alive():
+                    current_gcode_runner.is_running = False 
+                    # Wake it up if it's waiting for credits so it can die gracefully
+                    current_gcode_runner.slot_available_event.set()
+                    log_message("Stopping active print job thread...")
+                
+                # 2. Tell Arduino to dump its physical buffer
+                with lock:
+                    arduino.write((cmd + "\n").encode())
+                
+                log_message("Queue Cleared.")
+                return jsonify(success=True, message="Queue cleared and job stopped.")
+
+            # Normal Command
             with lock:
                 arduino.write((cmd + "\n").encode())
             log_message(f"Sent: {cmd}")
@@ -386,5 +363,32 @@ def get_logs():
     with lock:
         return jsonify(list(serial_log))
 
+# --- TEMPLATE ROUTES ---
+@app.route("/controls")
+def controls(): return render_template("index.html")
+@app.route("/terminal")
+def terminal(): return render_template("terminal.html")
+@app.route("/led_controls")
+def led_controls(): return render_template("led_controls.html")
+@app.route("/script")
+def script(): return render_template("script.html")
+@app.route("/AI_builder")
+def AI_builder(): return render_template("AI_builder.html")
+@app.route("/designs")
+def designs(): return render_template("designs.html")
+
+@app.route('/designs/<path:filename>')
+def serve_design_file(filename):
+    return send_from_directory(os.path.join(app.root_path, 'templates', 'designs'), filename)
+
+@app.route('/api/designs')
+def list_designs():
+    try:
+        files = [f for f in os.listdir(os.path.join(app.root_path, 'templates', 'designs')) if f.endswith('.txt')]
+        return jsonify(files)
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False)
+
