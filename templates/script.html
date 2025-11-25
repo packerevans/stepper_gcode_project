@@ -145,6 +145,19 @@ button:hover {
 
 button:disabled { opacity: 0.6; cursor: not-allowed; }
 
+/* Secondary Button (Calibrate) */
+button.secondary-btn {
+    background-color: transparent;
+    border: 2px solid var(--color-secondary);
+    color: var(--color-text);
+    box-shadow: none;
+}
+button.secondary-btn:hover {
+    background-color: var(--color-input-bg);
+    transform: none;
+    border-color: var(--color-primary);
+}
+
 /* Playback Controls */
 .playback-bar {
     display: flex; align-items: center; gap: 10px;
@@ -228,13 +241,13 @@ body[data-theme='dark'] canvas {
             </div>
 
             <div style="padding: 10px; background: var(--color-background); border-radius: 8px; border: 1px dashed var(--color-input-border);">
-                <label for="fileInput" style="margin-bottom:5px;">Upload G-Code File:</label>
-                <input type="file" id="fileInput" accept=".gcode,.txt,.nc">
+                <label for="fileInput" style="margin-bottom:5px; font-weight:bold;">Upload G-Code File:</label>
+                <input type="file" id="fileInput" accept=".gcode,.txt,.nc" style="margin-top:5px;">
             </div>
 
             <div>
-                <label for="gcodeConverterInput">1. Coordinates (Paste or Upload)</label>
-                <textarea id="gcodeConverterInput" rows="6" placeholder="G1 X100 Y50&#10;G1 X0 Y0"></textarea>
+                <label for="gcodeConverterInput">1. Coordinates</label>
+                <textarea id="gcodeConverterInput" rows="6" placeholder="Paste code or upload file..."></textarea>
             </div>
 
             <div class="param-grid">
@@ -252,7 +265,10 @@ body[data-theme='dark'] canvas {
                 </div>
             </div>
 
-            <button id="convertGCodeBtn">Convert, Smooth & Load</button>
+            <div style="display:flex; gap:10px;">
+                <button id="convertGCodeBtn" style="flex:2;">Convert, Smooth & Load</button>
+                <button id="autoCalibrateBtn" class="secondary-btn" style="flex:1;" title="Analyze file and set best values">Auto-Calibrate</button>
+            </div>
 
             <hr style="border:0; border-top:1px solid var(--color-shadow); width: 100%;">
 
@@ -321,12 +337,14 @@ function init() {
     // Listeners
     document.getElementById('loadCommandsBtn').addEventListener('click', loadCommands);
     document.getElementById('convertGCodeBtn').addEventListener('click', convertGCode);
+    
+    // Auto Calibrate Listener
+    document.getElementById('autoCalibrateBtn').addEventListener('click', autoCalibrate);
 
-    // --- FILE UPLOAD LISTENER ---
+    // File Upload Listener
     document.getElementById('fileInput').addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (!file) return;
-        
         const reader = new FileReader();
         reader.onload = function(e) {
             document.getElementById('gcodeConverterInput').value = e.target.result;
@@ -372,11 +390,8 @@ function resizeCanvas() {
     canvas.height = size;
     origin.x = size / 2;
     origin.y = size / 2;
-    
-    // Max reach plus padding
     const maxReach = (L1 + L2) * 1.1;
     worldScale = size / (maxReach * 2);
-    
     ctx.resetTransform();
     ctx.translate(origin.x, origin.y);
     ctx.scale(worldScale, -worldScale);
@@ -392,14 +407,11 @@ function clearCanvas() {
 function drawGrid() {
     const max = L1 + L2;
     const lw = 1 / worldScale;
-    
     ctx.strokeStyle = document.body.getAttribute('data-theme') === 'dark' ? 
         'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
     ctx.lineWidth = lw;
-
     ctx.beginPath(); ctx.arc(0,0,L1,0,2*Math.PI); ctx.stroke();
     ctx.beginPath(); ctx.arc(0,0,max,0,2*Math.PI); ctx.stroke();
-    
     ctx.beginPath();
     ctx.moveTo(-max*1.1, 0); ctx.lineTo(max*1.1, 0);
     ctx.moveTo(0, -max*1.1); ctx.lineTo(0, max*1.1);
@@ -408,12 +420,10 @@ function drawGrid() {
 
 function drawTrace() {
     if(tracePath.length < 2) return;
-    
     ctx.beginPath();
     ctx.strokeStyle = document.body.getAttribute('data-theme') === 'dark' ? 
         'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.3)';
     ctx.lineWidth = 2 / worldScale;
-    
     ctx.moveTo(tracePath[0].x, tracePath[0].y);
     for(let i=1; i<tracePath.length; i++) ctx.lineTo(tracePath[i].x, tracePath[i].y);
     ctx.stroke();
@@ -422,19 +432,13 @@ function drawTrace() {
 function drawArm(p0, p1, p2) {
     const w = 6 / worldScale;
     const r = 8 / worldScale;
-    const jointColor = '#b08d5c'; // Secondary Tan
-
-    // Limbs
+    const jointColor = '#b08d5c';
     ctx.lineWidth = w; 
     ctx.lineCap = 'round';
-    
-    ctx.strokeStyle = '#d2b48c'; // Primary color
+    ctx.strokeStyle = '#d2b48c';
     ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
-    
-    ctx.strokeStyle = '#b08d5c'; // Secondary color
+    ctx.strokeStyle = '#b08d5c'; 
     ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
-
-    // Joints
     ctx.fillStyle = jointColor;
     ctx.beginPath(); ctx.arc(p0.x, p0.y, r, 0, 2*Math.PI); ctx.fill();
     ctx.beginPath(); ctx.arc(p1.x, p1.y, r, 0, 2*Math.PI); ctx.fill();
@@ -446,12 +450,10 @@ function drawState(idx) {
     currentStep = idx;
     const state = cumulativeStates[idx];
     if(!state) return;
-
     clearCanvas();
     drawGrid();
     drawTrace();
     drawArm(state.p0, state.p1, state.p2);
-    
     slider.value = idx;
     stepDisp.textContent = `Step: ${idx} / ${cumulativeStates.length-1}`;
 }
@@ -459,12 +461,10 @@ function drawState(idx) {
 function drawInterpolatedState(from, to, prog) {
     const t1 = lerp(from.theta1_rad, to.theta1_rad, prog);
     const tb = lerp(from.theta_bend_rad, to.theta_bend_rad, prog);
-    
     const p0 = from.p0;
     const p1 = {x: p0.x + L1*Math.cos(t1), y: p0.y + L1*Math.sin(t1) };
     const t2 = t1 + tb;
     const p2 = {x: p1.x + L2*Math.cos(t2), y: p1.y + L2*Math.sin(t2) };
-
     clearCanvas();
     drawGrid();
     drawTrace();
@@ -472,7 +472,6 @@ function drawInterpolatedState(from, to, prog) {
 }
 
 // --- KINEMATICS & CONVERTER ---
-
 function getShortestRotation(raw, last) {
     let diff = (raw - last) / (2*Math.PI);
     let offset = Math.round(diff);
@@ -483,20 +482,16 @@ function calculateIK(x, y, lastBase = 0, lastElbow = 0) {
     let D = Math.hypot(x, y);
     const maxR = L1 + L2;
     let cx = x, cy = y;
-
     if(D > maxR) { 
         cx = x * maxR / D; 
         cy = y * maxR / D; 
         D = maxR; 
     }
-
     const lastT1 = -lastBase / STEPS_PER_RAD;
     const lastBend = (-lastElbow / STEPS_PER_RAD) - (GEAR_RATIO * lastT1);
-
     let finalT1, finalBend;
 
     if (D < 0.1) {
-        // Singularity at center
         finalBend = lastBend > 0 ? Math.PI : -Math.PI;
         let rawT1 = (D < 1e-6) ? lastT1 : Math.atan2(y,x);
         finalT1 = getShortestRotation(rawT1, lastT1);
@@ -504,98 +499,134 @@ function calculateIK(x, y, lastBase = 0, lastElbow = 0) {
     } else {
         let cosBend = (D*D - L1*L1 - L2*L2) / (2*L1*L2);
         cosBend = Math.max(-1, Math.min(1, cosBend));
-
-        // Solution 1
         const bend1 = Math.acos(cosBend);
         const k1_1 = L1 + L2 * Math.cos(bend1);
         const k2_1 = L2 * Math.sin(bend1);
         const rawT1_1 = Math.atan2(cy, cx) - Math.atan2(k2_1, k1_1);
         const t1_1 = getShortestRotation(rawT1_1, lastT1);
-
-        // Solution 2
         const bend2 = -Math.acos(cosBend);
         const k1_2 = L1 + L2 * Math.cos(bend2);
         const k2_2 = L2 * Math.sin(bend2);
         const rawT1_2 = Math.atan2(cy, cx) - Math.atan2(k2_2, k1_2);
         const t1_2 = getShortestRotation(rawT1_2, lastT1);
-
-        // Convert to Steps to check 'cost' (distance from previous state)
         const b1 = -t1_1 * STEPS_PER_RAD;
         const e1 = -(bend1 + GEAR_RATIO * t1_1) * STEPS_PER_RAD;
-        
         const b2 = -t1_2 * STEPS_PER_RAD;
         const e2 = -(bend2 + GEAR_RATIO * t1_2) * STEPS_PER_RAD;
-
         const cost1 = Math.abs(b1 - lastBase) + Math.abs(e1 - lastElbow);
         const cost2 = Math.abs(b2 - lastBase) + Math.abs(e2 - lastElbow);
-
         if(cost1 <= cost2) { finalT1 = t1_1; finalBend = bend1; }
         else { finalT1 = t1_2; finalBend = bend2; }
     }
-
     const alpha = finalT1;
     const beta = finalBend + (GEAR_RATIO * alpha);
-    
-    return {
-        base_steps: -alpha * STEPS_PER_RAD,
-        elbow_steps: -beta * STEPS_PER_RAD,
-        clamped_x: cx, clamped_y: cy
-    };
+    return { base_steps: -alpha * STEPS_PER_RAD, elbow_steps: -beta * STEPS_PER_RAD, clamped_x: cx, clamped_y: cy };
 }
 
 function calculateFK(p0, b, e) {
     const a = -b / STEPS_PER_RAD;
     const beta = -e / STEPS_PER_RAD;
-    
     const t1 = a;
     const tb = beta - (GEAR_RATIO * a);
     const t2 = t1 + tb;
-
     const p1 = {x: p0.x + L1*Math.cos(t1), y: p0.y + L1*Math.sin(t1) };
     const p2 = {x: p1.x + L2*Math.cos(t2), y: p1.y + L2*Math.sin(t2) };
-    
-    return { 
-        p0, p1, p2, 
-        target_base_steps: b, 
-        target_elbow_steps: e, 
-        theta1_rad: t1, 
-        theta_bend_rad: tb 
-    };
+    return { p0, p1, p2, target_base_steps: b, target_elbow_steps: e, theta1_rad: t1, theta_bend_rad: tb };
 }
 
-// --- MAIN CONVERTER FUNCTION (UPDATED FOR SANDIFY OFFSET) ---
+// --- AUTO CALIBRATION ---
+function autoCalibrate() {
+    const text = document.getElementById('gcodeConverterInput').value;
+    if(!text.trim()) { alert("Please upload or paste G-Code first."); return; }
+    
+    const lines = text.split('\n');
+    const format = document.querySelector('input[name="gcodeFormat"]:checked').value;
+    let totalDist = 0;
+    let count = 0;
+    let lastP = null;
+
+    // 1. Analyze Density
+    for(let line of lines) {
+        line = line.trim();
+        if(!line) continue;
+        let p = null;
+        
+        if(format === 'cartesian') {
+            const m = line.match(/G1\s+X(-?[\d.]+)\s+Y(-?[\d.]+)/i);
+            if(m) p = {x: parseFloat(m[1]), y: parseFloat(m[2])};
+        } else {
+            const m = line.match(/G1\s+R(-?[\d.]+)\s+A(-?[\d.]+)/i);
+            if(m) {
+                let r = parseFloat(m[1]);
+                let rad = parseFloat(m[2]) * (Math.PI/180);
+                p = {x: r*Math.cos(rad), y: r*Math.sin(rad)};
+            }
+        }
+
+        if(p) {
+            if(lastP) {
+                totalDist += Math.hypot(p.x - lastP.x, p.y - lastP.y);
+                count++;
+            }
+            lastP = p;
+        }
+    }
+
+    if(count === 0) return;
+
+    const avgSegment = totalDist / count;
+    
+    // 2. Apply Heuristics
+    // If avg segment is small (<2mm), input is High Res (Spirals) -> Use High Resolution Value (less interpolation)
+    // If avg segment is large (>10mm), input is Low Res (Shapes) -> Use Low Resolution Value (more interpolation)
+    
+    let recRes, recSmooth;
+
+    if (avgSegment < 2.5) {
+        // High Density (Spiral)
+        recRes = 6.0;       // Coarse interpolation (file is already detailed)
+        recSmooth = 0.001;  // Moderate smoothing to kill jitter
+    } else if (avgSegment > 10.0) {
+        // Low Density (Square/Triangle)
+        recRes = 1.0;       // Fine interpolation
+        recSmooth = 0.00001; // High accuracy
+    } else {
+        // Medium
+        recRes = 2.0;
+        recSmooth = 0.0001;
+    }
+
+    document.getElementById('linearResolution').value = recRes;
+    document.getElementById('smoothingSensitivity').value = recSmooth;
+    document.getElementById('stepDelayInput').value = "800"; // Good default speed
+
+    // 3. Run Conversion
+    convertGCode();
+}
+
+// --- CONVERTER ---
 function convertGCode() {
     const text = document.getElementById('gcodeConverterInput').value;
     const lines = text.split('\n');
     const format = document.querySelector('input[name="gcodeFormat"]:checked').value;
     const res = parseFloat(document.getElementById('linearResolution').value) || 1.0;
     
-    // --- TABLE CONFIGURATION ---
-    // Sandify often outputs 0 -> Diameter (0 -> 405.2). 
-    // We subtract radius to shift center to (0,0) for the Arm.
     const tableRadius = 202.6; 
 
     let coords = [];
-
     for(let line of lines) {
         line = line.trim();
         if(!line) continue;
-
         if(format === 'cartesian') {
             const m = line.match(/G1\s+X(-?[\d.]+)\s+Y(-?[\d.]+)/i);
             if(m) { 
                 let rawX = parseFloat(m[1]); 
                 let rawY = parseFloat(m[2]); 
-                
-                // SHIFT ORIGIN
-                // Sandify (Corner Origin) -> Arm (Center Origin)
                 let x = rawX - tableRadius;
                 let y = rawY - tableRadius;
-                
                 coords.push({x,y}); 
             }
         } else {
-            // Polar
             const m = line.match(/G1\s+R(-?[\d.]+)\s+A(-?[\d.]+)/i);
             if(m) {
                 let r = parseFloat(m[1]);
@@ -609,35 +640,28 @@ function convertGCode() {
 
     if(coords.length === 0) { alert("No valid G-Code found."); return; }
 
-    // Interpolate
     let interp = [coords[0]];
     for(let i=0; i<coords.length-1; i++) {
         const p1 = coords[i], p2 = coords[i+1];
         const dist = Math.hypot(p2.x-p1.x, p2.y-p1.y);
         const steps = Math.max(1, Math.ceil(dist/res));
-
         for(let j=1; j<=steps; j++) {
             let t = j/steps;
             interp.push({x: lerp(p1.x,p2.x,t), y: lerp(p1.y,p2.y,t) });
         }
     }
 
-    // Convert IK
     let genCmds = [];
     let prevB = 0, prevE = 0;
-    
-    // Setup start pos (Jump from 0,0 to first point)
     const start = calculateIK(interp[0].x, interp[0].y, 0, 0);
     prevB = start.base_steps; 
     prevE = start.elbow_steps;
-    
     const delay = document.getElementById('stepDelayInput').value;
 
     for(let i=1; i<interp.length; i++) {
         const ik = calculateIK(interp[i].x, interp[i].y, prevB, prevE);
         const rb = Math.round(ik.base_steps - prevB);
         const re = Math.round(ik.elbow_steps - prevE);
-
         if(rb !== 0 || re !== 0) {
             genCmds.push({elbow:re, base:rb, delay:delay});
         }
@@ -645,7 +669,6 @@ function convertGCode() {
         prevE = ik.elbow_steps;
     }
 
-    // Smooth
     const sens = parseFloat(document.getElementById('smoothingSensitivity').value);
     let smoothed = genCmds;
     let lastLen = -1;
@@ -654,7 +677,6 @@ function convertGCode() {
         smoothed = smoothCommands(smoothed, sens);
     }
 
-    // Output
     document.getElementById('commandsInput').value = smoothed.map(c => 
         `G1 ${c.elbow} ${c.base} ${c.delay}`
     ).join('\n');
@@ -666,16 +688,12 @@ function smoothCommands(cmds, sensitivity) {
     if(cmds.length === 0) return [];
     const out = [];
     let curr = {...cmds[0]};
-
     for(let i=1; i<cmds.length; i++) {
         const next = cmds[i];
         let combine = false;
-
         if(curr.delay == next.delay) {
-            // Check signs match
             const sB1 = Math.sign(curr.base), sB2 = Math.sign(next.base);
             const sE1 = Math.sign(curr.elbow), sE2 = Math.sign(next.elbow);
-
             if(curr.base === 0 && next.base === 0 && sE1 === sE2) combine = true;
             else if(curr.elbow === 0 && next.elbow === 0 && sB1 === sB2) combine = true;
             else if(curr.base !== 0 && next.base !== 0 && curr.elbow !== 0 && next.elbow !== 0) {
@@ -684,7 +702,6 @@ function smoothCommands(cmds, sensitivity) {
                 if(Math.abs(r1-r2) < sensitivity && sB1 === sB2) combine = true;
             }
         }
-
         if(combine) {
             curr.elbow += next.elbow;
             curr.base += next.base;
@@ -726,15 +743,12 @@ function loadCommands() {
             const from = cumulativeStates[i], to = cumulativeStates[i+1];
             const max = Math.max(Math.abs(to.target_base_steps - from.target_base_steps), 
                                  Math.abs(to.target_elbow_steps - from.target_elbow_steps));
-            
-            const segs = Math.max(2, Math.ceil(max/100)); // reduced fidelity for speed
-
+            const segs = Math.max(2, Math.ceil(max/100));
             for(let j=1; j<=segs; j++) {
                 const t = j/segs;
                 const t1 = lerp(from.theta1_rad, to.theta1_rad, t);
                 const tb = lerp(from.theta_bend_rad, to.theta_bend_rad, t);
                 const t2 = t1 + tb;
-                // Forward Kinematics for Trace
                 const p1 = {x: L1*Math.cos(t1), y: L1*Math.sin(t1) };
                 tracePath.push({x: p1.x + L2*Math.cos(t2), y: p1.y + L2*Math.sin(t2) });
             }
@@ -810,7 +824,6 @@ function playNext() {
 function animate(time, dur) {
     const elapsed = time - animationStartTime;
     let p = elapsed / dur;
-
     if(p >= 1) {
         drawState(currentStep);
         if(isAutoPlaying) playNext();
