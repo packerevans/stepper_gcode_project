@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sand Table Controller v9 (Scale Fix)</title>
+<title>Sand Table Controller v11</title>
 <style>
     :root {
         --bg: #f4f4f9;
@@ -84,6 +84,7 @@
         border: 2px solid var(--accent);
         color: var(--accent);
     }
+    
     button.send-btn { background-color: #28a745; margin-top: 10px; } 
     button.send-btn:hover { background-color: #1e7e34; }
     
@@ -126,7 +127,7 @@
 </head>
 <body>
 
-<h1>Sand Table Controller v9</h1>
+<h1>Sand Table Controller v11</h1>
 
 <div class="container">
     <div class="card">
@@ -157,7 +158,7 @@
             </div>
             <div>
                 <label>Target Speed (mm/s)</label>
-                <input type="number" id="targetSpeed" value="40">
+                <input type="number" id="targetSpeed" value="40" title="Visual speed of the ball">
             </div>
             <div>
                 <label>Arm 1 Length (mm)</label>
@@ -173,7 +174,7 @@
             </div>
             <div>
                 <label>Steps per Degree</label>
-                <input type="number" id="stepsPerDeg" value="17.777777" step="0.000001">
+                <input type="number" id="stepsPerDeg" value="8.888888" step="0.000001">
                 <div class="quick-toggle">
                     <button class="secondary" onclick="setMicrostep(16)">1/16 (3200)</button>
                     <button class="secondary" onclick="setMicrostep(32)">1/32 (6400)</button>
@@ -185,7 +186,7 @@
             </div>
         </div>
         <label>Interpolation Resolution (mm)</label>
-        <input type="number" id="resolution" value="1.0">
+        <input type="number" id="resolution" value="1.0" title="Smaller values = smoother curves but more data">
         <button onclick="processData()">Convert & Simulate</button>
     </div>
 
@@ -222,6 +223,7 @@
 <script>
 // --- CONFIGURATION ---
 const BASE_URL = window.location.origin; 
+// const BASE_URL = "http://YOUR_PI_IP:5000"; // Use this if running locally
 
 // --- GLOBAL CONSTANTS & STATE ---
 let RAW_COORDS = []; 
@@ -359,7 +361,7 @@ function interpolateAndGenerate() {
         let p2 = RAW_COORDS[i+1];
         
         if (p1.type === 'polar' && p2.type === 'polar') {
-            // Polar Interpolation (Fixes the "Straight line chord" issue)
+            // Polar Interpolation - Essential for spirals!
             let avgR = (p1.rho + p2.rho) / 2 * tableRadius;
             let dTheta = Math.abs(p2.theta - p1.theta);
             let arcDist = avgR * dTheta; 
@@ -432,7 +434,7 @@ function generateSteps(pathPoints) {
             let timeSeconds = distanceMm / targetSpeedMmSec;
             let maxSteps = Math.max(Math.abs(dBase), Math.abs(dElbow));
             
-            // Speed Calc (Half delay because Arduino does high+low)
+            // Speed Calc
             let calculatedDelay = 1000; 
             if (maxSteps > 0 && timeSeconds > 0) {
                 let timePerStepUs = (timeSeconds * 1000000) / maxSteps;
@@ -509,7 +511,7 @@ function calculateIK(x, y, lastBaseSteps, lastElbowSteps, L1, L2, gearRatio, ste
     let dist = Math.hypot(x, y);
     const maxReach = L1 + L2;
     
-    // NO SAFETY MARGIN (PER USER REQUEST)
+    // Safety Limits REMOVED per user request.
     if (dist > maxReach) {
         x = (x / dist) * maxReach;
         y = (y / dist) * maxReach;
@@ -518,8 +520,6 @@ function calculateIK(x, y, lastBaseSteps, lastElbowSteps, L1, L2, gearRatio, ste
 
     const lastT1 = -lastBaseSteps / stepsPerRad; 
     let cosBend = (dist*dist - L1*L1 - L2*L2) / (2 * L1 * L2);
-    
-    // Floating point safety
     cosBend = Math.max(-1, Math.min(1, cosBend));
     
     const bend1 = Math.acos(cosBend);
@@ -560,7 +560,7 @@ function calculateFK(baseSteps, elbowSteps, L1, L2, gearRatio, stepsPerRad) {
     };
 }
 
-// --- VISUALIZATION & SIMULATION ---
+// --- VISUALIZATION & SIMULATION (Updated for Manual Entry) ---
 
 function parseOutputAndSimulate() {
     const text = outputData.value;
@@ -576,17 +576,37 @@ function parseOutputAndSimulate() {
     let curBase = 0;
     let curElbow = 0;
 
+    // Start State
     ARM_STATES.push(calculateFK(0, 0, L1, L2, gearRatio, stepsPerRad));
 
     for (let line of lines) {
         const parts = line.trim().split(/\s+/);
         if (parts[0] === 'G1' && parts.length >= 3) {
-            let dElbow = parseInt(parts[1]);
-            let dBase = parseInt(parts[2]);
-            if (!isNaN(dElbow) && !isNaN(dBase)) {
-                curBase += dBase;
-                curElbow += dElbow;
-                ARM_STATES.push(calculateFK(curBase, curElbow, L1, L2, gearRatio, stepsPerRad));
+            let deltaElbow = parseInt(parts[1]);
+            let deltaBase = parseInt(parts[2]);
+            
+            if (!isNaN(deltaElbow) && !isNaN(deltaBase)) {
+                // VISUAL INTERPOLATION: 
+                // Subdivide large manual steps so the simulator draws the curve
+                // instead of a straight line connecting start/end (which is invisible for circles)
+                const maxDist = Math.max(Math.abs(deltaElbow), Math.abs(deltaBase));
+                const stepSize = 40; // Approx 5 degrees per visual frame
+                const segments = Math.max(1, Math.ceil(maxDist / stepSize));
+                
+                const stepBase = deltaBase / segments;
+                const stepElbow = deltaElbow / segments;
+
+                // Create intermediate frames for visualization
+                for(let i=0; i<segments; i++) {
+                    curBase += stepBase;
+                    curElbow += stepElbow;
+                    ARM_STATES.push(calculateFK(curBase, curElbow, L1, L2, gearRatio, stepsPerRad));
+                }
+                
+                // Ensure we land exactly on the integer target to prevent float drift
+                // (Optional refinement, but good practice)
+                // curBase = Math.round(curBase); 
+                // curElbow = Math.round(curElbow);
             }
         }
     }
