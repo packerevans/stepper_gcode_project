@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Constant Speed Sand Converter v3</title>
+<title>Constant Speed Sand Converter v4 (Polar Fix)</title>
 <style>
     :root {
         --bg: #f4f4f9;
@@ -117,10 +117,9 @@
 </head>
 <body>
 
-<h1>Sand Table Converter v3</h1>
+<h1>Sand Table Converter v4 (Polar Fix)</h1>
 
 <div class="container">
-    <!-- Input Section -->
     <div class="card">
         <h2>1. Input</h2>
         <div>
@@ -140,7 +139,6 @@
         <div class="status-bar" id="inputStats">Waiting for data...</div>
     </div>
 
-    <!-- Settings Section -->
     <div class="card">
         <h2>2. Machine Settings</h2>
         <div class="settings-grid">
@@ -154,20 +152,16 @@
             </div>
             <div>
                 <label>Arm 1 Length (mm)</label>
-                <input type="number" id="L1" value="101.3">
-            </div>
+                <input type="number" id="L1" value="101.5"> </div>
             <div>
                 <label>Arm 2 Length (mm)</label>
-                <input type="number" id="L2" value="101.3">
-            </div>
+                <input type="number" id="L2" value="101.5"> </div>
             <div>
                 <label>Gear Ratio</label>
-                <input type="number" id="gearRatio" value="1.125" step="0.001"> <!-- 9/8 = 1.125 -->
-            </div>
+                <input type="number" id="gearRatio" value="1.125" step="0.001"> </div>
             <div>
                 <label>Steps per Degree</label>
-                <input type="number" id="stepsPerDeg" value="8.888888" step="0.000001"> <!-- 3200/360 -->
-            </div>
+                <input type="number" id="stepsPerDeg" value="8.888888" step="0.000001"> </div>
             <div>
                 <label>Min Motor Delay (us)</label>
                 <input type="number" id="minDelay" value="200" title="Prevents motors from stalling if speed calculation asks for infinite speed">
@@ -178,7 +172,6 @@
         <button onclick="processData()">Convert & Simulate</button>
     </div>
 
-    <!-- Simulation Section -->
     <div class="card full-width">
         <h2>3. Simulation & Output</h2>
         <div style="display: flex; gap: 20px; flex-wrap: wrap;">
@@ -194,8 +187,8 @@
                 </div>
             </div>
             <div style="flex: 1; min-width: 300px;">
-                <label>Output Code</label>
-                <textarea id="outputData" style="height: 400px;" readonly placeholder="Converted G-code will appear here..."></textarea>
+                <label>Output Code (Editable)</label>
+                <textarea id="outputData" style="height: 400px;" placeholder="Converted G-code will appear here..."></textarea>
                 <button onclick="copyOutput()" style="margin-top: 10px;">Copy to Clipboard</button>
                 <button onclick="downloadOutput()" class="secondary" style="margin-top: 10px;">Download File (.txt)</button>
             </div>
@@ -205,7 +198,7 @@
 
 <script>
 // --- GLOBAL CONSTANTS & STATE ---
-let RAW_COORDS = []; // {x, y} in mm
+let RAW_COORDS = []; // {x, y, theta, rho, type}
 let GENERATED_COMMANDS = []; // {elbow, base, delay}
 let ARM_STATES = []; // For simulation
 let animId = null;
@@ -264,14 +257,13 @@ function processData() {
     
     RAW_COORDS = [];
     
-    // 2. Parse Input
+    // 2. Parse Input and Preserve Polar Data
     let mode = format;
     if (mode === 'auto') {
-        // Simple heuristic
         if (text.includes('thetarho')) mode = 'thr';
         else if (text.match(/G1.*R/i)) mode = 'polar_gcode';
         else if (text.match(/G1.*X/i)) mode = 'cartesian';
-        else mode = 'thr'; // Default to thr if it looks like raw numbers
+        else mode = 'thr';
     }
 
     document.getElementById('inputStats').innerText = `Detected Mode: ${mode}`;
@@ -280,43 +272,47 @@ function processData() {
         line = line.trim();
         if (!line || line.startsWith('#') || line.startsWith(';')) continue;
 
-        let x = 0, y = 0;
+        let p = { x: 0, y: 0, theta: 0, rho: 0, type: 'cartesian' }; 
 
         if (mode === 'thr') {
-            // Regex for "Theta Rho" (Space separated numbers)
-            // Example: 1.57080 1.00000
             const parts = line.trim().split(/\s+/);
             if (parts.length >= 2 && !isNaN(parseFloat(parts[0]))) {
-                let theta = parseFloat(parts[0]); // Radians
-                let rho = parseFloat(parts[1]);   // Normalized 0-1
+                p.theta = parseFloat(parts[0]); // Radians
+                p.rho = parseFloat(parts[1]);   // Normalized 0-1
+                p.type = 'polar';
                 
-                // Scale Rho to Table Dimensions
-                let r_mm = rho * tableRadius;
-                
-                x = r_mm * Math.cos(theta);
-                y = r_mm * Math.sin(theta);
-                RAW_COORDS.push({x, y});
+                // Calculate Cartesian for the "Raw" preview point
+                let r_mm = p.rho * tableRadius;
+                p.x = r_mm * Math.cos(p.theta);
+                p.y = r_mm * Math.sin(p.theta);
+                RAW_COORDS.push(p);
             }
         } 
         else if (mode === 'polar_gcode') {
-            // G1 R100 A90
             const match = line.match(/G1\s+.*R([\d.-]+).*A([\d.-]+)/i);
             if (match) {
                 let r = parseFloat(match[1]);
                 let deg = parseFloat(match[2]);
                 let rad = deg * (Math.PI / 180);
-                x = r * Math.cos(rad);
-                y = r * Math.sin(rad);
-                RAW_COORDS.push({x, y});
+                
+                // Treat Polar GCode as Polar for interpolation too
+                p.type = 'polar';
+                p.rho = r / tableRadius; // Normalize back to 0-1 for consistency
+                p.theta = rad;
+                
+                p.x = r * Math.cos(rad);
+                p.y = r * Math.sin(rad);
+                RAW_COORDS.push(p);
             }
         }
         else {
-            // Cartesian G1 X10 Y10
+            // Cartesian
             const match = line.match(/G1\s+.*X([\d.-]+).*Y([\d.-]+)/i);
             if (match) {
-                x = parseFloat(match[1]);
-                y = parseFloat(match[2]);
-                RAW_COORDS.push({x, y});
+                p.x = parseFloat(match[1]);
+                p.y = parseFloat(match[2]);
+                p.type = 'cartesian';
+                RAW_COORDS.push(p);
             }
         }
     }
@@ -326,21 +322,59 @@ function processData() {
         return;
     }
 
-    // 3. Interpolate (Smooth the path)
-    let interpolated = [RAW_COORDS[0]];
+    // 3. Interpolate (Smooth the path) - NOW HANDLES CURVES
+    let interpolated = [];
+    
+    if (RAW_COORDS.length > 0) interpolated.push({x: RAW_COORDS[0].x, y: RAW_COORDS[0].y});
+
     for (let i = 0; i < RAW_COORDS.length - 1; i++) {
         let p1 = RAW_COORDS[i];
         let p2 = RAW_COORDS[i+1];
-        let dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-        let steps = Math.ceil(dist / res);
-        steps = Math.max(1, steps);
         
-        for (let j = 1; j <= steps; j++) {
-            let t = j / steps;
-            interpolated.push({
-                x: p1.x + (p2.x - p1.x) * t,
-                y: p1.y + (p2.y - p1.y) * t
-            });
+        // CHECK: Are we connecting two Polar points?
+        if (p1.type === 'polar' && p2.type === 'polar') {
+            // ARC INTERPOLATION
+            
+            // 1. Calculate Arc Length distance to determine number of steps
+            let avgR = (p1.rho + p2.rho) / 2 * tableRadius;
+            let dTheta = Math.abs(p2.theta - p1.theta);
+            let arcDist = avgR * dTheta; 
+            let linDist = Math.abs((p2.rho - p1.rho) * tableRadius);
+            
+            // Hypotenuse of the "unrolled" movement
+            let totalDist = Math.sqrt(arcDist*arcDist + linDist*linDist);
+            
+            let steps = Math.ceil(totalDist / res);
+            steps = Math.max(1, steps);
+
+            for (let j = 1; j <= steps; j++) {
+                let t = j / steps;
+                
+                // Interpolate Angle and Radius separately
+                let interpTheta = p1.theta + (p2.theta - p1.theta) * t;
+                let interpRho = p1.rho + (p2.rho - p1.rho) * t;
+                
+                let r_mm = interpRho * tableRadius;
+                
+                // Convert back to Cartesian for the motor target
+                interpolated.push({
+                    x: r_mm * Math.cos(interpTheta),
+                    y: r_mm * Math.sin(interpTheta)
+                });
+            }
+        } else {
+            // LINEAR INTERPOLATION (For Cartesian G-Code)
+            let dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+            let steps = Math.ceil(dist / res);
+            steps = Math.max(1, steps);
+            
+            for (let j = 1; j <= steps; j++) {
+                let t = j / steps;
+                interpolated.push({
+                    x: p1.x + (p2.x - p1.x) * t,
+                    y: p1.y + (p2.y - p1.y) * t
+                });
+            }
         }
     }
 
@@ -558,17 +592,18 @@ function drawSimulation(index) {
     ctx.lineWidth = 2 / scale;
     ctx.stroke();
 
-    // Draw Input Path (Blue)
-    if (RAW_COORDS.length > 0) {
+    // Draw Input Path (Blue) - Shows the calculated path points
+    // Note: We reconstruct this from the interpolated points now for accuracy
+    /* if (RAW_COORDS.length > 0) {
         ctx.beginPath();
         ctx.strokeStyle = "rgba(0, 100, 255, 0.3)";
         ctx.lineWidth = 1 / scale;
-        ctx.moveTo(RAW_COORDS[0].x, RAW_COORDS[0].y);
-        for(let i=1; i<RAW_COORDS.length; i++) {
-            ctx.lineTo(RAW_COORDS[i].x, RAW_COORDS[i].y);
+        // This is just a rough preview of raw nodes
+        for(let i=0; i<RAW_COORDS.length; i++) {
+             // ...
         }
-        ctx.stroke();
     }
+    */
 
     // Draw Arm Trace (Red)
     if (ARM_STATES.length > 0) {
@@ -641,4 +676,3 @@ function downloadOutput() {
 </script>
 </body>
 </html>
-
