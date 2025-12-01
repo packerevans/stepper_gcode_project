@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sand Table Controller v12</title>
+<title>Sand Table Controller v13</title>
 <style>
     :root {
         --bg: #f4f4f9;
@@ -12,6 +12,8 @@
         --accent: #b08d5c;
         --accent-hover: #967548;
         --border: #ddd;
+        --error-bg: #ffe6e6;
+        --error-text: #d63031;
     }
     body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -116,11 +118,22 @@
         grid-template-columns: 1fr 1fr;
         gap: 10px;
     }
+    
+    .error-simulator {
+        background: var(--error-bg);
+        padding: 10px;
+        border-radius: 6px;
+        border: 1px solid #fab1a0;
+        margin-top: 10px;
+    }
+    .error-simulator label {
+        color: var(--error-text);
+    }
 </style>
 </head>
 <body>
 
-<h1>Sand Table Controller v12</h1>
+<h1>Sand Table Controller v13</h1>
 
 <div class="container">
     <div class="card">
@@ -192,6 +205,15 @@
                      <button class="secondary" onclick="stopSimulation()">⏹ Stop</button>
                      <input type="range" id="simSlider" min="0" max="100" value="0" style="flex-grow:1;">
                 </div>
+                
+                <div class="error-simulator">
+                    <label>⚠️ Simulate Arm 1 Offset (Steps)</label>
+                    <input type="number" id="offsetSteps" value="0" placeholder="e.g. 50">
+                    <div style="font-size: 0.8em; color: #d63031; margin-top:5px;">
+                        Set this to 0 for a perfect table. Change it to see what happens if your motor is slightly off-center.
+                    </div>
+                </div>
+
             </div>
             <div style="flex: 1; min-width: 300px;">
                 <label>Output Code (Editable)</label>
@@ -212,7 +234,7 @@
 <script>
 // --- CONFIGURATION ---
 const BASE_URL = window.location.origin; 
-// const BASE_URL = "http://YOUR_PI_IP:5000"; // Use this if running locally
+// const BASE_URL = "http://YOUR_PI_IP:5000"; 
 
 // --- GLOBAL CONSTANTS & STATE ---
 let RAW_COORDS = []; 
@@ -226,6 +248,7 @@ const outputData = document.getElementById('outputData');
 const canvas = document.getElementById('simCanvas');
 const ctx = canvas.getContext('2d');
 const simSlider = document.getElementById('simSlider');
+const offsetInput = document.getElementById('offsetSteps');
 
 // --- INITIALIZATION ---
 window.onload = function() {
@@ -250,6 +273,11 @@ window.onload = function() {
     });
 
     outputData.addEventListener('input', () => {
+        parseOutputAndSimulate();
+    });
+
+    // Re-run simulation immediately when offset changes
+    offsetInput.addEventListener('input', () => {
         parseOutputAndSimulate();
     });
 };
@@ -554,13 +582,16 @@ function parseOutputAndSimulate() {
     const gearRatio = parseFloat(document.getElementById('gearRatio').value);
     const stepsPerDeg = parseFloat(document.getElementById('stepsPerDeg').value);
     const stepsPerRad = stepsPerDeg * (180 / Math.PI);
+    
+    // Grab Error Offset
+    const arm1Offset = parseInt(document.getElementById('offsetSteps').value) || 0;
 
     ARM_STATES = [];
     let curBase = 0;
     let curElbow = 0;
 
-    // Start State
-    ARM_STATES.push(calculateFK(0, 0, L1, L2, gearRatio, stepsPerRad));
+    // Start State - Add Offset to Physical Base
+    ARM_STATES.push(calculateFK(curBase + arm1Offset, curElbow, L1, L2, gearRatio, stepsPerRad));
 
     for (let line of lines) {
         const parts = line.trim().split(/\s+/);
@@ -571,7 +602,7 @@ function parseOutputAndSimulate() {
             if (!isNaN(deltaElbow) && !isNaN(deltaBase)) {
                 // VISUAL INTERPOLATION
                 const maxDist = Math.max(Math.abs(deltaElbow), Math.abs(deltaBase));
-                const stepSize = 40; // Smaller step size for smooth "manual" preview
+                const stepSize = 40; 
                 const segments = Math.max(1, Math.ceil(maxDist / stepSize));
                 
                 const stepBase = deltaBase / segments;
@@ -580,7 +611,8 @@ function parseOutputAndSimulate() {
                 for(let i=0; i<segments; i++) {
                     curBase += stepBase;
                     curElbow += stepElbow;
-                    ARM_STATES.push(calculateFK(curBase, curElbow, L1, L2, gearRatio, stepsPerRad));
+                    // Apply offset to every single frame of the simulation
+                    ARM_STATES.push(calculateFK(curBase + arm1Offset, curElbow, L1, L2, gearRatio, stepsPerRad));
                 }
             }
         }
