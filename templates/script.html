@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sand Table Controller v5</title>
+<title>Sand Table Controller v6</title>
 <style>
     :root {
         --bg: #f4f4f9;
@@ -132,7 +132,7 @@
 </head>
 <body>
 
-<h1>Sand Table Controller v5</h1>
+<h1>Sand Table Controller v6</h1>
 
 <div class="container">
     <div class="card">
@@ -210,9 +210,9 @@
                 <textarea id="outputData" style="height: 300px;" placeholder="G-code appears here. Edit manually to update simulator."></textarea>
                 
                 <div class="connection-box">
-                    <label>Sand Table URL (e.g., ngrok link)</label>
+                    <label>Base URL (e.g. http://...ngrok-free.dev)</label>
                     <div style="display:flex; gap:10px;">
-                        <input type="text" id="tableUrl" placeholder="http://...ngrok-free.dev/upload">
+                        <input type="text" id="tableUrl" placeholder="http://xxxx-xx-xx-xx.ngrok-free.dev">
                         <button class="send-btn" onclick="sendToTable()">Send 🚀</button>
                     </div>
                     <div id="sendStatus" style="margin-top:5px; font-size:0.9em; color:#666;"></div>
@@ -443,11 +443,9 @@ function generateSteps(pathPoints) {
             let timeSeconds = distanceMm / targetSpeedMmSec;
             let maxSteps = Math.max(Math.abs(dBase), Math.abs(dElbow));
             
-            // SPEED CALCULATION FIX:
-            // 1. Time per step = Total Time / Max Steps
-            // 2. Arduino 'pulsePin' does delay(val); high; delay(val); low.
-            //    So total period = 2 * val.
-            //    Therefore, we must divide calculated total delay by 2.
+            // SPEED CALCULATION:
+            // Arduino 'pulsePin' does delay(val); high; delay(val); low.
+            // Total period = 2 * val.
             let calculatedDelay = 1000; 
             if (maxSteps > 0 && timeSeconds > 0) {
                 let timePerStepUs = (timeSeconds * 1000000) / maxSteps;
@@ -460,7 +458,7 @@ function generateSteps(pathPoints) {
 
             commands.push(`G1 ${dElbow} ${dBase} ${calculatedDelay}`);
             
-            totalTimeUs += (maxSteps * calculatedDelay * 2); // Count total time correctly
+            totalTimeUs += (maxSteps * calculatedDelay * 2);
 
             prevBase += dBase;
             prevElbow += dElbow;
@@ -524,16 +522,23 @@ function parseOutputAndSimulate() {
 
 // --- SEND TO TABLE ---
 async function sendToTable() {
-    const url = document.getElementById('tableUrl').value;
+    let baseUrl = document.getElementById('tableUrl').value.trim();
     const statusDiv = document.getElementById('sendStatus');
-    const gcode = outputData.value;
+    const finalGcode = outputData.value;
 
-    if (!url) {
-        statusDiv.innerText = "❌ Please enter a URL";
+    // Simple validation and cleanup of Base URL
+    if (!baseUrl) {
+        statusDiv.innerText = "❌ Please enter a Base URL";
         statusDiv.style.color = "red";
         return;
     }
-    if (!gcode) {
+    
+    // Remove trailing slash if user added it
+    if (baseUrl.endsWith('/')) {
+        baseUrl = baseUrl.slice(0, -1);
+    }
+
+    if (!finalGcode) {
         statusDiv.innerText = "❌ No G-code to send";
         return;
     }
@@ -542,13 +547,13 @@ async function sendToTable() {
     statusDiv.style.color = "#666";
 
     try {
-        // Assuming the endpoint accepts raw text in the body
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'text/plain',
-            },
-            body: gcode
+        const response = await fetch(`${baseUrl}/send_gcode_block`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                gcode: finalGcode,
+                speed_override: null // Let existing logic use the values in the text
+            })
         });
 
         if (response.ok) {
@@ -642,9 +647,6 @@ function drawSimulation(index) {
     ctx.strokeStyle = "#ddd";
     ctx.lineWidth = 2 / scale;
     ctx.stroke();
-
-    // Input Path (Blue) - Optional, only if RAW_COORDS exists
-    // Omitted to keep simulator clean for "Edited" output viewing
 
     // Arm Trace (Red)
     if (ARM_STATES.length > 0) {
