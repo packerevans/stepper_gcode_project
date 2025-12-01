@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sand Table Controller v6</title>
+<title>Sand Table Controller v7 (Singularity Fix)</title>
 <style>
     :root {
         --bg: #f4f4f9;
@@ -12,8 +12,6 @@
         --accent: #b08d5c;
         --accent-hover: #967548;
         --border: #ddd;
-        --success: #28a745;
-        --error: #dc3545;
     }
     body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -66,7 +64,6 @@
         resize: vertical;
         box-sizing: border-box;
         white-space: pre;
-        overflow-wrap: normal;
         overflow-x: scroll;
     }
     
@@ -87,10 +84,8 @@
         border: 2px solid var(--accent);
         color: var(--accent);
     }
-    button.secondary:hover { background-color: rgba(176, 141, 92, 0.1); }
-    
-    button.send-btn { background-color: #2196F3; }
-    button.send-btn:hover { background-color: #0b7dda; }
+    button.send-btn { background-color: #28a745; margin-top: 10px; } 
+    button.send-btn:hover { background-color: #1e7e34; }
 
     .canvas-container {
         position: relative;
@@ -113,7 +108,6 @@
         border-radius: 4px;
         font-size: 0.95em;
         color: #445;
-        line-height: 1.5;
         white-space: pre-wrap;
     }
     .settings-grid {
@@ -121,18 +115,11 @@
         grid-template-columns: 1fr 1fr;
         gap: 10px;
     }
-    .connection-box {
-        background: #f8f9fa;
-        padding: 10px;
-        border-radius: 6px;
-        border: 1px solid #dee2e6;
-        margin-top: 10px;
-    }
 </style>
 </head>
 <body>
 
-<h1>Sand Table Controller v6</h1>
+<h1>Sand Table Controller v7</h1>
 
 <div class="container">
     <div class="card">
@@ -163,7 +150,7 @@
             </div>
             <div>
                 <label>Target Speed (mm/s)</label>
-                <input type="number" id="targetSpeed" value="40" title="Visual speed of the ball">
+                <input type="number" id="targetSpeed" value="40">
             </div>
             <div>
                 <label>Arm 1 Length (mm)</label>
@@ -183,11 +170,11 @@
             </div>
             <div>
                 <label>Min Motor Delay (us)</label>
-                <input type="number" id="minDelay" value="100" title="Lower = Higher Max Speed">
+                <input type="number" id="minDelay" value="100">
             </div>
         </div>
         <label>Interpolation Resolution (mm)</label>
-        <input type="number" id="resolution" value="1.0" title="Smaller = Smoother but larger files">
+        <input type="number" id="resolution" value="1.0">
         <button onclick="processData()">Convert & Simulate</button>
     </div>
 
@@ -195,7 +182,7 @@
         <h2>3. Simulation & Output</h2>
         <div style="display: flex; gap: 20px; flex-wrap: wrap;">
             <div style="flex: 1; min-width: 300px;">
-                <label>Visual Preview (Red = Output)</label>
+                <label>Visual Preview</label>
                 <div class="canvas-container">
                     <canvas id="simCanvas"></canvas>
                 </div>
@@ -207,19 +194,13 @@
             </div>
             <div style="flex: 1; min-width: 300px;">
                 <label>Output Code (Editable)</label>
-                <textarea id="outputData" style="height: 300px;" placeholder="G-code appears here. Edit manually to update simulator."></textarea>
+                <textarea id="outputData" style="height: 300px;" placeholder="G-code appears here..."></textarea>
                 
-                <div class="connection-box">
-                    <label>Base URL (e.g. http://...ngrok-free.dev)</label>
-                    <div style="display:flex; gap:10px;">
-                        <input type="text" id="tableUrl" placeholder="http://xxxx-xx-xx-xx.ngrok-free.dev">
-                        <button class="send-btn" onclick="sendToTable()">Send 🚀</button>
-                    </div>
-                    <div id="sendStatus" style="margin-top:5px; font-size:0.9em; color:#666;"></div>
-                </div>
+                <button class="send-btn" onclick="sendToTable()">🚀 Send to Table</button>
+                <div id="sendStatus" style="margin-top:5px; font-size:0.9em; color:#666;"></div>
 
                 <div style="display:flex; gap:10px; margin-top:10px;">
-                    <button onclick="copyOutput()" style="flex:1;">Copy</button>
+                    <button onclick="copyOutput()" class="secondary" style="flex:1;">Copy</button>
                     <button onclick="downloadOutput()" class="secondary" style="flex:1;">Download</button>
                 </div>
             </div>
@@ -228,9 +209,16 @@
 </div>
 
 <script>
+// --- CONFIGURATION ---
+// Determines where to send the command. 
+// If running on the Pi, use window.location.origin.
+// If running on a laptop, YOU MUST CHANGE THIS to your Ngrok/Pi IP (e.g. "http://192.168.1.15:5000")
+const BASE_URL = window.location.origin; 
+// const BASE_URL = "http://YOUR-NGROK-ADDRESS-HERE"; // Uncomment and use this if running locally
+
 // --- GLOBAL CONSTANTS & STATE ---
-let RAW_COORDS = []; // {x, y, theta, rho, type}
-let ARM_STATES = []; // For simulation
+let RAW_COORDS = []; 
+let ARM_STATES = []; 
 let animId = null;
 
 // --- DOM ELEMENTS ---
@@ -246,7 +234,6 @@ window.onload = function() {
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
     
-    // File Upload Handler
     fileInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -258,14 +245,12 @@ window.onload = function() {
         reader.readAsText(file);
     });
 
-    // Slider Handler
     simSlider.addEventListener('input', (e) => {
         stopSimulation();
         const idx = Math.floor((parseFloat(e.target.value) / 100) * (ARM_STATES.length - 1));
         drawSimulation(idx);
     });
 
-    // Real-time Editing Handler
     outputData.addEventListener('input', () => {
         parseOutputAndSimulate();
     });
@@ -281,10 +266,9 @@ function resizeCanvas() {
     }
 }
 
-// --- CORE LOGIC: PARSING & CONVERSION ---
+// --- CORE LOGIC ---
 
 function processData() {
-    // 1. Settings
     const tableRadius = parseFloat(document.getElementById('tableRadius').value);
     const format = document.getElementById('inputFormat').value;
     const text = inputData.value;
@@ -292,7 +276,6 @@ function processData() {
     
     RAW_COORDS = [];
     
-    // 2. Parse Input
     let mode = format;
     if (mode === 'auto') {
         if (text.includes('thetarho')) mode = 'thr';
@@ -306,7 +289,6 @@ function processData() {
     for (let line of lines) {
         line = line.trim();
         if (!line || line.startsWith('#') || line.startsWith(';')) continue;
-
         let p = { x: 0, y: 0, theta: 0, rho: 0, type: 'cartesian' }; 
 
         if (mode === 'thr') {
@@ -350,8 +332,6 @@ function processData() {
         alert("No valid coordinates found.");
         return;
     }
-
-    // 3. Interpolate
     interpolateAndGenerate();
 }
 
@@ -367,7 +347,7 @@ function interpolateAndGenerate() {
         let p2 = RAW_COORDS[i+1];
         
         if (p1.type === 'polar' && p2.type === 'polar') {
-            // Polar Interpolation
+            // Polar Interpolation (Fixes the "Straight line chord" issue)
             let avgR = (p1.rho + p2.rho) / 2 * tableRadius;
             let dTheta = Math.abs(p2.theta - p1.theta);
             let arcDist = avgR * dTheta; 
@@ -392,7 +372,6 @@ function interpolateAndGenerate() {
             let dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
             let steps = Math.ceil(dist / res);
             steps = Math.max(1, steps);
-            
             for (let j = 1; j <= steps; j++) {
                 let t = j / steps;
                 interpolated.push({
@@ -402,8 +381,6 @@ function interpolateAndGenerate() {
             }
         }
     }
-
-    // 4. Generate G-Code Steps
     generateSteps(interpolated);
 }
 
@@ -425,7 +402,7 @@ function generateSteps(pathPoints) {
     let prevX = pathPoints[0].x;
     let prevY = pathPoints[0].y;
 
-    // Start Position
+    // Reset IK for start
     let startIK = calculateIK(pathPoints[0].x, pathPoints[0].y, 0, 0, L1, L2, gearRatio, stepsPerRad);
     prevBase = startIK.base_steps;
     prevElbow = startIK.elbow_steps;
@@ -443,21 +420,16 @@ function generateSteps(pathPoints) {
             let timeSeconds = distanceMm / targetSpeedMmSec;
             let maxSteps = Math.max(Math.abs(dBase), Math.abs(dElbow));
             
-            // SPEED CALCULATION:
-            // Arduino 'pulsePin' does delay(val); high; delay(val); low.
-            // Total period = 2 * val.
+            // Speed Calc (Half delay because Arduino does high+low)
             let calculatedDelay = 1000; 
             if (maxSteps > 0 && timeSeconds > 0) {
                 let timePerStepUs = (timeSeconds * 1000000) / maxSteps;
                 calculatedDelay = timePerStepUs / 2;
             }
-            
-            // Safety Clamp
             if (calculatedDelay < minDelayUs) calculatedDelay = minDelayUs;
             calculatedDelay = Math.round(calculatedDelay);
 
             commands.push(`G1 ${dElbow} ${dBase} ${calculatedDelay}`);
-            
             totalTimeUs += (maxSteps * calculatedDelay * 2);
 
             prevBase += dBase;
@@ -469,107 +441,54 @@ function generateSteps(pathPoints) {
 
     outputData.value = commands.join('\n');
     
-    // Stats
-    const totalSeconds = totalTimeUs / 1000000;
-    const h = Math.floor(totalSeconds / 3600);
-    const m = Math.floor((totalSeconds % 3600) / 60);
-    const s = Math.floor(totalSeconds % 60);
-    document.getElementById('inputStats').innerText += `\n✅ Generated ${commands.length} commands`;
-    document.getElementById('inputStats').innerText += `\n⏱ Est. Run Time: ${h}h ${m}m ${s}s`;
-
-    // Trigger Simulation Update
+    // Trigger Simulation
     parseOutputAndSimulate();
 }
 
-// --- SIMULATION FROM OUTPUT (Real-time Edit Support) ---
-
-function parseOutputAndSimulate() {
-    const text = outputData.value;
-    const lines = text.split('\n');
-    
-    const L1 = parseFloat(document.getElementById('L1').value);
-    const L2 = parseFloat(document.getElementById('L2').value);
-    const gearRatio = parseFloat(document.getElementById('gearRatio').value);
-    const stepsPerDeg = parseFloat(document.getElementById('stepsPerDeg').value);
-    const stepsPerRad = stepsPerDeg * (180 / Math.PI);
-
-    ARM_STATES = [];
-    let curBase = 0;
-    let curElbow = 0;
-
-    // Push initial state
-    ARM_STATES.push(calculateFK(0, 0, L1, L2, gearRatio, stepsPerRad));
-
-    for (let line of lines) {
-        // Parse "G1 <Elbow> <Base> <Speed>"
-        const parts = line.trim().split(/\s+/);
-        if (parts[0] === 'G1' && parts.length >= 3) {
-            let dElbow = parseInt(parts[1]);
-            let dBase = parseInt(parts[2]);
-            
-            if (!isNaN(dElbow) && !isNaN(dBase)) {
-                curBase += dBase;
-                curElbow += dElbow;
-                ARM_STATES.push(calculateFK(curBase, curElbow, L1, L2, gearRatio, stepsPerRad));
-            }
-        }
-    }
-    
-    // Redraw immediately
-    const idx = Math.floor((parseFloat(simSlider.value) / 100) * (ARM_STATES.length - 1));
-    drawSimulation(idx);
-}
-
-// --- SEND TO TABLE ---
+// --- SEND TO TABLE (Mimics drawing.html) ---
 async function sendToTable() {
-    let baseUrl = document.getElementById('tableUrl').value.trim();
+    const code = outputData.value;
     const statusDiv = document.getElementById('sendStatus');
-    const finalGcode = outputData.value;
 
-    // Simple validation and cleanup of Base URL
-    if (!baseUrl) {
-        statusDiv.innerText = "❌ Please enter a Base URL";
+    if (!code) {
+        statusDiv.innerText = "❌ Generate code first!";
         statusDiv.style.color = "red";
-        return;
-    }
-    
-    // Remove trailing slash if user added it
-    if (baseUrl.endsWith('/')) {
-        baseUrl = baseUrl.slice(0, -1);
-    }
-
-    if (!finalGcode) {
-        statusDiv.innerText = "❌ No G-code to send";
         return;
     }
 
     statusDiv.innerText = "⏳ Sending...";
     statusDiv.style.color = "#666";
 
+    // This Payload matches your drawing.html EXACTLY
+    // speed_override: 1000 (or null if you want to use the G-code speeds)
+    // We set speed_override: null so the Python script uses the delays we calculated above
     try {
-        const response = await fetch(`${baseUrl}/send_gcode_block`, {
+        const response = await fetch(`${BASE_URL}/send_gcode_block`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                gcode: finalGcode,
-                speed_override: null // Let existing logic use the values in the text
+            body: JSON.stringify({ 
+                gcode: code,
+                speed_override: null 
             })
         });
-
-        if (response.ok) {
-            statusDiv.innerText = "✅ Sent Successfully!";
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            statusDiv.innerText = "✅ Sent successfully!";
             statusDiv.style.color = "green";
         } else {
-            statusDiv.innerText = `❌ Error: ${response.status} ${response.statusText}`;
+            statusDiv.innerText = "❌ Error: " + (data.error || "Unknown");
             statusDiv.style.color = "red";
         }
-    } catch (err) {
-        statusDiv.innerText = `❌ Connection Failed: ${err.message}`;
+
+    } catch (e) {
+        statusDiv.innerText = "❌ Network Error: " + e.message;
         statusDiv.style.color = "red";
     }
 }
 
-// --- KINEMATICS (IK/FK) ---
+// --- KINEMATICS & SINGULARITY FIX ---
 
 function getShortestRotation(raw, last) {
     let diff = (raw - last) / (2 * Math.PI);
@@ -580,14 +499,30 @@ function getShortestRotation(raw, last) {
 function calculateIK(x, y, lastBaseSteps, lastElbowSteps, L1, L2, gearRatio, stepsPerRad) {
     let dist = Math.hypot(x, y);
     const maxReach = L1 + L2;
-    if (dist > maxReach) {
-        x = (x / dist) * maxReach;
-        y = (y / dist) * maxReach;
-        dist = maxReach;
+    
+    // --- SINGULARITY FIX ---
+    // If we try to reach 100% of length, math gets unstable at the edge.
+    // We clamp to 99.5% of max length to keep a tiny bend in the elbow.
+    const safeReach = maxReach * 0.995; 
+    
+    if (dist > safeReach) {
+        x = (x / dist) * safeReach;
+        y = (y / dist) * safeReach;
+        dist = safeReach;
+    }
+
+    // --- SNAP TO CENTER FIX ---
+    // If distance is tiny, force 0,0 angles to avoid jitter
+    if (dist < 0.5) {
+        // Just return current steps to hold position, or zero? 
+        // Zeroing geometry:
+        x = 0.001; y = 0; dist = 0.001;
     }
 
     const lastT1 = -lastBaseSteps / stepsPerRad; 
     let cosBend = (dist*dist - L1*L1 - L2*L2) / (2 * L1 * L2);
+    
+    // Floating point safety
     cosBend = Math.max(-1, Math.min(1, cosBend));
     
     const bend1 = Math.acos(cosBend);
@@ -628,7 +563,39 @@ function calculateFK(baseSteps, elbowSteps, L1, L2, gearRatio, stepsPerRad) {
     };
 }
 
-// --- VISUALIZATION ---
+// --- VISUALIZATION & SIMULATION ---
+
+function parseOutputAndSimulate() {
+    const text = outputData.value;
+    const lines = text.split('\n');
+    
+    const L1 = parseFloat(document.getElementById('L1').value);
+    const L2 = parseFloat(document.getElementById('L2').value);
+    const gearRatio = parseFloat(document.getElementById('gearRatio').value);
+    const stepsPerDeg = parseFloat(document.getElementById('stepsPerDeg').value);
+    const stepsPerRad = stepsPerDeg * (180 / Math.PI);
+
+    ARM_STATES = [];
+    let curBase = 0;
+    let curElbow = 0;
+
+    ARM_STATES.push(calculateFK(0, 0, L1, L2, gearRatio, stepsPerRad));
+
+    for (let line of lines) {
+        const parts = line.trim().split(/\s+/);
+        if (parts[0] === 'G1' && parts.length >= 3) {
+            let dElbow = parseInt(parts[1]);
+            let dBase = parseInt(parts[2]);
+            if (!isNaN(dElbow) && !isNaN(dBase)) {
+                curBase += dBase;
+                curElbow += dElbow;
+                ARM_STATES.push(calculateFK(curBase, curElbow, L1, L2, gearRatio, stepsPerRad));
+            }
+        }
+    }
+    const idx = Math.floor((parseFloat(simSlider.value) / 100) * (ARM_STATES.length - 1));
+    drawSimulation(idx);
+}
 
 function drawSimulation(index) {
     const width = canvas.width;
@@ -641,20 +608,17 @@ function drawSimulation(index) {
     const scale = (width/2) / (tableRadius * 1.1);
     ctx.scale(scale, -scale);
 
-    // Table
     ctx.beginPath();
     ctx.arc(0, 0, tableRadius, 0, Math.PI*2);
     ctx.strokeStyle = "#ddd";
     ctx.lineWidth = 2 / scale;
     ctx.stroke();
 
-    // Arm Trace (Red)
     if (ARM_STATES.length > 0) {
         ctx.beginPath();
         ctx.strokeStyle = "rgba(255, 0, 0, 0.5)";
         ctx.lineWidth = 1.5 / scale;
         
-        // Safety check index
         let safeIndex = Math.min(index, ARM_STATES.length - 1);
         if (safeIndex < 0) safeIndex = 0;
 
