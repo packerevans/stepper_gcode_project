@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sand Table Controller v13</title>
+<title>Sand Table Controller v14 (Debugger)</title>
 <style>
     :root {
         --bg: #f4f4f9;
@@ -11,9 +11,9 @@
         --text: #333;
         --accent: #b08d5c;
         --accent-hover: #967548;
+        --debug: #6c5ce7;
+        --debug-bg: #f3f0ff;
         --border: #ddd;
-        --error-bg: #ffe6e6;
-        --error-text: #d63031;
     }
     body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -44,10 +44,17 @@
         display: flex;
         flex-direction: column;
         gap: 15px;
+        position: relative;
+    }
+    .debug-card {
+        border: 2px solid var(--debug);
+        background: var(--debug-bg);
     }
     .full-width { grid-column: 1 / -1; }
     
     label { font-weight: 600; font-size: 0.9em; display: block; margin-bottom: 5px; }
+    .debug-label { color: var(--debug); }
+
     input[type="number"], input[type="text"], select {
         width: 100%;
         padding: 10px;
@@ -118,22 +125,11 @@
         grid-template-columns: 1fr 1fr;
         gap: 10px;
     }
-    
-    .error-simulator {
-        background: var(--error-bg);
-        padding: 10px;
-        border-radius: 6px;
-        border: 1px solid #fab1a0;
-        margin-top: 10px;
-    }
-    .error-simulator label {
-        color: var(--error-text);
-    }
 </style>
 </head>
 <body>
 
-<h1>Sand Table Controller v13</h1>
+<h1>Sand Table Controller v14</h1>
 
 <div class="container">
     <div class="card">
@@ -156,7 +152,7 @@
     </div>
 
     <div class="card">
-        <h2>2. Machine Settings</h2>
+        <h2>2. Generator Settings (Ideal)</h2>
         <div class="settings-grid">
             <div>
                 <label>Table Max Radius (mm)</label>
@@ -164,7 +160,7 @@
             </div>
             <div>
                 <label>Target Speed (mm/s)</label>
-                <input type="number" id="targetSpeed" value="40" title="Visual speed of the ball">
+                <input type="number" id="targetSpeed" value="40">
             </div>
             <div>
                 <label>Arm 1 Length (mm)</label>
@@ -188,35 +184,15 @@
             </div>
         </div>
         <label>Interpolation Resolution (mm)</label>
-        <input type="number" id="resolution" value="1.0" title="Smaller values = smoother curves but more data">
-        <button onclick="processData()">Convert & Simulate</button>
+        <input type="number" id="resolution" value="1.0">
+        <button onclick="processData()">Convert & Preview</button>
     </div>
 
     <div class="card full-width">
-        <h2>3. Simulation & Output</h2>
+        <h2>3. Output Code</h2>
         <div style="display: flex; gap: 20px; flex-wrap: wrap;">
             <div style="flex: 1; min-width: 300px;">
-                <label>Visual Preview</label>
-                <div class="canvas-container">
-                    <canvas id="simCanvas"></canvas>
-                </div>
-                <div style="margin-top:10px; display:flex; gap:10px;">
-                     <button class="secondary" onclick="playSimulation()">▶ Play</button>
-                     <button class="secondary" onclick="stopSimulation()">⏹ Stop</button>
-                     <input type="range" id="simSlider" min="0" max="100" value="0" style="flex-grow:1;">
-                </div>
-                
-                <div class="error-simulator">
-                    <label>⚠️ Simulate Arm 1 Offset (Steps)</label>
-                    <input type="number" id="offsetSteps" value="0" placeholder="e.g. 50">
-                    <div style="font-size: 0.8em; color: #d63031; margin-top:5px;">
-                        Set this to 0 for a perfect table. Change it to see what happens if your motor is slightly off-center.
-                    </div>
-                </div>
-
-            </div>
-            <div style="flex: 1; min-width: 300px;">
-                <label>Output Code (Editable)</label>
+                <label>Generated G-Code (Input for Debugger)</label>
                 <textarea id="outputData" style="height: 300px;" placeholder="G-code appears here..."></textarea>
                 
                 <button class="send-btn" onclick="sendToTable()">🚀 Send to Table</button>
@@ -227,33 +203,89 @@
                     <button onclick="downloadOutput()" class="secondary" style="flex:1;">Download</button>
                 </div>
             </div>
+            <div style="flex: 1; min-width: 300px;">
+                <label>Ideal Preview (Based on Settings above)</label>
+                <div class="canvas-container">
+                    <canvas id="simCanvas"></canvas>
+                </div>
+                <div style="margin-top:10px; display:flex; gap:10px;">
+                    <input type="range" id="simSlider" min="0" max="100" value="0" style="flex-grow:1;">
+                </div>
+            </div>
         </div>
     </div>
+
+    <div class="card full-width debug-card">
+        <h2 style="color:var(--debug);">4. Reality Debugger</h2>
+        <p style="font-size:0.9em; color:#555;">Tweak these numbers until the <b>purple preview</b> matches your <b>bad real-world result</b>. Then you know what is wrong.</p>
+        
+        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 300px;">
+                <div class="settings-grid">
+                    <div>
+                        <label class="debug-label">Debug Arm 1 Length</label>
+                        <input type="number" id="dL1" value="101.3">
+                    </div>
+                    <div>
+                        <label class="debug-label">Debug Arm 2 Length</label>
+                        <input type="number" id="dL2" value="101.3">
+                    </div>
+                    <div>
+                        <label class="debug-label">Debug Gear Ratio</label>
+                        <input type="number" id="dGear" value="1.125" step="0.001">
+                    </div>
+                    <div>
+                        <label class="debug-label">Debug Steps/Deg</label>
+                        <input type="number" id="dStepsPerDeg" value="8.888888" step="0.000001">
+                    </div>
+                    <div>
+                        <label class="debug-label" style="color:#d63031;">⚠️ Arm 1 Offset (Steps)</label>
+                        <input type="number" id="dOffset" value="0">
+                    </div>
+                </div>
+            </div>
+
+            <div style="flex: 1; min-width: 300px;">
+                <label class="debug-label">Debug Preview</label>
+                <div class="canvas-container" style="border-color:var(--debug);">
+                    <canvas id="debugCanvas"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <script>
 // --- CONFIGURATION ---
 const BASE_URL = window.location.origin; 
-// const BASE_URL = "http://YOUR_PI_IP:5000"; 
 
-// --- GLOBAL CONSTANTS & STATE ---
+// --- STATE ---
 let RAW_COORDS = []; 
 let ARM_STATES = []; 
-let animId = null;
+let DEBUG_ARM_STATES = [];
 
 // --- DOM ELEMENTS ---
 const fileInput = document.getElementById('fileInput');
 const inputData = document.getElementById('inputData');
 const outputData = document.getElementById('outputData');
 const canvas = document.getElementById('simCanvas');
+const debugCanvas = document.getElementById('debugCanvas');
 const ctx = canvas.getContext('2d');
+const dCtx = debugCanvas.getContext('2d');
 const simSlider = document.getElementById('simSlider');
-const offsetInput = document.getElementById('offsetSteps');
+
+// Debug Inputs
+const dL1Input = document.getElementById('dL1');
+const dL2Input = document.getElementById('dL2');
+const dGearInput = document.getElementById('dGear');
+const dStepsInput = document.getElementById('dStepsPerDeg');
+const dOffsetInput = document.getElementById('dOffset');
 
 // --- INITIALIZATION ---
 window.onload = function() {
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
+    resizeCanvases();
+    window.addEventListener('resize', resizeCanvases);
     
     fileInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
@@ -267,32 +299,41 @@ window.onload = function() {
     });
 
     simSlider.addEventListener('input', (e) => {
-        stopSimulation();
         const idx = Math.floor((parseFloat(e.target.value) / 100) * (ARM_STATES.length - 1));
         drawSimulation(idx);
+        // Sync debug view to slider too? Or keep it static? 
+        // Let's keep debug static full view for clarity, or match slider.
+        // Let's match slider for consistency.
+        const dIdx = Math.floor((parseFloat(e.target.value) / 100) * (DEBUG_ARM_STATES.length - 1));
+        drawDebugSimulation(dIdx);
     });
 
     outputData.addEventListener('input', () => {
         parseOutputAndSimulate();
+        runDebugSimulation();
     });
 
-    // Re-run simulation immediately when offset changes
-    offsetInput.addEventListener('input', () => {
-        parseOutputAndSimulate();
+    // Add listeners to all Debug Inputs to auto-update
+    [dL1Input, dL2Input, dGearInput, dStepsInput, dOffsetInput].forEach(el => {
+        el.addEventListener('input', runDebugSimulation);
     });
 };
 
-function resizeCanvas() {
-    const container = canvas.parentElement;
-    canvas.width = container.clientWidth;
-    canvas.height = container.clientHeight;
+function resizeCanvases() {
+    [canvas, debugCanvas].forEach(c => {
+        const container = c.parentElement;
+        c.width = container.clientWidth;
+        c.height = container.clientHeight;
+    });
+    
     if (ARM_STATES.length > 0) {
         const idx = Math.floor((parseFloat(simSlider.value) / 100) * (ARM_STATES.length - 1));
         drawSimulation(idx);
+        drawDebugSimulation(idx);
     }
 }
 
-// --- CORE LOGIC ---
+// --- MAIN LOGIC (GENERATOR) ---
 
 function processData() {
     const tableRadius = parseFloat(document.getElementById('tableRadius').value);
@@ -373,7 +414,6 @@ function interpolateAndGenerate() {
         let p2 = RAW_COORDS[i+1];
         
         if (p1.type === 'polar' && p2.type === 'polar') {
-            // Polar Interpolation - Essential for spirals!
             let avgR = (p1.rho + p2.rho) / 2 * tableRadius;
             let dTheta = Math.abs(p2.theta - p1.theta);
             let arcDist = avgR * dTheta; 
@@ -394,7 +434,6 @@ function interpolateAndGenerate() {
                 });
             }
         } else {
-            // Cartesian Interpolation
             let dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
             let steps = Math.ceil(dist / res);
             steps = Math.max(1, steps);
@@ -423,12 +462,10 @@ function generateSteps(pathPoints) {
     let commands = [];
     let prevBase = 0;
     let prevElbow = 0;
-    let totalTimeUs = 0;
     
     let prevX = pathPoints[0].x;
     let prevY = pathPoints[0].y;
 
-    // Reset IK for start
     let startIK = calculateIK(pathPoints[0].x, pathPoints[0].y, 0, 0, L1, L2, gearRatio, stepsPerRad);
     prevBase = startIK.base_steps;
     prevElbow = startIK.elbow_steps;
@@ -446,7 +483,6 @@ function generateSteps(pathPoints) {
             let timeSeconds = distanceMm / targetSpeedMmSec;
             let maxSteps = Math.max(Math.abs(dBase), Math.abs(dElbow));
             
-            // Speed Calc
             let calculatedDelay = 1000; 
             if (maxSteps > 0 && timeSeconds > 0) {
                 let timePerStepUs = (timeSeconds * 1000000) / maxSteps;
@@ -456,7 +492,6 @@ function generateSteps(pathPoints) {
             calculatedDelay = Math.round(calculatedDelay);
 
             commands.push(`G1 ${dElbow} ${dBase} ${calculatedDelay}`);
-            totalTimeUs += (maxSteps * calculatedDelay * 2);
 
             prevBase += dBase;
             prevElbow += dElbow;
@@ -466,52 +501,104 @@ function generateSteps(pathPoints) {
     }
 
     outputData.value = commands.join('\n');
-    
-    // Trigger Simulation
     parseOutputAndSimulate();
+    runDebugSimulation();
 }
 
-// --- SEND TO TABLE ---
-async function sendToTable() {
-    const code = outputData.value;
-    const statusDiv = document.getElementById('sendStatus');
+// --- STANDARD SIMULATION ---
 
-    if (!code) {
-        statusDiv.innerText = "❌ Generate code first!";
-        statusDiv.style.color = "red";
-        return;
-    }
+function parseOutputAndSimulate() {
+    const text = outputData.value;
+    const lines = text.split('\n');
+    
+    const L1 = parseFloat(document.getElementById('L1').value);
+    const L2 = parseFloat(document.getElementById('L2').value);
+    const gearRatio = parseFloat(document.getElementById('gearRatio').value);
+    const stepsPerDeg = parseFloat(document.getElementById('stepsPerDeg').value);
+    const stepsPerRad = stepsPerDeg * (180 / Math.PI);
 
-    statusDiv.innerText = "⏳ Sending...";
-    statusDiv.style.color = "#666";
+    ARM_STATES = [];
+    let curBase = 0;
+    let curElbow = 0;
 
-    try {
-        const response = await fetch(`${BASE_URL}/send_gcode_block`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ 
-                gcode: code,
-                speed_override: null 
-            })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            statusDiv.innerText = "✅ Sent successfully!";
-            statusDiv.style.color = "green";
-        } else {
-            statusDiv.innerText = "❌ Error: " + (data.error || "Unknown");
-            statusDiv.style.color = "red";
+    ARM_STATES.push(calculateFK(0, 0, L1, L2, gearRatio, stepsPerRad));
+
+    for (let line of lines) {
+        const parts = line.trim().split(/\s+/);
+        if (parts[0] === 'G1' && parts.length >= 3) {
+            let deltaElbow = parseInt(parts[1]);
+            let deltaBase = parseInt(parts[2]);
+            
+            if (!isNaN(deltaElbow) && !isNaN(deltaBase)) {
+                // Visual Interpolation for smooth preview
+                const maxDist = Math.max(Math.abs(deltaElbow), Math.abs(deltaBase));
+                const stepSize = 40; 
+                const segments = Math.max(1, Math.ceil(maxDist / stepSize));
+                const stepBase = deltaBase / segments;
+                const stepElbow = deltaElbow / segments;
+
+                for(let i=0; i<segments; i++) {
+                    curBase += stepBase;
+                    curElbow += stepElbow;
+                    ARM_STATES.push(calculateFK(curBase, curElbow, L1, L2, gearRatio, stepsPerRad));
+                }
+            }
         }
-
-    } catch (e) {
-        statusDiv.innerText = "❌ Network Error: " + e.message;
-        statusDiv.style.color = "red";
     }
+    const idx = Math.floor((parseFloat(simSlider.value) / 100) * (ARM_STATES.length - 1));
+    drawSimulation(idx);
 }
 
-// --- KINEMATICS ---
+// --- DEBUGGER SIMULATION ---
+
+function runDebugSimulation() {
+    const text = outputData.value;
+    const lines = text.split('\n');
+    
+    // Read from DEBUG Inputs
+    const L1 = parseFloat(dL1Input.value);
+    const L2 = parseFloat(dL2Input.value);
+    const gearRatio = parseFloat(dGearInput.value);
+    const stepsPerDeg = parseFloat(dStepsInput.value);
+    const offset = parseFloat(dOffsetInput.value) || 0;
+    
+    const stepsPerRad = stepsPerDeg * (180 / Math.PI);
+
+    DEBUG_ARM_STATES = [];
+    let curBase = 0;
+    let curElbow = 0;
+
+    // Apply offset to initial position
+    DEBUG_ARM_STATES.push(calculateFK(curBase + offset, curElbow, L1, L2, gearRatio, stepsPerRad));
+
+    for (let line of lines) {
+        const parts = line.trim().split(/\s+/);
+        if (parts[0] === 'G1' && parts.length >= 3) {
+            let deltaElbow = parseInt(parts[1]);
+            let deltaBase = parseInt(parts[2]);
+            
+            if (!isNaN(deltaElbow) && !isNaN(deltaBase)) {
+                const maxDist = Math.max(Math.abs(deltaElbow), Math.abs(deltaBase));
+                const stepSize = 40; 
+                const segments = Math.max(1, Math.ceil(maxDist / stepSize));
+                const stepBase = deltaBase / segments;
+                const stepElbow = deltaElbow / segments;
+
+                for(let i=0; i<segments; i++) {
+                    curBase += stepBase;
+                    curElbow += stepElbow;
+                    // Apply offset to every frame
+                    DEBUG_ARM_STATES.push(calculateFK(curBase + offset, curElbow, L1, L2, gearRatio, stepsPerRad));
+                }
+            }
+        }
+    }
+    
+    const idx = Math.floor((parseFloat(simSlider.value) / 100) * (DEBUG_ARM_STATES.length - 1));
+    drawDebugSimulation(idx);
+}
+
+// --- KINEMATICS & DRAWING ---
 
 function getShortestRotation(raw, last) {
     let diff = (raw - last) / (2 * Math.PI);
@@ -522,13 +609,11 @@ function getShortestRotation(raw, last) {
 function calculateIK(x, y, lastBaseSteps, lastElbowSteps, L1, L2, gearRatio, stepsPerRad) {
     let dist = Math.hypot(x, y);
     const maxReach = L1 + L2;
-    
     if (dist > maxReach) {
         x = (x / dist) * maxReach;
         y = (y / dist) * maxReach;
         dist = maxReach;
     }
-
     const lastT1 = -lastBaseSteps / stepsPerRad; 
     let cosBend = (dist*dist - L1*L1 - L2*L2) / (2 * L1 * L2);
     cosBend = Math.max(-1, Math.min(1, cosBend));
@@ -571,120 +656,103 @@ function calculateFK(baseSteps, elbowSteps, L1, L2, gearRatio, stepsPerRad) {
     };
 }
 
-// --- VISUALIZATION & SIMULATION ---
-
-function parseOutputAndSimulate() {
-    const text = outputData.value;
-    const lines = text.split('\n');
+function drawGeneric(context, states, index, radius, color) {
+    const width = context.canvas.width;
+    const height = context.canvas.height;
     
-    const L1 = parseFloat(document.getElementById('L1').value);
-    const L2 = parseFloat(document.getElementById('L2').value);
-    const gearRatio = parseFloat(document.getElementById('gearRatio').value);
-    const stepsPerDeg = parseFloat(document.getElementById('stepsPerDeg').value);
-    const stepsPerRad = stepsPerDeg * (180 / Math.PI);
-    
-    // Grab Error Offset
-    const arm1Offset = parseInt(document.getElementById('offsetSteps').value) || 0;
+    context.clearRect(0, 0, width, height);
+    context.save();
+    context.translate(width/2, height/2);
+    const scale = (width/2) / (radius * 1.1);
+    context.scale(scale, -scale);
 
-    ARM_STATES = [];
-    let curBase = 0;
-    let curElbow = 0;
+    // Table
+    context.beginPath();
+    context.arc(0, 0, radius, 0, Math.PI*2);
+    context.strokeStyle = "#ddd";
+    context.lineWidth = 2 / scale;
+    context.stroke();
 
-    // Start State - Add Offset to Physical Base
-    ARM_STATES.push(calculateFK(curBase + arm1Offset, curElbow, L1, L2, gearRatio, stepsPerRad));
+    if (states.length > 0) {
+        // Trace
+        context.beginPath();
+        context.strokeStyle = color; // Dynamic color
+        context.lineWidth = 1.5 / scale;
+        
+        let safeIndex = Math.min(index, states.length - 1);
+        if (safeIndex < 0) safeIndex = 0;
 
-    for (let line of lines) {
-        const parts = line.trim().split(/\s+/);
-        if (parts[0] === 'G1' && parts.length >= 3) {
-            let deltaElbow = parseInt(parts[1]);
-            let deltaBase = parseInt(parts[2]);
-            
-            if (!isNaN(deltaElbow) && !isNaN(deltaBase)) {
-                // VISUAL INTERPOLATION
-                const maxDist = Math.max(Math.abs(deltaElbow), Math.abs(deltaBase));
-                const stepSize = 40; 
-                const segments = Math.max(1, Math.ceil(maxDist / stepSize));
-                
-                const stepBase = deltaBase / segments;
-                const stepElbow = deltaElbow / segments;
-
-                for(let i=0; i<segments; i++) {
-                    curBase += stepBase;
-                    curElbow += stepElbow;
-                    // Apply offset to every single frame of the simulation
-                    ARM_STATES.push(calculateFK(curBase + arm1Offset, curElbow, L1, L2, gearRatio, stepsPerRad));
-                }
-            }
+        context.moveTo(states[0].x2, states[0].y2);
+        for(let i=1; i<=safeIndex; i++) {
+             context.lineTo(states[i].x2, states[i].y2);
         }
+        context.stroke();
+
+        // Arm
+        const state = states[safeIndex];
+        context.strokeStyle = "#333";
+        context.lineWidth = 4 / scale;
+        context.lineCap = "round";
+        context.beginPath();
+        context.moveTo(0,0);
+        context.lineTo(state.x1, state.y1);
+        context.lineTo(state.x2, state.y2);
+        context.stroke();
+
+        context.fillStyle = "#b08d5c";
+        context.beginPath(); context.arc(0,0, 6/scale, 0, Math.PI*2); context.fill();
+        context.beginPath(); context.arc(state.x1, state.y1, 5/scale, 0, Math.PI*2); context.fill();
     }
-    const idx = Math.floor((parseFloat(simSlider.value) / 100) * (ARM_STATES.length - 1));
-    drawSimulation(idx);
+    context.restore();
 }
 
 function drawSimulation(index) {
-    const width = canvas.width;
-    const height = canvas.height;
-    const tableRadius = parseFloat(document.getElementById('tableRadius').value);
-    
-    ctx.clearRect(0, 0, width, height);
-    ctx.save();
-    ctx.translate(width/2, height/2);
-    const scale = (width/2) / (tableRadius * 1.1);
-    ctx.scale(scale, -scale);
+    const r = parseFloat(document.getElementById('tableRadius').value);
+    drawGeneric(ctx, ARM_STATES, index, r, "rgba(255, 0, 0, 0.5)"); // Red for Ideal
+}
 
-    ctx.beginPath();
-    ctx.arc(0, 0, tableRadius, 0, Math.PI*2);
-    ctx.strokeStyle = "#ddd";
-    ctx.lineWidth = 2 / scale;
-    ctx.stroke();
+function drawDebugSimulation(index) {
+    const r = parseFloat(document.getElementById('tableRadius').value);
+    drawGeneric(dCtx, DEBUG_ARM_STATES, index, r, "rgba(108, 92, 231, 0.5)"); // Purple for Debug
+}
 
-    if (ARM_STATES.length > 0) {
-        ctx.beginPath();
-        ctx.strokeStyle = "rgba(255, 0, 0, 0.5)";
-        ctx.lineWidth = 1.5 / scale;
+async function sendToTable() {
+    const code = outputData.value;
+    const statusDiv = document.getElementById('sendStatus');
+
+    if (!code) {
+        statusDiv.innerText = "❌ Generate code first!";
+        statusDiv.style.color = "red";
+        return;
+    }
+
+    statusDiv.innerText = "⏳ Sending...";
+    statusDiv.style.color = "#666";
+
+    try {
+        const response = await fetch(`${BASE_URL}/send_gcode_block`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ 
+                gcode: code,
+                speed_override: null 
+            })
+        });
         
-        let safeIndex = Math.min(index, ARM_STATES.length - 1);
-        if (safeIndex < 0) safeIndex = 0;
-
-        ctx.moveTo(ARM_STATES[0].x2, ARM_STATES[0].y2);
-        for(let i=1; i<=safeIndex; i++) {
-             ctx.lineTo(ARM_STATES[i].x2, ARM_STATES[i].y2);
+        const data = await response.json();
+        
+        if (data.success) {
+            statusDiv.innerText = "✅ Sent successfully!";
+            statusDiv.style.color = "green";
+        } else {
+            statusDiv.innerText = "❌ Error: " + (data.error || "Unknown");
+            statusDiv.style.color = "red";
         }
-        ctx.stroke();
 
-        const state = ARM_STATES[safeIndex];
-        ctx.strokeStyle = "#333";
-        ctx.lineWidth = 4 / scale;
-        ctx.lineCap = "round";
-        ctx.beginPath();
-        ctx.moveTo(0,0);
-        ctx.lineTo(state.x1, state.y1);
-        ctx.lineTo(state.x2, state.y2);
-        ctx.stroke();
-
-        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
-        ctx.beginPath(); ctx.arc(0,0, 6/scale, 0, Math.PI*2); ctx.fill();
-        ctx.beginPath(); ctx.arc(state.x1, state.y1, 5/scale, 0, Math.PI*2); ctx.fill();
+    } catch (e) {
+        statusDiv.innerText = "❌ Network Error: " + e.message;
+        statusDiv.style.color = "red";
     }
-    ctx.restore();
-}
-
-function playSimulation() {
-    if (animId) return;
-    let i = parseInt(simSlider.value) / 100 * (ARM_STATES.length - 1);
-    function loop() {
-        i += 5; 
-        if (i >= ARM_STATES.length) i = 0;
-        simSlider.value = (i / ARM_STATES.length) * 100;
-        drawSimulation(Math.floor(i));
-        animId = requestAnimationFrame(loop);
-    }
-    loop();
-}
-
-function stopSimulation() {
-    if (animId) cancelAnimationFrame(animId);
-    animId = null;
 }
 
 function copyOutput() {
