@@ -3,10 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Packers Sand Table Control (Updated Engine)</title>
+    <title>Packers Sand Table Control (Vector Engine)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
+
+    <script src="https://cdn.jsdelivr.net/npm/imagetracerjs@1.2.6/imagetracer_v1.2.6.min.js"></script>
 
     <style>
         /* --- Root Variables --- */
@@ -232,6 +234,8 @@
             font-size: 13px; opacity: 0; transition: opacity 0.3s; z-index: 3000;
             pointer-events: none; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         }
+        .status-success { background: #4caf50 !important; }
+        .status-error { background: #ff4444 !important; }
 
         /* Details/Summary */
         details {
@@ -294,7 +298,7 @@
 
             <div class="btn-group">
                 <input type="file" id="traceInput" accept="image/*" onchange="handleImageUpload(this)">
-                <button class="ai-btn" onclick="document.getElementById('traceInput').click()">✨ AI Trace</button>
+                <button class="ai-btn" onclick="document.getElementById('traceInput').click()">✨ AI Vector Trace</button>
             </div>
             
             <div class="btn-group">
@@ -672,97 +676,101 @@
             render();
         }
 
-        // --- AI TRACER ---
+        // --- UPDATED AI VECTOR TRACER ---
         function handleImageUpload(input) {
             const file = input.files[0];
             if(!file) return;
-            saveState();
-            showToast("Processing...");
-            const img = new Image();
+            
+            showToast("Processing Vector Trace...");
+            
             const reader = new FileReader();
-            reader.onload = (e) => { img.onload = () => traceImage(img); img.src = e.target.result; };
+            reader.onload = function(e) {
+                // Settings for clean B&W tracing
+                const options = {
+                    ltres: 1,       // Linear error (lower = more detail)
+                    qtres: 1,       // Quadratic error (lower = smoother curves)
+                    pathomit: 8,    // Ignore very small specks
+                    colorsampling: 0, // Disable color sampling (force B&W)
+                    numberofcolors: 2,
+                    mincolorratio: 0,
+                    colorquantcycles: 0,
+                    blurradius: 0,   // Set to 1 or 2 if source image is noisy
+                    blurdelta: 10
+                };
+
+                // Use ImageTracer to get SVG String data directly
+                ImageTracer.imageToSVG(e.target.result, function(svgString) {
+                    processSVGToSandPoints(svgString);
+                }, options);
+            };
             reader.readAsDataURL(file);
         }
 
-        function traceImage(img) {
-            const traceW = 200; 
-            const traceH = 200;
-            const hidden = document.createElement('canvas');
-            hidden.width = traceW; hidden.height = traceH;
-            const hCtx = hidden.getContext('2d');
-            hCtx.drawImage(img, 0, 0, traceW, traceH);
-            const data = hCtx.getImageData(0,0,traceW,traceH).data;
-            let points = [];
-            const tableR = parseFloat(document.getElementById('cfgRadius').value);
-            
-            // Edge Detect
-            for(let y=1; y<traceH-1; y++) {
-                for(let x=1; x<traceW-1; x++) {
-                    const idx = (y*traceW+x)*4;
-                    const c = (data[idx]+data[idx+1]+data[idx+2])/3;
-                    const r = (data[idx+4]+data[idx+5]+data[idx+6])/3;
-                    const b = (data[idx+traceW*4]+data[idx+traceW*4+1]+data[idx+traceW*4+2])/3;
-                    
-                    if(Math.abs(c-r)>60 || Math.abs(c-b)>60) { 
-                        const mx = ((x/traceW)*2-1)*tableR*0.85;
-                        const my = -((y/traceH)*2-1)*tableR*0.85;
-                        if(Math.hypot(mx,my) < tableR) points.push({x:mx, y:my, visited:false});
-                    }
-                }
-            }
-            
-            if(points.length===0) { showToast("No edges found", 'error'); return; }
-            
-            let sorted = [];
-            let current = points[0]; current.visited = true;
-            let currentShape = [];
-            currentShape.push({x:current.x, y:current.y, type:'point'});
-            
-            const MIN_SHAPE_LEN_MM = 15.0; 
-            const JUMP_THRESHOLD = 20.0; 
-            
-            for(let i=0; i<points.length-1; i++) {
-                let closest=null, minDist=Infinity, idx=-1;
-                for(let j=0; j<points.length; j++) {
-                    if(points[j].visited) continue;
-                    const d = Math.hypot(current.x-points[j].x, current.y-points[j].y);
-                    if(d<minDist) { minDist=d; closest=points[j]; idx=j; if(d<1.5) break; }
-                }
+        function processSVGToSandPoints(svgString) {
+            saveState();
 
-                if(closest) {
-                    points[idx].visited = true; current = closest;
-                    if(minDist > JUMP_THRESHOLD) {
-                        if(getPathLength(currentShape) > MIN_SHAPE_LEN_MM) {
-                            sorted.push({type:'break'});
-                            sorted = sorted.concat(currentShape);
-                        }
-                        currentShape = []; 
+            // 1. Create a hidden dummy container to parse the SVG
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(svgString, "image/svg+xml");
+            const svgEl = doc.documentElement;
+            
+            // Get original dimensions to calculate scale
+            const svgWidth = parseFloat(svgEl.getAttribute("width"));
+            const svgHeight = parseFloat(svgEl.getAttribute("height"));
+            
+            // 2. Find all paths
+            const paths = svgEl.getElementsByTagName("path");
+            let newPoints = [];
+            
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            // Calculate scale to fit table (add 10% padding)
+            const scaleFactor = (tableR * 2 * 0.9) / Math.max(svgWidth, svgHeight);
+            
+            // Center offsets
+            const offX = -svgWidth / 2;
+            const offY = -svgHeight / 2;
+
+            // 3. Iterate over every path found by the AI
+            for(let i = 0; i < paths.length; i++) {
+                const path = paths[i];
+                const totalLen = path.getTotalLength();
+                
+                // Skip tiny noise paths
+                if(totalLen < 15) continue; 
+
+                // Start a new line (lift pen)
+                newPoints.push({type: 'break'});
+
+                // 4. Sample the curve smoothly
+                // "Resolution" determines how smooth. 2mm is a good balance.
+                const resolution = 2.0; 
+                
+                for (let dist = 0; dist <= totalLen; dist += resolution) {
+                    const pt = path.getPointAtLength(dist);
+                    
+                    // Transform SVG coordinates to Table coordinates (Centered 0,0)
+                    // Note: SVG Y is down, Table Y is usually Up. We flip Y here.
+                    const tx = (pt.x + offX) * scaleFactor;
+                    const ty = -(pt.y + offY) * scaleFactor; // Flip Y for standard graph coords
+
+                    // Circular masking (don't draw outside table)
+                    if (Math.hypot(tx, ty) < tableR) {
+                        newPoints.push({ x: tx, y: ty, type: 'point' });
                     }
-                    currentShape.push({x:current.x, y:current.y, type:'point'});
-                } else {
-                    break;
                 }
             }
-            
-            if(getPathLength(currentShape) > MIN_SHAPE_LEN_MM) {
-                 sorted.push({type:'break'});
-                 sorted = sorted.concat(currentShape);
+
+            // 5. Update State
+            if(newPoints.length > 0) {
+                newPoints.push({type: 'break'});
+                // Replace current drawing or append? Let's replace for a clean import.
+                rawPoints = newPoints; 
+                showToast(`Vector Trace Complete!`, 'success');
+                render(); 
+                generateCode();
+            } else {
+                showToast("No valid paths found.", 'error');
             }
-            
-            rawPoints.push({type:'break'});
-            rawPoints = rawPoints.concat(sorted);
-            rawPoints.push({type:'break'});
-            
-            showToast(`Traced & Filtered`, 'success');
-            render(); generateCode();
-        }
-        
-        function getPathLength(pts) {
-            let len = 0;
-            for(let i=0; i<pts.length-1; i++) {
-                len += Math.hypot(pts[i+1].x - pts[i].x, pts[i+1].y - pts[i].y);
-            }
-            return len;
         }
 
 
