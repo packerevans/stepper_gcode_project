@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Packers Sand Pro (Perimeter Rider)</title>
+    <title>Packers Sand Pro (Auto-Clear)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -192,6 +192,14 @@
                 Status: <span id="statusTxt" style="font-weight:bold; color:var(--primary);">Drawing Mode</span>
             </div>
 
+            <div class="toggle-row" style="background:rgba(0,0,0,0.03); padding:8px; border-radius:8px; margin-bottom:10px;">
+                <span style="font-weight:600; font-size:13px;">✨ Auto-Clear Before Run</span>
+                <label class="switch">
+                    <input type="checkbox" id="autoClearMode" checked>
+                    <span class="slider-tog"></span>
+                </label>
+            </div>
+
             <div class="btn-group">
                 <button onclick="sendToTable()" class="active">🚀 Run</button>
                 <button onclick="downloadGcode()" class="secondary">💾 Save</button>
@@ -215,8 +223,8 @@
 
     <script>
         // --- GLOBAL STATE ---
-        let rawPoints = []; 
-        let processedPoints = []; 
+        let rawPoints = []; // User Input (Blue Line)
+        let processedPoints = []; // Final G-Code Points (Red Line)
         let historyStack = [];
         let isDrawing = false;
         let currentTool = 'draw';
@@ -472,7 +480,7 @@
         // --- OPTIMIZER (THE PERIMETER RIDER) ---
         function prepareGCode() {
             if(rawPoints.length === 0) return showToast("Draw something first!", "error");
-            showToast("Optimizing with Perimeter Rider...", "info");
+            showToast("Optimizing Path...", "info");
 
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
             const sym = parseInt(document.getElementById('symSlider').value);
@@ -514,17 +522,16 @@
                 }
             }
 
-            // Orient Start Shape
             let startShape = pool[bestShapeIdx];
             pool.splice(bestShapeIdx, 1);
             let dClose = Math.hypot(startShape[0].x - startShape[startShape.length-1].x, startShape[0].y - startShape[startShape.length-1].y);
             
-            if(dClose < 5.0) { // Closed Loop
+            if(dClose < 5.0) { 
                 let p1 = startShape.slice(bestPointIdx);
                 let p2 = startShape.slice(0, bestPointIdx);
                 startShape = p1.concat(p2);
                 startShape.push(startShape[0]);
-            } else { // Open Line
+            } else { 
                 let dStart = Math.hypot(startShape[0].x, startShape[0].y);
                 let dEnd = Math.hypot(startShape[startShape.length-1].x, startShape[startShape.length-1].y);
                 if(dEnd > dStart) startShape.reverse();
@@ -574,15 +581,13 @@
                 pool.splice(bestIdx, 1);
             }
 
-            // 5. Entry/Exit + PERIMETER RIDER (The "Turtle Leg" Fix)
+            // 5. Entry/Exit + Perimeter Rider
             if(sortedShapes.length > 0) {
-                // Entry Line
                 let first = sortedShapes[0];
                 let fPt = first[0];
                 let fAng = Math.atan2(fPt.y, fPt.x);
                 first.unshift({x: tableR*Math.cos(fAng), y: tableR*Math.sin(fAng), type:'point'});
 
-                // Exit Line
                 let last = sortedShapes[sortedShapes.length-1];
                 let lPt = last[last.length-1];
                 let lAng = Math.atan2(lPt.y, lPt.x);
@@ -594,16 +599,10 @@
             
             for(let i=0; i<sortedShapes.length; i++) {
                 let s = sortedShapes[i];
-                
-                // === THE PERIMETER RIDER LOGIC ===
-                // Instead of jumping directly from Prev-End to Curr-Start,
-                // re-trace Prev's perimeter to get as close as possible to Curr-Start.
                 if(i > 0) {
                     let prev = sortedShapes[i-1];
                     let currStart = s[0];
-                    let prevEnd = prev[prev.length-1]; // We are physically here
-
-                    // Find point on 'prev' closest to 'currStart'
+                    
                     let bestExitIdx = -1;
                     let minDist = Infinity;
                     for(let k=0; k<prev.length; k++) {
@@ -611,35 +610,22 @@
                         if(d < minDist) { minDist = d; bestExitIdx = k; }
                     }
 
-                    // Are we close enough to justify re-tracing? 
-                    // If jump is small, just jump. If shape is far, retrace.
-                    
-                    // Generate re-trace path: From End (index length-1) -> bestExitIdx
                     let isPrevClosed = Math.hypot(prev[0].x - prev[prev.length-1].x, prev[0].y - prev[prev.length-1].y) < 5.0;
-                    
                     let retracePath = [];
                     if(isPrevClosed) {
-                        // Check shortest way around loop: Forward from 0 or Backward from L-1
-                        // Current position is effectively index 0 (since L-1 == 0)
                         let distFwd = bestExitIdx; 
                         let distBk = (prev.length-1) - bestExitIdx;
-                        
                         if(distFwd < distBk) {
-                            // Forward: 0 -> 1 -> ... -> bestExitIdx
                             for(let m=0; m<=bestExitIdx; m++) retracePath.push(prev[m]);
                         } else {
-                            // Backward: L-1 -> L-2 -> ... -> bestExitIdx
                             for(let m=prev.length-1; m>=bestExitIdx; m--) retracePath.push(prev[m]);
                         }
                     } else {
-                        // Open Line: Must walk backwards
                         for(let m=prev.length-1; m>=bestExitIdx; m--) retracePath.push(prev[m]);
                     }
 
-                    // Add Retrace Path (Hidden Travel)
                     retracePath.forEach(p => processedPoints.push(p));
                     
-                    // Now we are at prev[bestExitIdx]. Interpolate jump to currStart.
                     let startJump = prev[bestExitIdx];
                     let jumpDist = Math.hypot(currStart.x - startJump.x, currStart.y - startJump.y);
                     let steps = Math.ceil(jumpDist/res);
@@ -652,7 +638,6 @@
                         });
                     }
                 }
-
                 s.forEach(p => processedPoints.push(p));
             }
 
@@ -686,7 +671,6 @@
             prevBase = startIK.base_steps;
             prevElbow = startIK.elbow_steps;
 
-            // Interpolate small steps for smooth motor movement
             for(let i=0; i<processedPoints.length-1; i++) {
                 let p1 = processedPoints[i];
                 let p2 = processedPoints[i+1];
@@ -764,14 +748,38 @@
         }
 
         // --- ACTIONS ---
-        function sendToTable() {
+        async function sendToTable() {
             if(!generatedGCode) return showToast("Click 'Prepare Path' first!", "error");
+            
+            let finalCode = generatedGCode;
+            const autoClear = document.getElementById('autoClearMode').checked;
+
+            if(autoClear) {
+                showToast("Fetching Clear Pattern...", "info");
+                try {
+                    // Try to fetch clear.TXT first (user preference)
+                    let response = await fetch('./designs/clear.TXT');
+                    if(!response.ok) response = await fetch('./designs/clear.txt'); // Fallback
+                    
+                    if(response.ok) {
+                        const clearCode = await response.text();
+                        finalCode = clearCode + "\n" + finalCode;
+                        showToast("Auto-Clear Added.", "success");
+                    } else {
+                        showToast("Clear file not found!", "error");
+                    }
+                } catch(e) {
+                    console.error(e);
+                    showToast("Clear file error (check console)", "error");
+                }
+            }
+
             showToast("Sending...", "info");
             fetch(BASE_URL + '/send_gcode_block', {
                 method:'POST', headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({gcode: generatedGCode, speed_override: null})
+                body: JSON.stringify({gcode: finalCode, speed_override: null})
             }).then(r=>r.json()).then(d=>{
-                if(d.success) showToast("Sent!", "success");
+                if(d.success) showToast("Sent Successfully!", "success");
                 else showToast("Error: " + d.error, "error");
             }).catch(()=>showToast("Network Error", "error"));
         }
