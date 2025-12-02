@@ -1,394 +1,900 @@
-from flask import Flask, render_template, request, jsonify, Response, url_for, send_from_directory, redirect
-import serial, threading, time, subprocess
-import os
-import re
-import asyncio
-import socket
-# Assuming these modules exist in your project folder
-import wifi_tools 
-import ble_controller 
-
-app = Flask(__name__)
-app.secret_key = 'your_super_secret_key' 
-
-@app.after_request
-def apply_ngrok_header(response: Response):
-    response.headers["ngrok-skip-browser-warning"] = "true"
-    return response
-
-# === SERIAL LOGGING ===
-serial_log = []
-lock = threading.Lock()
-
-def log_message(msg):
-    """Adds a message to the serial log thread-safely."""
-    timestamp = time.strftime("[%H:%M:%S] ")
-    with lock:
-        serial_log.append(timestamp + msg)
-        if len(serial_log) > 200:
-            serial_log.pop(0)
-
-# Connect BLE logs to Flask logs
-ble_controller.set_logger(log_message)
-
-# === SERIAL CONNECTION SETUP ===
-arduino = None
-arduino_connected = False
-current_gcode_runner = None
-
-try:
-    arduino = serial.Serial('/dev/ttyACM0', 9600, timeout=0.1) 
-    time.sleep(2) # Wait for Arduino reset
-    arduino_connected = True
-except Exception as e:
-    print(f"WARNING: Arduino not connected: {e}") 
-    log_message(f"Arduino Init Failed: {e}")
-
-# === SMART G-CODE RUNNER (FLOW CONTROL) ===
-class GCodeRunner(threading.Thread):
-    def __init__(self, gcode_block):
-        super().__init__(daemon=True)
-        # Filter and store only G1 commands
-        self.lines = [
-            line.split(';')[0].strip() for line in gcode_block.split('\n') 
-            if line.split(';')[0].strip().upper().startswith('G1')
-        ]
-        self.total_lines = len(self.lines)
-        self.is_running = True
-        
-        # FLOW CONTROL CONFIGURATION
-        # Arduino has a buffer of 50. We fill to 40 to be safe.
-        self.ARDUINO_BUFFER_SIZE = 40  
-        self.credits = self.ARDUINO_BUFFER_SIZE 
-        self.lines_sent = 0
-        
-        # Thread Event: Used to pause sending when credits are 0
-        self.slot_available_event = threading.Event()
-
-    def process_incoming_serial(self, line):
-        """Called by the serial reader thread when Arduino speaks."""
-        line = line.strip().upper()
-        # "Done" means Arduino finished a move and has space for 1 more
-        if line == "DONE":
-            with lock:
-                self.credits += 1
-                self.slot_available_event.set() # Wake up the sender!
-
-    def send_line(self, line):
-        try:
-            with lock:
-                arduino.write((line + "\n").encode())
-            
-            # Optional: Log progress (can be noisy for large designs)
-            # log_message(f"Sent ({self.lines_sent+1}/{self.total_lines})")
-            
-            self.lines_sent += 1
-            self.credits -= 1 # Used one buffer slot
-            return True
-        except Exception as e:
-            log_message(f"SERIAL ERROR: {e}")
-            self.is_running = False
-            return False
-
-    def run(self):
-        global current_gcode_runner
-        current_gcode_runner = self
-        
-        log_message(f"Job Started: {self.total_lines} lines.")
-
-        while self.is_running and self.lines_sent < self.total_lines:
-            
-            # 1. CHECK CREDITS (Is Arduino full?)
-            if self.credits <= 0:
-                self.slot_available_event.clear()
-                # Wait for Arduino to say "Done" (timeout 10s to prevent hanging)
-                got_slot = self.slot_available_event.wait(timeout=10.0) 
-                if not got_slot:
-                    log_message("TIMEOUT: Arduino stopped responding.")
-                    break
-            
-            # 2. SEND COMMAND
-            if self.is_running:
-                next_line = self.lines[self.lines_sent]
-                if not self.send_line(next_line):
-                    break
-                
-                # Tiny sleep to let the serial bus breathe, but fast enough to keep buffer full
-                time.sleep(0.002) 
-
-        current_gcode_runner = None
-        log_message("Design Completed.")
-
-# === SERIAL READER THREAD ===
-def read_from_serial():
-    global current_gcode_runner
-    while arduino_connected:
-        try:
-            if arduino.in_waiting > 0:
-                line = arduino.readline().decode(errors="ignore").strip()
-                if line:
-                    # Log everything from Arduino
-                    log_message(f"Ard: {line}") 
-                    
-                    # If we are running a job, pass the message to the runner
-                    # so it can count "Done" signals
-                    if current_gcode_runner:
-                        current_gcode_runner.process_incoming_serial(line)
-            else:
-                time.sleep(0.01) 
-        except Exception as e:
-            log_message(f"SERIAL ERROR: {e}")
-            time.sleep(1)
-
-if arduino_connected:
-    threading.Thread(target=read_from_serial, daemon=True).start()
-
-
-# === UTILITY FUNCTIONS ===
-
-def get_current_ip():
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.settimeout(0)
-        s.connect(('10.254.254.254', 1)) 
-        ip = s.getsockname()[0]
-        s.close()
-    except Exception:
-        ip = '127.0.0.1'
-    return ip
-
-# === FLASK ROUTES ===
-
-@app.route("/")
-def index():
-    current_ip = get_current_ip()
-    # Force setup if on Hotspot
-    if current_ip in ["10.42.0.1", "192.168.4.1"]:
-        return redirect(url_for('wifi_setup_page'))
-    return render_template("designs.html")
-
-@app.route("/wifi_setup")
-def wifi_setup_page():
-    networks = wifi_tools.get_wifi_networks()
-    saved_networks = wifi_tools.get_saved_networks()
-    current_ip = get_current_ip()
-    hostname = socket.gethostname()
-    return render_template("wifi_setup.html", networks=networks, saved_networks=saved_networks, ip_address=current_ip, hostname=hostname)
-
-@app.route("/api/forget_wifi", methods=["POST"])
-def forget_wifi_route():
-    data = request.json
-    ssid = data.get("ssid")
-    if not ssid: return jsonify(success=False, message="No SSID")
-    log_message(f"Forgetting: {ssid}")
-    success, msg = wifi_tools.forget_network(ssid)
-    return jsonify(success=success, message=msg)
-
-@app.route("/check_password", methods=["POST"])
-def check_password_route():
-    data = request.json
-    if data.get("password") == "2025":
-        return jsonify(success=True)
-    return jsonify(success=False), 401
-
-@app.route("/shutdown", methods=["POST"])
-def shutdown():
-    log_message("System shutting down...")
-    subprocess.Popen(["sudo", "shutdown", "now"])
-    return jsonify(success=True)
-
-@app.route("/reboot", methods=["POST"])
-def reboot():
-    log_message("System rebooting...")
-    subprocess.Popen(["sudo", "reboot"])
-    return jsonify(success=True)
-
-@app.route("/pull", methods=["POST"])
-def git_pull():
-    log_message("Running git pull...")
-    try:
-        result = subprocess.run(["git", "pull"], capture_output=True, text=True, cwd=".", check=True, timeout=15)
-        output = result.stdout.strip() if result.stdout else "No output."
-        log_message(f"Git Output: {output[:50]}...")
-        return jsonify(success=True, message=output[:100])
-    except Exception as e:
-        log_message(f"Git Failed: {e}")
-        return jsonify(success=False, message=str(e)), 500
-
-@app.route("/update_firmware", methods=["POST"])
-def update_firmware():
-    global arduino, arduino_connected
-    log_message("FIRMWARE UPDATE STARTED...")
-    if arduino and arduino.is_open:
-        arduino.close()
-    arduino_connected = False
-    try:
-        log_message("Compiling...")
-        subprocess.run(["arduino-cli", "compile", "--fqbn", "arduino:avr:uno", "/home/pacpi/Desktop/stepper_gcode_project/Sand"], check=True, capture_output=True, text=True)
-        log_message("Uploading...")
-        subprocess.run(["arduino-cli", "upload", "-p", "/dev/ttyACM0", "--fqbn", "arduino:avr:uno", "/home/pacpi/Desktop/stepper_gcode_project/Sand"], check=True, capture_output=True, text=True)
-        success_msg = "Firmware updated."
-    except Exception as e:
-        log_message(f"UPDATE ERROR: {str(e)}")
-        success_msg = f"Error: {str(e)}"
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Packers Sand Pro (Center Fix)</title>
     
-    # Reconnect
-    try:
-        time.sleep(2) 
-        arduino = serial.Serial('/dev/ttyACM0', 9600, timeout=0.1)
-        arduino_connected = True
-        threading.Thread(target=read_from_serial, daemon=True).start()
-        log_message("Serial reconnected.")
-    except Exception as e:
-        log_message(f"FAILED TO RECONNECT SERIAL: {e}")
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
+
+    <script src="https://cdn.jsdelivr.net/npm/imagetracerjs@1.2.6/imagetracer_v1.2.6.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #d2b48c; 
+            --secondary: #b08d5c; 
+            --bg: #f4f4f4; 
+            --panel: #ffffff; 
+            --text: #333;
+            --accent: #2ecc71;
+            --danger: #e74c3c;
+            --btn-text: #fff;
+        }
+        body[data-theme='dark'] {
+            --bg: #121212; --panel: #1e1e1e; --text: #e0e0e0; --btn-text: #000;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg); color: var(--text);
+            margin: 0; padding: 0; height: 100vh;
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+
+        .nav-bar {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 15px; background: var(--panel);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 100;
+        }
+        .sidebar {
+            height: 100%; width: 0; position: fixed; top: 0; left: 0;
+            background-color: var(--primary); overflow-x: hidden;
+            transition: 0.3s; padding-top: 60px; z-index: 2000;
+            box-shadow: 4px 0 10px rgba(0,0,0,0.3);
+        }
+        .sidebar a {
+            padding: 15px 24px; text-decoration: none; font-size: 18px;
+            color: #fff; display: block; font-weight: 500;
+        }
+
+        .app-container {
+            display: flex; flex-direction: column; height: 100%; width: 100%;
+            padding: 10px; box-sizing: border-box; gap: 10px; overflow-y: auto;
+        }
+        @media (min-width: 768px) {
+            .app-container { flex-direction: row; overflow: hidden; }
+            .drawing-panel { flex: 2; border-radius: 16px; background: var(--panel); position: relative; }
+            .controls-panel { flex: 1; max-width: 400px; border-radius: 16px; background: var(--panel); padding: 20px; overflow-y: auto; }
+        }
+        @media (max-width: 767px) {
+            .drawing-panel { width: 100%; aspect-ratio: 1/1; border-radius: 16px; background: var(--panel); flex-shrink: 0; }
+            .controls-panel { flex: 1; border-radius: 16px; background: var(--panel); padding: 15px; }
+        }
+
+        .canvas-wrapper {
+            position: relative; width: 95%; height: 95%; margin: auto;
+            aspect-ratio: 1/1; border-radius: 50%;
+            border: 4px solid var(--primary); background: #fff;
+            touch-action: none; cursor: crosshair; overflow: hidden;
+            top: 50%; transform: translateY(-50%);
+        }
+        body[data-theme='dark'] .canvas-wrapper { background: #222; border-color: var(--secondary); }
+        canvas { display: block; width: 100%; height: 100%; border-radius: 50%; }
+
+        h2 { margin: 0 0 15px 0; font-size: 1.2rem; color: var(--secondary); text-align: center; }
+        .btn-group { display: flex; gap: 8px; margin-bottom: 12px; }
+        button {
+            background: var(--primary); color: var(--btn-text); border: none;
+            padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer;
+            flex: 1; transition: 0.2s; display: flex; align-items: center; justify-content: center;
+        }
+        button:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        button.secondary { background: transparent; border: 1px solid var(--text); color: var(--text); }
+        button.active { background: var(--secondary); border: 2px solid var(--text); }
+        button.action { background: var(--accent); color: #000; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         
-    return jsonify(success=True, message=success_msg)
-
-# === COMMAND ROUTES ===
-
-@app.route("/send_gcode_block", methods=["POST"])
-def send_gcode_block_route():
-    data = request.json
-    gcode_block = data.get("gcode")
-    speed_override = data.get("speed_override") 
-
-    if not gcode_block: return jsonify(success=False, error="No G-code received."), 400
-    if not arduino_connected: return jsonify(success=False, error="Arduino not connected."), 500
-
-    global current_gcode_runner
-    if current_gcode_runner and current_gcode_runner.is_alive():
-        return jsonify(success=False, error="Busy. Clear queue first."), 503
-
-    # Backward compatibility for Speed Override (if used by old controls)
-    # The new designs.html applies speed directly to the G-code string, so this might be null
-    if speed_override:
-        new_block = []
-        for line in gcode_block.split('\n'):
-            if line.strip().startswith('G1'):
-                parts = line.split()
-                if len(parts) >= 3:
-                    new_block.append(f"{parts[0]} {parts[1]} {parts[2]} {speed_override}")
-            else:
-                new_block.append(line)
-        gcode_block = "\n".join(new_block)
-        log_message(f"Speed override applied: {speed_override}µs")
-
-    # --- AUTO-RESUME FEATURE ---
-    # Ensure the table is not paused when starting a new design
-    with lock:
-        arduino.write(b"RESUME\n")
-    log_message("Auto-Resumed for new job.")
-
-    # Start the job
-    runner = GCodeRunner(gcode_block)
-    runner.start()
-    return jsonify(success=True, message="Started.")
-
-@app.route("/send_single_gcode_line", methods=["POST"])
-def send_single_gcode_line_route():
-    data = request.json
-    line = data.get("gcode_line", "").strip()
-
-    if not line: return jsonify(success=False), 400
-    if not arduino_connected: return jsonify(success=False, error="No Arduino"), 500
-
-    if not line.upper().startswith('G1'):
-         return jsonify(success=False, error="Only G1 allowed"), 400
-
-    try:
-        with lock:
-            arduino.write((line + "\n").encode())
-        log_message(f"Manual: {line}")
-        return jsonify(success=True)
-    except Exception as e:
-        return jsonify(success=False, error=str(e)), 500
-
-@app.route("/send", methods=["POST"])
-def send_command():
-    data = request.json
-    cmd = data.get("command")
-    log_message(f"WEB RECEIVED: {cmd}")
-
-    if not cmd: return jsonify(success=False)
-
-    try:
-        # BLE COMMANDS
-        if cmd.startswith("LED:") or cmd in ["CONNECT", "DISCONNECT", "POWER:ON", "POWER:OFF"]:
-            if cmd.startswith("LED:"):
-                parts = cmd.split(":")[1].split(",")
-                r, g, b, br = map(int, parts)
-                asyncio.run_coroutine_threadsafe(ble_controller.send_led_command(r, g, b, br), ble_controller.loop)
-            else:
-                asyncio.run_coroutine_threadsafe(ble_controller.handle_command(cmd), ble_controller.loop)
-            return jsonify(success=True, message="Queued")
-
-        # ARDUINO COMMANDS
-        if arduino_connected:
-            # --- DEEP CLEAR FEATURE ---
-            if cmd == "CLEAR":
-                global current_gcode_runner
-                # 1. Kill the Python Thread so it stops sending
-                if current_gcode_runner and current_gcode_runner.is_alive():
-                    current_gcode_runner.is_running = False 
-                    # Wake it up if it's waiting for credits so it can die gracefully
-                    current_gcode_runner.slot_available_event.set()
-                    log_message("Stopping active print job thread...")
-                
-                # 2. Tell Arduino to dump its physical buffer
-                with lock:
-                    arduino.write((cmd + "\n").encode())
-                
-                log_message("Queue Cleared.")
-                return jsonify(success=True, message="Queue cleared and job stopped.")
-
-            # Normal Command
-            with lock:
-                arduino.write((cmd + "\n").encode())
-            log_message(f"Sent: {cmd}")
-            return jsonify(success=True)
+        .slider-row { margin-bottom: 15px; background: rgba(0,0,0,0.05); padding: 8px; border-radius: 8px; }
+        .slider-header { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; font-weight: bold; }
+        input[type="range"] { width: 100%; accent-color: var(--secondary); }
         
-        log_message(f"Command '{cmd}' ignored (No Connection).")
-        return jsonify(success=False, error="No device connected."), 500
+        #progressSlider {
+            -webkit-appearance: none; width: 100%; height: 8px; border-radius: 5px; background: #d3d3d3; outline: none;
+        }
+        #progressSlider::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--secondary); cursor: pointer;
+        }
 
-    except Exception as e:
-        log_message(f"Error: {e}")
-        return jsonify(success=False, error=str(e)), 500
+        details { background: rgba(0,0,0,0.05); padding: 10px; border-radius: 8px; margin-top: 10px; }
+        summary { cursor: pointer; font-weight: bold; font-size: 13px; }
+        .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+        input[type="number"] { width: 100%; padding: 5px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box; font-family: monospace;}
 
-@app.route("/status", methods=["GET"])
-def get_status():
-    return jsonify({"connected": ble_controller.is_connected()})
+        #status-toast {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: #333; color: white; padding: 10px 20px; border-radius: 20px;
+            font-size: 13px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 3000;
+        }
+        .success { background: var(--accent) !important; color: #000 !important; }
+        .error { background: var(--danger) !important; color: #fff !important; }
 
-@app.route("/terminal/logs")
-def get_logs():
-    with lock:
-        return jsonify(list(serial_log))
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 0 5px; }
+        .switch { position: relative; display: inline-block; width: 40px; height: 22px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider-tog { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
+        .slider-tog:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider-tog { background-color: var(--secondary); }
+        input:checked + .slider-tog:before { transform: translateX(18px); }
 
-# --- TEMPLATE ROUTES ---
-@app.route("/controls")
-def controls(): return render_template("index.html")
-@app.route("/terminal")
-def terminal(): return render_template("terminal.html")
-@app.route("/led_controls")
-def led_controls(): return render_template("led_controls.html")
-@app.route("/script")
-def script(): return render_template("script.html")
-@app.route("/AI_builder")
-def AI_builder(): return render_template("AI_builder.html")
-@app.route("/designs")
-def designs(): return render_template("designs.html")
+    </style>
+</head>
+<body data-theme="light">
 
-@app.route('/designs/<path:filename>')
-def serve_design_file(filename):
-    return send_from_directory(os.path.join(app.root_path, 'templates', 'designs'), filename)
+    <div id="mySidebar" class="sidebar">
+        <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
+        <a href="/">Designs</a> 
+        <a href="/controls">Drawing</a>
+        <a href="/led_controls">LED Controls</a>
+        <a href="/ai_builder">AI Builder</a>
+        <a href="/terminal">Terminal</a>
+    </div>
 
-@app.route('/api/designs')
-def list_designs():
-    try:
-        files = [f for f in os.listdir(os.path.join(app.root_path, 'templates', 'designs')) if f.endswith('.txt')]
-        return jsonify(files)
-    except Exception as e:
-        return jsonify(error=str(e)), 500
+    <div class="nav-bar">
+        <button style="flex:0; background:none; font-size:24px; color:var(--text); padding:0;" onclick="openNav()">☰</button>
+        <h1 style="margin:0; font-size:1.2rem;">Sand Controller</h1>
+        <button style="flex:0; background:none; font-size:20px;" onclick="toggleTheme()">☀️</button>
+    </div>
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False)
+    <div class="app-container">
+        
+        <div class="drawing-panel">
+            <div class="canvas-wrapper" id="canvasContainer">
+                <canvas id="drawCanvas"></canvas>
+            </div>
+            <div id="coordDisplay" style="position:absolute; bottom:10px; left:10px; background:rgba(0,0,0,0.5); color:white; padding:4px 8px; border-radius:4px; font-size:11px; pointer-events:none;">X:0 Y:0</div>
+        </div>
+
+        <div class="controls-panel">
+            <h2>Tools</h2>
+            
+            <div class="toggle-row">
+                <span style="font-weight:600; font-size:13px;">🖋️ Smart Pen Mode</span>
+                <label class="switch">
+                    <input type="checkbox" id="smartPenMode" checked>
+                    <span class="slider-tog"></span>
+                </label>
+            </div>
+
+            <div class="btn-group">
+                <button id="btnDraw" onclick="setTool('draw')" class="active">✏️ Draw</button>
+                <button id="btnErase" onclick="setTool('erase')" class="secondary">🧼 Erase</button>
+            </div>
+
+            <div class="btn-group">
+                <input type="file" id="imgUpload" accept="image/*" style="display:none" onchange="handleImageUpload(this)">
+                <button class="secondary" onclick="document.getElementById('imgUpload').click()">✨ Trace Image</button>
+            </div>
+
+            <div class="btn-group">
+                <button onclick="undo()" class="secondary">↶ Undo</button>
+                <button onclick="clearCanvas()" class="secondary" style="color:var(--danger); border-color:var(--danger);">✖ Clear</button>
+            </div>
+
+            <hr style="border:0; border-top:1px solid #ddd; margin: 15px 0;">
+            
+             <div class="slider-row">
+                <div class="slider-header"><span>SYMMETRY</span> <span id="symVal">1x</span></div>
+                <input type="range" id="symSlider" min="1" max="12" value="1" step="1" oninput="updateUI()">
+            </div>
+
+            <div class="slider-row">
+                <div class="slider-header"><span>SIMULATION (Start ⮕ Finish)</span> <span id="progVal">100%</span></div>
+                <input type="range" id="progressSlider" min="0" max="100" value="100" oninput="render()">
+            </div>
+
+            <button class="action" onclick="prepareGCode()" style="margin-bottom:15px; font-size:1.1em;">⚙️ Prepare Path</button>
+
+            <div style="text-align:center; font-size:12px; margin-bottom:10px; color:#666;">
+                Status: <span id="statusTxt" style="font-weight:bold; color:var(--primary);">Drawing Mode</span>
+            </div>
+
+            <div class="toggle-row" style="background:rgba(0,0,0,0.03); padding:8px; border-radius:8px; margin-bottom:10px;">
+                <span style="font-weight:600; font-size:13px;">✨ Auto-Clear Before Run</span>
+                <label class="switch">
+                    <input type="checkbox" id="autoClearMode" checked>
+                    <span class="slider-tog"></span>
+                </label>
+            </div>
+
+            <div class="btn-group">
+                <button onclick="sendToTable()" class="active">🚀 Run</button>
+                <!-- UPDATED BUTTON -->
+                <button onclick="saveToPi()" class="secondary">💾 Save to Pi</button>
+            </div>
+
+            <details>
+                <summary>⚙️ Machine Settings</summary>
+                <div class="settings-grid">
+                    <div><label>Radius</label><input type="number" id="cfgRadius" value="202.6" onchange="resizeCanvas()"></div>
+                    <div><label>Center Speed</label><input type="number" id="cfgCenterDelay" value="500"></div>
+                    <div><label>Rim Speed</label><input type="number" id="cfgPerimDelay" value="3000"></div>
+                    <div><label>Steps/Deg</label><input type="number" id="cfgStepsPerDeg" value="8.888888"></div>
+                    <!-- ADDED GEAR RATIO INPUT -->
+                    <div><label>Gear Ratio</label><input type="number" id="cfgGearRatio" value="1.125" step="0.001"></div>
+                    <div><label>Arm 1</label><input type="number" id="cfgL1" value="101.3"></div>
+                    <div><label>Arm 2</label><input type="number" id="cfgL2" value="101.3"></div>
+                </div>
+            </details>
+        </div>
+    </div>
+
+    <div id="status-toast"></div>
+
+    <script>
+        let rawPoints = []; 
+        let processedPoints = []; 
+        let historyStack = [];
+        let isDrawing = false;
+        let currentTool = 'draw';
+        let origin = {x:0, y:0};
+        let scale = 1;
+        let generatedGCode = null;
+
+        const canvas = document.getElementById('drawCanvas');
+        const ctx = canvas.getContext('2d');
+        const BASE_URL = window.location.origin;
+
+        function init() {
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            canvas.addEventListener('pointerdown', startDraw);
+            canvas.addEventListener('pointermove', moveDraw);
+            canvas.addEventListener('pointerup', endDraw);
+            canvas.addEventListener('pointerleave', endDraw);
+            canvas.style.touchAction = "none";
+            
+            updateUI();
+        }
+
+        // --- DRAWING LOGIC ---
+        function startDraw(e) {
+            e.preventDefault();
+            const smart = document.getElementById('smartPenMode').checked;
+            if(smart) {
+                if(e.pointerType === 'pen') setTool('draw');
+                else if(e.pointerType === 'touch') setTool('erase');
+            }
+            saveState();
+            isDrawing = true;
+            canvas.setPointerCapture(e.pointerId);
+            processPointer(e);
+            resetStatus();
+        }
+
+        function moveDraw(e) {
+            e.preventDefault();
+            const pos = getPos(e);
+            document.getElementById('coordDisplay').textContent = `X:${pos.x.toFixed(0)} Y:${pos.y.toFixed(0)}`;
+            if(!isDrawing) { render(); drawCursor(pos); return; }
+            processPointer(e);
+        }
+
+        function endDraw(e) {
+            if(!isDrawing) return;
+            isDrawing = false;
+            if(currentTool === 'draw') rawPoints.push({type:'break'});
+            canvas.releasePointerCapture(e.pointerId);
+            render();
+        }
+
+        function getPos(e) {
+            return {
+                x: (e.offsetX - origin.x) / scale,
+                y: -(e.offsetY - origin.y) / scale
+            };
+        }
+
+        function processPointer(e) {
+            const p = getPos(e);
+            if(currentTool === 'draw') {
+                rawPoints.push({x: p.x, y: p.y, type: 'point'});
+            } else {
+                const r = 10;
+                rawPoints = rawPoints.filter(pt => {
+                    if(pt.type === 'break') return true;
+                    return Math.hypot(pt.x - p.x, pt.y - p.y) > r;
+                });
+            }
+            render();
+            if(currentTool==='erase') drawCursor(p);
+        }
+
+        function drawCursor(p) {
+            if(currentTool !== 'erase') return;
+            const r = 10 * scale;
+            const px = origin.x + p.x * scale;
+            const py = origin.y - p.y * scale;
+            ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI*2);
+            ctx.strokeStyle = "#999"; ctx.fillStyle = "rgba(200,200,200,0.3)";
+            ctx.stroke(); ctx.fill();
+        }
+
+        function resetStatus() {
+            generatedGCode = null;
+            processedPoints = [];
+            document.getElementById('statusTxt').innerText = "Drawing Mode";
+            document.getElementById('statusTxt').style.color = "orange";
+            document.getElementById('progressSlider').value = 100;
+        }
+
+        // --- RENDERER ---
+        function render() {
+            const w = canvas.width / window.devicePixelRatio;
+            const h = canvas.height / window.devicePixelRatio;
+            ctx.clearRect(0, 0, w, h);
+            
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            const sym = parseInt(document.getElementById('symSlider').value);
+            const dark = document.body.getAttribute('data-theme') === 'dark';
+            const prog = parseInt(document.getElementById('progressSlider').value);
+            document.getElementById('progVal').textContent = prog + '%';
+
+            ctx.save();
+            ctx.translate(origin.x, origin.y);
+
+            // Table Circle
+            ctx.beginPath(); ctx.arc(0, 0, tableR*scale, 0, Math.PI*2);
+            ctx.strokeStyle = dark ? '#444' : '#ddd'; ctx.lineWidth = 2; ctx.stroke();
+
+            const showingFinal = (processedPoints.length > 0);
+            const dataToShow = showingFinal ? processedPoints : rawPoints;
+            const limit = Math.floor(dataToShow.length * (prog/100));
+            const color = showingFinal ? '#ff0000' : (dark ? 'cyan' : '#007bff');
+
+            ctx.lineWidth = 1.5;
+            
+            const loopCount = showingFinal ? 1 : sym;
+
+            for(let s=0; s<loopCount; s++) {
+                const ang = s * (Math.PI*2/sym);
+                ctx.save(); 
+                if(!showingFinal) ctx.rotate(ang); 
+                
+                ctx.beginPath();
+                ctx.strokeStyle = color;
+                
+                let isMove = true;
+                for(let i=0; i<limit; i++) {
+                    const p = dataToShow[i];
+                    if(p.type === 'break') { isMove = true; continue; }
+                    
+                    const px = p.x * scale;
+                    const py = -p.y * scale;
+                    
+                    if(isMove) { ctx.moveTo(px, py); isMove = false; }
+                    else ctx.lineTo(px, py);
+                }
+                ctx.stroke();
+                
+                if(limit > 0 && limit < dataToShow.length) {
+                    const tip = dataToShow[limit];
+                    if(tip.type !== 'break') {
+                        ctx.beginPath(); 
+                        ctx.arc(tip.x*scale, -tip.y*scale, 4, 0, Math.PI*2);
+                        ctx.fillStyle = color; ctx.fill();
+                    }
+                }
+                ctx.restore();
+            }
+            ctx.restore();
+        }
+
+        // --- AI TRACER ---
+        function handleImageUpload(input) {
+            const file = input.files[0];
+            if(!file) return;
+            showToast("Scanning...", "info");
+            saveState();
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const tCan = document.createElement('canvas');
+                    const MAX = 1000;
+                    let tw = img.width, th = img.height;
+                    if(tw>th && tw>MAX){ th*=MAX/tw; tw=MAX; } 
+                    else if(th>MAX){ tw*=MAX/th; th=MAX; }
+                    
+                    tCan.width = tw; tCan.height = th;
+                    const tCtx = tCan.getContext('2d');
+                    tCtx.fillStyle = "white"; tCtx.fillRect(0,0,tw,th);
+                    tCtx.filter = "grayscale(100%) contrast(150%)";
+                    tCtx.drawImage(img, 0, 0, tw, th);
+                    
+                    ImageTracer.imageToSVG(tCan.toDataURL(), function(svgStr){
+                        processTrace(svgStr, tw, th);
+                    }, { ltres:0.5, qtres:0.5, pathomit:2, colorsampling:2, numberofcolors:2 });
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function processTrace(svgStr, imgW, imgH) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(svgStr, "image/svg+xml");
+            const paths = doc.getElementsByTagName("path");
+            let strokes = [];
+            const res = 2.0; 
+
+            for(let i=0; i<paths.length; i++) {
+                const p = paths[i];
+                const len = p.getTotalLength();
+                if(len < 5) continue; 
+                
+                let pts = [];
+                let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+
+                for(let d=0; d<=len; d+=res) {
+                    const pt = p.getPointAtLength(d);
+                    pts.push({x: pt.x, y: pt.y});
+                    if(pt.x<minX) minX=pt.x; if(pt.x>maxX) maxX=pt.x;
+                    if(pt.y<minY) minY=pt.y; if(pt.y>maxY) maxY=pt.y;
+                }
+                
+                const w = maxX - minX;
+                const h = maxY - minY;
+                if (w > imgW * 0.98 || h > imgH * 0.98) continue; 
+                strokes.push(pts);
+            }
+
+            if(strokes.length === 0) return showToast("No shapes found", "error");
+
+            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+            strokes.flat().forEach(p => {
+                if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
+                if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
+            });
+            
+            const contentW = maxX - minX;
+            const contentH = maxY - minY;
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            const scaleFac = (tableR * 2 * 0.9) / Math.max(contentW, contentH);
+            const cx = (minX + maxX)/2;
+            const cy = (minY + maxY)/2;
+
+            let normalizedStrokes = strokes.map(s => {
+                return s.map(p => ({
+                    x: (p.x - cx) * scaleFac,
+                    y: -(p.y - cy) * scaleFac 
+                })).filter(p => Math.hypot(p.x, p.y) < tableR);
+            });
+
+            rawPoints = [];
+            normalizedStrokes.forEach(s => {
+                rawPoints.push({type:'break'});
+                s.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
+            });
+            rawPoints.push({type:'break'});
+
+            resetStatus();
+            showToast("Trace Loaded (Click Prepare)", "info");
+            render();
+        }
+
+        // --- OPTIMIZER ---
+        function prepareGCode() {
+            if(rawPoints.length === 0) return showToast("Draw something first!", "error");
+            showToast("Optimizing Path...", "info");
+
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            const sym = parseInt(document.getElementById('symSlider').value);
+            
+            let shapes = [];
+            let curShape = [];
+            rawPoints.forEach(p => {
+                if(p.type === 'break') {
+                    if(curShape.length > 0) shapes.push(curShape);
+                    curShape = [];
+                } else {
+                    curShape.push(p);
+                }
+            });
+            if(curShape.length > 0) shapes.push(curShape);
+
+            let pool = [];
+            for(let s=0; s<sym; s++) {
+                const ang = s * (Math.PI*2/sym);
+                const c = Math.cos(ang), si = Math.sin(ang);
+                shapes.forEach(sh => {
+                    let newSh = sh.map(p => ({
+                        x: p.x*c - p.y*si,
+                        y: p.x*si + p.y*c,
+                        type: 'point'
+                    }));
+                    pool.push(newSh);
+                });
+            }
+
+            let bestShapeIdx = -1, bestPointIdx = -1, maxDist = -1;
+            for (let i=0; i<pool.length; i++) {
+                for (let j=0; j<pool[i].length; j++) {
+                    let d = Math.hypot(pool[i][j].x, pool[i][j].y);
+                    if (d > maxDist) { maxDist = d; bestShapeIdx = i; bestPointIdx = j; }
+                }
+            }
+
+            let startShape = pool[bestShapeIdx];
+            pool.splice(bestShapeIdx, 1);
+            let dClose = Math.hypot(startShape[0].x - startShape[startShape.length-1].x, startShape[0].y - startShape[startShape.length-1].y);
+            
+            if(dClose < 5.0) { 
+                let p1 = startShape.slice(bestPointIdx);
+                let p2 = startShape.slice(0, bestPointIdx);
+                startShape = p1.concat(p2);
+                startShape.push(startShape[0]);
+            } else { 
+                let dStart = Math.hypot(startShape[0].x, startShape[0].y);
+                let dEnd = Math.hypot(startShape[startShape.length-1].x, startShape[startShape.length-1].y);
+                if(dEnd > dStart) startShape.reverse();
+            }
+
+            let sortedShapes = [startShape];
+            let curPos = startShape[startShape.length-1];
+
+            while(pool.length > 0) {
+                let bestIdx = -1;
+                let bestDist = Infinity;
+                let bestStartIdx = 0;
+                let bestIsReverse = false;
+
+                for(let i=0; i<pool.length; i++) {
+                    let s = pool[i];
+                    let isClosed = Math.hypot(s[0].x - s[s.length-1].x, s[0].y - s[s.length-1].y) < 5.0;
+
+                    if(isClosed) {
+                        for(let k=0; k<s.length; k++) {
+                            let d = Math.hypot(curPos.x - s[k].x, curPos.y - s[k].y);
+                            if(d < bestDist) { bestDist = d; bestIdx = i; bestStartIdx = k; bestIsReverse = false; }
+                        }
+                    } else {
+                        let dStart = Math.hypot(curPos.x - s[0].x, curPos.y - s[0].y);
+                        if(dStart < bestDist) { bestDist=dStart; bestIdx=i; bestStartIdx=0; bestIsReverse=false; }
+                        let dEnd = Math.hypot(curPos.x - s[s.length-1].x, curPos.y - s[s.length-1].y);
+                        if(dEnd < bestDist) { bestDist=dEnd; bestIdx=i; bestStartIdx=0; bestIsReverse=true; }
+                    }
+                }
+
+                let winner = pool[bestIdx];
+                let isWinnerClosed = Math.hypot(winner[0].x - winner[winner.length-1].x, winner[0].y - winner[winner.length-1].y) < 5.0;
+
+                if(isWinnerClosed) {
+                    let p1 = winner.slice(bestStartIdx);
+                    let p2 = winner.slice(0, bestStartIdx);
+                    winner = p1.concat(p2);
+                    winner.push(winner[0]);
+                } else {
+                    if(bestIsReverse) winner.reverse();
+                }
+
+                sortedShapes.push(winner);
+                curPos = winner[winner.length-1];
+                pool.splice(bestIdx, 1);
+            }
+
+            if(sortedShapes.length > 0) {
+                let first = sortedShapes[0];
+                let fPt = first[0];
+                let fAng = Math.atan2(fPt.y, fPt.x);
+                first.unshift({x: tableR*Math.cos(fAng), y: tableR*Math.sin(fAng), type:'point'});
+
+                let last = sortedShapes[sortedShapes.length-1];
+                let lPt = last[last.length-1];
+                let lAng = Math.atan2(lPt.y, lPt.x);
+                // Mark exit for pause
+                last.push({x: tableR*Math.cos(lAng), y: tableR*Math.sin(lAng), type:'exit'});
+            }
+
+            processedPoints = [];
+            const res = 1.0; 
+            
+            for(let i=0; i<sortedShapes.length; i++) {
+                let s = sortedShapes[i];
+                if(i > 0) {
+                    let prev = sortedShapes[i-1];
+                    let currStart = s[0];
+                    let bestExitIdx = -1;
+                    let minDist = Infinity;
+                    for(let k=0; k<prev.length; k++) {
+                        let d = Math.hypot(prev[k].x - currStart.x, prev[k].y - currStart.y);
+                        if(d < minDist) { minDist = d; bestExitIdx = k; }
+                    }
+
+                    let isPrevClosed = Math.hypot(prev[0].x - prev[prev.length-1].x, prev[0].y - prev[prev.length-1].y) < 5.0;
+                    let retracePath = [];
+                    if(isPrevClosed) {
+                        let distFwd = bestExitIdx; 
+                        let distBk = (prev.length-1) - bestExitIdx;
+                        if(distFwd < distBk) {
+                            for(let m=0; m<=bestExitIdx; m++) retracePath.push(prev[m]);
+                        } else {
+                            for(let m=prev.length-1; m>=bestExitIdx; m--) retracePath.push(prev[m]);
+                        }
+                    } else {
+                        for(let m=prev.length-1; m>=bestExitIdx; m--) retracePath.push(prev[m]);
+                    }
+
+                    retracePath.forEach(p => processedPoints.push(p));
+                    
+                    let startJump = prev[bestExitIdx];
+                    let jumpDist = Math.hypot(currStart.x - startJump.x, currStart.y - startJump.y);
+                    let steps = Math.ceil(jumpDist/res);
+                    for(let k=1; k<=steps; k++) {
+                        let t = k/steps;
+                        processedPoints.push({
+                            x: startJump.x + (currStart.x-startJump.x)*t,
+                            y: startJump.y + (currStart.y-startJump.y)*t,
+                            type: 'point'
+                        });
+                    }
+                }
+                s.forEach(p => processedPoints.push(p));
+            }
+
+            generatedGCode = generateGCodeStringFromProcessed();
+            
+            document.getElementById('statusTxt').innerText = "Path Optimized (Red)";
+            document.getElementById('statusTxt').style.color = "green";
+            document.getElementById('progressSlider').value = 0;
+            render(); 
+            showToast("Perimeter Rider Path Ready!", "success");
+        }
+
+        // --- G-CODE GENERATION ---
+        function generateGCodeStringFromProcessed() {
+            const L1 = parseFloat(document.getElementById('cfgL1').value);
+            const L2 = parseFloat(document.getElementById('cfgL2').value);
+            // UPDATED: Get Gear Ratio from Input
+            const gearRatio = parseFloat(document.getElementById('cfgGearRatio').value); 
+            const tableRadius = parseFloat(document.getElementById('cfgRadius').value);
+            const stepsPerDeg = parseFloat(document.getElementById('cfgStepsPerDeg').value);
+            const stepsPerRad = stepsPerDeg * (180 / Math.PI);
+            
+            const centerDelay = parseFloat(document.getElementById('cfgCenterDelay').value);
+            const perimDelay = parseFloat(document.getElementById('cfgPerimDelay').value);
+
+            let cmds = [];
+            let prevBase = 0;
+            let prevElbow = 0;
+
+            if(processedPoints.length === 0) return "";
+
+            let firstPt = processedPoints[0];
+            let startIK = calculateIK(firstPt.x, firstPt.y, 0, 0, L1, L2, gearRatio, stepsPerRad);
+            prevBase = startIK.base_steps;
+            prevElbow = startIK.elbow_steps;
+
+            for(let i=0; i<processedPoints.length-1; i++) {
+                let p1 = processedPoints[i];
+                let p2 = processedPoints[i+1];
+                let dist = Math.hypot(p2.x-p1.x, p2.y-p1.y);
+                let steps = Math.max(1, Math.ceil(dist / 1.0)); 
+                
+                if(p2.type === 'exit') {
+                    cmds.push("M0");
+                }
+
+                for(let j=1; j<=steps; j++) {
+                    let t = j/steps;
+                    let x = p1.x + (p2.x - p1.x)*t;
+                    let y = p1.y + (p2.y - p1.y)*t;
+
+                    // Pass previous Base steps to IK so it knows how to handle the center
+                    let ik = calculateIK(x, y, prevBase, prevElbow, L1, L2, gearRatio, stepsPerRad);
+                    let dBase = Math.round(ik.base_steps - prevBase);
+                    let dElbow = Math.round(ik.elbow_steps - prevElbow);
+
+                    if(dBase !== 0 || dElbow !== 0) {
+                        let r = Math.hypot(x, y);
+                        let rFactor = r / tableRadius;
+                        if(rFactor > 1) rFactor = 1;
+                        let delay = Math.round(centerDelay + ((perimDelay - centerDelay) * rFactor));
+                        
+                        cmds.push(`G1 ${dElbow} ${dBase} ${delay}`);
+                        prevBase += dBase; prevElbow += dElbow;
+                    }
+                }
+            }
+            return cmds.join('\n');
+        }
+
+        // --- FIXED KINEMATICS (CENTER SAFE) ---
+        function getShortestRotation(raw, last) {
+            let diff = (raw - last) / (2 * Math.PI);
+            let offset = Math.round(diff);
+            return raw - (offset * 2 * Math.PI);
+        }
+
+        function calculateIK(x, y, lastBaseSteps, lastElbowSteps, L1, L2, gearRatio, stepsPerRad) {
+            let dist = Math.hypot(x, y);
+            const maxReach = L1 + L2;
+            
+            if (dist > maxReach) {
+                x = (x / dist) * maxReach;
+                y = (y / dist) * maxReach;
+                dist = maxReach;
+            }
+
+            // --- CENTER PASS-THROUGH LOGIC ---
+            // If we are extremely close to the center, force the math to prioritize
+            // keeping the Base Angle steady. This prevents the "Base Spin" issue.
+            // We treat the target as a "fold" at the *current* base angle.
+            
+            if (dist < 1.0) { // Within 1mm of center
+                
+                // We want the base to stay exactly where it was
+                const targetBaseSteps = lastBaseSteps; 
+                
+                // At center (dist=0), the internal angle is PI (180 deg).
+                // Elbow Steps = -(PI + GearRatio * BaseAngle) * StepsPerRad
+                // We need to reverse-engineer BaseAngle from lastBaseSteps
+                const currentBaseAngle = -lastBaseSteps / stepsPerRad;
+                const targetElbowSteps = -(Math.PI + gearRatio * currentBaseAngle) * stepsPerRad;
+                
+                return { base_steps: targetBaseSteps, elbow_steps: targetElbowSteps };
+            }
+
+            // Standard Math for non-center points
+            const lastT1 = -lastBaseSteps / stepsPerRad; 
+            let cosBend = (dist*dist - L1*L1 - L2*L2) / (2 * L1 * L2);
+            cosBend = Math.max(-1, Math.min(1, cosBend));
+            
+            const bend1 = Math.acos(cosBend);
+            const bend2 = -Math.acos(cosBend);
+
+            const k1_1 = L1 + L2 * Math.cos(bend1);
+            const k2_1 = L2 * Math.sin(bend1);
+            let t1_1 = Math.atan2(y, x) - Math.atan2(k2_1, k1_1);
+            t1_1 = getShortestRotation(t1_1, lastT1);
+
+            const k1_2 = L1 + L2 * Math.cos(bend2);
+            const k2_2 = L2 * Math.sin(bend2);
+            let t1_2 = Math.atan2(y, x) - Math.atan2(k2_2, k1_2);
+            t1_2 = getShortestRotation(t1_2, lastT1);
+
+            const b1_steps = -t1_1 * stepsPerRad;
+            const e1_steps = -(bend1 + gearRatio * t1_1) * stepsPerRad;
+            const b2_steps = -t1_2 * stepsPerRad;
+            const e2_steps = -(bend2 + gearRatio * t1_2) * stepsPerRad;
+
+            const cost1 = Math.abs(b1_steps - lastBaseSteps) + Math.abs(e1_steps - lastElbowSteps);
+            const cost2 = Math.abs(b2_steps - lastBaseSteps) + Math.abs(e2_steps - lastElbowSteps);
+
+            return (cost1 <= cost2) ? { base_steps: b1_steps, elbow_steps: e1_steps } 
+                                    : { base_steps: b2_steps, elbow_steps: e2_steps };
+        }
+
+        // --- ACTIONS ---
+        async function sendToTable() {
+            if(!generatedGCode) return showToast("Click 'Prepare Path' first!", "error");
+            
+            let finalCode = generatedGCode;
+            const autoClear = document.getElementById('autoClearMode').checked;
+
+            if(autoClear) {
+                showToast("Fetching Clear Pattern...", "info");
+                try {
+                    let response = await fetch('./designs/clear.TXT');
+                    if(!response.ok) response = await fetch('./designs/clear.txt'); 
+                    
+                    if(response.ok) {
+                        const clearCode = await response.text();
+                        finalCode = clearCode + "\n" + finalCode;
+                        showToast("Auto-Clear Added.", "success");
+                    } else {
+                        showToast("Clear file not found!", "error");
+                    }
+                } catch(e) {
+                    console.error(e);
+                    showToast("Clear file error (check console)", "error");
+                }
+            }
+
+            showToast("Sending...", "info");
+            fetch(BASE_URL + '/send_gcode_block', {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({gcode: finalCode, speed_override: null})
+            }).then(r=>r.json()).then(d=>{
+                if(d.success) showToast("Sent Successfully!", "success");
+                else showToast("Error: " + d.error, "error");
+            }).catch(()=>showToast("Network Error", "error"));
+        }
+        
+        // --- NEW SAVE FUNCTIONALITY ---
+        async function saveToPi() {
+            if(!generatedGCode) return showToast("Click 'Prepare Path' first!", "error");
+            
+            let name = prompt("Name your design:", "my_pattern");
+            if(name === null) return; // Cancelled
+            
+            // cleanup name
+            name = name.trim().replace(/[^a-zA-Z0-9_-]/g, "_");
+            if(name === "") name = "pattern_" + Date.now();
+            if(!name.toLowerCase().endsWith(".txt")) name += ".txt";
+
+            showToast("Saving to Pi...", "info");
+
+            try {
+                // We assume an endpoint '/save_design' exists on the server
+                // that accepts JSON { filename: "...", gcode: "..." }
+                const response = await fetch(BASE_URL + '/save_design', {
+                    method: 'POST', 
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({
+                        filename: name,
+                        gcode: generatedGCode
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if(data.success) {
+                    showToast("✅ Saved: " + name, "success");
+                } else {
+                    showToast("❌ Error: " + (data.error || "Server denied"), "error");
+                }
+            } catch(e) {
+                console.error(e);
+                showToast("❌ Network Error (Check Server)", "error");
+            }
+        }
+
+        // --- UTILS ---
+        function resizeCanvas() {
+            const container = document.getElementById('canvasContainer');
+            const size = container.getBoundingClientRect().width;
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = size * dpr;
+            canvas.height = size * dpr;
+            ctx.scale(dpr, dpr);
+            origin = { x: size/2, y: size/2 };
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            scale = (size/2) / (tableR * 1.05);
+            render();
+        }
+        function saveState() {
+            if(historyStack.length>10) historyStack.shift();
+            historyStack.push(JSON.stringify(rawPoints));
+        }
+        function undo() {
+            if(historyStack.length===0) return;
+            rawPoints = JSON.parse(historyStack.pop());
+            resetStatus();
+            render();
+        }
+        function clearCanvas() {
+            saveState();
+            rawPoints = [];
+            resetStatus();
+            render();
+        }
+        function setTool(t) {
+            currentTool = t;
+            document.getElementById('btnDraw').className = t==='draw'?'active':'secondary';
+            document.getElementById('btnErase').className = t==='erase'?'active':'secondary';
+        }
+        function updateUI() {
+            document.getElementById('symVal').textContent = document.getElementById('symSlider').value + 'x';
+            render();
+        }
+        function showToast(msg, type) {
+            const t = document.getElementById('status-toast');
+            t.textContent = msg; t.className = type; t.style.opacity = 1;
+            setTimeout(()=>t.style.opacity=0, 3000);
+        }
+        function openNav() { document.getElementById("mySidebar").style.width = "250px"; }
+        function closeNav() { document.getElementById("mySidebar").style.width = "0"; }
+        function toggleTheme() {
+            const b = document.body;
+            b.setAttribute('data-theme', b.getAttribute('data-theme')==='dark'?'light':'dark');
+            render();
+        }
+
+        init();
+    </script>
+</body>
+</html>
+
 
