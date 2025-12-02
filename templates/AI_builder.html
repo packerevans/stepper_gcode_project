@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Packers Sand Pro (Optimizer V2)</title>
+    <title>Packers Sand Pro (Rim Optimized)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -186,9 +186,10 @@
                 <input type="range" id="progressSlider" min="0" max="100" value="100" oninput="render()">
             </div>
 
-            <button class="action" onclick="prepareGCode()" style="margin-bottom:15px; font-size:1.1em;">⚙️ Prepare Path (Optimize)</button>
+            <button class="action" onclick="prepareGCode()" style="margin-bottom:15px; font-size:1.1em;">⚙️ Prepare Path</button>
 
             <div style="text-align:center; font-size:12px; margin-bottom:10px; color:#666;">
+                Lines: <span id="ptCount" style="font-weight:bold;">0</span> | 
                 Status: <span id="statusTxt" style="font-weight:bold; color:var(--primary);">Drawing Mode</span>
             </div>
 
@@ -254,7 +255,7 @@
             isDrawing = true;
             canvas.setPointerCapture(e.pointerId);
             processPointer(e);
-            resetStatus(); // Go back to raw view if user draws
+            resetStatus();
         }
 
         function moveDraw(e) {
@@ -336,6 +337,8 @@
             const showingFinal = (processedPoints.length > 0);
             const dataToShow = showingFinal ? processedPoints : rawPoints;
             const limit = Math.floor(dataToShow.length * (prog/100));
+            
+            // Color: Blue for Edit, Red for Final Simulation
             const color = showingFinal ? '#ff0000' : (dark ? 'cyan' : '#007bff');
 
             ctx.lineWidth = 1.5;
@@ -364,7 +367,7 @@
                 }
                 ctx.stroke();
                 
-                // Draw Ball Head
+                // Draw Head
                 if(limit > 0 && limit < dataToShow.length) {
                     const tip = dataToShow[limit];
                     if(tip.type !== 'break') {
@@ -383,7 +386,6 @@
         function handleImageUpload(input) {
             const file = input.files[0];
             if(!file) return;
-            
             showToast("Scanning...", "info");
             saveState();
 
@@ -474,15 +476,15 @@
             render();
         }
 
-        // --- OPTIMIZER (ROTATIONAL TSP) ---
+        // --- OPTIMIZER LOGIC (THE BRAIN) ---
         function prepareGCode() {
             if(rawPoints.length === 0) return showToast("Draw something first!", "error");
-            showToast("Calculating Best Routes...", "info");
+            showToast("Calculating Best Route...", "info");
 
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
             const sym = parseInt(document.getElementById('symSlider').value);
             
-            // 1. Separate into individual shapes
+            // 1. Separate Shapes
             let shapes = [];
             let curShape = [];
             rawPoints.forEach(p => {
@@ -510,67 +512,87 @@
                 });
             }
 
-            // 3. OPTIMIZER LOOP
-            let sortedShapes = [];
-            // Start position is on the rim, at angle 0 (roughly)
-            let curPos = {x: tableR, y: 0}; 
+            // --- STEP 3: FIND ABSOLUTE BEST START POINT (Closest to Rim) ---
+            // Scan EVERY pixel of EVERY shape to find the one closest to perimeter.
+            let bestShapeIdx = -1;
+            let bestPointIdx = -1;
+            let maxDist = -1;
 
+            for (let i=0; i<pool.length; i++) {
+                for (let j=0; j<pool[i].length; j++) {
+                    let d = Math.hypot(pool[i][j].x, pool[i][j].y);
+                    if (d > maxDist) {
+                        maxDist = d;
+                        bestShapeIdx = i;
+                        bestPointIdx = j;
+                    }
+                }
+            }
+
+            // Extract Start Shape
+            let startShape = pool[bestShapeIdx];
+            pool.splice(bestShapeIdx, 1);
+
+            // ROTATE/REVERSE Start Shape to align with that point
+            // Check if closed loop (tolerance 5mm)
+            let dClose = Math.hypot(startShape[0].x - startShape[startShape.length-1].x, startShape[0].y - startShape[startShape.length-1].y);
+            if(dClose < 5.0) {
+                // Closed Loop: Rotate points so bestPointIdx is the first point
+                const part1 = startShape.slice(bestPointIdx);
+                const part2 = startShape.slice(0, bestPointIdx);
+                startShape = part1.concat(part2);
+                startShape.push(startShape[0]); // Ensure visual closure
+            } else {
+                // Open Line: Reverse if best point is at the end
+                // If best point is in middle, we can't do much without cutting line. 
+                // Just check ends.
+                let dStart = Math.hypot(startShape[0].x, startShape[0].y);
+                let dEnd = Math.hypot(startShape[startShape.length-1].x, startShape[startShape.length-1].y);
+                if(dEnd > dStart) startShape.reverse();
+            }
+
+            let sortedShapes = [startShape];
+            let curPos = startShape[startShape.length-1];
+
+            // --- STEP 4: GREEDY TSP SORT ---
             while(pool.length > 0) {
                 let bestIdx = -1;
                 let bestDist = Infinity;
-                let bestStartIdx = 0; // For closed loops
-                let bestIsReverse = false; // For open lines
+                let bestStartIdx = 0;
+                let bestIsReverse = false;
 
                 for(let i=0; i<pool.length; i++) {
                     let s = pool[i];
-                    
-                    // Is it a closed loop? (First and last point near each other)
-                    let dClose = Math.hypot(s[0].x - s[s.length-1].x, s[0].y - s[s.length-1].y);
-                    let isClosed = dClose < 5.0; // 5mm tolerance
+                    let isClosed = Math.hypot(s[0].x - s[s.length-1].x, s[0].y - s[s.length-1].y) < 5.0;
 
                     if(isClosed) {
-                        // Check EVERY point to find best entry
+                        // Check EVERY point for entry
                         for(let k=0; k<s.length; k++) {
                             let d = Math.hypot(curPos.x - s[k].x, curPos.y - s[k].y);
                             if(d < bestDist) {
                                 bestDist = d;
                                 bestIdx = i;
                                 bestStartIdx = k;
-                                bestIsReverse = false; // Closed loops just rotate, don't reverse
+                                bestIsReverse = false;
                             }
                         }
                     } else {
                         // Check Start vs End
                         let dStart = Math.hypot(curPos.x - s[0].x, curPos.y - s[0].y);
-                        if(dStart < bestDist) {
-                            bestDist = dStart;
-                            bestIdx = i;
-                            bestStartIdx = 0;
-                            bestIsReverse = false;
-                        }
-                        
+                        if(dStart < bestDist) { bestDist=dStart; bestIdx=i; bestStartIdx=0; bestIsReverse=false; }
                         let dEnd = Math.hypot(curPos.x - s[s.length-1].x, curPos.y - s[s.length-1].y);
-                        if(dEnd < bestDist) {
-                            bestDist = dEnd;
-                            bestIdx = i;
-                            bestStartIdx = 0;
-                            bestIsReverse = true;
-                        }
+                        if(dEnd < bestDist) { bestDist=dEnd; bestIdx=i; bestStartIdx=0; bestIsReverse=true; }
                     }
                 }
 
-                // Process the winner
+                // Process Winner
                 let winner = pool[bestIdx];
-                let dClose = Math.hypot(winner[0].x - winner[winner.length-1].x, winner[0].y - winner[winner.length-1].y);
-                let isWinnerClosed = dClose < 5.0;
+                let isWinnerClosed = Math.hypot(winner[0].x - winner[winner.length-1].x, winner[0].y - winner[winner.length-1].y) < 5.0;
 
                 if(isWinnerClosed) {
-                    // Rotate array to start at bestStartIdx
-                    // Optimization: Array rotation
-                    let part1 = winner.slice(bestStartIdx);
-                    let part2 = winner.slice(0, bestStartIdx);
-                    winner = part1.concat(part2);
-                    // Close the loop visually
+                    let p1 = winner.slice(bestStartIdx);
+                    let p2 = winner.slice(0, bestStartIdx);
+                    winner = p1.concat(p2);
                     winner.push(winner[0]);
                 } else {
                     if(bestIsReverse) winner.reverse();
@@ -581,29 +603,29 @@
                 pool.splice(bestIdx, 1);
             }
 
-            // 4. Perimeter Projection (Entry/Exit Lines)
+            // --- STEP 5: ADD ENTRY/EXIT LINES ---
             if(sortedShapes.length > 0) {
-                // Entry
+                // Entry Line (From rim to first point)
                 let first = sortedShapes[0];
                 let fPt = first[0];
                 let fAng = Math.atan2(fPt.y, fPt.x);
                 first.unshift({x: tableR*Math.cos(fAng), y: tableR*Math.sin(fAng), type:'point'});
 
-                // Exit
+                // Exit Line (From last point to rim)
                 let last = sortedShapes[sortedShapes.length-1];
                 let lPt = last[last.length-1];
                 let lAng = Math.atan2(lPt.y, lPt.x);
                 last.push({x: tableR*Math.cos(lAng), y: tableR*Math.sin(lAng), type:'point'});
             }
 
-            // 5. Final Flatten & Interpolation
+            // --- STEP 6: FLATTEN & INTERPOLATE FOR VISUALS ---
             processedPoints = [];
             const res = 1.0; 
             
             for(let i=0; i<sortedShapes.length; i++) {
                 let s = sortedShapes[i];
                 
-                // If moving between shapes, add interpolation (Travel Line)
+                // Add travel line from previous shape
                 if(i > 0) {
                     let prev = sortedShapes[i-1];
                     let p1 = prev[prev.length-1];
@@ -619,18 +641,17 @@
                         });
                     }
                 }
-
                 s.forEach(p => processedPoints.push(p));
             }
 
-            // 6. Generate G-Code
+            // Generate G-Code
             generatedGCode = generateGCodeStringFromProcessed();
             
             document.getElementById('statusTxt').innerText = "Path Optimized (Red)";
             document.getElementById('statusTxt').style.color = "green";
             document.getElementById('progressSlider').value = 0;
             render(); 
-            showToast("Optimization Complete!", "success");
+            showToast("Path Optimized!", "success");
         }
 
         // --- G-CODE GENERATION ---
@@ -654,14 +675,12 @@
             prevBase = startIK.base_steps;
             prevElbow = startIK.elbow_steps;
 
-            // Go through points. Since processedPoints is already interpolated, we just process.
-            // But we do a small re-interpolation just to be safe on resolution
-            
+            // Interpolate small steps for smooth motor movement
             for(let i=0; i<processedPoints.length-1; i++) {
                 let p1 = processedPoints[i];
                 let p2 = processedPoints[i+1];
                 let dist = Math.hypot(p2.x-p1.x, p2.y-p1.y);
-                let steps = Math.max(1, Math.ceil(dist / 1.0)); // 1mm res
+                let steps = Math.max(1, Math.ceil(dist / 1.0)); 
                 
                 for(let j=1; j<=steps; j++) {
                     let t = j/steps;
