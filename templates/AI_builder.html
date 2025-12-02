@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Packers Sand Table (Pro Engine)</title>
+    <title>Packers Sand Pro (Fixed Engine)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -11,527 +11,708 @@
     <script src="https://cdn.jsdelivr.net/npm/imagetracerjs@1.2.6/imagetracer_v1.2.6.min.js"></script>
 
     <style>
-        /* --- Dark/Gold Theme (Packers Inspired) --- */
         :root {
-            --color-primary: #d2b48c; 
-            --color-secondary: #b08d5c; 
-            --color-bg: #121212;
-            --color-panel: #1e1e1e;
-            --color-text: #e0e0e0;
-            --color-accent: #2ecc71;
-            --radius: 12px;
+            --primary: #d2b48c; 
+            --secondary: #b08d5c; 
+            --bg: #f4f4f4; 
+            --panel: #ffffff; 
+            --text: #333;
+            --accent: #2ecc71;
+            --danger: #e74c3c;
+        }
+        body[data-theme='dark'] {
+            --bg: #121212; --panel: #1e1e1e; --text: #e0e0e0;
         }
 
         body {
             font-family: 'Segoe UI', Roboto, sans-serif;
-            background: var(--color-bg);
-            color: var(--color-text);
-            margin: 0; padding: 0;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
+            background: var(--bg); color: var(--text);
+            margin: 0; padding: 0; height: 100vh;
+            display: flex; flex-direction: column; overflow: hidden;
         }
 
-        /* --- Header --- */
+        /* --- Header & Nav --- */
         .nav-bar {
-            padding: 10px 15px; background: var(--color-panel);
             display: flex; justify-content: space-between; align-items: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-            z-index: 10;
+            padding: 10px 15px; background: var(--panel);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 100;
         }
+        .sidebar {
+            height: 100%; width: 0; position: fixed; top: 0; left: 0;
+            background-color: var(--primary); overflow-x: hidden;
+            transition: 0.3s; padding-top: 60px; z-index: 2000;
+            box-shadow: 4px 0 10px rgba(0,0,0,0.3);
+        }
+        .sidebar a {
+            padding: 15px 24px; text-decoration: none; font-size: 18px;
+            color: #fff; display: block; font-weight: 500;
+        }
+        .sidebar a:hover { background: var(--secondary); }
 
-        /* --- Layout --- */
+        /* --- Main Layout --- */
         .app-container {
-            flex: 1; display: flex; flex-direction: column;
-            padding: 10px; gap: 10px; overflow: hidden;
+            display: flex; flex-direction: column; height: 100%; width: 100%;
+            padding: 10px; box-sizing: border-box; gap: 10px; overflow-y: auto;
         }
-        
         @media (min-width: 768px) {
-            .app-container { flex-direction: row; }
-            .canvas-panel { flex: 2; }
-            .controls-panel { flex: 1; min-width: 320px; max-width: 400px; }
+            .app-container { flex-direction: row; overflow: hidden; }
+            .drawing-panel { flex: 2; border-radius: 16px; background: var(--panel); position: relative; }
+            .controls-panel { flex: 1; max-width: 400px; border-radius: 16px; background: var(--panel); padding: 20px; overflow-y: auto; }
+        }
+        @media (max-width: 767px) {
+            .drawing-panel { width: 100%; aspect-ratio: 1/1; border-radius: 16px; background: var(--panel); flex-shrink: 0; }
+            .controls-panel { flex: 1; border-radius: 16px; background: var(--panel); padding: 15px; }
         }
 
         /* --- Canvas --- */
-        .canvas-panel {
-            background: var(--color-panel); border-radius: var(--radius);
-            position: relative; display: flex; align-items: center; justify-content: center;
-            overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        }
         .canvas-wrapper {
-            width: 95%; aspect-ratio: 1/1; max-height: 90vh;
-            border: 3px solid var(--color-secondary); border-radius: 50%;
-            background: #222; position: relative; overflow: hidden;
+            position: relative; width: 95%; height: 95%; margin: auto;
+            aspect-ratio: 1/1; border-radius: 50%;
+            border: 4px solid var(--primary); background: #fff;
+            touch-action: none; cursor: crosshair; overflow: hidden;
+            top: 50%; transform: translateY(-50%);
         }
-        canvas { width: 100%; height: 100%; display: block; border-radius: 50%; }
+        body[data-theme='dark'] .canvas-wrapper { background: #222; border-color: var(--secondary); }
+        canvas { display: block; width: 100%; height: 100%; border-radius: 50%; }
 
         /* --- Controls --- */
-        .controls-panel {
-            background: var(--color-panel); border-radius: var(--radius);
-            padding: 15px; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        }
-
+        h2 { margin: 0 0 15px 0; font-size: 1.2rem; color: var(--secondary); text-align: center; }
         .btn-group { display: flex; gap: 8px; margin-bottom: 12px; }
         button {
-            flex: 1; padding: 12px; border: none; border-radius: 8px;
-            font-weight: 600; cursor: pointer; transition: 0.2s;
-            background: #333; color: white;
+            background: var(--primary); color: white; border: none;
+            padding: 10px; border-radius: 8px; font-weight: 600; cursor: pointer;
+            flex: 1; transition: 0.2s;
         }
-        button.primary { background: var(--color-primary); color: #000; }
-        button.action { background: var(--color-accent); color: #000; }
-        button:hover { filter: brightness(1.1); transform: translateY(-1px); }
-        button:active { transform: translateY(0); }
+        button:hover { filter: brightness(1.1); }
+        button.secondary { background: transparent; border: 1px solid var(--text); color: var(--text); }
+        button.active { background: var(--secondary); border: 2px solid var(--text); }
+        button.action { background: var(--accent); color: #000; }
+        
+        .slider-row { margin-bottom: 15px; background: rgba(0,0,0,0.05); padding: 8px; border-radius: 8px; }
+        .slider-header { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; font-weight: bold; }
+        input[type="range"] { width: 100%; accent-color: var(--secondary); }
 
-        .slider-row { margin-bottom: 15px; background: #2a2a2a; padding: 10px; border-radius: 8px; }
-        .slider-header { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; color: #aaa; }
-        input[type="range"] { width: 100%; accent-color: var(--color-secondary); }
+        details { background: rgba(0,0,0,0.05); padding: 10px; border-radius: 8px; margin-top: 10px; }
+        summary { cursor: pointer; font-weight: bold; font-size: 13px; }
+        .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+        input[type="number"] { width: 100%; padding: 5px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box; font-family: monospace;}
 
-        /* --- Status --- */
+        /* --- Toast --- */
         #status-toast {
             position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
             background: #333; color: white; padding: 10px 20px; border-radius: 20px;
-            font-size: 13px; opacity: 0; transition: opacity 0.3s; pointer-events: none;
-            z-index: 100; box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            font-size: 13px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 3000;
         }
-        .success { background: #2ecc71 !important; color: #000 !important; }
-        .error { background: #e74c3c !important; color: white !important; }
+        .success { background: var(--accent) !important; color: #000 !important; }
+        .error { background: var(--danger) !important; color: #fff !important; }
 
-        input[type="file"] { display: none; }
-        
-        details { background: #2a2a2a; padding: 10px; border-radius: 8px; margin-top: 10px; }
-        summary { cursor: pointer; font-size: 13px; font-weight: bold; color: #aaa; }
-        .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
-        .settings-grid input { width: 100%; box-sizing: border-box; background: #444; border: 1px solid #555; color: white; padding: 5px; border-radius: 4px; }
+        /* Toggle */
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 0 5px; }
+        .switch { position: relative; display: inline-block; width: 40px; height: 22px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider-tog { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
+        .slider-tog:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider-tog { background-color: var(--secondary); }
+        input:checked + .slider-tog:before { transform: translateX(18px); }
+
     </style>
 </head>
-<body>
+<body data-theme="light">
+
+    <div id="mySidebar" class="sidebar">
+        <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
+        <a href="/">Designs</a> 
+        <a href="/controls">Drawing</a>
+        <a href="/led_controls">LED Controls</a>
+        <a href="/ai_builder">AI Builder</a>
+        <a href="/terminal">Terminal</a>
+    </div>
 
     <div class="nav-bar">
-        <h1 style="margin:0; font-size:1.1rem; color:var(--color-primary);">Packers Sand Pro</h1>
-        <button style="background:none; border:none; font-size:1.2rem;" onclick="location.reload()">↺</button>
+        <button style="flex:0; background:none; font-size:24px; color:var(--text); padding:0;" onclick="openNav()">☰</button>
+        <h1 style="margin:0; font-size:1.2rem;">Sand Controller</h1>
+        <button style="flex:0; background:none; font-size:20px;" onclick="toggleTheme()">☀️</button>
     </div>
 
     <div class="app-container">
-        <div class="canvas-panel">
+        
+        <div class="drawing-panel">
             <div class="canvas-wrapper" id="canvasContainer">
-                <canvas id="mainCanvas"></canvas>
+                <canvas id="drawCanvas"></canvas>
             </div>
-            <div style="position:absolute; bottom:10px; left:10px; font-size:10px; color:#666;">
-                Points: <span id="ptCount">0</span>
-            </div>
+            <div id="coordDisplay" style="position:absolute; bottom:10px; left:10px; background:rgba(0,0,0,0.5); color:white; padding:4px 8px; border-radius:4px; font-size:11px; pointer-events:none;">X:0 Y:0</div>
         </div>
 
         <div class="controls-panel">
+            <h2>Tools</h2>
             
+            <div class="toggle-row">
+                <span style="font-weight:600; font-size:13px;">🖋️ Smart Pen Mode</span>
+                <label class="switch">
+                    <input type="checkbox" id="smartPenMode" checked>
+                    <span class="slider-tog"></span>
+                </label>
+            </div>
+
             <div class="btn-group">
-                <input type="file" id="imgUpload" accept="image/*" onchange="processImage(this)">
-                <button class="primary" onclick="document.getElementById('imgUpload').click()">📂 Open Image</button>
-                <button onclick="clearTable()">✖ Clear</button>
+                <button id="btnDraw" onclick="setTool('draw')" class="active">✏️ Draw</button>
+                <button id="btnErase" onclick="setTool('erase')" class="secondary">🧼 Erase</button>
+            </div>
+
+            <div class="btn-group">
+                <input type="file" id="imgUpload" accept="image/*" style="display:none" onchange="handleImageUpload(this)">
+                <button class="action" onclick="document.getElementById('imgUpload').click()">✨ AI Trace</button>
+            </div>
+
+            <div class="btn-group">
+                <button onclick="undo()" class="secondary">↶ Undo</button>
+                <button onclick="clearCanvas()" class="secondary" style="color:var(--danger); border-color:var(--danger);">✖ Clear</button>
             </div>
 
             <div class="slider-row">
-                <div class="slider-header"><span>SMOOTHNESS</span> <span id="smoothVal">High</span></div>
-                <input type="range" id="smoothSlider" min="0" max="5" value="3" oninput="updateFilters()">
-                <div style="font-size:10px; color:#666; margin-top:4px;">Higher = Rounder Curves</div>
+                <div class="slider-header"><span>SMOOTHING</span> <span id="smoothVal">2mm</span></div>
+                <input type="range" id="smoothSlider" min="0" max="5" value="2" oninput="updateSettings()">
+            </div>
+            
+             <div class="slider-row">
+                <div class="slider-header"><span>SYMMETRY</span> <span id="symVal">1x</span></div>
+                <input type="range" id="symSlider" min="1" max="12" value="1" step="1" oninput="updateSettings()">
             </div>
 
             <div class="slider-row">
-                <div class="slider-header"><span>SIMULATION</span> <span id="simVal">100%</span></div>
-                <input type="range" id="simSlider" min="0" max="100" value="100" oninput="render()">
-            </div>
-            
-            <div class="btn-group">
-                <button class="action" onclick="sendToTable()">🚀 SEND TO TABLE</button>
-                <button onclick="downloadCode()">💾 Save G-Code</button>
+                <div class="slider-header"><span>PREVIEW</span> <span id="progVal">100%</span></div>
+                <input type="range" id="progressSlider" min="0" max="100" value="100" oninput="render()">
             </div>
 
-            <div style="text-align:center; margin-top:10px; font-size:12px; color:#888;">
-                Est. Time: <span id="timeEst" style="color:var(--color-primary); font-weight:bold;">0m 0s</span>
+            <div style="text-align:center; font-size:12px; margin-bottom:10px; color:#666;">
+                Points: <span id="ptCount" style="font-weight:bold;">0</span> | 
+                Est. Steps: <span id="timeEst" style="font-weight:bold; color:var(--primary);">0</span>
+            </div>
+
+            <div class="btn-group">
+                <button onclick="sendToTable()" class="action">🚀 Run</button>
+                <button onclick="downloadGcode()" class="secondary">💾 Save</button>
             </div>
 
             <details>
-                <summary>Machine Settings</summary>
+                <summary>⚙️ Machine Settings</summary>
                 <div class="settings-grid">
-                    <label>Radius (mm)</label> <input type="number" id="cfgRadius" value="202.6">
-                    <label>Arm 1</label> <input type="number" id="cfgL1" value="101.3">
-                    <label>Arm 2</label> <input type="number" id="cfgL2" value="101.3">
-                    <label>Gear Ratio</label> <input type="number" id="cfgGear" value="1.125">
+                    <div><label>Radius (mm)</label><input type="number" id="cfgRadius" value="202.6" onchange="resizeCanvas()"></div>
+                    <div><label>Center Delay</label><input type="number" id="cfgCenterDelay" value="500"></div>
+                    <div><label>Perim Delay</label><input type="number" id="cfgPerimDelay" value="3000"></div>
+                    <div><label>Steps/Deg</label><input type="number" id="cfgStepsPerDeg" value="8.888888"></div>
+                    <div><label>Arm 1</label><input type="number" id="cfgL1" value="101.3"></div>
+                    <div><label>Arm 2</label><input type="number" id="cfgL2" value="101.3"></div>
                 </div>
             </details>
-
         </div>
     </div>
 
     <div id="status-toast"></div>
 
     <script>
-        // --- CORE VARIABLES ---
-        let rawPaths = [];      // Original paths from tracer
-        let processedPoints = []; // Final sorted & smoothed points
-        let gcode = "";
-        
-        const canvas = document.getElementById('mainCanvas');
+        // --- GLOBAL STATE ---
+        let rawPoints = []; // Stores {x, y, type: 'point'|'break'}
+        let historyStack = [];
+        let isDrawing = false;
+        let currentTool = 'draw';
+        let origin = {x:0, y:0};
+        let scale = 1;
+        let generatedGCode = "";
+
+        const canvas = document.getElementById('drawCanvas');
         const ctx = canvas.getContext('2d');
-        let tableRadius = 202.6;
+        const BASE_URL = window.location.origin;
 
         // --- INIT ---
         function init() {
-            window.addEventListener('resize', resize);
-            resize();
-            // Load default settings
-            tableRadius = parseFloat(document.getElementById('cfgRadius').value);
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            // Pointer Events for Drawing
+            canvas.addEventListener('pointerdown', startDraw);
+            canvas.addEventListener('pointermove', moveDraw);
+            canvas.addEventListener('pointerup', endDraw);
+            canvas.addEventListener('pointerleave', endDraw);
+            canvas.style.touchAction = "none";
+            
+            updateSettings();
         }
 
-        function resize() {
-            const container = document.getElementById('canvasContainer');
-            const size = container.getBoundingClientRect().width;
-            canvas.width = size * window.devicePixelRatio;
-            canvas.height = size * window.devicePixelRatio;
-            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        // --- DRAWING LOGIC ---
+        function startDraw(e) {
+            e.preventDefault();
+            const smart = document.getElementById('smartPenMode').checked;
+            if(smart) {
+                if(e.pointerType === 'pen') setTool('draw');
+                else if(e.pointerType === 'touch') setTool('erase');
+            }
+            saveState();
+            isDrawing = true;
+            canvas.setPointerCapture(e.pointerId);
+            processPointer(e);
+        }
+
+        function moveDraw(e) {
+            e.preventDefault();
+            const pos = getPos(e);
+            document.getElementById('coordDisplay').textContent = `X:${pos.x.toFixed(0)} Y:${pos.y.toFixed(0)}`;
+            if(!isDrawing) { render(); drawCursor(pos); return; }
+            processPointer(e);
+        }
+
+        function endDraw(e) {
+            if(!isDrawing) return;
+            isDrawing = false;
+            if(currentTool === 'draw') rawPoints.push({type:'break'});
+            canvas.releasePointerCapture(e.pointerId);
             render();
+            calculateStats();
         }
 
-        // --- 1. IMAGE PROCESSING (The "Input" Stage) ---
-        function processImage(input) {
+        function getPos(e) {
+            return {
+                x: (e.offsetX - origin.x) / scale,
+                y: -(e.offsetY - origin.y) / scale
+            };
+        }
+
+        function processPointer(e) {
+            const p = getPos(e);
+            if(currentTool === 'draw') {
+                rawPoints.push({x: p.x, y: p.y, type: 'point'});
+            } else {
+                // Eraser
+                const r = 10; // Eraser radius mm
+                rawPoints = rawPoints.filter(pt => {
+                    if(pt.type === 'break') return true;
+                    return Math.hypot(pt.x - p.x, pt.y - p.y) > r;
+                });
+            }
+            render();
+            if(currentTool==='erase') drawCursor(p);
+        }
+
+        function drawCursor(p) {
+            if(currentTool !== 'erase') return;
+            const r = 10 * scale;
+            const px = origin.x + p.x * scale;
+            const py = origin.y - p.y * scale;
+            ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI*2);
+            ctx.strokeStyle = "#999"; ctx.fillStyle = "rgba(200,200,200,0.3)";
+            ctx.stroke(); ctx.fill();
+        }
+
+        // --- RENDERER ---
+        function render() {
+            const w = canvas.width / window.devicePixelRatio;
+            const h = canvas.height / window.devicePixelRatio;
+            ctx.clearRect(0, 0, w, h);
+            
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            const sym = parseInt(document.getElementById('symSlider').value);
+            const dark = document.body.getAttribute('data-theme') === 'dark';
+
+            ctx.save();
+            ctx.translate(origin.x, origin.y);
+
+            // Table Circle
+            ctx.beginPath(); ctx.arc(0, 0, tableR*scale, 0, Math.PI*2);
+            ctx.strokeStyle = dark ? '#444' : '#ddd'; ctx.lineWidth = 2; ctx.stroke();
+
+            // Draw Points
+            const prog = parseInt(document.getElementById('progressSlider').value);
+            const limit = Math.floor(rawPoints.length * (prog/100));
+
+            ctx.lineWidth = 1.5;
+            
+            for(let s=0; s<sym; s++) {
+                const ang = s * (Math.PI*2/sym);
+                ctx.save(); ctx.rotate(ang);
+                
+                ctx.beginPath();
+                ctx.strokeStyle = dark ? 'cyan' : '#b08d5c';
+                
+                let isMove = true;
+                for(let i=0; i<limit; i++) {
+                    const p = rawPoints[i];
+                    if(p.type === 'break') { isMove = true; continue; }
+                    
+                    const px = p.x * scale;
+                    const py = -p.y * scale;
+                    
+                    if(isMove) { ctx.moveTo(px, py); isMove = false; }
+                    else ctx.lineTo(px, py);
+                }
+                ctx.stroke();
+                ctx.restore();
+            }
+            ctx.restore();
+        }
+
+        // --- IMAGE TRACER ---
+        function handleImageUpload(input) {
             const file = input.files[0];
             if(!file) return;
-
-            showToast("Analyzing Image...", "info");
+            
+            showToast("Scanning Image...", "info");
+            saveState();
 
             const reader = new FileReader();
             reader.onload = function(e) {
                 const img = new Image();
                 img.onload = function() {
-                    // 1. Pre-process Image (High Contrast for Line Drawings)
-                    const tempCan = document.createElement('canvas');
-                    const MAX = 1000; 
-                    let w = img.width, h = img.height;
-                    // Smart resize
-                    if(w>h && w>MAX){ h*=MAX/w; w=MAX; }
-                    else if(h>MAX){ w*=MAX/h; h=MAX; }
+                    const tCan = document.createElement('canvas');
+                    const MAX = 1000;
+                    let tw = img.width, th = img.height;
+                    if(tw>th && tw>MAX){ th*=MAX/tw; tw=MAX; } 
+                    else if(th>MAX){ tw*=MAX/th; th=MAX; }
                     
-                    tempCan.width = w; tempCan.height = h;
-                    const tCtx = tempCan.getContext('2d');
-                    tCtx.fillStyle = "white"; tCtx.fillRect(0,0,w,h);
+                    tCan.width = tw; tCan.height = th;
+                    const tCtx = tCan.getContext('2d');
+                    tCtx.fillStyle = "white"; tCtx.fillRect(0,0,tw,th);
+                    tCtx.filter = "grayscale(100%) contrast(150%)";
+                    tCtx.drawImage(img, 0, 0, tw, th);
                     
-                    // Contrast Filter
-                    tCtx.filter = "grayscale(100%) contrast(150%) brightness(100%)";
-                    tCtx.drawImage(img, 0, 0, w, h);
-                    
-                    // 2. Run Tracer
-                    const opts = {
-                        ltres: 0.1, qtres: 0.1, pathomit: 2, 
-                        colorsampling: 2, numberofcolors: 2,
-                        blurradius: 0, blurdelta: 10
-                    };
-                    
-                    ImageTracer.imageToSVG(tempCan.toDataURL(), function(svgStr){
-                        parseSVG(svgStr);
-                    }, opts);
+                    ImageTracer.imageToSVG(tCan.toDataURL(), function(svgStr){
+                        processTrace(svgStr, tw, th);
+                    }, { ltres:0.5, qtres:0.5, pathomit:2, colorsampling:2, numberofcolors:2 });
                 };
                 img.src = e.target.result;
             };
             reader.readAsDataURL(file);
         }
 
-        // --- 2. PARSING & SCALING (The "Normalization" Stage) ---
-        function parseSVG(svgStr) {
+        function processTrace(svgStr, imgW, imgH) {
             const parser = new DOMParser();
             const doc = parser.parseFromString(svgStr, "image/svg+xml");
             const paths = doc.getElementsByTagName("path");
             
-            let extractedPaths = [];
-            const samplingRes = 2.0; // mm
+            let strokes = [];
+            const res = 2.0; // mm resolution
 
-            // Extract points from SVG paths
             for(let i=0; i<paths.length; i++) {
                 const p = paths[i];
                 const len = p.getTotalLength();
-                if(len < 5) continue; // Skip noise
-
+                if(len < 5) continue; 
+                
                 let pts = [];
-                for(let d=0; d<=len; d+=samplingRes) {
+                let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+
+                for(let d=0; d<=len; d+=res) {
                     const pt = p.getPointAtLength(d);
                     pts.push({x: pt.x, y: pt.y});
+                    if(pt.x<minX) minX=pt.x; if(pt.x>maxX) maxX=pt.x;
+                    if(pt.y<minY) minY=pt.y; if(pt.y>maxY) maxY=pt.y;
                 }
-                extractedPaths.push(pts);
+                
+                // --- FIXED OCTAGON GHOST ---
+                // If the shape touches the border (within 2%), discard it
+                const w = maxX - minX;
+                const h = maxY - minY;
+                
+                // Check if bounds are near image size
+                if (w > imgW * 0.98 || h > imgH * 0.98) {
+                    console.log("Discarding Border Path");
+                    continue; 
+                }
+
+                strokes.push(pts);
             }
 
-            if(extractedPaths.length === 0) return showToast("No shapes found!", "error");
+            if(strokes.length === 0) return showToast("No shapes found", "error");
 
-            // Auto-Scale to fit Table (Bounding Box)
             let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
-            extractedPaths.forEach(path => path.forEach(p => {
+            strokes.flat().forEach(p => {
                 if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
                 if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
-            }));
-
-            const w = maxX - minX;
-            const h = maxY - minY;
-            const scale = (tableRadius * 2 * 0.95) / Math.max(w, h);
+            });
+            
+            const contentW = maxX - minX;
+            const contentH = maxY - minY;
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            const scaleFac = (tableR * 2 * 0.9) / Math.max(contentW, contentH);
             const cx = (minX + maxX)/2;
             const cy = (minY + maxY)/2;
 
-            // Normalize
-            rawPaths = extractedPaths.map(path => {
-                return path.map(p => ({
-                    x: (p.x - cx) * scale,
-                    y: -(p.y - cy) * scale // Flip Y
-                })).filter(p => Math.hypot(p.x, p.y) < tableRadius);
+            let normalizedStrokes = strokes.map(s => {
+                return s.map(p => ({
+                    x: (p.x - cx) * scaleFac,
+                    y: -(p.y - cy) * scaleFac // Flip Y
+                })).filter(p => Math.hypot(p.x, p.y) < tableR);
             });
 
-            updateFilters(); // Triggers Optimization & Rendering
-            showToast("Trace Successful!", "success");
-        }
-
-        // --- 3. OPTIMIZATION & SMOOTHING (The "Pro" Stage) ---
-        function updateFilters() {
-            if(rawPaths.length === 0) return;
-
-            const smoothLevel = parseInt(document.getElementById('smoothSlider').value);
-            document.getElementById('smoothVal').textContent = smoothLevel;
-
-            // A. PATH SORTING (Traveling Salesman - Greedy)
-            // Reorder shapes to minimize travel time
-            let pool = [...rawPaths];
+            // TSP Sort
             let sorted = [];
-            let currentPos = {x:0, y:0}; // Start at center
+            let pool = [...normalizedStrokes];
+            let curPos = {x:0, y:0};
 
             while(pool.length > 0) {
-                let bestIdx = -1;
-                let bestDist = Infinity;
-                let reverseBest = false;
-
+                let bestI = -1, bestDist = Infinity, rev = false;
                 for(let i=0; i<pool.length; i++) {
-                    const p = pool[i];
-                    const start = p[0];
-                    const end = p[p.length-1];
-
-                    // Dist to Start
-                    const dStart = Math.hypot(start.x-currentPos.x, start.y-currentPos.y);
-                    if(dStart < bestDist) {
-                        bestDist = dStart;
-                        bestIdx = i;
-                        reverseBest = false;
-                    }
-
-                    // Dist to End (if we draw it backwards)
-                    const dEnd = Math.hypot(end.x-currentPos.x, end.y-currentPos.y);
-                    if(dEnd < bestDist) {
-                        bestDist = dEnd;
-                        bestIdx = i;
-                        reverseBest = true;
-                    }
+                    const s = pool[i];
+                    if(s.length===0) continue;
+                    const dStart = Math.hypot(s[0].x-curPos.x, s[0].y-curPos.y);
+                    if(dStart < bestDist) { bestDist=dStart; bestI=i; rev=false; }
+                    const dEnd = Math.hypot(s[s.length-1].x-curPos.x, s[s.length-1].y-curPos.y);
+                    if(dEnd < bestDist) { bestDist=dEnd; bestI=i; rev=true; }
                 }
-
-                let chosen = pool[bestIdx];
-                if(reverseBest) chosen.reverse();
-                
-                sorted.push(chosen);
-                currentPos = chosen[chosen.length-1];
-                pool.splice(bestIdx, 1);
+                if(bestI === -1) break;
+                let choice = pool[bestI];
+                if(rev) choice.reverse();
+                sorted.push(choice);
+                curPos = choice[choice.length-1];
+                pool.splice(bestI, 1);
             }
 
-            // B. SMOOTHING (Chaikin's Algorithm)
-            // Runs iteratively based on slider
-            let smoothed = [];
-            
-            sorted.forEach(path => {
-                let sp = [...path];
-                for(let i=0; i<smoothLevel; i++) {
-                    sp = chaikinSmooth(sp);
-                }
-                smoothed.push({type: 'break'});
-                sp.forEach(p => smoothed.push({type:'point', x:p.x, y:p.y}));
+            // Flatten
+            rawPoints = [];
+            sorted.forEach(s => {
+                rawPoints.push({type:'break'});
+                s.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
             });
-            smoothed.push({type:'break'});
+            rawPoints.push({type:'break'});
 
-            processedPoints = smoothed;
-            generateGCode();
+            showToast("Trace Complete!", "success");
             render();
-        }
-
-        function chaikinSmooth(points) {
-            if(points.length < 3) return points;
-            let newPts = [points[0]];
-            for(let i=0; i<points.length-1; i++) {
-                const p0 = points[i];
-                const p1 = points[i+1];
-                
-                // Cut corners at 25% and 75%
-                const Q = { x: 0.75*p0.x + 0.25*p1.x, y: 0.75*p0.y + 0.25*p1.y };
-                const R = { x: 0.25*p0.x + 0.75*p1.x, y: 0.25*p0.y + 0.75*p1.y };
-                
-                newPts.push(Q);
-                newPts.push(R);
-            }
-            newPts.push(points[points.length-1]);
-            return newPts;
-        }
-
-        // --- 4. ENGINE (V17 Kinematics) ---
-        function generateGCode() {
-            if(processedPoints.length < 2) return;
-
-            const L1 = parseFloat(document.getElementById('cfgL1').value);
-            const L2 = parseFloat(document.getElementById('cfgL2').value);
-            const gear = parseFloat(document.getElementById('cfgGear').value);
-            const minDelay = 50; 
-            
-            // Steps calc
-            const STEPS_PER_RAD = 8.888888 * (180/Math.PI);
-
-            let cmds = [];
-            let time = 0;
-            let prevB=0, prevE=0;
-
-            // Initial Move
-            const startPt = processedPoints.find(p=>p.type==='point');
-            if(startPt) {
-                const ik = calcIK(startPt.x, startPt.y, 0, 0, L1, L2, gear, STEPS_PER_RAD);
-                prevB = ik.b; prevE = ik.e;
-            }
-
-            // Iterate
-            for(let i=0; i<processedPoints.length; i++) {
-                const p = processedPoints[i];
-                if(p.type === 'break') continue;
-
-                // Simple scaling speed (slower near center)
-                let r = Math.hypot(p.x, p.y);
-                let delay = 500 + (2500 * (r/tableRadius)); // 500us center, 3000us edge
-
-                let ik = calcIK(p.x, p.y, prevB, prevE, L1, L2, gear, STEPS_PER_RAD);
-                let db = Math.round(ik.b - prevB);
-                let de = Math.round(ik.e - prevE);
-
-                if(db!==0 || de!==0) {
-                    cmds.push(`G1 ${de} ${db} ${Math.round(delay)}`);
-                    let steps = Math.max(Math.abs(db), Math.abs(de));
-                    time += steps * delay;
-                    prevB += db; prevE += de;
-                }
-            }
-
-            gcode = cmds.join('\n');
-            
-            // Time Calc
-            let sec = Math.round(time/1000000);
-            let m = Math.floor(sec/60);
-            document.getElementById('timeEst').textContent = `${m}m ${sec%60}s`;
-            document.getElementById('ptCount').textContent = processedPoints.length;
-        }
-
-        // --- KINEMATICS UTILS ---
-        function getShortestRot(r, l) {
-            let d = (r - l) / (2*Math.PI);
-            let o = Math.round(d);
-            return r - (o * 2 * Math.PI);
-        }
-
-        function calcIK(x, y, lb, le, l1, l2, gr, spr) {
-            let d = Math.hypot(x, y);
-            let max = l1+l2;
-            if(d > max) { x = x*max/d; y = y*max/d; d=max; }
-            if(d < 1.0) { // Center Singularity Fix
-                let curBase = -lb / spr;
-                return { b: lb, e: -(Math.PI + gr * curBase) * spr };
-            }
-
-            let lt1 = -lb / spr;
-            let cb = (d*d - l1*l1 - l2*l2)/(2*l1*l2);
-            cb = Math.max(-1, Math.min(1, cb));
-            let b1 = Math.acos(cb), b2 = -Math.acos(cb);
-            
-            let k1_1 = l1 + l2*Math.cos(b1), k2_1 = l2*Math.sin(b1);
-            let t1_1 = getShortestRot(Math.atan2(y,x) - Math.atan2(k2_1, k1_1), lt1);
-            
-            let k1_2 = l1 + l2*Math.cos(b2), k2_2 = l2*Math.sin(b2);
-            let t1_2 = getShortestRot(Math.atan2(y,x) - Math.atan2(k2_2, k1_2), lt1);
-
-            let bs1 = -t1_1 * spr, es1 = -(b1 + gr*t1_1) * spr;
-            let bs2 = -t1_2 * spr, es2 = -(b2 + gr*t1_2) * spr;
-
-            let c1 = Math.abs(bs1-lb) + Math.abs(es1-le);
-            let c2 = Math.abs(bs2-lb) + Math.abs(es2-le);
-            return (c1<=c2) ? {b:bs1, e:es1} : {b:bs2, e:es2};
-        }
-
-        // --- RENDER ---
-        function render() {
-            const width = canvas.width / window.devicePixelRatio;
-            const height = canvas.height / window.devicePixelRatio;
-            const size = Math.min(width, height);
-            const scale = (size/2) / (tableRadius*1.05);
-            const cx = width/2;
-            const cy = height/2;
-
-            ctx.clearRect(0,0,width,height);
-
-            // Bed
-            ctx.beginPath(); ctx.arc(cx, cy, tableRadius*scale, 0, Math.PI*2);
-            ctx.strokeStyle = "#333"; ctx.lineWidth=2; ctx.stroke();
-
-            // Paths
-            if(processedPoints.length === 0) return;
-
-            const limitPct = parseInt(document.getElementById('simSlider').value);
-            const limitIdx = Math.floor((processedPoints.length * limitPct)/100);
-
-            ctx.beginPath();
-            ctx.strokeStyle = "#d2b48c"; ctx.lineWidth = 1.5;
-
-            let isMove = true;
-            for(let i=0; i<limitIdx; i++) {
-                const p = processedPoints[i];
-                if(p.type==='break') { isMove=true; continue; }
-                
-                const px = cx + p.x*scale;
-                const py = cy - p.y*scale;
-
-                if(isMove) { ctx.moveTo(px, py); isMove=false; }
-                else ctx.lineTo(px, py);
-            }
-            ctx.stroke();
-
-            // Head
-            if(limitIdx > 0 && limitIdx < processedPoints.length) {
-                const last = processedPoints[limitIdx];
-                if(last.type === 'point') {
-                    ctx.beginPath();
-                    ctx.arc(cx+last.x*scale, cy-last.y*scale, 4, 0, Math.PI*2);
-                    ctx.fillStyle = "#2ecc71"; ctx.fill();
-                }
-            }
+            calculateStats();
         }
 
         // --- UTILS ---
+        function resizeCanvas() {
+            const container = document.getElementById('canvasContainer');
+            const size = container.getBoundingClientRect().width;
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = size * dpr;
+            canvas.height = size * dpr;
+            ctx.scale(dpr, dpr);
+            
+            origin = { x: size/2, y: size/2 };
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            scale = (size/2) / (tableR * 1.05);
+            render();
+        }
+
+        function saveState() {
+            if(historyStack.length>10) historyStack.shift();
+            historyStack.push(JSON.stringify(rawPoints));
+        }
+        function undo() {
+            if(historyStack.length===0) return;
+            rawPoints = JSON.parse(historyStack.pop());
+            render();
+        }
+        function clearCanvas() {
+            saveState();
+            rawPoints = [];
+            render();
+        }
+        function setTool(t) {
+            currentTool = t;
+            document.getElementById('btnDraw').className = t==='draw'?'active':'secondary';
+            document.getElementById('btnErase').className = t==='erase'?'active':'secondary';
+        }
+        function updateSettings() {
+            document.getElementById('smoothVal').textContent = document.getElementById('smoothSlider').value + 'mm';
+            document.getElementById('symVal').textContent = document.getElementById('symSlider').value + 'x';
+            render();
+        }
         function showToast(msg, type) {
             const t = document.getElementById('status-toast');
             t.textContent = msg; t.className = type; t.style.opacity = 1;
             setTimeout(()=>t.style.opacity=0, 3000);
         }
+        function openNav() { document.getElementById("mySidebar").style.width = "250px"; }
+        function closeNav() { document.getElementById("mySidebar").style.width = "0"; }
+        function toggleTheme() {
+            const b = document.body;
+            b.setAttribute('data-theme', b.getAttribute('data-theme')==='dark'?'light':'dark');
+            render();
+        }
+
+        function calculateStats() {
+            const pts = rawPoints.filter(p=>p.type==='point').length;
+            document.getElementById('ptCount').textContent = pts;
+        }
+
+        // --- KINEMATICS & G-CODE GENERATOR (PORTED FROM SCRIPT.HTML) ---
+        function generateGCodeString() {
+            const L1 = parseFloat(document.getElementById('cfgL1').value);
+            const L2 = parseFloat(document.getElementById('cfgL2').value);
+            const gearRatio = 1.125; // Default from script.html
+            const tableRadius = parseFloat(document.getElementById('cfgRadius').value);
+            const sym = parseInt(document.getElementById('symSlider').value);
+            const stepsPerDeg = parseFloat(document.getElementById('cfgStepsPerDeg').value);
+            const stepsPerRad = stepsPerDeg * (180 / Math.PI);
+            
+            const centerDelay = parseFloat(document.getElementById('cfgCenterDelay').value);
+            const perimDelay = parseFloat(document.getElementById('cfgPerimDelay').value);
+
+            let cmds = [];
+            let prevBase = 0;
+            let prevElbow = 0;
+
+            // 1. GENERATE ALL POINTS (Symmetry Included)
+            let pathPoints = [];
+            for(let s=0; s<sym; s++) {
+                const ang = s * (Math.PI*2/sym);
+                const c = Math.cos(ang), si = Math.sin(ang);
+                rawPoints.forEach(p => {
+                    if(p.type === 'break') { 
+                        // Break implies we just move to next point directly
+                        return; 
+                    }
+                    pathPoints.push({
+                        x: p.x*c - p.y*si,
+                        y: p.x*si + p.y*c
+                    });
+                });
+            }
+
+            if(pathPoints.length === 0) return null;
+
+            // 2. INITIALIZE IK
+            let startIK = calculateIK(pathPoints[0].x, pathPoints[0].y, 0, 0, L1, L2, gearRatio, stepsPerRad);
+            prevBase = startIK.base_steps;
+            prevElbow = startIK.elbow_steps;
+
+            // 3. INTERPOLATION LOOP
+            // We must interpolate drawing points to ensure smooth curves like script.html
+            const interpolationRes = 1.0; // 1mm resolution like script.html default
+            
+            let interpolated = [pathPoints[0]];
+            for(let i=0; i<pathPoints.length-1; i++) {
+                let p1 = pathPoints[i];
+                let p2 = pathPoints[i+1];
+                
+                // Check if this jump is a "Break" (distance > 5mm)
+                // If it is a break, we don't interpolate, we just go there.
+                // But rawPoints structure handled breaks earlier. 
+                // Here we assume contiguous lines unless distance is huge.
+                let dist = Math.hypot(p2.x-p1.x, p2.y-p1.y);
+                if(dist > 5.0) {
+                     // Just add p2, don't interpolate air travel
+                     interpolated.push(p2);
+                } else {
+                    let steps = Math.max(1, Math.ceil(dist / interpolationRes));
+                    for(let j=1; j<=steps; j++) {
+                        let t = j/steps;
+                        interpolated.push({
+                            x: p1.x + (p2.x - p1.x)*t,
+                            y: p1.y + (p2.y - p1.y)*t
+                        });
+                    }
+                }
+            }
+
+            // 4. GENERATE G-CODE
+            for(let i=0; i<interpolated.length; i++) {
+                let p = interpolated[i];
+                
+                // IK Calculation
+                let ik = calculateIK(p.x, p.y, prevBase, prevElbow, L1, L2, gearRatio, stepsPerRad);
+                
+                let dBase = Math.round(ik.base_steps - prevBase);
+                let dElbow = Math.round(ik.elbow_steps - prevElbow);
+
+                if (dBase !== 0 || dElbow !== 0) {
+                    // Speed Scaling
+                    let distFromCenter = Math.hypot(p.x, p.y);
+                    let rFactor = distFromCenter / tableRadius;
+                    if (rFactor > 1.0) rFactor = 1.0;
+                    
+                    let calculatedDelay = centerDelay + ((perimDelay - centerDelay) * rFactor);
+                    calculatedDelay = Math.round(calculatedDelay);
+
+                    // COMMAND FORMAT: G1 [ELBOW] [BASE] [DELAY]
+                    // (Matching script.html logic)
+                    cmds.push(`G1 ${dElbow} ${dBase} ${calculatedDelay}`);
+
+                    prevBase += dBase;
+                    prevElbow += dElbow;
+                }
+            }
+            
+            return cmds.join('\n');
+        }
+
+        // --- IK MATH (COPIED EXACTLY FROM SCRIPT.HTML) ---
+        function getShortestRotation(raw, last) {
+            let diff = (raw - last) / (2 * Math.PI);
+            let offset = Math.round(diff);
+            return raw - (offset * 2 * Math.PI);
+        }
+
+        function calculateIK(x, y, lastBaseSteps, lastElbowSteps, L1, L2, gearRatio, stepsPerRad) {
+            let dist = Math.hypot(x, y);
+            const maxReach = L1 + L2;
+            
+            if (dist > maxReach) {
+                x = (x / dist) * maxReach;
+                y = (y / dist) * maxReach;
+                dist = maxReach;
+            }
+
+            if (dist < 1.0) { 
+                const targetBaseSteps = lastBaseSteps; 
+                const currentBaseAngle = -lastBaseSteps / stepsPerRad;
+                const targetElbowSteps = -(Math.PI + gearRatio * currentBaseAngle) * stepsPerRad;
+                return { base_steps: targetBaseSteps, elbow_steps: targetElbowSteps };
+            }
+
+            const lastT1 = -lastBaseSteps / stepsPerRad; 
+            let cosBend = (dist*dist - L1*L1 - L2*L2) / (2 * L1 * L2);
+            cosBend = Math.max(-1, Math.min(1, cosBend));
+            
+            const bend1 = Math.acos(cosBend);
+            const bend2 = -Math.acos(cosBend);
+
+            const k1_1 = L1 + L2 * Math.cos(bend1);
+            const k2_1 = L2 * Math.sin(bend1);
+            let t1_1 = Math.atan2(y, x) - Math.atan2(k2_1, k1_1);
+            t1_1 = getShortestRotation(t1_1, lastT1);
+
+            const k1_2 = L1 + L2 * Math.cos(bend2);
+            const k2_2 = L2 * Math.sin(bend2);
+            let t1_2 = Math.atan2(y, x) - Math.atan2(k2_2, k1_2);
+            t1_2 = getShortestRotation(t1_2, lastT1);
+
+            const b1_steps = -t1_1 * stepsPerRad;
+            const e1_steps = -(bend1 + gearRatio * t1_1) * stepsPerRad;
+            const b2_steps = -t1_2 * stepsPerRad;
+            const e2_steps = -(bend2 + gearRatio * t1_2) * stepsPerRad;
+
+            const cost1 = Math.abs(b1_steps - lastBaseSteps) + Math.abs(e1_steps - lastElbowSteps);
+            const cost2 = Math.abs(b2_steps - lastBaseSteps) + Math.abs(e2_steps - lastElbowSteps);
+
+            return (cost1 <= cost2) ? { base_steps: b1_steps, elbow_steps: e1_steps } 
+                                    : { base_steps: b2_steps, elbow_steps: e2_steps };
+        }
+
         function sendToTable() {
-            if(!gcode) return showToast("No pattern!", "error");
+            const gcode = generateGCodeString();
+            if(!gcode) return showToast("Draw something first!", "error");
+            
+            // Calculate Total Steps for Stats
+            const lines = gcode.split('\n').length;
+            document.getElementById('timeEst').textContent = lines;
+
             showToast("Sending...", "info");
-            fetch(window.location.origin + '/send_gcode_block', {
+            fetch(BASE_URL + '/send_gcode_block', {
                 method:'POST', headers:{'Content-Type':'application/json'},
                 body: JSON.stringify({gcode: gcode, speed_override: null})
             }).then(r=>r.json()).then(d=>{
                 if(d.success) showToast("Sent!", "success");
-                else showToast("Error", "error");
+                else showToast("Error: " + d.error, "error");
             }).catch(()=>showToast("Network Error", "error"));
         }
-        function downloadCode() {
-            if(!gcode) return;
-            const b = new Blob([gcode], {type:'text/plain'});
+        
+        function downloadGcode() {
+            const gcode = generateGCodeString();
+            if(!gcode) return showToast("Empty Pattern", "error");
+            const blob = new Blob([gcode], {type:'text/plain'});
             const a = document.createElement('a');
-            a.download = 'trace_pro.txt'; a.href = URL.createObjectURL(b); a.click();
-        }
-        function clearTable() {
-            processedPoints = []; gcode = ""; rawPaths = [];
-            render(); showToast("Cleared", "info");
+            a.download = 'pattern.txt'; a.href = URL.createObjectURL(blob); a.click();
         }
 
         init();
