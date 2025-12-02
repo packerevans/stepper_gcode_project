@@ -1,22 +1,26 @@
 // ==========================================
-//      ARDUINO SAND TABLE FIRMWARE v4
-//      M0 Support & Perimeter Logic
+//      ARDUINO SAND TABLE FIRMWARE v5
+//      Restored Pins + Auto-Pause (M0)
 // ==========================================
 
-// --- MOTOR PIN DEFINITIONS ---
-const int dirBase = 9;
+// --- YOUR SPECIFIC MOTOR PINS ---
 const int stepBase = 8;
-const int dirArm = 11;
-const int stepArm = 10;
-const int enPin = 3;
+const int dirBase  = 9;
+const int stepArm  = 10;
+const int dirArm   = 11;
+const int enPin    = 3;
 
-// Microstepping Pins
+// Microstepping Pins (Optional, keep if you use them)
 const int ms1 = 4;
 const int ms2 = 5;
 const int ms3 = 6;
 
+// --- SETTINGS ---
+// MUST match your Python script (usually 9600 for older scripts)
+#define BAUD_RATE 9600 
+
 // --- STATE VARIABLES ---
-bool paused = true; // Global immediate pause (user clicking Pause button)
+bool paused = true; 
 const int MAX_QUEUE_SIZE = 50;
 
 // Command Types
@@ -36,13 +40,13 @@ int queueTail = 0;
 int queueCount = 0;
 
 void setup() {
-  Serial.begin(115200); // Increased baud rate for faster transfer
+  Serial.begin(BAUD_RATE);
   
   pinMode(stepBase, OUTPUT); pinMode(dirBase, OUTPUT);
   pinMode(stepArm, OUTPUT);  pinMode(dirArm, OUTPUT);
   pinMode(enPin, OUTPUT);
 
-  // 1/32 Microstepping Setup
+  // 1/32 Microstepping Setup (from your original file)
   pinMode(ms1, OUTPUT); pinMode(ms2, OUTPUT); pinMode(ms3, OUTPUT);
   digitalWrite(ms1, HIGH); digitalWrite(ms2, HIGH); digitalWrite(ms3, HIGH);
 
@@ -66,7 +70,7 @@ void handleSerial() {
     cmd.trim();
     if (cmd.length() == 0) continue;
 
-    // --- IMMEDIATE COMMANDS (Happen Now) ---
+    // --- IMMEDIATE COMMANDS ---
     if (cmd.equalsIgnoreCase("PAUSE")) {
       paused = true;
       digitalWrite(enPin, HIGH);
@@ -81,7 +85,7 @@ void handleSerial() {
       queueHead = queueTail = queueCount = 0;
       Serial.println(F("Cleared"));
     }
-    // --- QUEUED COMMANDS (Happen in order) ---
+    // --- QUEUED COMMANDS ---
     else if (cmd.startsWith("G1")) {
       parseAndEnqueueMove(cmd);
     }
@@ -94,7 +98,6 @@ void handleSerial() {
 void enqueuePause() {
   if (queueCount < MAX_QUEUE_SIZE) {
     queue[queueTail].type = CMD_WAIT;
-    // Steps/Speed don't matter for wait command
     queue[queueTail].armSteps = 0;
     queue[queueTail].baseSteps = 0;
     queue[queueTail].speed = 0;
@@ -152,7 +155,7 @@ void executeNextCommand() {
   
   if (cmd.type == CMD_MOVE) {
     moveBresenham(cmd.armSteps, cmd.baseSteps, cmd.speed);
-    Serial.println(F("Done")); // Tell Python we finished a move
+    Serial.println(F("Done")); // Signal to Python that we are ready for more
   } 
   else if (cmd.type == CMD_WAIT) {
     performProgrammedPause();
@@ -161,8 +164,11 @@ void executeNextCommand() {
 
 // Blocks everything until "R" or "RESUME" is received
 void performProgrammedPause() {
-  Serial.println(F("PROGRAM_PAUSED")); // Tell Python we hit M0
-  digitalWrite(enPin, HIGH); // Disable motors (optional: change to LOW to hold position)
+  Serial.println(F("Done")); // Tell Python the "M0" command is processed so it doesn't timeout
+  // NOTE: Depending on your Python script, you might want to send a specific status here.
+  // But usually sending "Done" satisfies the script to wait.
+  
+  digitalWrite(enPin, HIGH); // Disable motors (Pause state)
   
   bool waiting = true;
   while (waiting) {
@@ -171,12 +177,12 @@ void performProgrammedPause() {
       input.trim();
       if (input.equalsIgnoreCase("R") || input.equalsIgnoreCase("RESUME")) {
         waiting = false;
-        Serial.println(F("PROGRAM_RESUMED"));
         digitalWrite(enPin, LOW); // Re-enable motors
+        // Serial.println(F("Resumed")); // Optional debug
       }
       // Handle immediate stop even during M0
       if (input.equalsIgnoreCase("PAUSE")) {
-        paused = true; // Will prevent next moves after this function exits
+        paused = true; 
       }
     }
     delay(50);
@@ -198,7 +204,7 @@ void moveBresenham(long da, long db, int delayUs) {
   long accB = steps / 2;
 
   for (long i = 0; i < steps; i++) {
-    // Check Serial frequently
+    // Check Serial frequently to prevent buffer overflow
     if (Serial.available()) handleSerial();
     
     // Immediate pause check
