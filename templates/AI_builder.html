@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Packers Sand Table Control (Universal Tracer)</title>
+    <title>Packers Sand Table (Auto-Scale Engine)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -676,7 +676,7 @@
             render();
         }
 
-        // --- UPDATED AI VECTOR TRACER (FIXED FOR ALL IMAGES) ---
+        // --- NUCLEAR AI VECTOR TRACER (Auto-Contrast + Auto-Scale) ---
         function handleImageUpload(input) {
             const file = input.files[0];
             if(!file) return;
@@ -685,8 +685,6 @@
             
             const reader = new FileReader();
             reader.onload = function(e) {
-                // Pre-process: Resize to max 800px to prevent mobile crash
-                // and to standardize input for the tracer
                 const img = new Image();
                 img.onload = function() {
                     const canvas = document.createElement('canvas');
@@ -703,11 +701,14 @@
                     canvas.width = w;
                     canvas.height = h;
                     const ctx = canvas.getContext('2d');
-                    ctx.fillStyle = "white"; // Force white background
+                    
+                    // PRE-PROCESS: Force High Contrast
+                    // This turns gray lines into black lines, helping the elephant drawing
+                    ctx.filter = 'grayscale(100%) contrast(150%) brightness(95%)';
+                    ctx.fillStyle = "white"; 
                     ctx.fillRect(0, 0, w, h);
                     ctx.drawImage(img, 0, 0, w, h);
                     
-                    // Trace resized data
                     const resizedData = canvas.toDataURL('image/png');
                     runTracer(resizedData);
                 };
@@ -717,12 +718,11 @@
         }
 
         function runTracer(imageData) {
-            // Settings: Balanced for both Elephant (smooth) and Tree (detail)
             const options = {
                 ltres: 0.5,       
                 qtres: 0.5,       
-                pathomit: 1,      // 1 = Skip only 1px noise
-                colorsampling: 1, 
+                pathomit: 1,      
+                colorsampling: 2, // Deterministic sampling
                 numberofcolors: 2, 
                 mincolorratio: 0,
                 colorquantcycles: 0,
@@ -741,73 +741,81 @@
             const parser = new DOMParser();
             const doc = parser.parseFromString(svgString, "image/svg+xml");
             const svgEl = doc.documentElement;
-            
-            // --- CRITICAL FIX: Robust Dimension Parsing ---
-            // ImageTracer often skips width/height and only provides viewBox
-            let svgWidth = parseFloat(svgEl.getAttribute("width"));
-            let svgHeight = parseFloat(svgEl.getAttribute("height"));
-            
-            if (!svgWidth || isNaN(svgWidth) || !svgHeight || isNaN(svgHeight)) {
-                const viewBox = svgEl.getAttribute("viewBox");
-                if (viewBox) {
-                    const parts = viewBox.split(/\s+|,/).map(parseFloat);
-                    if(parts.length >= 4) {
-                        svgWidth = parts[2];
-                        svgHeight = parts[3];
-                    }
-                }
-            }
-            
-            // Absolute Fallback (prevents NaN math)
-            if (!svgWidth || isNaN(svgWidth)) svgWidth = 1000;
-            if (!svgHeight || isNaN(svgHeight)) svgHeight = 1000;
-            
             const paths = svgEl.getElementsByTagName("path");
-            let newPoints = [];
             
-            const tableR = parseFloat(document.getElementById('cfgRadius').value);
-            // Fit to table with 5% padding
-            const scaleFactor = (tableR * 2 * 0.95) / Math.max(svgWidth, svgHeight);
+            // --- NUCLEAR FIX: AUTO-SCALE ---
+            // Don't trust SVG Width/Height. They are often wrong or missing.
+            // Instead, we will collect ALL points and calculate the Bounding Box ourselves.
             
-            const offX = -svgWidth / 2;
-            const offY = -svgHeight / 2;
-
-            let pathCount = 0;
+            let tempPoints = [];
+            const resolution = 1.5; 
+            
             for(let i = 0; i < paths.length; i++) {
                 const path = paths[i];
                 let totalLen = 0;
                 try { totalLen = path.getTotalLength(); } catch(e) { continue; }
-                
-                // Keep almost everything (threshold 2)
                 if(totalLen < 2) continue; 
-                pathCount++;
-
-                newPoints.push({type: 'break'});
                 
-                // Resolution: 1.5mm is a good balance
-                const resolution = 1.5; 
-                
+                let stroke = [];
                 for (let dist = 0; dist <= totalLen; dist += resolution) {
                     const pt = path.getPointAtLength(dist);
-                    
-                    const tx = (pt.x + offX) * scaleFactor;
-                    const ty = -(pt.y + offY) * scaleFactor; 
+                    stroke.push({x: pt.x, y: pt.y});
+                }
+                tempPoints.push(stroke);
+            }
+            
+            if(tempPoints.length === 0) {
+                 // Debug: Paste error to textarea so user can see it
+                document.getElementById('stepsOutput').value = "Error: SVG produced no paths. " + svgString;
+                showToast("No valid paths found.", 'error');
+                return;
+            }
 
+            // Calculate Bounding Box of actual drawn lines
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            for(let stroke of tempPoints) {
+                for(let p of stroke) {
+                    if(p.x < minX) minX = p.x;
+                    if(p.x > maxX) maxX = p.x;
+                    if(p.y < minY) minY = p.y;
+                    if(p.y > maxY) maxY = p.y;
+                }
+            }
+            
+            // Calculate Scaling
+            const contentW = maxX - minX;
+            const contentH = maxY - minY;
+            const centerX = (minX + maxX) / 2;
+            const centerY = (minY + maxY) / 2;
+            
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            // Fit largest dimension to table diameter (minus 5% padding)
+            const scaleFactor = (tableR * 2 * 0.95) / Math.max(contentW, contentH);
+            
+            // Finalize Points
+            let finalPoints = [];
+            for(let stroke of tempPoints) {
+                finalPoints.push({type: 'break'});
+                for(let p of stroke) {
+                    // Normalize to Center (0,0) and Scale
+                    const tx = (p.x - centerX) * scaleFactor;
+                    const ty = -(p.y - centerY) * scaleFactor; // Flip Y
+                    
+                    // Circular Crop
                     if (Math.hypot(tx, ty) < tableR) {
-                        newPoints.push({ x: tx, y: ty, type: 'point' });
+                        finalPoints.push({x: tx, y: ty, type:'point'});
                     }
                 }
             }
-
-            if(newPoints.length > 0) {
-                newPoints.push({type: 'break'});
-                rawPoints = newPoints; 
-                showToast(`Trace Success: ${pathCount} paths found`, 'success');
+            
+            if(finalPoints.length > 0) {
+                finalPoints.push({type: 'break'});
+                rawPoints = finalPoints; 
+                showToast(`Trace Success! Auto-Scaled.`, 'success');
                 render(); 
                 generateCode();
             } else {
-                console.log("SVG Debug:", svgString);
-                showToast("No valid paths found. Try high contrast image.", 'error');
+                showToast("Paths found but outside crop area.", 'error');
             }
         }
 
