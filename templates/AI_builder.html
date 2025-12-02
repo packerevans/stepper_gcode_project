@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Packers Sand Pro (Final Logic)</title>
+    <title>Packers Sand Pro (Final Visualizer)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -92,7 +92,6 @@
         .slider-header { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; font-weight: bold; }
         input[type="range"] { width: 100%; accent-color: var(--secondary); }
         
-        /* Smooth slider specific */
         #progressSlider {
             -webkit-appearance: none; width: 100%; height: 8px; border-radius: 5px; background: #d3d3d3; outline: none;
         }
@@ -190,7 +189,6 @@
             <button class="action" onclick="prepareGCode()" style="margin-bottom:15px; font-size:1.1em;">⚙️ Prepare Path</button>
 
             <div style="text-align:center; font-size:12px; margin-bottom:10px; color:#666;">
-                Lines: <span id="ptCount" style="font-weight:bold;">0</span> | 
                 Status: <span id="statusTxt" style="font-weight:bold; color:var(--primary);">Drawing Mode</span>
             </div>
 
@@ -217,8 +215,8 @@
 
     <script>
         // --- GLOBAL STATE ---
-        let rawPoints = []; // User Input (Red Line)
-        let processedPoints = []; // Final Path (Green Line)
+        let rawPoints = []; // User Input (Blue Line)
+        let processedPoints = []; // Final G-Code Points (Red Line - includes travel)
         let historyStack = [];
         let isDrawing = false;
         let currentTool = 'draw';
@@ -256,7 +254,7 @@
             isDrawing = true;
             canvas.setPointerCapture(e.pointerId);
             processPointer(e);
-            resetStatus();
+            resetStatus(); // Go back to raw view if user draws
         }
 
         function moveDraw(e) {
@@ -334,28 +332,28 @@
             ctx.beginPath(); ctx.arc(0, 0, tableR*scale, 0, Math.PI*2);
             ctx.strokeStyle = dark ? '#444' : '#ddd'; ctx.lineWidth = 2; ctx.stroke();
 
-            // DECIDE WHAT TO SHOW:
-            // If processedPoints exists (Prepare Path clicked), show GREEN line.
-            // Else show RED raw line.
+            // RENDER LOGIC:
+            // If we have Processed Points (Prepare clicked), show those (RED, Continuous)
+            // If not, show Raw Points (BLUE, Broken)
             const showingFinal = (processedPoints.length > 0);
-            const dataToShow = showingFinal ? processedPoints : rawPoints;
             
-            // Limit by Slider
+            const dataToShow = showingFinal ? processedPoints : rawPoints;
             const limit = Math.floor(dataToShow.length * (prog/100));
             
-            // Color Logic
-            const color = showingFinal ? (dark ? '#00ff00' : '#2ecc71') : (dark ? 'cyan' : '#ff5555');
+            // Color: Blue for Edit Mode, Red for Simulation Mode
+            const color = showingFinal ? '#ff0000' : (dark ? 'cyan' : '#007bff');
 
             ctx.lineWidth = 1.5;
             
-            // Draw
-            for(let s=0; s<sym; s++) {
-                // If showing final processed path, symmetry is already baked in, so only run loop once (s=0) unless raw
-                if (showingFinal && s > 0) break; 
+            // Symmetry Loop
+            // Note: If showingFinal is true, symmetry is already baked into the points,
+            // so we run the loop exactly once.
+            const loopCount = showingFinal ? 1 : sym;
 
+            for(let s=0; s<loopCount; s++) {
                 const ang = s * (Math.PI*2/sym);
                 ctx.save(); 
-                if(!showingFinal) ctx.rotate(ang); // Rotate only for raw preview
+                if(!showingFinal) ctx.rotate(ang); 
                 
                 ctx.beginPath();
                 ctx.strokeStyle = color;
@@ -373,7 +371,7 @@
                 }
                 ctx.stroke();
                 
-                // Draw Head at tip
+                // Draw Ball Head
                 if(limit > 0 && limit < dataToShow.length) {
                     const tip = dataToShow[limit];
                     if(tip.type !== 'break') {
@@ -487,12 +485,12 @@
         // --- CORE LOGIC: PREPARE PATH ---
         function prepareGCode() {
             if(rawPoints.length === 0) return showToast("Draw something first!", "error");
-            showToast("Computing Path...", "info");
+            showToast("Optimizing Path...", "info");
 
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
             const sym = parseInt(document.getElementById('symSlider').value);
             
-            // 1. Expand Symmetry into a single continuous list
+            // 1. Extract shapes
             let allShapes = [];
             let currentShape = [];
 
@@ -506,11 +504,11 @@
             });
             if(currentShape.length > 0) allShapes.push(currentShape);
 
+            // 2. Expand Symmetry
             let fullDesignShapes = [];
             for(let s=0; s<sym; s++) {
                 const ang = s * (Math.PI*2/sym);
                 const c = Math.cos(ang), si = Math.sin(ang);
-                
                 allShapes.forEach(shape => {
                     let newShape = shape.map(p => ({
                         x: p.x*c - p.y*si,
@@ -521,11 +519,36 @@
                 });
             }
 
-            // 2. TSP Optimization
-            let sortedShapes = [];
-            let pool = [...fullDesignShapes];
-            let curPos = {x: tableR, y: 0}; 
+            // 3. Find BEST START SHAPE (Closest to Rim)
+            // We search all shapes for the point with max hypotenuse
+            let bestStartShapeIndex = 0;
+            let maxHypot = -1;
+            
+            for(let i=0; i<fullDesignShapes.length; i++) {
+                let s = fullDesignShapes[i];
+                for(let j=0; j<s.length; j++) {
+                    let h = Math.hypot(s[j].x, s[j].y);
+                    if(h > maxHypot) {
+                        maxHypot = h;
+                        bestStartShapeIndex = i;
+                    }
+                }
+            }
+            
+            // Reorder pool so bestStartShape is first
+            let startShape = fullDesignShapes[bestStartShapeIndex];
+            fullDesignShapes.splice(bestStartShapeIndex, 1);
+            
+            // Orient startShape so its start point is the one closest to rim
+            let dStart = Math.hypot(startShape[0].x, startShape[0].y);
+            let dEnd = Math.hypot(startShape[startShape.length-1].x, startShape[startShape.length-1].y);
+            if(dEnd > dStart) startShape.reverse();
 
+            let sortedShapes = [startShape];
+            let pool = fullDesignShapes;
+            let curPos = startShape[startShape.length-1];
+
+            // 4. TSP Sort Rest
             while(pool.length > 0) {
                 let bestI = -1, bestDist = Infinity, rev = false;
                 for(let i=0; i<pool.length; i++) {
@@ -544,7 +567,7 @@
                 pool.splice(bestI, 1);
             }
 
-            // 3. Perimeter Projection (Start/End Fix)
+            // 5. Add Entry/Exit Lines
             if(sortedShapes.length > 0) {
                 let firstShape = sortedShapes[0];
                 let firstPt = firstShape[0];
@@ -559,27 +582,48 @@
                 lastShape.push(endRim);
             }
 
-            // 4. Flatten
+            // 6. Flatten into Continuous Path (Interpolate Jumps)
+            // This is crucial for the slider to visualize the travel lines
             processedPoints = [];
-            sortedShapes.forEach(s => {
-                processedPoints.push({type:'break'});
-                s.forEach(p => processedPoints.push(p));
-            });
-            processedPoints.push({type:'break'});
+            const interpolationRes = 1.0; 
+            
+            for(let i=0; i<sortedShapes.length; i++) {
+                let s = sortedShapes[i];
+                
+                // If there's a previous shape, bridge the gap
+                if(i > 0) {
+                    let prevShape = sortedShapes[i-1];
+                    let p1 = prevShape[prevShape.length-1];
+                    let p2 = s[0];
+                    
+                    let dist = Math.hypot(p2.x-p1.x, p2.y-p1.y);
+                    let steps = Math.ceil(dist / interpolationRes);
+                    for(let k=1; k<=steps; k++) {
+                        let t = k/steps;
+                        processedPoints.push({
+                            x: p1.x + (p2.x-p1.x)*t,
+                            y: p1.y + (p2.y-p1.y)*t,
+                            type: 'point'
+                        });
+                    }
+                }
 
-            // 5. Generate G-Code (Using Script.html Math)
+                // Add points of current shape
+                s.forEach(p => processedPoints.push(p));
+            }
+
+            // 7. Generate G-Code
             generatedGCode = generateGCodeStringFromProcessed();
             
-            // Update UI
-            document.getElementById('statusTxt').innerText = "Path Ready";
+            // UI Update
+            document.getElementById('statusTxt').innerText = "Path Ready (Red)";
             document.getElementById('statusTxt').style.color = "green";
-            const lines = generatedGCode ? generatedGCode.split('\n').length : 0;
-            document.getElementById('ptCount').textContent = lines;
+            document.getElementById('progressSlider').value = 0; // Reset slider so user can play it
             render(); 
             showToast("Path Prepared!", "success");
         }
 
-        // --- G-CODE GENERATION (EXACT COPY OF SCRIPT.HTML LOGIC) ---
+        // --- G-CODE GENERATION ---
         function generateGCodeStringFromProcessed() {
             const L1 = parseFloat(document.getElementById('cfgL1').value);
             const L2 = parseFloat(document.getElementById('cfgL2').value);
@@ -595,22 +639,19 @@
             let prevBase = 0;
             let prevElbow = 0;
 
-            let firstPt = processedPoints.find(p => p.type === 'point');
-            if(!firstPt) return null;
-
+            let firstPt = processedPoints[0];
             let startIK = calculateIK(firstPt.x, firstPt.y, 0, 0, L1, L2, gearRatio, stepsPerRad);
             prevBase = startIK.base_steps;
             prevElbow = startIK.elbow_steps;
-
-            let flatPts = processedPoints.filter(p => p.type === 'point');
             
-            const res = 1.0; 
-            for(let i=0; i<flatPts.length-1; i++) {
-                let p1 = flatPts[i];
-                let p2 = flatPts[i+1];
+            // Iterate all points (since they are now continuous with travel moves interpolated)
+            for(let i=0; i<processedPoints.length-1; i++) {
+                let p1 = processedPoints[i];
+                let p2 = processedPoints[i+1];
                 
+                // Interpolate just to be safe for kinematics resolution
                 let dist = Math.hypot(p2.x-p1.x, p2.y-p1.y);
-                let steps = Math.max(1, Math.ceil(dist / res));
+                let steps = Math.max(1, Math.ceil(dist / 1.0));
                 
                 for(let j=1; j<=steps; j++) {
                     let t = j/steps;
@@ -627,7 +668,6 @@
                         if(rFactor > 1) rFactor = 1;
                         let delay = Math.round(centerDelay + ((perimDelay - centerDelay) * rFactor));
                         
-                        // EXACT FORMAT: G1 ELBOW BASE DELAY
                         cmds.push(`G1 ${dElbow} ${dBase} ${delay}`);
                         prevBase += dBase; prevElbow += dElbow;
                     }
@@ -636,7 +676,7 @@
             return cmds.join('\n');
         }
 
-        // --- IK MATH (EXACT COPY OF SCRIPT.HTML) ---
+        // --- IK MATH ---
         function getShortestRotation(raw, last) {
             let diff = (raw - last) / (2 * Math.PI);
             let offset = Math.round(diff);
@@ -738,7 +778,6 @@
             document.getElementById('btnErase').className = t==='erase'?'active':'secondary';
         }
         function updateUI() {
-            // document.getElementById('smoothVal').textContent = document.getElementById('smoothSlider').value + 'mm'; // Removed smooth slider
             document.getElementById('symVal').textContent = document.getElementById('symSlider').value + 'x';
             render();
         }
