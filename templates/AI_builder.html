@@ -208,6 +208,8 @@
                     <div><label>Center Speed</label><input type="number" id="cfgCenterDelay" value="500"></div>
                     <div><label>Rim Speed</label><input type="number" id="cfgPerimDelay" value="3000"></div>
                     <div><label>Steps/Deg</label><input type="number" id="cfgStepsPerDeg" value="8.888888"></div>
+                    <!-- ADDED GEAR RATIO INPUT -->
+                    <div><label>Gear Ratio</label><input type="number" id="cfgGearRatio" value="1.125" step="0.001"></div>
                     <div><label>Arm 1</label><input type="number" id="cfgL1" value="101.3"></div>
                     <div><label>Arm 2</label><input type="number" id="cfgL2" value="101.3"></div>
                 </div>
@@ -643,7 +645,8 @@
         function generateGCodeStringFromProcessed() {
             const L1 = parseFloat(document.getElementById('cfgL1').value);
             const L2 = parseFloat(document.getElementById('cfgL2').value);
-            const gearRatio = 1.125;
+            // UPDATED: Get Gear Ratio from Input
+            const gearRatio = parseFloat(document.getElementById('cfgGearRatio').value); 
             const tableRadius = parseFloat(document.getElementById('cfgRadius').value);
             const stepsPerDeg = parseFloat(document.getElementById('cfgStepsPerDeg').value);
             const stepsPerRad = stepsPerDeg * (180 / Math.PI);
@@ -654,6 +657,8 @@
             let cmds = [];
             let prevBase = 0;
             let prevElbow = 0;
+
+            if(processedPoints.length === 0) return "";
 
             let firstPt = processedPoints[0];
             let startIK = calculateIK(firstPt.x, firstPt.y, 0, 0, L1, L2, gearRatio, stepsPerRad);
@@ -703,29 +708,34 @@
 
         function calculateIK(x, y, lastBaseSteps, lastElbowSteps, L1, L2, gearRatio, stepsPerRad) {
             let dist = Math.hypot(x, y);
+            const maxReach = L1 + L2;
             
-            // --- SINGULARITY FIX: CENTER LOCK ---
-            if (dist < 2.0) { // If within 2mm of center
-                // Lock Base to where it last was
+            if (dist > maxReach) {
+                x = (x / dist) * maxReach;
+                y = (y / dist) * maxReach;
+                dist = maxReach;
+            }
+
+            // --- CENTER PASS-THROUGH LOGIC ---
+            // If we are extremely close to the center, force the math to prioritize
+            // keeping the Base Angle steady. This prevents the "Base Spin" issue.
+            // We treat the target as a "fold" at the *current* base angle.
+            
+            if (dist < 1.0) { // Within 1mm of center
+                
+                // We want the base to stay exactly where it was
                 const targetBaseSteps = lastBaseSteps; 
                 
-                // Calculate required elbow steps to be at center
-                // At center (dist=0), elbow is ideally 180 deg (PI) relative to base
-                // Steps = -(PI + GearRatio * BaseAngle) * StepsPerRad
+                // At center (dist=0), the internal angle is PI (180 deg).
+                // Elbow Steps = -(PI + GearRatio * BaseAngle) * StepsPerRad
+                // We need to reverse-engineer BaseAngle from lastBaseSteps
                 const currentBaseAngle = -lastBaseSteps / stepsPerRad;
                 const targetElbowSteps = -(Math.PI + gearRatio * currentBaseAngle) * stepsPerRad;
                 
                 return { base_steps: targetBaseSteps, elbow_steps: targetElbowSteps };
             }
 
-            // Normal IK Logic
-            const maxReach = L1 + L2;
-            if (dist > maxReach) { 
-                x = (x / dist) * maxReach; 
-                y = (y / dist) * maxReach; 
-                dist = maxReach; 
-            }
-
+            // Standard Math for non-center points
             const lastT1 = -lastBaseSteps / stepsPerRad; 
             let cosBend = (dist*dist - L1*L1 - L2*L2) / (2 * L1 * L2);
             cosBend = Math.max(-1, Math.min(1, cosBend));
@@ -853,3 +863,4 @@
     </script>
 </body>
 </html>
+
