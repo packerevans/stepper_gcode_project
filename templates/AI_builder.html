@@ -198,7 +198,6 @@
 
             <div class="btn-group">
                 <button onclick="sendToTable()" class="active">🚀 Run</button>
-                <!-- UPDATED BUTTON -->
                 <button onclick="saveToPi()" class="secondary">💾 Save to Pi</button>
             </div>
 
@@ -209,7 +208,6 @@
                     <div><label>Center Speed</label><input type="number" id="cfgCenterDelay" value="500"></div>
                     <div><label>Rim Speed</label><input type="number" id="cfgPerimDelay" value="3000"></div>
                     <div><label>Steps/Deg</label><input type="number" id="cfgStepsPerDeg" value="8.888888"></div>
-                    <!-- ADDED GEAR RATIO INPUT -->
                     <div><label>Gear Ratio</label><input type="number" id="cfgGearRatio" value="1.125" step="0.001"></div>
                     <div><label>Arm 1</label><input type="number" id="cfgL1" value="101.3"></div>
                     <div><label>Arm 2</label><input type="number" id="cfgL2" value="101.3"></div>
@@ -642,11 +640,10 @@
             showToast("Perimeter Rider Path Ready!", "success");
         }
 
-        // --- G-CODE GENERATION ---
+        // --- G-CODE GENERATION (With Center Avoidance) ---
         function generateGCodeStringFromProcessed() {
             const L1 = parseFloat(document.getElementById('cfgL1').value);
             const L2 = parseFloat(document.getElementById('cfgL2').value);
-            // UPDATED: Get Gear Ratio from Input
             const gearRatio = parseFloat(document.getElementById('cfgGearRatio').value); 
             const tableRadius = parseFloat(document.getElementById('cfgRadius').value);
             const stepsPerDeg = parseFloat(document.getElementById('cfgStepsPerDeg').value);
@@ -666,35 +663,87 @@
             prevBase = startIK.base_steps;
             prevElbow = startIK.elbow_steps;
 
+            // Safety Radius (mm) to avoid center singularity
+            const SAFE_R = 3.0; 
+
             for(let i=0; i<processedPoints.length-1; i++) {
                 let p1 = processedPoints[i];
                 let p2 = processedPoints[i+1];
-                let dist = Math.hypot(p2.x-p1.x, p2.y-p1.y);
-                let steps = Math.max(1, Math.ceil(dist / 1.0)); 
                 
-                if(p2.type === 'exit') {
-                    cmds.push("M0");
+                // --- CENTER AVOIDANCE CHECK ---
+                // If segment passes too close to 0,0, we must detour
+                // Check distance of line segment to origin
+                let subPoints = [p2];
+                
+                // Calculate minimum distance from origin to the line segment p1-p2
+                // Line eq: P = p1 + t*(p2-p1)
+                // Project Origin onto line: t = - (p1 . (p2-p1)) / |p2-p1|^2
+                const dx = p2.x - p1.x;
+                const dy = p2.y - p1.y;
+                const len2 = dx*dx + dy*dy;
+                if(len2 > 0.001) {
+                    const t = -(p1.x*dx + p1.y*dy) / len2;
+                    if(t > 0 && t < 1) {
+                        const closestX = p1.x + t*dx;
+                        const closestY = p1.y + t*dy;
+                        const distToOrigin = Math.hypot(closestX, closestY);
+                        
+                        if(distToOrigin < SAFE_R) {
+                            // DETOUR DETECTED: The line cuts through the danger zone.
+                            // Generate intermediate points along the safe radius arc
+                            const ang1 = Math.atan2(p1.y, p1.x);
+                            let ang2 = Math.atan2(p2.y, p2.x);
+                            
+                            // Find shortest direction
+                            let diff = ang2 - ang1;
+                            while(diff <= -Math.PI) diff += 2*Math.PI;
+                            while(diff > Math.PI) diff -= 2*Math.PI;
+                            
+                            // Generate arc steps
+                            const stepsArc = Math.ceil(Math.abs(diff * SAFE_R)); // 1mm resolution along arc
+                            subPoints = [];
+                            for(let k=1; k<=stepsArc; k++) {
+                                const a = ang1 + diff * (k/stepsArc);
+                                subPoints.push({
+                                    x: SAFE_R * Math.cos(a),
+                                    y: SAFE_R * Math.sin(a),
+                                    type: 'point'
+                                });
+                            }
+                            subPoints.push(p2); // Finally go to target
+                            // Recalculate p1 as the start of the sub-segment
+                        }
+                    }
                 }
 
-                for(let j=1; j<=steps; j++) {
-                    let t = j/steps;
-                    let x = p1.x + (p2.x - p1.x)*t;
-                    let y = p1.y + (p2.y - p1.y)*t;
+                // Process all points (either the single target or the detour arc)
+                let currP1 = p1;
+                for(let pt of subPoints) {
+                    let dist = Math.hypot(pt.x - currP1.x, pt.y - currP1.y);
+                    let steps = Math.max(1, Math.ceil(dist / 1.0)); 
 
-                    // Pass previous Base steps to IK so it knows how to handle the center
-                    let ik = calculateIK(x, y, prevBase, prevElbow, L1, L2, gearRatio, stepsPerRad);
-                    let dBase = Math.round(ik.base_steps - prevBase);
-                    let dElbow = Math.round(ik.elbow_steps - prevElbow);
+                    if(pt.type === 'exit') cmds.push("M0");
 
-                    if(dBase !== 0 || dElbow !== 0) {
-                        let r = Math.hypot(x, y);
-                        let rFactor = r / tableRadius;
-                        if(rFactor > 1) rFactor = 1;
-                        let delay = Math.round(centerDelay + ((perimDelay - centerDelay) * rFactor));
-                        
-                        cmds.push(`G1 ${dElbow} ${dBase} ${delay}`);
-                        prevBase += dBase; prevElbow += dElbow;
+                    for(let j=1; j<=steps; j++) {
+                        let t = j/steps;
+                        let x = currP1.x + (pt.x - currP1.x)*t;
+                        let y = currP1.y + (pt.y - currP1.y)*t;
+
+                        let ik = calculateIK(x, y, prevBase, prevElbow, L1, L2, gearRatio, stepsPerRad);
+                        let dBase = Math.round(ik.base_steps - prevBase);
+                        let dElbow = Math.round(ik.elbow_steps - prevElbow);
+
+                        if(dBase !== 0 || dElbow !== 0) {
+                            let r = Math.hypot(x, y);
+                            let rFactor = r / tableRadius;
+                            if(rFactor > 1) rFactor = 1;
+                            let delay = Math.round(centerDelay + ((perimDelay - centerDelay) * rFactor));
+                            
+                            cmds.push(`G1 ${dElbow} ${dBase} ${delay}`);
+                            prevBase += dBase; prevElbow += dElbow;
+                        }
                     }
+                    currP1 = pt; // Move forward
                 }
             }
             return cmds.join('\n');
