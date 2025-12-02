@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Packers Sand Table Control (Vector Engine)</title>
+    <title>Packers Sand Table Control (Universal Tracer)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -676,100 +676,138 @@
             render();
         }
 
-        // --- UPDATED AI VECTOR TRACER ---
+        // --- UPDATED AI VECTOR TRACER (FIXED FOR ALL IMAGES) ---
         function handleImageUpload(input) {
             const file = input.files[0];
             if(!file) return;
             
-            showToast("Processing Vector Trace...");
+            showToast("Processing Image...");
             
             const reader = new FileReader();
             reader.onload = function(e) {
-                // Settings for clean B&W tracing
-                const options = {
-                    ltres: 1,       // Linear error (lower = more detail)
-                    qtres: 1,       // Quadratic error (lower = smoother curves)
-                    pathomit: 8,    // Ignore very small specks
-                    colorsampling: 0, // Disable color sampling (force B&W)
-                    numberofcolors: 2,
-                    mincolorratio: 0,
-                    colorquantcycles: 0,
-                    blurradius: 0,   // Set to 1 or 2 if source image is noisy
-                    blurdelta: 10
+                // Pre-process: Resize to max 800px to prevent mobile crash
+                // and to standardize input for the tracer
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const MAX_SIZE = 800;
+                    let w = img.width;
+                    let h = img.height;
+                    
+                    if (w > h) {
+                        if (w > MAX_SIZE) { h *= MAX_SIZE / w; w = MAX_SIZE; }
+                    } else {
+                        if (h > MAX_SIZE) { w *= MAX_SIZE / h; h = MAX_SIZE; }
+                    }
+                    
+                    canvas.width = w;
+                    canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = "white"; // Force white background
+                    ctx.fillRect(0, 0, w, h);
+                    ctx.drawImage(img, 0, 0, w, h);
+                    
+                    // Trace resized data
+                    const resizedData = canvas.toDataURL('image/png');
+                    runTracer(resizedData);
                 };
-
-                // Use ImageTracer to get SVG String data directly
-                ImageTracer.imageToSVG(e.target.result, function(svgString) {
-                    processSVGToSandPoints(svgString);
-                }, options);
+                img.src = e.target.result;
             };
             reader.readAsDataURL(file);
+        }
+
+        function runTracer(imageData) {
+            // Settings: Balanced for both Elephant (smooth) and Tree (detail)
+            const options = {
+                ltres: 0.5,       
+                qtres: 0.5,       
+                pathomit: 1,      // 1 = Skip only 1px noise
+                colorsampling: 1, 
+                numberofcolors: 2, 
+                mincolorratio: 0,
+                colorquantcycles: 0,
+                blurradius: 0,    
+                blurdelta: 10
+            };
+
+            ImageTracer.imageToSVG(imageData, function(svgString) {
+                processSVGToSandPoints(svgString);
+            }, options);
         }
 
         function processSVGToSandPoints(svgString) {
             saveState();
 
-            // 1. Create a hidden dummy container to parse the SVG
             const parser = new DOMParser();
             const doc = parser.parseFromString(svgString, "image/svg+xml");
             const svgEl = doc.documentElement;
             
-            // Get original dimensions to calculate scale
-            const svgWidth = parseFloat(svgEl.getAttribute("width"));
-            const svgHeight = parseFloat(svgEl.getAttribute("height"));
+            // --- CRITICAL FIX: Robust Dimension Parsing ---
+            // ImageTracer often skips width/height and only provides viewBox
+            let svgWidth = parseFloat(svgEl.getAttribute("width"));
+            let svgHeight = parseFloat(svgEl.getAttribute("height"));
             
-            // 2. Find all paths
+            if (!svgWidth || isNaN(svgWidth) || !svgHeight || isNaN(svgHeight)) {
+                const viewBox = svgEl.getAttribute("viewBox");
+                if (viewBox) {
+                    const parts = viewBox.split(/\s+|,/).map(parseFloat);
+                    if(parts.length >= 4) {
+                        svgWidth = parts[2];
+                        svgHeight = parts[3];
+                    }
+                }
+            }
+            
+            // Absolute Fallback (prevents NaN math)
+            if (!svgWidth || isNaN(svgWidth)) svgWidth = 1000;
+            if (!svgHeight || isNaN(svgHeight)) svgHeight = 1000;
+            
             const paths = svgEl.getElementsByTagName("path");
             let newPoints = [];
             
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
-            // Calculate scale to fit table (add 10% padding)
-            const scaleFactor = (tableR * 2 * 0.9) / Math.max(svgWidth, svgHeight);
+            // Fit to table with 5% padding
+            const scaleFactor = (tableR * 2 * 0.95) / Math.max(svgWidth, svgHeight);
             
-            // Center offsets
             const offX = -svgWidth / 2;
             const offY = -svgHeight / 2;
 
-            // 3. Iterate over every path found by the AI
+            let pathCount = 0;
             for(let i = 0; i < paths.length; i++) {
                 const path = paths[i];
-                const totalLen = path.getTotalLength();
+                let totalLen = 0;
+                try { totalLen = path.getTotalLength(); } catch(e) { continue; }
                 
-                // Skip tiny noise paths
-                if(totalLen < 15) continue; 
+                // Keep almost everything (threshold 2)
+                if(totalLen < 2) continue; 
+                pathCount++;
 
-                // Start a new line (lift pen)
                 newPoints.push({type: 'break'});
-
-                // 4. Sample the curve smoothly
-                // "Resolution" determines how smooth. 2mm is a good balance.
-                const resolution = 2.0; 
+                
+                // Resolution: 1.5mm is a good balance
+                const resolution = 1.5; 
                 
                 for (let dist = 0; dist <= totalLen; dist += resolution) {
                     const pt = path.getPointAtLength(dist);
                     
-                    // Transform SVG coordinates to Table coordinates (Centered 0,0)
-                    // Note: SVG Y is down, Table Y is usually Up. We flip Y here.
                     const tx = (pt.x + offX) * scaleFactor;
-                    const ty = -(pt.y + offY) * scaleFactor; // Flip Y for standard graph coords
+                    const ty = -(pt.y + offY) * scaleFactor; 
 
-                    // Circular masking (don't draw outside table)
                     if (Math.hypot(tx, ty) < tableR) {
                         newPoints.push({ x: tx, y: ty, type: 'point' });
                     }
                 }
             }
 
-            // 5. Update State
             if(newPoints.length > 0) {
                 newPoints.push({type: 'break'});
-                // Replace current drawing or append? Let's replace for a clean import.
                 rawPoints = newPoints; 
-                showToast(`Vector Trace Complete!`, 'success');
+                showToast(`Trace Success: ${pathCount} paths found`, 'success');
                 render(); 
                 generateCode();
             } else {
-                showToast("No valid paths found.", 'error');
+                console.log("SVG Debug:", svgString);
+                showToast("No valid paths found. Try high contrast image.", 'error');
             }
         }
 
