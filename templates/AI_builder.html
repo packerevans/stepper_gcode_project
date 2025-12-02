@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Packers Sand Table (Hybrid Engine)</title>
+    <title>Packers Sand Table (Pro Engine)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -11,1117 +11,527 @@
     <script src="https://cdn.jsdelivr.net/npm/imagetracerjs@1.2.6/imagetracer_v1.2.6.min.js"></script>
 
     <style>
-        /* --- Root Variables --- */
+        /* --- Dark/Gold Theme (Packers Inspired) --- */
         :root {
             --color-primary: #d2b48c; 
             --color-secondary: #b08d5c; 
-            --color-background: #f0f0f0; 
-            --color-surface: #ffffff; 
-            --color-text: #333333;
-            --color-shadow: rgba(0, 0, 0, 0.08);
-            --border-radius: 16px;
-            --color-input-bg: #f9f9f9;
-            --color-input-border: #ccc;
-            --color-danger: #ff6b6b;
-            --color-success: #4caf50;
-            --color-accent: #8e44ad;
-        }
-
-        body[data-theme='dark'] {
-            --color-background: #121212;
-            --color-surface: #1e1e1e;
+            --color-bg: #121212;
+            --color-panel: #1e1e1e;
             --color-text: #e0e0e0;
-            --color-shadow: rgba(0, 0, 0, 0.3);
-            --color-input-bg: #2c2c2c;
-            --color-input-border: #444;
+            --color-accent: #2ecc71;
+            --radius: 12px;
         }
 
         body {
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background: var(--color-background);
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            background: var(--color-bg);
             color: var(--color-text);
             margin: 0; padding: 0;
             height: 100vh;
             display: flex;
             flex-direction: column;
-            overflow: hidden; 
-            overscroll-behavior: none;
+            overflow: hidden;
         }
 
-        /* --- Navigation --- */
-        .sidebar {
-            height: 100%; width: 0; position: fixed; top: 0; left: 0;
-            background-color: var(--color-primary); overflow-x: hidden;
-            transition: 0.3s; padding-top: 60px; z-index: 2000;
-            box-shadow: 4px 0 10px var(--color-shadow);
-        }
-        .sidebar a {
-            padding: 15px 24px; text-decoration: none; font-size: 18px;
-            color: #fff; display: block; transition: 0.2s; font-weight: 500;
-        }
-        .sidebar a:hover { background-color: var(--color-secondary); }
-
+        /* --- Header --- */
         .nav-bar {
+            padding: 10px 15px; background: var(--color-panel);
             display: flex; justify-content: space-between; align-items: center;
-            padding: 10px 15px; background: var(--color-surface);
-            box-shadow: 0 2px 5px var(--color-shadow); z-index: 100;
-            flex-shrink: 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+            z-index: 10;
         }
 
-        .menu-btn { font-size: 20px; cursor: pointer; background: none; border: none; color: var(--color-text); }
-        .theme-btn { font-size: 20px; cursor: pointer; background: none; border: none; }
-
-        /* --- Layout Grid --- */
+        /* --- Layout --- */
         .app-container {
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-            width: 100%;
-            padding: 10px;
-            box-sizing: border-box;
-            gap: 10px;
-            overflow-y: auto;
+            flex: 1; display: flex; flex-direction: column;
+            padding: 10px; gap: 10px; overflow: hidden;
+        }
+        
+        @media (min-width: 768px) {
+            .app-container { flex-direction: row; }
+            .canvas-panel { flex: 2; }
+            .controls-panel { flex: 1; min-width: 320px; max-width: 400px; }
         }
 
-        @media (min-width: 768px), (orientation: landscape) {
-            .app-container {
-                flex-direction: row;
-                align-items: stretch;
-                overflow: hidden;
-            }
-            .drawing-panel {
-                flex: 2;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                background: var(--color-surface);
-                border-radius: var(--border-radius);
-                box-shadow: 0 4px 10px var(--color-shadow);
-                position: relative;
-                overflow: hidden;
-            }
-            .controls-panel {
-                flex: 1;
-                min-width: 300px;
-                max-width: 400px;
-                background: var(--color-surface);
-                border-radius: var(--border-radius);
-                box-shadow: 0 4px 10px var(--color-shadow);
-                padding: 20px;
-                overflow-y: auto;
-            }
+        /* --- Canvas --- */
+        .canvas-panel {
+            background: var(--color-panel); border-radius: var(--radius);
+            position: relative; display: flex; align-items: center; justify-content: center;
+            overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
-
-        @media (max-width: 767px) and (orientation: portrait) {
-            .drawing-panel {
-                width: 100%;
-                aspect-ratio: 1/1;
-                max-height: 50vh;
-                background: var(--color-surface);
-                border-radius: var(--border-radius);
-                display: flex; justify-content: center; align-items: center;
-                flex-shrink: 0;
-            }
-            .controls-panel {
-                width: 100%;
-                background: var(--color-surface);
-                border-radius: var(--border-radius);
-                padding: 15px;
-                flex-grow: 1;
-                padding-bottom: 80px; 
-            }
-        }
-
-        /* --- Canvas Container --- */
         .canvas-wrapper {
-            position: relative;
-            width: 95%; 
-            height: 95%;
-            aspect-ratio: 1 / 1; 
-            max-width: 90vmin; 
-            max-height: 90vmin;
-            border-radius: 50%;
-            border: 4px solid var(--color-primary);
-            background: #fff;
-            box-shadow: inset 0 0 20px rgba(0,0,0,0.1);
-            touch-action: none; 
-            cursor: crosshair;
-            margin: auto;
-            overflow: hidden; 
+            width: 95%; aspect-ratio: 1/1; max-height: 90vh;
+            border: 3px solid var(--color-secondary); border-radius: 50%;
+            background: #222; position: relative; overflow: hidden;
         }
-        body[data-theme='dark'] .canvas-wrapper {
-            background: #222; 
-            border-color: var(--color-secondary);
+        canvas { width: 100%; height: 100%; display: block; border-radius: 50%; }
+
+        /* --- Controls --- */
+        .controls-panel {
+            background: var(--color-panel); border-radius: var(--radius);
+            padding: 15px; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
-        canvas { display: block; width: 100%; height: 100%; border-radius: 50%; }
 
-        /* --- Controls UI --- */
-        h2 { margin: 0 0 15px 0; font-size: 1.2rem; color: var(--color-secondary); text-align: center; }
-        
-        label { font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-text); display: block; margin-bottom: 4px;}
-
-        .btn-group { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; }
-        
+        .btn-group { display: flex; gap: 8px; margin-bottom: 12px; }
         button {
-            background-color: var(--color-primary); color: white;
-            border: none; padding: 10px 15px; border-radius: 8px; font-size: 14px;
-            cursor: pointer; transition: 0.2s; font-weight: 600; flex-grow: 1;
-            box-shadow: 0 2px 4px var(--color-shadow);
-            display: flex; align-items: center; justify-content: center; gap: 5px;
+            flex: 1; padding: 12px; border: none; border-radius: 8px;
+            font-weight: 600; cursor: pointer; transition: 0.2s;
+            background: #333; color: white;
         }
-        button:hover { background-color: var(--color-secondary); transform: translateY(-1px); }
+        button.primary { background: var(--color-primary); color: #000; }
+        button.action { background: var(--color-accent); color: #000; }
+        button:hover { filter: brightness(1.1); transform: translateY(-1px); }
         button:active { transform: translateY(0); }
-        
-        button.secondary { background-color: transparent; border: 1px solid var(--color-text); color: var(--color-text); box-shadow: none; opacity: 0.7;}
-        button.secondary:hover { opacity: 1; background: var(--color-input-bg); }
-        
-        button.active-tool { 
-            background-color: var(--color-secondary); 
-            border: 2px solid var(--color-secondary);
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
-        }
 
-        button.ai-btn {
-            background: linear-gradient(135deg, #8e44ad, #3498db);
-            color: white; border: none;
-        }
-        button.ai-btn:hover { filter: brightness(1.1); }
-
-        /* Toggle Switch */
-        .toggle-row {
-            display: flex; justify-content: space-between; align-items: center;
-            background: var(--color-input-bg); padding: 8px 12px;
-            border-radius: 8px; margin-bottom: 10px;
-            font-size: 13px; font-weight: 600;
-        }
-        .switch { position: relative; display: inline-block; width: 40px; height: 22px; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider {
-            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
-            background-color: #ccc; transition: .4s; border-radius: 22px;
-        }
-        .slider:before {
-            position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px;
-            background-color: white; transition: .4s; border-radius: 50%;
-        }
-        input:checked + .slider { background-color: var(--color-secondary); }
-        input:checked + .slider:before { transform: translateX(18px); }
-
-        /* Sliders */
-        .slider-control { margin-bottom: 15px; }
-        .slider-header { display: flex; justify-content: space-between; margin-bottom: 5px; }
+        .slider-row { margin-bottom: 15px; background: #2a2a2a; padding: 10px; border-radius: 8px; }
+        .slider-header { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; color: #aaa; }
         input[type="range"] { width: 100%; accent-color: var(--color-secondary); }
-        
-        #progressSlider {
-            height: 8px; border-radius: 4px; background: #ddd; outline: none; -webkit-appearance: none;
-        }
-        #progressSlider::-webkit-slider-thumb {
-            -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--color-secondary); cursor: pointer;
-        }
 
-        /* Info Stats */
-        .stats-row {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;
-            background: var(--color-input-bg); padding: 10px; border-radius: 8px;
-        }
-        .stat-item { text-align: center; }
-        .stat-val { font-weight: bold; font-size: 14px; font-family: monospace; }
-
-        /* Status Banner */
-        #status-banner {
+        /* --- Status --- */
+        #status-toast {
             position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
             background: #333; color: white; padding: 10px 20px; border-radius: 20px;
-            font-size: 13px; opacity: 0; transition: opacity 0.3s; z-index: 3000;
-            pointer-events: none; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            font-size: 13px; opacity: 0; transition: opacity 0.3s; pointer-events: none;
+            z-index: 100; box-shadow: 0 5px 15px rgba(0,0,0,0.5);
         }
-        .status-success { background: #4caf50 !important; }
-        .status-error { background: #ff4444 !important; }
+        .success { background: #2ecc71 !important; color: #000 !important; }
+        .error { background: #e74c3c !important; color: white !important; }
 
-        /* Details/Summary */
-        details {
-            background: var(--color-input-bg); padding: 10px; border-radius: 8px;
-            margin-bottom: 10px; border: 1px solid var(--color-input-border);
-        }
-        summary { cursor: pointer; font-weight: 600; font-size: 13px; outline: none; }
-        .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
-        input[type="number"] {
-            width: 100%; padding: 6px; border-radius: 4px; border: 1px solid var(--color-input-border);
-            background: var(--color-surface); color: var(--color-text); box-sizing: border-box;
-        }
+        input[type="file"] { display: none; }
         
-        #traceInput { display: none; }
-        #insertModeNotice { display: none; background: var(--color-accent); color: white; padding: 5px 10px; border-radius: 5px; font-size: 12px; margin-bottom: 5px; }
-
+        details { background: #2a2a2a; padding: 10px; border-radius: 8px; margin-top: 10px; }
+        summary { cursor: pointer; font-size: 13px; font-weight: bold; color: #aaa; }
+        .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+        .settings-grid input { width: 100%; box-sizing: border-box; background: #444; border: 1px solid #555; color: white; padding: 5px; border-radius: 4px; }
     </style>
 </head>
-<body data-theme="light">
-
-    <div id="mySidebar" class="sidebar">
-        <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
-        <a href="/">Designs</a> 
-        <a href="/controls">Drawing</a>
-        <a href="/led_controls">LED Controls</a>
-        <a href="/ai_builder">AI Builder</a>
-        <a href="/terminal">Terminal</a>
-    </div>
+<body>
 
     <div class="nav-bar">
-        <button class="menu-btn" onclick="openNav()">☰</button>
-        <h1 style="margin:0; font-size:1.2rem;">Sand Controller</h1>
-        <button class="theme-btn" id="themeToggle" onclick="toggleTheme()">☀️</button>
+        <h1 style="margin:0; font-size:1.1rem; color:var(--color-primary);">Packers Sand Pro</h1>
+        <button style="background:none; border:none; font-size:1.2rem;" onclick="location.reload()">↺</button>
     </div>
 
     <div class="app-container">
-        
-        <div class="drawing-panel">
+        <div class="canvas-panel">
             <div class="canvas-wrapper" id="canvasContainer">
-                <canvas id="drawCanvas"></canvas>
+                <canvas id="mainCanvas"></canvas>
             </div>
-            <div id="coordDisplay" style="position:absolute; bottom:10px; left:10px; background:rgba(0,0,0,0.5); color:white; padding:4px 8px; border-radius:4px; font-size:11px; pointer-events:none;">X:0 Y:0</div>
+            <div style="position:absolute; bottom:10px; left:10px; font-size:10px; color:#666;">
+                Points: <span id="ptCount">0</span>
+            </div>
         </div>
 
         <div class="controls-panel">
-            <h2>Controls</h2>
             
-            <div class="toggle-row" title="Pen Draws, Finger Erases">
-                <span>🖋️ Smart Pen Mode</span>
-                <label class="switch">
-                    <input type="checkbox" id="smartPenMode" checked>
-                    <span class="slider"></span>
-                </label>
+            <div class="btn-group">
+                <input type="file" id="imgUpload" accept="image/*" onchange="processImage(this)">
+                <button class="primary" onclick="document.getElementById('imgUpload').click()">📂 Open Image</button>
+                <button onclick="clearTable()">✖ Clear</button>
             </div>
 
-            <div class="btn-group">
-                <button id="drawToolBtn" onclick="setTool('draw')" class="active-tool">✏️ Draw</button>
-                <button id="eraseToolBtn" onclick="setTool('erase')" class="secondary">🧼 Eraser</button>
+            <div class="slider-row">
+                <div class="slider-header"><span>SMOOTHNESS</span> <span id="smoothVal">High</span></div>
+                <input type="range" id="smoothSlider" min="0" max="5" value="3" oninput="updateFilters()">
+                <div style="font-size:10px; color:#666; margin-top:4px;">Higher = Rounder Curves</div>
             </div>
 
-            <div class="btn-group">
-                <input type="file" id="traceInput" accept="image/*" onchange="handleImageUpload(this)">
-                <button class="ai-btn" onclick="document.getElementById('traceInput').click()">✨ AI Trace (Hybrid)</button>
+            <div class="slider-row">
+                <div class="slider-header"><span>SIMULATION</span> <span id="simVal">100%</span></div>
+                <input type="range" id="simSlider" min="0" max="100" value="100" oninput="render()">
             </div>
             
             <div class="btn-group">
-                <button onclick="undo()" class="secondary">↶ Undo</button>
-                <button onclick="clearCanvas()" class="secondary" style="color:var(--color-danger); border-color:var(--color-danger);">✖ Clear</button>
+                <button class="action" onclick="sendToTable()">🚀 SEND TO TABLE</button>
+                <button onclick="downloadCode()">💾 Save G-Code</button>
             </div>
 
-            <div class="slider-control" style="background: var(--color-input-bg); padding: 10px; border-radius: 8px;">
-                <div class="slider-header">
-                    <label>Simulation Progress</label>
-                    <span id="progressVal" style="font-size:12px;">100%</span>
-                </div>
-                <div id="insertModeNotice">✨ INSERT MODE: Inserting at closest Break</div>
-                <input type="range" id="progressSlider" min="0" max="100" value="100" oninput="updateSimulationView()">
-            </div>
-
-            <div class="slider-control">
-                <div class="slider-header"><label>Smoothing</label><span id="smoothVal">2mm</span></div>
-                <input type="range" id="smoothSlider" min="1" max="10" value="2" oninput="updateUI(); generateCode();">
-            </div>
-
-            <div class="slider-control">
-                <div class="slider-header"><label>Symmetry</label><span id="symVal">1x</span></div>
-                <input type="range" id="symSlider" min="1" max="12" value="1" step="1" oninput="updateUI(); render(); generateCode();">
-            </div>
-
-            <div class="stats-row">
-                <div class="stat-item"><label>Est. Time</label><div class="stat-val" id="timeEstimate">0s</div></div>
-                <div class="stat-item"><label>Points</label><div class="stat-val" id="pointCount">0</div></div>
+            <div style="text-align:center; margin-top:10px; font-size:12px; color:#888;">
+                Est. Time: <span id="timeEst" style="color:var(--color-primary); font-weight:bold;">0m 0s</span>
             </div>
 
             <details>
-                <summary>⚙️ Machine Settings</summary>
+                <summary>Machine Settings</summary>
                 <div class="settings-grid">
-                    <div><label>Radius (mm)</label><input type="number" id="cfgRadius" value="202.6" onchange="resizeCanvas(); generateCode();"></div>
-                    
-                    <div><label>Center Delay (us)</label><input type="number" id="cfgCenterDelay" value="500" onchange="generateCode()"></div>
-                    <div><label>Perim Delay (us)</label><input type="number" id="cfgPerimDelay" value="3000" onchange="generateCode()"></div>
-                    
-                    <div><label>Arm 1</label><input type="number" id="cfgL1" value="101.3"></div>
-                    <div><label>Arm 2</label><input type="number" id="cfgL2" value="101.3"></div>
-                    <div><label>Gear Ratio</label><input type="number" id="cfgGear" value="1.125"></div>
-                    <div><label>Min Delay</label><input type="number" id="cfgMinDelay" value="50"></div>
+                    <label>Radius (mm)</label> <input type="number" id="cfgRadius" value="202.6">
+                    <label>Arm 1</label> <input type="number" id="cfgL1" value="101.3">
+                    <label>Arm 2</label> <input type="number" id="cfgL2" value="101.3">
+                    <label>Gear Ratio</label> <input type="number" id="cfgGear" value="1.125">
                 </div>
             </details>
 
-            <div style="margin-top:20px;">
-                <div class="btn-group">
-                    <button onclick="sendToTable()" style="background-color: var(--color-success);">🚀 Run</button>
-                    <button onclick="downloadGcode()" class="secondary">💾 Save</button>
-                    <button onclick="copyToClipboard()" class="secondary">📋 Copy</button>
-                </div>
-            </div>
-
-            <textarea id="stepsOutput" style="position:absolute; left:-9999px;"></textarea>
         </div>
     </div>
 
-    <div id="status-banner"></div>
+    <div id="status-toast"></div>
 
     <script>
-        // --- STATE ---
-        let isDrawing = false;
-        let currentTool = 'draw';
-        let rawPoints = []; 
-        let historyStack = []; 
+        // --- CORE VARIABLES ---
+        let rawPaths = [];      // Original paths from tracer
+        let processedPoints = []; // Final sorted & smoothed points
+        let gcode = "";
         
-        let simulatedPath = [];  
-        let generatedGCode = "";
-        let origin = { x: 0, y: 0 };
-        let scale = 1;
-        
-        // Backup Image Data storage
-        let lastImageData = null; 
-        
-        // UI State
-        let cursorPosition = { x: 0, y: 0, visible: false };
-        
-        // INSERT MODE VARS
-        let simLimitIndex = -1; 
-        let insertModeActive = false;
-        let insertStrokeBuffer = []; 
-        
-        const canvas = document.getElementById('drawCanvas');
+        const canvas = document.getElementById('mainCanvas');
         const ctx = canvas.getContext('2d');
-        const BASE_URL = window.location.origin;
-        
-        const ERASER_RADIUS_MM = 3.75; 
-        const PEN_OFFSET_X = 5; 
-        const PEN_OFFSET_Y = 3; 
+        let tableRadius = 202.6;
 
         // --- INIT ---
         function init() {
-            resizeCanvas();
-            window.addEventListener('resize', resizeCanvas);
-            
-            canvas.addEventListener('pointerdown', handlePointerDown);
-            canvas.addEventListener('pointermove', handlePointerMove);
-            canvas.addEventListener('pointerup', endInput);
-            canvas.addEventListener('pointerleave', endInput);
-            canvas.style.touchAction = "none";
+            window.addEventListener('resize', resize);
+            resize();
+            // Load default settings
+            tableRadius = parseFloat(document.getElementById('cfgRadius').value);
+        }
 
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            document.body.setAttribute('data-theme', savedTheme);
-            document.getElementById('themeToggle').textContent = savedTheme === 'dark' ? '🌙' : '☀️';
-            
-            updateUI();
+        function resize() {
+            const container = document.getElementById('canvasContainer');
+            const size = container.getBoundingClientRect().width;
+            canvas.width = size * window.devicePixelRatio;
+            canvas.height = size * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
             render();
         }
 
-        // --- HISTORY / UNDO ---
-        function saveState() {
-            if(historyStack.length > 20) historyStack.shift();
-            historyStack.push(JSON.stringify(rawPoints));
-        }
-
-        function undo() {
-            if(historyStack.length === 0) return;
-            const state = historyStack.pop();
-            rawPoints = JSON.parse(state);
-            generateCode();
-            render();
-        }
-
-        // --- POINTERS ---
-        function handlePointerDown(e) {
-            e.preventDefault();
-            const isSmartMode = document.getElementById('smartPenMode').checked;
-            
-            if (isSmartMode) {
-                if (e.pointerType === 'pen') setTool('draw');
-                else if (e.pointerType === 'touch') setTool('erase');
-            }
-
-            saveState(); 
-            isDrawing = true;
-            canvas.setPointerCapture(e.pointerId);
-            
-            if(insertModeActive) insertStrokeBuffer = [];
-            processInput(e);
-        }
-
-        function handlePointerMove(e) {
-            e.preventDefault();
-            const pos = getPointerPos(e);
-            cursorPosition = { x: pos.px, y: pos.py, visible: true };
-            
-            if (!isDrawing) {
-                render(); 
-                return;
-            }
-            processInput(e);
-        }
-
-        function endInput(e) {
-            if (!isDrawing) return;
-            isDrawing = false;
-            
-            if(currentTool === 'draw') {
-                if(insertModeActive && insertStrokeBuffer.length > 0) {
-                    performInsertion();
-                } else {
-                    rawPoints.push({ type: 'break' });
-                    generateCode(); 
-                }
-            } else {
-                generateCode();
-            }
-            canvas.releasePointerCapture(e.pointerId);
-        }
-
-        function getPointerPos(e) {
-            return { px: e.offsetX, py: e.offsetY };
-        }
-
-        function processInput(e) {
-            const rawPx = e.offsetX;
-            const rawPy = e.offsetY;
-            
-            const offsetPx = rawPx + PEN_OFFSET_X;
-            const offsetPy = rawPy + PEN_OFFSET_Y;
-            
-            const mx = (offsetPx - origin.x) / scale;
-            const my = -(offsetPy - origin.y) / scale; 
-            
-            document.getElementById('coordDisplay').textContent = `X:${mx.toFixed(0)} Y:${my.toFixed(0)}`;
-            
-            if (currentTool === 'draw') {
-                if(insertModeActive) insertStrokeBuffer.push({x:mx, y:my, type:'point'});
-                else rawPoints.push({ x: mx, y: my, type: 'point' });
-            } else {
-                eraseAt(mx, my);
-            }
-            render();
-        }
-
-        // --- SMART INSERT LOGIC ---
-        function findInsertionIndex() {
-            if(simulatedPath.length === 0) return rawPoints.length;
-            
-            let limit = simLimitIndex >= 0 ? simLimitIndex : simulatedPath.length - 1;
-            if(limit > simulatedPath.length-1) limit = simulatedPath.length-1;
-            const simTip = simulatedPath[limit];
-
-            let closestIdx = rawPoints.length;
-            let minDist = Infinity;
-
-            if(rawPoints.length > 0) {
-                let startD = Math.hypot(rawPoints[0].x - simTip.x, rawPoints[0].y - simTip.y);
-                if(startD < minDist) { minDist = startD; closestIdx = 0; }
-
-                for(let i=0; i<rawPoints.length; i++) {
-                    if(rawPoints[i].type === 'break') {
-                        if(i > 0 && rawPoints[i-1].type !== 'break') {
-                            let d = Math.hypot(rawPoints[i-1].x - simTip.x, rawPoints[i-1].y - simTip.y);
-                            if(d < minDist) { minDist = d; closestIdx = i; } 
-                        }
-                    }
-                }
-            }
-            return closestIdx;
-        }
-
-        function performInsertion() {
-            let idx = findInsertionIndex();
-            let toAdd = [];
-            if(idx > 0 && rawPoints[idx-1].type !== 'break') toAdd.push({type:'break'});
-            toAdd = toAdd.concat(insertStrokeBuffer);
-            if(idx < rawPoints.length && rawPoints[idx].type !== 'break') toAdd.push({type:'break'});
-            
-            rawPoints.splice(idx, 0, ...toAdd);
-            insertStrokeBuffer = [];
-
-            document.getElementById('progressSlider').value = 100;
-            updateSimulationView(); 
-            generateCode();
-            showToast("Inserted at closest break!", 'success');
-        }
-
-        // --- CANVAS ---
-        function resizeCanvas() {
-            const wrapper = document.getElementById('canvasContainer');
-            const size = wrapper.getBoundingClientRect().width;
-            const dpr = window.devicePixelRatio || 1;
-            canvas.width = size * dpr;
-            canvas.height = size * dpr;
-            ctx.scale(dpr, dpr);
-            
-            origin = { x: size/2, y: size/2 }; 
-            const tableR = parseFloat(document.getElementById('cfgRadius').value) || 202.6;
-            scale = (size / 2) / (tableR * 1.05); 
-            render();
-        }
-
-        function render() {
-            const width = canvas.width / (window.devicePixelRatio || 1);
-            const height = canvas.height / (window.devicePixelRatio || 1);
-            ctx.clearRect(0, 0, width, height);
-            
-            const tableR = parseFloat(document.getElementById('cfgRadius').value);
-            const symCount = parseInt(document.getElementById('symSlider').value);
-            const isDark = document.body.getAttribute('data-theme') === 'dark';
-
-            ctx.save();
-            ctx.translate(origin.x, origin.y);
-            
-            // Table
-            ctx.beginPath(); ctx.arc(0, 0, tableR * scale, 0, Math.PI * 2);
-            ctx.strokeStyle = isDark ? '#444' : '#ddd'; ctx.lineWidth = 2; ctx.stroke();
-            
-            // Input (Ghost)
-            ctx.strokeStyle = isDark ? 'rgba(0, 255, 255, 0.3)' : 'rgba(0, 100, 255, 0.2)';
-            ctx.lineWidth = 2;
-            for(let s=0; s<symCount; s++) {
-                const angle = s * (Math.PI * 2 / symCount);
-                ctx.save(); ctx.rotate(angle);
-                ctx.beginPath();
-                let isMove = true;
-                for(let p of rawPoints) {
-                    if(p.type === 'break') { isMove = true; continue; }
-                    const px = p.x * scale; const py = -p.y * scale;
-                    if(isMove) { ctx.moveTo(px, py); isMove = false; }
-                    else ctx.lineTo(px, py);
-                }
-                ctx.stroke();
-                
-                if(insertStrokeBuffer.length > 0) {
-                    ctx.beginPath(); ctx.strokeStyle = '#8e44ad'; ctx.lineWidth=3;
-                    let isMoveB = true;
-                    for(let p of insertStrokeBuffer) {
-                        const px = p.x*scale; const py = -p.y*scale;
-                        if(isMoveB){ctx.moveTo(px,py); isMoveB=false;} else ctx.lineTo(px,py);
-                    }
-                    ctx.stroke();
-                }
-                ctx.restore();
-            }
-
-            // Simulation
-            ctx.strokeStyle = '#ff4444';
-            ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-            
-            if(simulatedPath.length > 0) {
-                let limit = simLimitIndex >= 0 ? simLimitIndex : simulatedPath.length - 1;
-                if(limit > simulatedPath.length-1) limit = simulatedPath.length-1;
-                
-                ctx.beginPath();
-                ctx.moveTo(simulatedPath[0].x * scale, -simulatedPath[0].y * scale);
-                for(let i=1; i<=limit; i++) {
-                    ctx.lineTo(simulatedPath[i].x * scale, -simulatedPath[i].y * scale);
-                }
-                ctx.stroke();
-
-                const end = simulatedPath[limit];
-                ctx.fillStyle = insertModeActive ? '#8e44ad' : '#fff'; 
-                ctx.strokeStyle = insertModeActive ? '#fff' : '#ff4444';
-                ctx.lineWidth = 2;
-                ctx.beginPath(); ctx.arc(end.x*scale, -end.y*scale, insertModeActive?6:4, 0, Math.PI*2);
-                ctx.fill(); ctx.stroke();
-            }
-
-            ctx.restore();
-
-            // Eraser Visual
-            if(currentTool === 'erase' && cursorPosition.visible) {
-                ctx.beginPath();
-                ctx.arc(cursorPosition.x + PEN_OFFSET_X, cursorPosition.y + PEN_OFFSET_Y, ERASER_RADIUS_MM * scale, 0, Math.PI*2);
-                ctx.fillStyle = "rgba(150, 150, 150, 0.4)";
-                ctx.strokeStyle = "#888";
-                ctx.lineWidth = 1;
-                ctx.fill(); ctx.stroke();
-            }
-
-            document.getElementById('pointCount').textContent = rawPoints.length;
-        }
-
-        // --- SLIDER & TOOLS ---
-        function updateSimulationView() {
-            const pct = parseInt(document.getElementById('progressSlider').value);
-            document.getElementById('progressVal').textContent = pct + '%';
-            
-            if(pct < 100) {
-                simLimitIndex = Math.floor((pct / 100) * (simulatedPath.length - 1));
-                insertModeActive = true;
-                document.getElementById('insertModeNotice').style.display = 'block';
-            } else {
-                simLimitIndex = -1;
-                insertModeActive = false;
-                document.getElementById('insertModeNotice').style.display = 'none';
-            }
-            render();
-        }
-
-        function eraseAt(ex, ey) {
-            const r = ERASER_RADIUS_MM; 
-            rawPoints = rawPoints.filter(p => {
-                if(p.type === 'break') return true;
-                return Math.hypot(p.x - ex, p.y - ey) > r;
-            });
-            for(let i=rawPoints.length-1; i>0; i--) {
-                if(rawPoints[i].type === 'break' && rawPoints[i-1].type === 'break') rawPoints.splice(i,1);
-            }
-        }
-
-        function undoLastStroke() {
-            if(rawPoints.length > 0 && rawPoints[rawPoints.length-1].type === 'break') rawPoints.pop();
-            while(rawPoints.length > 0) {
-                if(rawPoints[rawPoints.length-1].type === 'break') break;
-                rawPoints.pop();
-            }
-            render(); generateCode();
-        }
-
-        function clearCanvas() {
-            saveState();
-            rawPoints = []; simulatedPath = []; generatedGCode = "";
-            document.getElementById('timeEstimate').textContent = "0s";
-            render();
-        }
-
-        // --- HYBRID AI VECTOR TRACER ---
-        function handleImageUpload(input) {
+        // --- 1. IMAGE PROCESSING (The "Input" Stage) ---
+        function processImage(input) {
             const file = input.files[0];
             if(!file) return;
-            
-            showToast("Processing Image...");
-            
+
+            showToast("Analyzing Image...", "info");
+
             const reader = new FileReader();
             reader.onload = function(e) {
                 const img = new Image();
                 img.onload = function() {
-                    const canvas = document.createElement('canvas');
-                    const MAX_SIZE = 800;
-                    let w = img.width;
-                    let h = img.height;
+                    // 1. Pre-process Image (High Contrast for Line Drawings)
+                    const tempCan = document.createElement('canvas');
+                    const MAX = 1000; 
+                    let w = img.width, h = img.height;
+                    // Smart resize
+                    if(w>h && w>MAX){ h*=MAX/w; w=MAX; }
+                    else if(h>MAX){ w*=MAX/h; h=MAX; }
                     
-                    if (w > h) {
-                        if (w > MAX_SIZE) { h *= MAX_SIZE / w; w = MAX_SIZE; }
-                    } else {
-                        if (h > MAX_SIZE) { w *= MAX_SIZE / h; h = MAX_SIZE; }
-                    }
+                    tempCan.width = w; tempCan.height = h;
+                    const tCtx = tempCan.getContext('2d');
+                    tCtx.fillStyle = "white"; tCtx.fillRect(0,0,w,h);
                     
-                    canvas.width = w;
-                    canvas.height = h;
-                    const ctx = canvas.getContext('2d');
+                    // Contrast Filter
+                    tCtx.filter = "grayscale(100%) contrast(150%) brightness(100%)";
+                    tCtx.drawImage(img, 0, 0, w, h);
                     
-                    // CLEANED UP: No Filters. Trust the library.
-                    ctx.fillStyle = "white"; 
-                    ctx.fillRect(0, 0, w, h);
-                    ctx.drawImage(img, 0, 0, w, h);
+                    // 2. Run Tracer
+                    const opts = {
+                        ltres: 0.1, qtres: 0.1, pathomit: 2, 
+                        colorsampling: 2, numberofcolors: 2,
+                        blurradius: 0, blurdelta: 10
+                    };
                     
-                    const resizedData = canvas.toDataURL('image/png');
-                    lastImageData = ctx.getImageData(0,0,w,h); // Save for backup
-                    runTracer(resizedData);
+                    ImageTracer.imageToSVG(tempCan.toDataURL(), function(svgStr){
+                        parseSVG(svgStr);
+                    }, opts);
                 };
                 img.src = e.target.result;
             };
             reader.readAsDataURL(file);
         }
 
-        function runTracer(imageData) {
-            const options = {
-                ltres: 0.5,       
-                qtres: 0.5,       
-                pathomit: 1,      
-                colorsampling: 1, 
-                numberofcolors: 2, 
-                mincolorratio: 0,
-                colorquantcycles: 0,
-                blurradius: 0,    
-                blurdelta: 10
-            };
+        // --- 2. PARSING & SCALING (The "Normalization" Stage) ---
+        function parseSVG(svgStr) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(svgStr, "image/svg+xml");
+            const paths = doc.getElementsByTagName("path");
+            
+            let extractedPaths = [];
+            const samplingRes = 2.0; // mm
 
-            ImageTracer.imageToSVG(imageData, function(svgString) {
-                processSVGToSandPoints(svgString);
-            }, options);
+            // Extract points from SVG paths
+            for(let i=0; i<paths.length; i++) {
+                const p = paths[i];
+                const len = p.getTotalLength();
+                if(len < 5) continue; // Skip noise
+
+                let pts = [];
+                for(let d=0; d<=len; d+=samplingRes) {
+                    const pt = p.getPointAtLength(d);
+                    pts.push({x: pt.x, y: pt.y});
+                }
+                extractedPaths.push(pts);
+            }
+
+            if(extractedPaths.length === 0) return showToast("No shapes found!", "error");
+
+            // Auto-Scale to fit Table (Bounding Box)
+            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+            extractedPaths.forEach(path => path.forEach(p => {
+                if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
+                if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
+            }));
+
+            const w = maxX - minX;
+            const h = maxY - minY;
+            const scale = (tableRadius * 2 * 0.95) / Math.max(w, h);
+            const cx = (minX + maxX)/2;
+            const cy = (minY + maxY)/2;
+
+            // Normalize
+            rawPaths = extractedPaths.map(path => {
+                return path.map(p => ({
+                    x: (p.x - cx) * scale,
+                    y: -(p.y - cy) * scale // Flip Y
+                })).filter(p => Math.hypot(p.x, p.y) < tableRadius);
+            });
+
+            updateFilters(); // Triggers Optimization & Rendering
+            showToast("Trace Successful!", "success");
         }
 
-        function processSVGToSandPoints(svgString) {
-            saveState();
+        // --- 3. OPTIMIZATION & SMOOTHING (The "Pro" Stage) ---
+        function updateFilters() {
+            if(rawPaths.length === 0) return;
 
-            // 1. DOM Injection Fix (Solves iPhone 0-length bug)
-            const tempDiv = document.createElement('div');
-            tempDiv.style.position = 'absolute';
-            tempDiv.style.top = '-9999px';
-            tempDiv.style.left = '-9999px';
-            tempDiv.innerHTML = svgString;
-            document.body.appendChild(tempDiv);
-            
-            const svgEl = tempDiv.querySelector('svg');
-            if(!svgEl) {
-                document.body.removeChild(tempDiv);
-                runBackupPixelTracer(); // FAIL -> Backup
-                return;
-            }
+            const smoothLevel = parseInt(document.getElementById('smoothSlider').value);
+            document.getElementById('smoothVal').textContent = smoothLevel;
 
-            const paths = svgEl.getElementsByTagName("path");
-            let tempPoints = [];
-            const resolution = 2.0; 
-            
-            // 2. Extract Points
-            for(let i = 0; i < paths.length; i++) {
-                const path = paths[i];
-                let totalLen = 0;
-                try { totalLen = path.getTotalLength(); } catch(e) { continue; }
-                
-                if(totalLen < 2) continue; 
-                
-                let stroke = [];
-                for (let dist = 0; dist <= totalLen; dist += resolution) {
-                    const pt = path.getPointAtLength(dist);
-                    stroke.push({x: pt.x, y: pt.y});
-                }
-                tempPoints.push(stroke);
-            }
-            
-            document.body.removeChild(tempDiv); // Cleanup
-
-            // 3. Validation
-            if(tempPoints.length === 0) {
-                console.log("Vector Engine Failed. Switching to Pixel Engine.");
-                runBackupPixelTracer();
-                return;
-            }
-
-            // 4. Auto-Scale Logic
-            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-            for(let stroke of tempPoints) {
-                for(let p of stroke) {
-                    if(p.x < minX) minX = p.x;
-                    if(p.x > maxX) maxX = p.x;
-                    if(p.y < minY) minY = p.y;
-                    if(p.y > maxY) maxY = p.y;
-                }
-            }
-            
-            const contentW = maxX - minX;
-            const contentH = maxY - minY;
-            const centerX = (minX + maxX) / 2;
-            const centerY = (minY + maxY) / 2;
-            const tableR = parseFloat(document.getElementById('cfgRadius').value);
-            const scaleFactor = (tableR * 2 * 0.95) / Math.max(contentW, contentH);
-            
-            let finalPoints = [];
-            for(let stroke of tempPoints) {
-                finalPoints.push({type: 'break'});
-                for(let p of stroke) {
-                    const tx = (p.x - centerX) * scaleFactor;
-                    const ty = -(p.y - centerY) * scaleFactor; 
-                    if (Math.hypot(tx, ty) < tableR) {
-                        finalPoints.push({x: tx, y: ty, type:'point'});
-                    }
-                }
-            }
-            
-            if(finalPoints.length > 0) {
-                finalPoints.push({type: 'break'});
-                rawPoints = finalPoints; 
-                showToast(`Vector Trace Success!`, 'success');
-                render(); 
-                generateCode();
-            } else {
-                runBackupPixelTracer();
-            }
-        }
-
-        // --- BACKUP PIXEL TRACER (With Smoothing) ---
-        function runBackupPixelTracer() {
-            if(!lastImageData) { showToast("Trace Failed completely.", 'error'); return; }
-            showToast("Vector failed. Running Pixel Smoothing...", 'info');
-            
-            const data = lastImageData.data;
-            const w = lastImageData.width;
-            const h = lastImageData.height;
-            const tableR = parseFloat(document.getElementById('cfgRadius').value);
-            
-            let points = [];
-            
-            // Simple Edge Detect
-            for(let y=2; y<h-2; y+=2) {
-                for(let x=2; x<w-2; x+=2) {
-                    const idx = (y*w+x)*4;
-                    const c = (data[idx]+data[idx+1]+data[idx+2])/3;
-                    // Check right neighbor
-                    const idxR = (y*w+(x+2))*4;
-                    const cR = (data[idxR]+data[idxR+1]+data[idxR+2])/3;
-                    
-                    if(Math.abs(c - cR) > 50) {
-                        // Map to table
-                        const mx = ((x/w)*2-1)*tableR*0.9;
-                        const my = -((y/h)*2-1)*tableR*0.9;
-                        if(Math.hypot(mx,my) < tableR) points.push({x:mx, y:my});
-                    }
-                }
-            }
-
-            // Sort points to reduce jumping
-            if(points.length < 10) { showToast("No image detected.", 'error'); return; }
-            
+            // A. PATH SORTING (Traveling Salesman - Greedy)
+            // Reorder shapes to minimize travel time
+            let pool = [...rawPaths];
             let sorted = [];
-            let current = points[0]; 
-            points.splice(0,1);
-            sorted.push(current);
-            
-            // Naive Nearest Neighbor Sort
-            while(points.length > 0) {
-                let closest = -1;
-                let minDist = Infinity;
-                // Optimization: Search only a window of points, not all (too slow otherwise)
-                let searchLimit = Math.min(points.length, 500); 
-                
-                for(let i=0; i<searchLimit; i++) {
-                    const d = Math.hypot(current.x-points[i].x, current.y-points[i].y);
-                    if(d < minDist) { minDist = d; closest = i; }
+            let currentPos = {x:0, y:0}; // Start at center
+
+            while(pool.length > 0) {
+                let bestIdx = -1;
+                let bestDist = Infinity;
+                let reverseBest = false;
+
+                for(let i=0; i<pool.length; i++) {
+                    const p = pool[i];
+                    const start = p[0];
+                    const end = p[p.length-1];
+
+                    // Dist to Start
+                    const dStart = Math.hypot(start.x-currentPos.x, start.y-currentPos.y);
+                    if(dStart < bestDist) {
+                        bestDist = dStart;
+                        bestIdx = i;
+                        reverseBest = false;
+                    }
+
+                    // Dist to End (if we draw it backwards)
+                    const dEnd = Math.hypot(end.x-currentPos.x, end.y-currentPos.y);
+                    if(dEnd < bestDist) {
+                        bestDist = dEnd;
+                        bestIdx = i;
+                        reverseBest = true;
+                    }
                 }
+
+                let chosen = pool[bestIdx];
+                if(reverseBest) chosen.reverse();
                 
-                if(minDist > 15.0) { // Jump
-                    sorted.push({type:'break'});
-                }
-                
-                current = points[closest];
-                sorted.push(current);
-                points.splice(closest, 1);
+                sorted.push(chosen);
+                currentPos = chosen[chosen.length-1];
+                pool.splice(bestIdx, 1);
             }
 
-            // APPLY SMOOTHING (Chaikin's Algorithm lite)
+            // B. SMOOTHING (Chaikin's Algorithm)
+            // Runs iteratively based on slider
             let smoothed = [];
-            for(let i=0; i<sorted.length-1; i++) {
-                let p1 = sorted[i];
-                let p2 = sorted[i+1];
-                if(p1.type==='break' || p2.type==='break') {
-                    smoothed.push(p1);
-                    continue;
+            
+            sorted.forEach(path => {
+                let sp = [...path];
+                for(let i=0; i<smoothLevel; i++) {
+                    sp = chaikinSmooth(sp);
                 }
-                // Average
-                smoothed.push({ x: 0.75*p1.x + 0.25*p2.x, y: 0.75*p1.y + 0.25*p2.y });
-                smoothed.push({ x: 0.25*p1.x + 0.75*p2.x, y: 0.25*p1.y + 0.75*p2.y });
-            }
-            
-            rawPoints = smoothed;
-            rawPoints.push({type:'break'});
-            
-            showToast("Backup Trace Complete.", 'success');
+                smoothed.push({type: 'break'});
+                sp.forEach(p => smoothed.push({type:'point', x:p.x, y:p.y}));
+            });
+            smoothed.push({type:'break'});
+
+            processedPoints = smoothed;
+            generateGCode();
             render();
-            generateCode();
         }
 
+        function chaikinSmooth(points) {
+            if(points.length < 3) return points;
+            let newPts = [points[0]];
+            for(let i=0; i<points.length-1; i++) {
+                const p0 = points[i];
+                const p1 = points[i+1];
+                
+                // Cut corners at 25% and 75%
+                const Q = { x: 0.75*p0.x + 0.25*p1.x, y: 0.75*p0.y + 0.25*p1.y };
+                const R = { x: 0.25*p0.x + 0.75*p1.x, y: 0.25*p0.y + 0.75*p1.y };
+                
+                newPts.push(Q);
+                newPts.push(R);
+            }
+            newPts.push(points[points.length-1]);
+            return newPts;
+        }
 
-        // --- ENGINE (Updated with V17 Mechanics) ---
-        function generateCode() {
-            if(rawPoints.length === 0) return;
-            
+        // --- 4. ENGINE (V17 Kinematics) ---
+        function generateGCode() {
+            if(processedPoints.length < 2) return;
+
             const L1 = parseFloat(document.getElementById('cfgL1').value);
             const L2 = parseFloat(document.getElementById('cfgL2').value);
-            const gearRatio = parseFloat(document.getElementById('cfgGear').value);
-            const tableR = parseFloat(document.getElementById('cfgRadius').value);
-            const minDelay = parseFloat(document.getElementById('cfgMinDelay').value);
-            const smoothDist = parseFloat(document.getElementById('smoothSlider').value);
-            const symCount = parseInt(document.getElementById('symSlider').value);
+            const gear = parseFloat(document.getElementById('cfgGear').value);
+            const minDelay = 50; 
             
-            // Speed Settings
-            const centerDelay = parseFloat(document.getElementById('cfgCenterDelay').value);
-            const perimDelay = parseFloat(document.getElementById('cfgPerimDelay').value);
-
-            // Corrected Scale (1/16th Microstepping)
-            const STEPS_PER_DEG = 8.888888;
-            const STEPS_PER_RAD = STEPS_PER_DEG * (180/Math.PI);
-
-            let points = [];
-            for (let s = 0; s < symCount; s++) {
-                const ang = s * (Math.PI * 2 / symCount);
-                const cos = Math.cos(ang), sin = Math.sin(ang);
-                for(let p of rawPoints) {
-                    if(p.type === 'break') { points.push({type:'break'}); continue; }
-                    points.push({x: p.x * cos - p.y * sin, y: p.x * sin + p.y * cos});
-                }
-                if(s < symCount-1) points.push({type:'break'});
-            }
-
-            let clean = [];
-            let lastP = null;
-            
-            let firstPoint = points.find(p => p.type !== 'break');
-            if(firstPoint) {
-                const ang = Math.atan2(firstPoint.y, firstPoint.x);
-                clean.push({x: tableR * Math.cos(ang), y: tableR * Math.sin(ang)});
-                lastP = clean[0];
-            } else {
-                clean.push({x: tableR, y: 0});
-                lastP = clean[0];
-            }
-
-            for(let p of points) {
-                if(p.type === 'break') continue; 
-                let d = Math.hypot(p.x, p.y);
-                if(d > tableR) { let r = tableR/d; p.x*=r; p.y*=r; }
-                if(!lastP) { clean.push(p); lastP = p; }
-                else {
-                    if(Math.hypot(p.x - lastP.x, p.y - lastP.y) >= smoothDist) {
-                        clean.push(p); lastP = p;
-                    }
-                }
-            }
-
-            let lastPoint = clean[clean.length-1];
-            if(lastPoint) {
-                const ang = Math.atan2(lastPoint.y, lastPoint.x);
-                clean.push({x: tableR * Math.cos(ang), y: tableR * Math.sin(ang)});
-            }
-            
-            if(clean.length < 2) return;
-
-            let interp = [clean[0]];
-            for(let i=0; i<clean.length-1; i++) {
-                let p1 = clean[i], p2 = clean[i+1];
-                let dist = Math.hypot(p2.x-p1.x, p2.y-p1.y);
-                let steps = Math.max(1, Math.ceil(dist/1.0)); 
-                for(let k=1; k<=steps; k++) {
-                    let t = k/steps;
-                    interp.push({ x: p1.x+(p2.x-p1.x)*t, y: p1.y+(p2.y-p1.y)*t });
-                }
-            }
+            // Steps calc
+            const STEPS_PER_RAD = 8.888888 * (180/Math.PI);
 
             let cmds = [];
-            let prevB = 0, prevE = 0, totalTime = 0;
-            let start = calcIK(interp[0].x, interp[0].y, 0, 0, L1, L2, gearRatio, STEPS_PER_RAD);
-            prevB = start.b; prevE = start.e;
-            
-            simulatedPath = [];
-            simulatedPath.push(calcFK(prevB, prevE, L1, L2, gearRatio, STEPS_PER_RAD));
+            let time = 0;
+            let prevB=0, prevE=0;
 
-            for(let i=1; i<interp.length; i++) {
-                let p = interp[i], prevP = interp[i-1];
-                let ik = calcIK(p.x, p.y, prevB, prevE, L1, L2, gearRatio, STEPS_PER_RAD);
+            // Initial Move
+            const startPt = processedPoints.find(p=>p.type==='point');
+            if(startPt) {
+                const ik = calcIK(startPt.x, startPt.y, 0, 0, L1, L2, gear, STEPS_PER_RAD);
+                prevB = ik.b; prevE = ik.e;
+            }
+
+            // Iterate
+            for(let i=0; i<processedPoints.length; i++) {
+                const p = processedPoints[i];
+                if(p.type === 'break') continue;
+
+                // Simple scaling speed (slower near center)
+                let r = Math.hypot(p.x, p.y);
+                let delay = 500 + (2500 * (r/tableRadius)); // 500us center, 3000us edge
+
+                let ik = calcIK(p.x, p.y, prevB, prevE, L1, L2, gear, STEPS_PER_RAD);
                 let db = Math.round(ik.b - prevB);
                 let de = Math.round(ik.e - prevE);
 
-                if(db !== 0 || de !== 0) {
-                    
-                    // --- SPEED SCALING LOGIC (FROM V16/17) ---
-                    let distFromCenter = Math.hypot(p.x, p.y);
-                    let rFactor = distFromCenter / tableR;
-                    if(rFactor > 1.0) rFactor = 1.0;
-                    
-                    // Linear scaling
-                    let delay = centerDelay + ((perimDelay - centerDelay) * rFactor);
-                    if(delay < minDelay) delay = minDelay;
-                    
-                    // BRESENHAM FIX: No dividing by 2!
+                if(db!==0 || de!==0) {
                     cmds.push(`G1 ${de} ${db} ${Math.round(delay)}`);
-                    
-                    let maxSteps = Math.max(Math.abs(db), Math.abs(de));
-                    totalTime += (maxSteps * delay); // Single delay per step
-                    
+                    let steps = Math.max(Math.abs(db), Math.abs(de));
+                    time += steps * delay;
                     prevB += db; prevE += de;
-                    simulatedPath.push(calcFK(prevB, prevE, L1, L2, gearRatio, STEPS_PER_RAD));
                 }
             }
 
-            generatedGCode = cmds.join('\n');
-            document.getElementById('stepsOutput').value = generatedGCode;
+            gcode = cmds.join('\n');
             
-            let sec = Math.round(totalTime / 1000000);
-            let min = Math.floor(sec/60); sec = sec%60;
-            document.getElementById('timeEstimate').textContent = `${min}m ${sec}s`;
-            
-            render();
+            // Time Calc
+            let sec = Math.round(time/1000000);
+            let m = Math.floor(sec/60);
+            document.getElementById('timeEst').textContent = `${m}m ${sec%60}s`;
+            document.getElementById('ptCount').textContent = processedPoints.length;
         }
 
+        // --- KINEMATICS UTILS ---
         function getShortestRot(r, l) {
             let d = (r - l) / (2*Math.PI);
             let o = Math.round(d);
             return r - (o * 2 * Math.PI);
         }
 
-        // --- ROBUST INVERSE KINEMATICS (V17 Singularity Logic) ---
         function calcIK(x, y, lb, le, l1, l2, gr, spr) {
             let d = Math.hypot(x, y);
             let max = l1+l2;
             if(d > max) { x = x*max/d; y = y*max/d; d=max; }
-            
-            // Center Pass-Through Fix:
-            // If near center, force base to stay put and just fold elbow
-            if(d < 1.0) {
-                // Keep base angle, calculate fold
-                let currentBaseAngle = -lb / spr;
-                // Target is effectively a fold (PI internal angle) relative to base
-                let targetElbow = -(Math.PI + gr * currentBaseAngle) * spr;
-                return { b: lb, e: targetElbow };
+            if(d < 1.0) { // Center Singularity Fix
+                let curBase = -lb / spr;
+                return { b: lb, e: -(Math.PI + gr * curBase) * spr };
             }
 
             let lt1 = -lb / spr;
             let cb = (d*d - l1*l1 - l2*l2)/(2*l1*l2);
             cb = Math.max(-1, Math.min(1, cb));
             let b1 = Math.acos(cb), b2 = -Math.acos(cb);
+            
             let k1_1 = l1 + l2*Math.cos(b1), k2_1 = l2*Math.sin(b1);
             let t1_1 = getShortestRot(Math.atan2(y,x) - Math.atan2(k2_1, k1_1), lt1);
+            
             let k1_2 = l1 + l2*Math.cos(b2), k2_2 = l2*Math.sin(b2);
             let t1_2 = getShortestRot(Math.atan2(y,x) - Math.atan2(k2_2, k1_2), lt1);
+
             let bs1 = -t1_1 * spr, es1 = -(b1 + gr*t1_1) * spr;
             let bs2 = -t1_2 * spr, es2 = -(b2 + gr*t1_2) * spr;
+
             let c1 = Math.abs(bs1-lb) + Math.abs(es1-le);
             let c2 = Math.abs(bs2-lb) + Math.abs(es2-le);
             return (c1<=c2) ? {b:bs1, e:es1} : {b:bs2, e:es2};
         }
 
-        function calcFK(b, e, l1, l2, gr, spr) {
-            let a = -b/spr;
-            let comb = -e/spr;
-            let beta = comb - (gr*a);
-            return {
-                x: l1*Math.cos(a) + l2*Math.cos(a+beta),
-                y: l1*Math.sin(a) + l2*Math.sin(a+beta)
-            };
+        // --- RENDER ---
+        function render() {
+            const width = canvas.width / window.devicePixelRatio;
+            const height = canvas.height / window.devicePixelRatio;
+            const size = Math.min(width, height);
+            const scale = (size/2) / (tableRadius*1.05);
+            const cx = width/2;
+            const cy = height/2;
+
+            ctx.clearRect(0,0,width,height);
+
+            // Bed
+            ctx.beginPath(); ctx.arc(cx, cy, tableRadius*scale, 0, Math.PI*2);
+            ctx.strokeStyle = "#333"; ctx.lineWidth=2; ctx.stroke();
+
+            // Paths
+            if(processedPoints.length === 0) return;
+
+            const limitPct = parseInt(document.getElementById('simSlider').value);
+            const limitIdx = Math.floor((processedPoints.length * limitPct)/100);
+
+            ctx.beginPath();
+            ctx.strokeStyle = "#d2b48c"; ctx.lineWidth = 1.5;
+
+            let isMove = true;
+            for(let i=0; i<limitIdx; i++) {
+                const p = processedPoints[i];
+                if(p.type==='break') { isMove=true; continue; }
+                
+                const px = cx + p.x*scale;
+                const py = cy - p.y*scale;
+
+                if(isMove) { ctx.moveTo(px, py); isMove=false; }
+                else ctx.lineTo(px, py);
+            }
+            ctx.stroke();
+
+            // Head
+            if(limitIdx > 0 && limitIdx < processedPoints.length) {
+                const last = processedPoints[limitIdx];
+                if(last.type === 'point') {
+                    ctx.beginPath();
+                    ctx.arc(cx+last.x*scale, cy-last.y*scale, 4, 0, Math.PI*2);
+                    ctx.fillStyle = "#2ecc71"; ctx.fill();
+                }
+            }
         }
 
-        function updateUI() {
-            document.getElementById('smoothVal').textContent = document.getElementById('smoothSlider').value + 'mm';
-            document.getElementById('symVal').textContent = document.getElementById('symSlider').value + 'x';
-        }
-        function setTool(t) {
-            currentTool = t;
-            document.getElementById('drawToolBtn').className = t==='draw'?'active-tool':'secondary';
-            document.getElementById('eraseToolBtn').className = t==='erase'?'active-tool':'secondary';
-        }
-        function showToast(msg, type='info') {
-            const b = document.getElementById('status-banner');
-            b.textContent = msg; 
-            b.className = type === 'success' ? 'status-success' : (type === 'error' ? 'status-error' : 'status-info');
-            b.style.opacity = 1;
-            setTimeout(()=> b.style.opacity = 0, 3000);
-        }
-        function copyToClipboard() {
-            if(!generatedGCode) return showToast("Draw something first!");
-            document.getElementById('stepsOutput').select();
-            document.execCommand('copy');
-            showToast("Copied to clipboard!", 'success');
-        }
-        function downloadGcode() {
-            if(!generatedGCode) return showToast("Draw something first!");
-            const blob = new Blob([generatedGCode], {type:'text/plain'});
-            const a = document.createElement('a');
-            a.download = 'pattern.txt'; a.href = URL.createObjectURL(blob); a.click();
+        // --- UTILS ---
+        function showToast(msg, type) {
+            const t = document.getElementById('status-toast');
+            t.textContent = msg; t.className = type; t.style.opacity = 1;
+            setTimeout(()=>t.style.opacity=0, 3000);
         }
         function sendToTable() {
-            if(!generatedGCode) return showToast("Draw something first!");
-            showToast("Sending...");
-            fetch(`${BASE_URL}/send_gcode_block`, {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({gcode: generatedGCode, speed_override: null}) // Important: null speed override
+            if(!gcode) return showToast("No pattern!", "error");
+            showToast("Sending...", "info");
+            fetch(window.location.origin + '/send_gcode_block', {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({gcode: gcode, speed_override: null})
             }).then(r=>r.json()).then(d=>{
-                if(d.success) showToast("Sent Successfully!", 'success');
-                else showToast("Error: " + d.error, 'error');
-            }).catch(e=>showToast("Net Error", 'error'));
+                if(d.success) showToast("Sent!", "success");
+                else showToast("Error", "error");
+            }).catch(()=>showToast("Network Error", "error"));
         }
-        function openNav() { document.getElementById("mySidebar").style.width = "200px"; }
-        function closeNav() { document.getElementById("mySidebar").style.width = "0"; }
-        function toggleTheme() {
-            const b = document.body;
-            const n = b.getAttribute('data-theme')==='dark'?'light':'dark';
-            b.setAttribute('data-theme', n); localStorage.setItem('theme', n);
-            document.getElementById('themeToggle').textContent = n==='dark'?'🌙':'☀️';
-            render();
+        function downloadCode() {
+            if(!gcode) return;
+            const b = new Blob([gcode], {type:'text/plain'});
+            const a = document.createElement('a');
+            a.download = 'trace_pro.txt'; a.href = URL.createObjectURL(b); a.click();
+        }
+        function clearTable() {
+            processedPoints = []; gcode = ""; rawPaths = [];
+            render(); showToast("Cleared", "info");
         }
 
         init();
