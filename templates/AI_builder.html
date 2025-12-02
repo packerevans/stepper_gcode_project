@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Packers Sand Pro (Rim Optimized)</title>
+    <title>Packers Sand Pro (Perimeter Rider)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -189,7 +189,6 @@
             <button class="action" onclick="prepareGCode()" style="margin-bottom:15px; font-size:1.1em;">⚙️ Prepare Path</button>
 
             <div style="text-align:center; font-size:12px; margin-bottom:10px; color:#666;">
-                Lines: <span id="ptCount" style="font-weight:bold;">0</span> | 
                 Status: <span id="statusTxt" style="font-weight:bold; color:var(--primary);">Drawing Mode</span>
             </div>
 
@@ -216,8 +215,8 @@
 
     <script>
         // --- GLOBAL STATE ---
-        let rawPoints = []; // User Input (Blue Line)
-        let processedPoints = []; // Final G-Code Points (Red Line - includes travel)
+        let rawPoints = []; 
+        let processedPoints = []; 
         let historyStack = [];
         let isDrawing = false;
         let currentTool = 'draw';
@@ -333,17 +332,13 @@
             ctx.beginPath(); ctx.arc(0, 0, tableR*scale, 0, Math.PI*2);
             ctx.strokeStyle = dark ? '#444' : '#ddd'; ctx.lineWidth = 2; ctx.stroke();
 
-            // RENDER LOGIC:
             const showingFinal = (processedPoints.length > 0);
             const dataToShow = showingFinal ? processedPoints : rawPoints;
             const limit = Math.floor(dataToShow.length * (prog/100));
-            
-            // Color: Blue for Edit, Red for Final Simulation
             const color = showingFinal ? '#ff0000' : (dark ? 'cyan' : '#007bff');
 
             ctx.lineWidth = 1.5;
             
-            // Symmetry Loop
             const loopCount = showingFinal ? 1 : sym;
 
             for(let s=0; s<loopCount; s++) {
@@ -367,7 +362,6 @@
                 }
                 ctx.stroke();
                 
-                // Draw Head
                 if(limit > 0 && limit < dataToShow.length) {
                     const tip = dataToShow[limit];
                     if(tip.type !== 'break') {
@@ -376,7 +370,6 @@
                         ctx.fillStyle = color; ctx.fill();
                     }
                 }
-
                 ctx.restore();
             }
             ctx.restore();
@@ -476,10 +469,10 @@
             render();
         }
 
-        // --- OPTIMIZER LOGIC (THE BRAIN) ---
+        // --- OPTIMIZER (THE PERIMETER RIDER) ---
         function prepareGCode() {
             if(rawPoints.length === 0) return showToast("Draw something first!", "error");
-            showToast("Calculating Best Route...", "info");
+            showToast("Optimizing with Perimeter Rider...", "info");
 
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
             const sym = parseInt(document.getElementById('symSlider').value);
@@ -512,40 +505,26 @@
                 });
             }
 
-            // --- STEP 3: FIND ABSOLUTE BEST START POINT (Closest to Rim) ---
-            // Scan EVERY pixel of EVERY shape to find the one closest to perimeter.
-            let bestShapeIdx = -1;
-            let bestPointIdx = -1;
-            let maxDist = -1;
-
+            // 3. Find Absolute Best Start (Rim Closest)
+            let bestShapeIdx = -1, bestPointIdx = -1, maxDist = -1;
             for (let i=0; i<pool.length; i++) {
                 for (let j=0; j<pool[i].length; j++) {
                     let d = Math.hypot(pool[i][j].x, pool[i][j].y);
-                    if (d > maxDist) {
-                        maxDist = d;
-                        bestShapeIdx = i;
-                        bestPointIdx = j;
-                    }
+                    if (d > maxDist) { maxDist = d; bestShapeIdx = i; bestPointIdx = j; }
                 }
             }
 
-            // Extract Start Shape
+            // Orient Start Shape
             let startShape = pool[bestShapeIdx];
             pool.splice(bestShapeIdx, 1);
-
-            // ROTATE/REVERSE Start Shape to align with that point
-            // Check if closed loop (tolerance 5mm)
             let dClose = Math.hypot(startShape[0].x - startShape[startShape.length-1].x, startShape[0].y - startShape[startShape.length-1].y);
-            if(dClose < 5.0) {
-                // Closed Loop: Rotate points so bestPointIdx is the first point
-                const part1 = startShape.slice(bestPointIdx);
-                const part2 = startShape.slice(0, bestPointIdx);
-                startShape = part1.concat(part2);
-                startShape.push(startShape[0]); // Ensure visual closure
-            } else {
-                // Open Line: Reverse if best point is at the end
-                // If best point is in middle, we can't do much without cutting line. 
-                // Just check ends.
+            
+            if(dClose < 5.0) { // Closed Loop
+                let p1 = startShape.slice(bestPointIdx);
+                let p2 = startShape.slice(0, bestPointIdx);
+                startShape = p1.concat(p2);
+                startShape.push(startShape[0]);
+            } else { // Open Line
                 let dStart = Math.hypot(startShape[0].x, startShape[0].y);
                 let dEnd = Math.hypot(startShape[startShape.length-1].x, startShape[startShape.length-1].y);
                 if(dEnd > dStart) startShape.reverse();
@@ -554,7 +533,7 @@
             let sortedShapes = [startShape];
             let curPos = startShape[startShape.length-1];
 
-            // --- STEP 4: GREEDY TSP SORT ---
+            // 4. TSP + Rotational Sort
             while(pool.length > 0) {
                 let bestIdx = -1;
                 let bestDist = Infinity;
@@ -566,18 +545,11 @@
                     let isClosed = Math.hypot(s[0].x - s[s.length-1].x, s[0].y - s[s.length-1].y) < 5.0;
 
                     if(isClosed) {
-                        // Check EVERY point for entry
                         for(let k=0; k<s.length; k++) {
                             let d = Math.hypot(curPos.x - s[k].x, curPos.y - s[k].y);
-                            if(d < bestDist) {
-                                bestDist = d;
-                                bestIdx = i;
-                                bestStartIdx = k;
-                                bestIsReverse = false;
-                            }
+                            if(d < bestDist) { bestDist = d; bestIdx = i; bestStartIdx = k; bestIsReverse = false; }
                         }
                     } else {
-                        // Check Start vs End
                         let dStart = Math.hypot(curPos.x - s[0].x, curPos.y - s[0].y);
                         if(dStart < bestDist) { bestDist=dStart; bestIdx=i; bestStartIdx=0; bestIsReverse=false; }
                         let dEnd = Math.hypot(curPos.x - s[s.length-1].x, curPos.y - s[s.length-1].y);
@@ -585,7 +557,6 @@
                     }
                 }
 
-                // Process Winner
                 let winner = pool[bestIdx];
                 let isWinnerClosed = Math.hypot(winner[0].x - winner[winner.length-1].x, winner[0].y - winner[winner.length-1].y) < 5.0;
 
@@ -603,55 +574,95 @@
                 pool.splice(bestIdx, 1);
             }
 
-            // --- STEP 5: ADD ENTRY/EXIT LINES ---
+            // 5. Entry/Exit + PERIMETER RIDER (The "Turtle Leg" Fix)
             if(sortedShapes.length > 0) {
-                // Entry Line (From rim to first point)
+                // Entry Line
                 let first = sortedShapes[0];
                 let fPt = first[0];
                 let fAng = Math.atan2(fPt.y, fPt.x);
                 first.unshift({x: tableR*Math.cos(fAng), y: tableR*Math.sin(fAng), type:'point'});
 
-                // Exit Line (From last point to rim)
+                // Exit Line
                 let last = sortedShapes[sortedShapes.length-1];
                 let lPt = last[last.length-1];
                 let lAng = Math.atan2(lPt.y, lPt.x);
                 last.push({x: tableR*Math.cos(lAng), y: tableR*Math.sin(lAng), type:'point'});
             }
 
-            // --- STEP 6: FLATTEN & INTERPOLATE FOR VISUALS ---
             processedPoints = [];
             const res = 1.0; 
             
             for(let i=0; i<sortedShapes.length; i++) {
                 let s = sortedShapes[i];
                 
-                // Add travel line from previous shape
+                // === THE PERIMETER RIDER LOGIC ===
+                // Instead of jumping directly from Prev-End to Curr-Start,
+                // re-trace Prev's perimeter to get as close as possible to Curr-Start.
                 if(i > 0) {
                     let prev = sortedShapes[i-1];
-                    let p1 = prev[prev.length-1];
-                    let p2 = s[0];
-                    let d = Math.hypot(p2.x-p1.x, p2.y-p1.y);
-                    let steps = Math.ceil(d/res);
+                    let currStart = s[0];
+                    let prevEnd = prev[prev.length-1]; // We are physically here
+
+                    // Find point on 'prev' closest to 'currStart'
+                    let bestExitIdx = -1;
+                    let minDist = Infinity;
+                    for(let k=0; k<prev.length; k++) {
+                        let d = Math.hypot(prev[k].x - currStart.x, prev[k].y - currStart.y);
+                        if(d < minDist) { minDist = d; bestExitIdx = k; }
+                    }
+
+                    // Are we close enough to justify re-tracing? 
+                    // If jump is small, just jump. If shape is far, retrace.
+                    
+                    // Generate re-trace path: From End (index length-1) -> bestExitIdx
+                    let isPrevClosed = Math.hypot(prev[0].x - prev[prev.length-1].x, prev[0].y - prev[prev.length-1].y) < 5.0;
+                    
+                    let retracePath = [];
+                    if(isPrevClosed) {
+                        // Check shortest way around loop: Forward from 0 or Backward from L-1
+                        // Current position is effectively index 0 (since L-1 == 0)
+                        let distFwd = bestExitIdx; 
+                        let distBk = (prev.length-1) - bestExitIdx;
+                        
+                        if(distFwd < distBk) {
+                            // Forward: 0 -> 1 -> ... -> bestExitIdx
+                            for(let m=0; m<=bestExitIdx; m++) retracePath.push(prev[m]);
+                        } else {
+                            // Backward: L-1 -> L-2 -> ... -> bestExitIdx
+                            for(let m=prev.length-1; m>=bestExitIdx; m--) retracePath.push(prev[m]);
+                        }
+                    } else {
+                        // Open Line: Must walk backwards
+                        for(let m=prev.length-1; m>=bestExitIdx; m--) retracePath.push(prev[m]);
+                    }
+
+                    // Add Retrace Path (Hidden Travel)
+                    retracePath.forEach(p => processedPoints.push(p));
+                    
+                    // Now we are at prev[bestExitIdx]. Interpolate jump to currStart.
+                    let startJump = prev[bestExitIdx];
+                    let jumpDist = Math.hypot(currStart.x - startJump.x, currStart.y - startJump.y);
+                    let steps = Math.ceil(jumpDist/res);
                     for(let k=1; k<=steps; k++) {
                         let t = k/steps;
                         processedPoints.push({
-                            x: p1.x + (p2.x-p1.x)*t,
-                            y: p1.y + (p2.y-p1.y)*t,
+                            x: startJump.x + (currStart.x-startJump.x)*t,
+                            y: startJump.y + (currStart.y-startJump.y)*t,
                             type: 'point'
                         });
                     }
                 }
+
                 s.forEach(p => processedPoints.push(p));
             }
 
-            // Generate G-Code
             generatedGCode = generateGCodeStringFromProcessed();
             
             document.getElementById('statusTxt').innerText = "Path Optimized (Red)";
             document.getElementById('statusTxt').style.color = "green";
             document.getElementById('progressSlider').value = 0;
             render(); 
-            showToast("Path Optimized!", "success");
+            showToast("Perimeter Rider Path Ready!", "success");
         }
 
         // --- G-CODE GENERATION ---
