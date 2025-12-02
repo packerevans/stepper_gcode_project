@@ -1,233 +1,126 @@
 // ==========================================
-//      ARDUINO SAND TABLE FIRMWARE v5
-//      Restored Pins + Auto-Pause (M0)
+//      ARDUINO SAND TABLE FIRMWARE v6
+//      Center-Safe & Buffer Fix
 // ==========================================
 
-// --- YOUR SPECIFIC MOTOR PINS ---
 const int stepBase = 8;
 const int dirBase  = 9;
 const int stepArm  = 10;
 const int dirArm   = 11;
 const int enPin    = 3;
 
-// Microstepping Pins (Optional, keep if you use them)
-const int ms1 = 4;
-const int ms2 = 5;
-const int ms3 = 6;
+// Settings
+#define BAUD_RATE 115200 // Ensure your Raspberry Pi uses 115200 too!
 
-// --- SETTINGS ---
-// MUST match your Python script (usually 9600 for older scripts)
-#define BAUD_RATE 9600 
-
-// --- STATE VARIABLES ---
 bool paused = true; 
 const int MAX_QUEUE_SIZE = 50;
 
-// Command Types
-const int CMD_MOVE = 0;
-const int CMD_WAIT = 1;
-
 struct GCommand {
-  int type;       // 0 = Move, 1 = Wait (M0)
-  long armSteps;
-  long baseSteps;
+  int type; // 0=Move, 1=Wait
+  long arm;
+  long base;
   int speed;
 };
 
 GCommand queue[MAX_QUEUE_SIZE];
-int queueHead = 0;
-int queueTail = 0;
-int queueCount = 0;
+int head = 0;
+int tail = 0;
+int count = 0;
 
 void setup() {
   Serial.begin(BAUD_RATE);
-  
   pinMode(stepBase, OUTPUT); pinMode(dirBase, OUTPUT);
   pinMode(stepArm, OUTPUT);  pinMode(dirArm, OUTPUT);
   pinMode(enPin, OUTPUT);
-
-  // 1/32 Microstepping Setup (from your original file)
-  pinMode(ms1, OUTPUT); pinMode(ms2, OUTPUT); pinMode(ms3, OUTPUT);
-  digitalWrite(ms1, HIGH); digitalWrite(ms2, HIGH); digitalWrite(ms3, HIGH);
-
   digitalWrite(enPin, HIGH); // Start Disabled
-  Serial.println(F("READY"));
+  Serial.println("READY");
 }
 
 void loop() {
-  // Always check for new data
   if (Serial.available()) handleSerial();
-
-  // Execute queue if not paused by user
-  if (!paused && queueCount > 0) {
-    executeNextCommand();
-  }
+  if (!paused && count > 0) executeNext();
 }
 
 void handleSerial() {
   while (Serial.available() > 0) {
-    String cmd = Serial.readStringUntil('\n');
-    cmd.trim();
-    if (cmd.length() == 0) continue;
+    String c = Serial.readStringUntil('\n');
+    c.trim();
+    if (c.length() == 0) continue;
 
-    // --- IMMEDIATE COMMANDS ---
-    if (cmd.equalsIgnoreCase("PAUSE")) {
-      paused = true;
-      digitalWrite(enPin, HIGH);
-      Serial.println(F("Paused"));
-    }
-    else if (cmd.equalsIgnoreCase("RESUME") || cmd.equalsIgnoreCase("R")) {
-      paused = false;
-      digitalWrite(enPin, LOW);
-      Serial.println(F("Resumed"));
-    }
-    else if (cmd.equalsIgnoreCase("CLEAR")) {
-      queueHead = queueTail = queueCount = 0;
-      Serial.println(F("Cleared"));
-    }
-    // --- QUEUED COMMANDS ---
-    else if (cmd.startsWith("G1")) {
-      parseAndEnqueueMove(cmd);
-    }
-    else if (cmd.startsWith("M0") || cmd.startsWith("m0")) {
-      enqueuePause();
-    }
+    if (c.equalsIgnoreCase("PAUSE")) { paused = true; digitalWrite(enPin, HIGH); Serial.println("Paused"); }
+    else if (c.equalsIgnoreCase("RESUME") || c.equalsIgnoreCase("R")) { paused = false; digitalWrite(enPin, LOW); Serial.println("Resumed"); }
+    else if (c.equalsIgnoreCase("CLEAR")) { head = tail = count = 0; Serial.println("Cleared"); }
+    else if (c.startsWith("G1")) parseMove(c);
+    else if (c.startsWith("M0")) parseWait();
   }
 }
 
-void enqueuePause() {
-  if (queueCount < MAX_QUEUE_SIZE) {
-    queue[queueTail].type = CMD_WAIT;
-    queue[queueTail].armSteps = 0;
-    queue[queueTail].baseSteps = 0;
-    queue[queueTail].speed = 0;
-    
-    queueTail = (queueTail + 1) % MAX_QUEUE_SIZE;
-    queueCount++;
+void parseWait() {
+  if (count < MAX_QUEUE_SIZE) {
+    queue[tail] = {1, 0, 0, 0};
+    tail = (tail + 1) % MAX_QUEUE_SIZE;
+    count++;
+  } else Serial.println("ERR:FULL");
+}
+
+void parseMove(String c) {
+  // G1 <Elbow> <Base> <Speed>
+  int s1 = c.indexOf(' ');
+  int s2 = c.indexOf(' ', s1 + 1);
+  int s3 = c.indexOf(' ', s2 + 1);
+  
+  if (s1 > 0 && s2 > 0) {
+    long arm = c.substring(s1 + 1, s2).toInt();
+    long base = (s3 > 0) ? c.substring(s2 + 1, s3).toInt() : c.substring(s2 + 1).toInt();
+    int spd = (s3 > 0) ? c.substring(s3 + 1).toInt() : 1000;
+
+    if (count < MAX_QUEUE_SIZE) {
+      queue[tail] = {0, arm, base, spd};
+      tail = (tail + 1) % MAX_QUEUE_SIZE;
+      count++;
+    } else Serial.println("ERR:FULL");
+  }
+}
+
+void executeNext() {
+  GCommand cmd = queue[head];
+  head = (head + 1) % MAX_QUEUE_SIZE;
+  count--;
+
+  if (cmd.type == 0) {
+    move(cmd.arm, cmd.base, cmd.speed);
+    Serial.println("Done"); 
   } else {
-    Serial.println(F("ERROR:OVERFLOW"));
-  }
-}
-
-void parseAndEnqueueMove(String cmd) {
-  // Expected Format: G1 <Elbow> <Base> <Speed>
-  long armSteps = 0;
-  long baseSteps = 0;
-  int speed = 1000;
-
-  int s1 = cmd.indexOf(' ');
-  int s2 = cmd.indexOf(' ', s1 + 1);
-  int s3 = cmd.indexOf(' ', s2 + 1);
-
-  if (s1 > 0) {
-    // Parse Elbow (Arm)
-    armSteps = cmd.substring(s1 + 1, s2).toInt();
-    
-    if (s2 > 0) {
-      if (s3 > 0) {
-        // Parse Base & Speed
-        baseSteps = cmd.substring(s2 + 1, s3).toInt();
-        speed = cmd.substring(s3 + 1).toInt();
-      } else {
-        // Parse Base only (default speed)
-        baseSteps = cmd.substring(s2 + 1).toInt();
+    // BLOCKING WAIT
+    Serial.println("PAUSED_AT_M0");
+    digitalWrite(enPin, HIGH); 
+    while (true) {
+      if (Serial.available()) {
+        String s = Serial.readStringUntil('\n');
+        s.trim();
+        if (s.equalsIgnoreCase("R") || s.equalsIgnoreCase("RESUME")) break;
       }
+      delay(50);
     }
-  }
-
-  if (queueCount < MAX_QUEUE_SIZE) {
-    queue[queueTail].type = CMD_MOVE;
-    queue[queueTail].armSteps = armSteps;
-    queue[queueTail].baseSteps = baseSteps;
-    queue[queueTail].speed = speed;
-    
-    queueTail = (queueTail + 1) % MAX_QUEUE_SIZE;
-    queueCount++;
-  } else {
-    Serial.println(F("ERROR:OVERFLOW"));
+    digitalWrite(enPin, LOW);
+    Serial.println("RESUMED_FROM_M0");
   }
 }
 
-void executeNextCommand() {
-  GCommand cmd = queue[queueHead];
-  queueHead = (queueHead + 1) % MAX_QUEUE_SIZE;
-  queueCount--;
-  
-  if (cmd.type == CMD_MOVE) {
-    moveBresenham(cmd.armSteps, cmd.baseSteps, cmd.speed);
-    Serial.println(F("Done")); // Signal to Python that we are ready for more
-  } 
-  else if (cmd.type == CMD_WAIT) {
-    performProgrammedPause();
-  }
-}
-
-// Blocks everything until "R" or "RESUME" is received
-void performProgrammedPause() {
-  Serial.println(F("Done")); // Tell Python the "M0" command is processed so it doesn't timeout
-  // NOTE: Depending on your Python script, you might want to send a specific status here.
-  // But usually sending "Done" satisfies the script to wait.
-  
-  digitalWrite(enPin, HIGH); // Disable motors (Pause state)
-  
-  bool waiting = true;
-  while (waiting) {
-    if (Serial.available()) {
-      String input = Serial.readStringUntil('\n');
-      input.trim();
-      if (input.equalsIgnoreCase("R") || input.equalsIgnoreCase("RESUME")) {
-        waiting = false;
-        digitalWrite(enPin, LOW); // Re-enable motors
-        // Serial.println(F("Resumed")); // Optional debug
-      }
-      // Handle immediate stop even during M0
-      if (input.equalsIgnoreCase("PAUSE")) {
-        paused = true; 
-      }
-    }
-    delay(50);
-  }
-}
-
-void moveBresenham(long da, long db, int delayUs) {
-  digitalWrite(enPin, LOW); // Enable motors
-
+void move(long da, long db, int dly) {
   digitalWrite(dirArm, (da >= 0) ? HIGH : LOW);
   digitalWrite(dirBase, (db >= 0) ? HIGH : LOW);
+  long ad = abs(da), bd = abs(db);
+  long steps = max(ad, bd);
+  long aa = steps/2, ab = steps/2;
 
-  long ad = abs(da);
-  long bd = abs(db);
-  
-  long steps = max(ad, bd); 
-
-  long accA = steps / 2;
-  long accB = steps / 2;
-
-  for (long i = 0; i < steps; i++) {
-    // Check Serial frequently to prevent buffer overflow
+  for (long i=0; i<steps; i++) {
     if (Serial.available()) handleSerial();
-    
-    // Immediate pause check
     if (paused) break;
-
-    accA -= ad;
-    if (accA < 0) {
-      pulsePin(stepArm);
-      accA += steps;
-    }
-
-    accB -= bd;
-    if (accB < 0) {
-      pulsePin(stepBase);
-      accB += steps;
-    }
     
-    delayMicroseconds(delayUs);
+    aa -= ad; if (aa < 0) { digitalWrite(10, HIGH); delayMicroseconds(2); digitalWrite(10, LOW); aa += steps; }
+    ab -= bd; if (ab < 0) { digitalWrite(8, HIGH); delayMicroseconds(2); digitalWrite(8, LOW); ab += steps; }
+    
+    delayMicroseconds(dly);
   }
-}
-
-void pulsePin(int pin) {
-  digitalWrite(pin, HIGH);
-  delayMicroseconds(2); 
-  digitalWrite(pin, LOW);
 }
