@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Packers Sand Pro (Perimeter Fix)</title>
+    <title>Packers Sand Pro (Final Logic)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -91,6 +91,14 @@
         .slider-row { margin-bottom: 15px; background: rgba(0,0,0,0.05); padding: 8px; border-radius: 8px; }
         .slider-header { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; font-weight: bold; }
         input[type="range"] { width: 100%; accent-color: var(--secondary); }
+        
+        /* Smooth slider specific */
+        #progressSlider {
+            -webkit-appearance: none; width: 100%; height: 8px; border-radius: 5px; background: #d3d3d3; outline: none;
+        }
+        #progressSlider::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--secondary); cursor: pointer;
+        }
 
         details { background: rgba(0,0,0,0.05); padding: 10px; border-radius: 8px; margin-top: 10px; }
         summary { cursor: pointer; font-weight: bold; font-size: 13px; }
@@ -168,22 +176,22 @@
             </div>
 
             <hr style="border:0; border-top:1px solid #ddd; margin: 15px 0;">
-
-            <div class="slider-row">
-                <div class="slider-header"><span>SMOOTHING</span> <span id="smoothVal">2mm</span></div>
-                <input type="range" id="smoothSlider" min="0" max="5" value="2" oninput="updateUI()">
-            </div>
             
              <div class="slider-row">
                 <div class="slider-header"><span>SYMMETRY</span> <span id="symVal">1x</span></div>
                 <input type="range" id="symSlider" min="1" max="12" value="1" step="1" oninput="updateUI()">
             </div>
 
+            <div class="slider-row">
+                <div class="slider-header"><span>SIMULATION (Start ⮕ Finish)</span> <span id="progVal">100%</span></div>
+                <input type="range" id="progressSlider" min="0" max="100" value="100" oninput="render()">
+            </div>
+
             <button class="action" onclick="prepareGCode()" style="margin-bottom:15px; font-size:1.1em;">⚙️ Prepare Path</button>
 
             <div style="text-align:center; font-size:12px; margin-bottom:10px; color:#666;">
                 Lines: <span id="ptCount" style="font-weight:bold;">0</span> | 
-                Status: <span id="statusTxt" style="font-weight:bold; color:var(--primary);">Ready</span>
+                Status: <span id="statusTxt" style="font-weight:bold; color:var(--primary);">Drawing Mode</span>
             </div>
 
             <div class="btn-group">
@@ -209,8 +217,8 @@
 
     <script>
         // --- GLOBAL STATE ---
-        let rawPoints = []; // User Input (Drawing/Trace)
-        let processedPoints = []; // Final G-Code Points (with Perimeter fix)
+        let rawPoints = []; // User Input (Red Line)
+        let processedPoints = []; // Final Path (Green Line)
         let historyStack = [];
         let isDrawing = false;
         let currentTool = 'draw';
@@ -302,8 +310,9 @@
         function resetStatus() {
             generatedGCode = null;
             processedPoints = [];
-            document.getElementById('statusTxt').innerText = "Not Converted";
+            document.getElementById('statusTxt').innerText = "Drawing Mode";
             document.getElementById('statusTxt').style.color = "orange";
+            document.getElementById('progressSlider').value = 100;
         }
 
         // --- RENDERER ---
@@ -315,6 +324,8 @@
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
             const sym = parseInt(document.getElementById('symSlider').value);
             const dark = document.body.getAttribute('data-theme') === 'dark';
+            const prog = parseInt(document.getElementById('progressSlider').value);
+            document.getElementById('progVal').textContent = prog + '%';
 
             ctx.save();
             ctx.translate(origin.x, origin.y);
@@ -323,21 +334,34 @@
             ctx.beginPath(); ctx.arc(0, 0, tableR*scale, 0, Math.PI*2);
             ctx.strokeStyle = dark ? '#444' : '#ddd'; ctx.lineWidth = 2; ctx.stroke();
 
-            // Render Mode: Show processed if available, else show raw
-            const dataToShow = (processedPoints.length > 0) ? processedPoints : rawPoints;
-            const color = (processedPoints.length > 0) ? (dark ? '#00ff00' : '#2ecc71') : (dark ? 'cyan' : '#b08d5c');
+            // DECIDE WHAT TO SHOW:
+            // If processedPoints exists (Prepare Path clicked), show GREEN line.
+            // Else show RED raw line.
+            const showingFinal = (processedPoints.length > 0);
+            const dataToShow = showingFinal ? processedPoints : rawPoints;
+            
+            // Limit by Slider
+            const limit = Math.floor(dataToShow.length * (prog/100));
+            
+            // Color Logic
+            const color = showingFinal ? (dark ? '#00ff00' : '#2ecc71') : (dark ? 'cyan' : '#ff5555');
 
             ctx.lineWidth = 1.5;
             
+            // Draw
             for(let s=0; s<sym; s++) {
+                // If showing final processed path, symmetry is already baked in, so only run loop once (s=0) unless raw
+                if (showingFinal && s > 0) break; 
+
                 const ang = s * (Math.PI*2/sym);
-                ctx.save(); ctx.rotate(ang);
+                ctx.save(); 
+                if(!showingFinal) ctx.rotate(ang); // Rotate only for raw preview
                 
                 ctx.beginPath();
                 ctx.strokeStyle = color;
                 
                 let isMove = true;
-                for(let i=0; i<dataToShow.length; i++) {
+                for(let i=0; i<limit; i++) {
                     const p = dataToShow[i];
                     if(p.type === 'break') { isMove = true; continue; }
                     
@@ -348,6 +372,17 @@
                     else ctx.lineTo(px, py);
                 }
                 ctx.stroke();
+                
+                // Draw Head at tip
+                if(limit > 0 && limit < dataToShow.length) {
+                    const tip = dataToShow[limit];
+                    if(tip.type !== 'break') {
+                        ctx.beginPath(); 
+                        ctx.arc(tip.x*scale, -tip.y*scale, 4, 0, Math.PI*2);
+                        ctx.fillStyle = color; ctx.fill();
+                    }
+                }
+
                 ctx.restore();
             }
             ctx.restore();
@@ -437,7 +472,6 @@
                 })).filter(p => Math.hypot(p.x, p.y) < tableR);
             });
 
-            // Flatten to rawPoints
             rawPoints = [];
             normalizedStrokes.forEach(s => {
                 rawPoints.push({type:'break'});
@@ -458,11 +492,10 @@
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
             const sym = parseInt(document.getElementById('symSlider').value);
             
-            // 1. Expand Symmetry into a single continuous list of shapes
+            // 1. Expand Symmetry into a single continuous list
             let allShapes = [];
             let currentShape = [];
 
-            // Extract shapes from rawPoints
             rawPoints.forEach(p => {
                 if(p.type === 'break') {
                     if(currentShape.length > 0) allShapes.push(currentShape);
@@ -473,7 +506,6 @@
             });
             if(currentShape.length > 0) allShapes.push(currentShape);
 
-            // Apply Symmetry duplication
             let fullDesignShapes = [];
             for(let s=0; s<sym; s++) {
                 const ang = s * (Math.PI*2/sym);
@@ -489,15 +521,10 @@
                 });
             }
 
-            // 2. TSP Optimization (Order shapes by nearest neighbor)
+            // 2. TSP Optimization
             let sortedShapes = [];
             let pool = [...fullDesignShapes];
-            let curPos = {x:0, y:0}; // Robot starts at center usually, but we want rim start.
-            // Actually, for TSP, we just optimize relative to each other.
-            
-            // Find shape closest to RIM for start? Or closest to previous end?
-            // Let's just start with closest to (R, 0)
-            curPos = {x: tableR, y: 0}; 
+            let curPos = {x: tableR, y: 0}; 
 
             while(pool.length > 0) {
                 let bestI = -1, bestDist = Infinity, rev = false;
@@ -505,14 +532,11 @@
                     const s = pool[i];
                     const start = s[0];
                     const end = s[s.length-1];
-                    
                     const dStart = Math.hypot(start.x-curPos.x, start.y-curPos.y);
                     if(dStart < bestDist) { bestDist=dStart; bestI=i; rev=false; }
-                    
                     const dEnd = Math.hypot(end.x-curPos.x, end.y-curPos.y);
                     if(dEnd < bestDist) { bestDist=dEnd; bestI=i; rev=true; }
                 }
-                
                 let choice = pool[bestI];
                 if(rev) choice.reverse();
                 sortedShapes.push(choice);
@@ -522,22 +546,20 @@
 
             // 3. Perimeter Projection (Start/End Fix)
             if(sortedShapes.length > 0) {
-                // Fix Start: Project first point of first shape to rim
                 let firstShape = sortedShapes[0];
                 let firstPt = firstShape[0];
                 let angS = Math.atan2(firstPt.y, firstPt.x);
                 let startRim = { x: tableR * Math.cos(angS), y: tableR * Math.sin(angS), type: 'point' };
-                firstShape.unshift(startRim); // Add to beginning
+                firstShape.unshift(startRim);
                 
-                // Fix End: Project last point of last shape to rim
                 let lastShape = sortedShapes[sortedShapes.length-1];
                 let lastPt = lastShape[lastShape.length-1];
                 let angE = Math.atan2(lastPt.y, lastPt.x);
                 let endRim = { x: tableR * Math.cos(angE), y: tableR * Math.sin(angE), type: 'point' };
-                lastShape.push(endRim); // Add to end
+                lastShape.push(endRim);
             }
 
-            // 4. Flatten to processedPoints
+            // 4. Flatten
             processedPoints = [];
             sortedShapes.forEach(s => {
                 processedPoints.push({type:'break'});
@@ -545,19 +567,19 @@
             });
             processedPoints.push({type:'break'});
 
-            // 5. Generate G-Code
+            // 5. Generate G-Code (Using Script.html Math)
             generatedGCode = generateGCodeStringFromProcessed();
             
             // Update UI
-            document.getElementById('statusTxt').innerText = "Converted & Ready";
+            document.getElementById('statusTxt').innerText = "Path Ready";
             document.getElementById('statusTxt').style.color = "green";
             const lines = generatedGCode ? generatedGCode.split('\n').length : 0;
             document.getElementById('ptCount').textContent = lines;
-            render(); // Renders the Green path now
+            render(); 
             showToast("Path Prepared!", "success");
         }
 
-        // --- G-CODE GENERATION ---
+        // --- G-CODE GENERATION (EXACT COPY OF SCRIPT.HTML LOGIC) ---
         function generateGCodeStringFromProcessed() {
             const L1 = parseFloat(document.getElementById('cfgL1').value);
             const L2 = parseFloat(document.getElementById('cfgL2').value);
@@ -573,7 +595,6 @@
             let prevBase = 0;
             let prevElbow = 0;
 
-            // Initialize at first point
             let firstPt = processedPoints.find(p => p.type === 'point');
             if(!firstPt) return null;
 
@@ -581,21 +602,16 @@
             prevBase = startIK.base_steps;
             prevElbow = startIK.elbow_steps;
 
-            // Iterate points
             let flatPts = processedPoints.filter(p => p.type === 'point');
             
-            // Interpolate for smoothness
-            const res = 1.0; // mm
+            const res = 1.0; 
             for(let i=0; i<flatPts.length-1; i++) {
                 let p1 = flatPts[i];
                 let p2 = flatPts[i+1];
                 
                 let dist = Math.hypot(p2.x-p1.x, p2.y-p1.y);
-                // If distance is huge (e.g. between shapes), jump it? 
-                // Since we sorted shapes, jumps should be minimal, or we drag through sand.
-                // Sand tables usually drag.
-                
                 let steps = Math.max(1, Math.ceil(dist / res));
+                
                 for(let j=1; j<=steps; j++) {
                     let t = j/steps;
                     let x = p1.x + (p2.x - p1.x)*t;
@@ -611,6 +627,7 @@
                         if(rFactor > 1) rFactor = 1;
                         let delay = Math.round(centerDelay + ((perimDelay - centerDelay) * rFactor));
                         
+                        // EXACT FORMAT: G1 ELBOW BASE DELAY
                         cmds.push(`G1 ${dElbow} ${dBase} ${delay}`);
                         prevBase += dBase; prevElbow += dElbow;
                     }
@@ -619,7 +636,7 @@
             return cmds.join('\n');
         }
 
-        // --- IK MATH ---
+        // --- IK MATH (EXACT COPY OF SCRIPT.HTML) ---
         function getShortestRotation(raw, last) {
             let diff = (raw - last) / (2 * Math.PI);
             let offset = Math.round(diff);
@@ -721,8 +738,9 @@
             document.getElementById('btnErase').className = t==='erase'?'active':'secondary';
         }
         function updateUI() {
-            document.getElementById('smoothVal').textContent = document.getElementById('smoothSlider').value + 'mm';
+            // document.getElementById('smoothVal').textContent = document.getElementById('smoothSlider').value + 'mm'; // Removed smooth slider
             document.getElementById('symVal').textContent = document.getElementById('symSlider').value + 'x';
+            render();
         }
         function showToast(msg, type) {
             const t = document.getElementById('status-toast');
