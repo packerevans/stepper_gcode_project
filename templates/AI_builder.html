@@ -198,7 +198,8 @@
 
             <div class="btn-group">
                 <button onclick="sendToTable()" class="active">🚀 Run</button>
-                <button onclick="downloadGcode()" class="secondary">💾 Save</button>
+                <!-- UPDATED BUTTON -->
+                <button onclick="saveToPi()" class="secondary">💾 Save to Pi</button>
             </div>
 
             <details>
@@ -801,11 +802,43 @@
             }).catch(()=>showToast("Network Error", "error"));
         }
         
-        function downloadGcode() {
+        // --- NEW SAVE FUNCTIONALITY ---
+        async function saveToPi() {
             if(!generatedGCode) return showToast("Click 'Prepare Path' first!", "error");
-            const blob = new Blob([generatedGCode], {type:'text/plain'});
-            const a = document.createElement('a');
-            a.download = 'pattern.txt'; a.href = URL.createObjectURL(blob); a.click();
+            
+            let name = prompt("Name your design:", "my_pattern");
+            if(name === null) return; // Cancelled
+            
+            // cleanup name
+            name = name.trim().replace(/[^a-zA-Z0-9_-]/g, "_");
+            if(name === "") name = "pattern_" + Date.now();
+            if(!name.toLowerCase().endsWith(".txt")) name += ".txt";
+
+            showToast("Saving to Pi...", "info");
+
+            try {
+                // We assume an endpoint '/save_design' exists on the server
+                // that accepts JSON { filename: "...", gcode: "..." }
+                const response = await fetch(BASE_URL + '/save_design', {
+                    method: 'POST', 
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({
+                        filename: name,
+                        gcode: generatedGCode
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if(data.success) {
+                    showToast("✅ Saved: " + name, "success");
+                } else {
+                    showToast("❌ Error: " + (data.error || "Server denied"), "error");
+                }
+            } catch(e) {
+                console.error(e);
+                showToast("❌ Network Error (Check Server)", "error");
+            }
         }
 
         // --- UTILS ---
@@ -863,4 +896,5 @@
     </script>
 </body>
 </html>
+
 
