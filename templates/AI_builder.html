@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Packers Sand Table (Auto-Scale Engine)</title>
+    <title>Packers Sand Table (Hybrid Engine)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -298,7 +298,7 @@
 
             <div class="btn-group">
                 <input type="file" id="traceInput" accept="image/*" onchange="handleImageUpload(this)">
-                <button class="ai-btn" onclick="document.getElementById('traceInput').click()">✨ AI Vector Trace</button>
+                <button class="ai-btn" onclick="document.getElementById('traceInput').click()">✨ AI Trace (Hybrid)</button>
             </div>
             
             <div class="btn-group">
@@ -370,6 +370,9 @@
         let generatedGCode = "";
         let origin = { x: 0, y: 0 };
         let scale = 1;
+        
+        // Backup Image Data storage
+        let lastImageData = null; 
         
         // UI State
         let cursorPosition = { x: 0, y: 0, visible: false };
@@ -676,7 +679,7 @@
             render();
         }
 
-        // --- NUCLEAR AI VECTOR TRACER (Auto-Contrast + Auto-Scale) ---
+        // --- HYBRID AI VECTOR TRACER ---
         function handleImageUpload(input) {
             const file = input.files[0];
             if(!file) return;
@@ -702,14 +705,13 @@
                     canvas.height = h;
                     const ctx = canvas.getContext('2d');
                     
-                    // PRE-PROCESS: Force High Contrast
-                    // This turns gray lines into black lines, helping the elephant drawing
-                    ctx.filter = 'grayscale(100%) contrast(150%) brightness(95%)';
+                    // CLEANED UP: No Filters. Trust the library.
                     ctx.fillStyle = "white"; 
                     ctx.fillRect(0, 0, w, h);
                     ctx.drawImage(img, 0, 0, w, h);
                     
                     const resizedData = canvas.toDataURL('image/png');
+                    lastImageData = ctx.getImageData(0,0,w,h); // Save for backup
                     runTracer(resizedData);
                 };
                 img.src = e.target.result;
@@ -722,7 +724,7 @@
                 ltres: 0.5,       
                 qtres: 0.5,       
                 pathomit: 1,      
-                colorsampling: 2, // Deterministic sampling
+                colorsampling: 1, 
                 numberofcolors: 2, 
                 mincolorratio: 0,
                 colorquantcycles: 0,
@@ -738,22 +740,31 @@
         function processSVGToSandPoints(svgString) {
             saveState();
 
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(svgString, "image/svg+xml");
-            const svgEl = doc.documentElement;
+            // 1. DOM Injection Fix (Solves iPhone 0-length bug)
+            const tempDiv = document.createElement('div');
+            tempDiv.style.position = 'absolute';
+            tempDiv.style.top = '-9999px';
+            tempDiv.style.left = '-9999px';
+            tempDiv.innerHTML = svgString;
+            document.body.appendChild(tempDiv);
+            
+            const svgEl = tempDiv.querySelector('svg');
+            if(!svgEl) {
+                document.body.removeChild(tempDiv);
+                runBackupPixelTracer(); // FAIL -> Backup
+                return;
+            }
+
             const paths = svgEl.getElementsByTagName("path");
-            
-            // --- NUCLEAR FIX: AUTO-SCALE ---
-            // Don't trust SVG Width/Height. They are often wrong or missing.
-            // Instead, we will collect ALL points and calculate the Bounding Box ourselves.
-            
             let tempPoints = [];
-            const resolution = 1.5; 
+            const resolution = 2.0; 
             
+            // 2. Extract Points
             for(let i = 0; i < paths.length; i++) {
                 const path = paths[i];
                 let totalLen = 0;
                 try { totalLen = path.getTotalLength(); } catch(e) { continue; }
+                
                 if(totalLen < 2) continue; 
                 
                 let stroke = [];
@@ -764,14 +775,16 @@
                 tempPoints.push(stroke);
             }
             
+            document.body.removeChild(tempDiv); // Cleanup
+
+            // 3. Validation
             if(tempPoints.length === 0) {
-                 // Debug: Paste error to textarea so user can see it
-                document.getElementById('stepsOutput').value = "Error: SVG produced no paths. " + svgString;
-                showToast("No valid paths found.", 'error');
+                console.log("Vector Engine Failed. Switching to Pixel Engine.");
+                runBackupPixelTracer();
                 return;
             }
 
-            // Calculate Bounding Box of actual drawn lines
+            // 4. Auto-Scale Logic
             let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
             for(let stroke of tempPoints) {
                 for(let p of stroke) {
@@ -782,26 +795,19 @@
                 }
             }
             
-            // Calculate Scaling
             const contentW = maxX - minX;
             const contentH = maxY - minY;
             const centerX = (minX + maxX) / 2;
             const centerY = (minY + maxY) / 2;
-            
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
-            // Fit largest dimension to table diameter (minus 5% padding)
             const scaleFactor = (tableR * 2 * 0.95) / Math.max(contentW, contentH);
             
-            // Finalize Points
             let finalPoints = [];
             for(let stroke of tempPoints) {
                 finalPoints.push({type: 'break'});
                 for(let p of stroke) {
-                    // Normalize to Center (0,0) and Scale
                     const tx = (p.x - centerX) * scaleFactor;
-                    const ty = -(p.y - centerY) * scaleFactor; // Flip Y
-                    
-                    // Circular Crop
+                    const ty = -(p.y - centerY) * scaleFactor; 
                     if (Math.hypot(tx, ty) < tableR) {
                         finalPoints.push({x: tx, y: ty, type:'point'});
                     }
@@ -811,12 +817,93 @@
             if(finalPoints.length > 0) {
                 finalPoints.push({type: 'break'});
                 rawPoints = finalPoints; 
-                showToast(`Trace Success! Auto-Scaled.`, 'success');
+                showToast(`Vector Trace Success!`, 'success');
                 render(); 
                 generateCode();
             } else {
-                showToast("Paths found but outside crop area.", 'error');
+                runBackupPixelTracer();
             }
+        }
+
+        // --- BACKUP PIXEL TRACER (With Smoothing) ---
+        function runBackupPixelTracer() {
+            if(!lastImageData) { showToast("Trace Failed completely.", 'error'); return; }
+            showToast("Vector failed. Running Pixel Smoothing...", 'info');
+            
+            const data = lastImageData.data;
+            const w = lastImageData.width;
+            const h = lastImageData.height;
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            
+            let points = [];
+            
+            // Simple Edge Detect
+            for(let y=2; y<h-2; y+=2) {
+                for(let x=2; x<w-2; x+=2) {
+                    const idx = (y*w+x)*4;
+                    const c = (data[idx]+data[idx+1]+data[idx+2])/3;
+                    // Check right neighbor
+                    const idxR = (y*w+(x+2))*4;
+                    const cR = (data[idxR]+data[idxR+1]+data[idxR+2])/3;
+                    
+                    if(Math.abs(c - cR) > 50) {
+                        // Map to table
+                        const mx = ((x/w)*2-1)*tableR*0.9;
+                        const my = -((y/h)*2-1)*tableR*0.9;
+                        if(Math.hypot(mx,my) < tableR) points.push({x:mx, y:my});
+                    }
+                }
+            }
+
+            // Sort points to reduce jumping
+            if(points.length < 10) { showToast("No image detected.", 'error'); return; }
+            
+            let sorted = [];
+            let current = points[0]; 
+            points.splice(0,1);
+            sorted.push(current);
+            
+            // Naive Nearest Neighbor Sort
+            while(points.length > 0) {
+                let closest = -1;
+                let minDist = Infinity;
+                // Optimization: Search only a window of points, not all (too slow otherwise)
+                let searchLimit = Math.min(points.length, 500); 
+                
+                for(let i=0; i<searchLimit; i++) {
+                    const d = Math.hypot(current.x-points[i].x, current.y-points[i].y);
+                    if(d < minDist) { minDist = d; closest = i; }
+                }
+                
+                if(minDist > 15.0) { // Jump
+                    sorted.push({type:'break'});
+                }
+                
+                current = points[closest];
+                sorted.push(current);
+                points.splice(closest, 1);
+            }
+
+            // APPLY SMOOTHING (Chaikin's Algorithm lite)
+            let smoothed = [];
+            for(let i=0; i<sorted.length-1; i++) {
+                let p1 = sorted[i];
+                let p2 = sorted[i+1];
+                if(p1.type==='break' || p2.type==='break') {
+                    smoothed.push(p1);
+                    continue;
+                }
+                // Average
+                smoothed.push({ x: 0.75*p1.x + 0.25*p2.x, y: 0.75*p1.y + 0.25*p2.y });
+                smoothed.push({ x: 0.25*p1.x + 0.75*p2.x, y: 0.25*p1.y + 0.75*p2.y });
+            }
+            
+            rawPoints = smoothed;
+            rawPoints.push({type:'break'});
+            
+            showToast("Backup Trace Complete.", 'success');
+            render();
+            generateCode();
         }
 
 
