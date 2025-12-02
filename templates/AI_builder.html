@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Packers Sand Pro (Auto-Pause)</title>
+    <title>Packers Sand Pro (Center Fix)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -32,7 +32,6 @@
             display: flex; flex-direction: column; overflow: hidden;
         }
 
-        /* --- Header --- */
         .nav-bar {
             display: flex; justify-content: space-between; align-items: center;
             padding: 10px 15px; background: var(--panel);
@@ -49,7 +48,6 @@
             color: #fff; display: block; font-weight: 500;
         }
 
-        /* --- Layout --- */
         .app-container {
             display: flex; flex-direction: column; height: 100%; width: 100%;
             padding: 10px; box-sizing: border-box; gap: 10px; overflow-y: auto;
@@ -64,7 +62,6 @@
             .controls-panel { flex: 1; border-radius: 16px; background: var(--panel); padding: 15px; }
         }
 
-        /* --- Canvas --- */
         .canvas-wrapper {
             position: relative; width: 95%; height: 95%; margin: auto;
             aspect-ratio: 1/1; border-radius: 50%;
@@ -75,7 +72,6 @@
         body[data-theme='dark'] .canvas-wrapper { background: #222; border-color: var(--secondary); }
         canvas { display: block; width: 100%; height: 100%; border-radius: 50%; }
 
-        /* --- Controls --- */
         h2 { margin: 0 0 15px 0; font-size: 1.2rem; color: var(--secondary); text-align: center; }
         .btn-group { display: flex; gap: 8px; margin-bottom: 12px; }
         button {
@@ -222,9 +218,8 @@
     <div id="status-toast"></div>
 
     <script>
-        // --- GLOBAL STATE ---
-        let rawPoints = []; // User Input (Blue Line)
-        let processedPoints = []; // Final G-Code Points (Red Line)
+        let rawPoints = []; 
+        let processedPoints = []; 
         let historyStack = [];
         let isDrawing = false;
         let currentTool = 'draw';
@@ -236,7 +231,6 @@
         const ctx = canvas.getContext('2d');
         const BASE_URL = window.location.origin;
 
-        // --- INIT ---
         function init() {
             resizeCanvas();
             window.addEventListener('resize', resizeCanvas);
@@ -340,7 +334,6 @@
             ctx.beginPath(); ctx.arc(0, 0, tableR*scale, 0, Math.PI*2);
             ctx.strokeStyle = dark ? '#444' : '#ddd'; ctx.lineWidth = 2; ctx.stroke();
 
-            // RENDER LOGIC:
             const showingFinal = (processedPoints.length > 0);
             const dataToShow = showingFinal ? processedPoints : rawPoints;
             const limit = Math.floor(dataToShow.length * (prog/100));
@@ -478,7 +471,7 @@
             render();
         }
 
-        // --- OPTIMIZER (PERIMETER RIDER) ---
+        // --- OPTIMIZER ---
         function prepareGCode() {
             if(rawPoints.length === 0) return showToast("Draw something first!", "error");
             showToast("Optimizing Path...", "info");
@@ -486,7 +479,6 @@
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
             const sym = parseInt(document.getElementById('symSlider').value);
             
-            // 1. Separate Shapes
             let shapes = [];
             let curShape = [];
             rawPoints.forEach(p => {
@@ -499,7 +491,6 @@
             });
             if(curShape.length > 0) shapes.push(curShape);
 
-            // 2. Expand Symmetry
             let pool = [];
             for(let s=0; s<sym; s++) {
                 const ang = s * (Math.PI*2/sym);
@@ -514,7 +505,6 @@
                 });
             }
 
-            // 3. Find Absolute Best Start (Rim Closest)
             let bestShapeIdx = -1, bestPointIdx = -1, maxDist = -1;
             for (let i=0; i<pool.length; i++) {
                 for (let j=0; j<pool[i].length; j++) {
@@ -541,7 +531,6 @@
             let sortedShapes = [startShape];
             let curPos = startShape[startShape.length-1];
 
-            // 4. TSP + Rotational Sort
             while(pool.length > 0) {
                 let bestIdx = -1;
                 let bestDist = Infinity;
@@ -582,7 +571,6 @@
                 pool.splice(bestIdx, 1);
             }
 
-            // 5. Entry/Exit + Perimeter Rider
             if(sortedShapes.length > 0) {
                 let first = sortedShapes[0];
                 let fPt = first[0];
@@ -592,7 +580,7 @@
                 let last = sortedShapes[sortedShapes.length-1];
                 let lPt = last[last.length-1];
                 let lAng = Math.atan2(lPt.y, lPt.x);
-                // Mark final point as 'exit' for the pause logic
+                // Mark exit for pause
                 last.push({x: tableR*Math.cos(lAng), y: tableR*Math.sin(lAng), type:'exit'});
             }
 
@@ -604,7 +592,6 @@
                 if(i > 0) {
                     let prev = sortedShapes[i-1];
                     let currStart = s[0];
-                    
                     let bestExitIdx = -1;
                     let minDist = Infinity;
                     for(let k=0; k<prev.length; k++) {
@@ -679,9 +666,8 @@
                 let dist = Math.hypot(p2.x-p1.x, p2.y-p1.y);
                 let steps = Math.max(1, Math.ceil(dist / 1.0)); 
                 
-                // --- INSERT PAUSE BEFORE EXIT ---
                 if(p2.type === 'exit') {
-                    cmds.push("M0 ; Pause: Design Done");
+                    cmds.push("M0");
                 }
 
                 for(let j=1; j<=steps; j++) {
@@ -689,6 +675,7 @@
                     let x = p1.x + (p2.x - p1.x)*t;
                     let y = p1.y + (p2.y - p1.y)*t;
 
+                    // Pass previous Base steps to IK so it knows how to handle the center
                     let ik = calculateIK(x, y, prevBase, prevElbow, L1, L2, gearRatio, stepsPerRad);
                     let dBase = Math.round(ik.base_steps - prevBase);
                     let dElbow = Math.round(ik.elbow_steps - prevElbow);
@@ -707,7 +694,7 @@
             return cmds.join('\n');
         }
 
-        // --- IK MATH ---
+        // --- FIXED KINEMATICS (CENTER SAFE) ---
         function getShortestRotation(raw, last) {
             let diff = (raw - last) / (2 * Math.PI);
             let offset = Math.round(diff);
@@ -716,19 +703,33 @@
 
         function calculateIK(x, y, lastBaseSteps, lastElbowSteps, L1, L2, gearRatio, stepsPerRad) {
             let dist = Math.hypot(x, y);
-            const maxReach = L1 + L2;
-            if (dist > maxReach) { x = (x / dist) * maxReach; y = (y / dist) * maxReach; dist = maxReach; }
-
-            if (dist < 1.0) { 
+            
+            // --- SINGULARITY FIX: CENTER LOCK ---
+            if (dist < 2.0) { // If within 2mm of center
+                // Lock Base to where it last was
                 const targetBaseSteps = lastBaseSteps; 
+                
+                // Calculate required elbow steps to be at center
+                // At center (dist=0), elbow is ideally 180 deg (PI) relative to base
+                // Steps = -(PI + GearRatio * BaseAngle) * StepsPerRad
                 const currentBaseAngle = -lastBaseSteps / stepsPerRad;
                 const targetElbowSteps = -(Math.PI + gearRatio * currentBaseAngle) * stepsPerRad;
+                
                 return { base_steps: targetBaseSteps, elbow_steps: targetElbowSteps };
+            }
+
+            // Normal IK Logic
+            const maxReach = L1 + L2;
+            if (dist > maxReach) { 
+                x = (x / dist) * maxReach; 
+                y = (y / dist) * maxReach; 
+                dist = maxReach; 
             }
 
             const lastT1 = -lastBaseSteps / stepsPerRad; 
             let cosBend = (dist*dist - L1*L1 - L2*L2) / (2 * L1 * L2);
             cosBend = Math.max(-1, Math.min(1, cosBend));
+            
             const bend1 = Math.acos(cosBend);
             const bend2 = -Math.acos(cosBend);
 
