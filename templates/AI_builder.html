@@ -651,47 +651,66 @@
             
             const centerDelay = parseFloat(document.getElementById('cfgCenterDelay').value);
             const perimDelay = parseFloat(document.getElementById('cfgPerimDelay').value);
-
-            let cmds = [];
-            let prevBase = 0;
-            let prevElbow = 0;
+            const res = 1.0; 
 
             if(processedPoints.length === 0) return "";
 
-            let firstPt = processedPoints[0];
-            let startIK = calculateIK(firstPt.x, firstPt.y, 0, 0, L1, L2, gearRatio, stepsPerRad);
-            prevBase = startIK.base_steps;
-            prevElbow = startIK.elbow_steps;
+            // 1. Interpolation (Matching interpolateAndGenerate from script.html)
+            let interpolated = [];
+            interpolated.push(processedPoints[0]);
 
             for(let i=0; i<processedPoints.length-1; i++) {
                 let p1 = processedPoints[i];
                 let p2 = processedPoints[i+1];
-                let dist = Math.hypot(p2.x-p1.x, p2.y-p1.y);
-                let steps = Math.max(1, Math.ceil(dist / 1.0)); 
-                
-                if(p2.type === 'exit') {
-                    cmds.push("M0");
-                }
+                let dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+                let steps = Math.ceil(dist / res);
+                steps = Math.max(1, steps);
 
                 for(let j=1; j<=steps; j++) {
                     let t = j/steps;
-                    let x = p1.x + (p2.x - p1.x)*t;
-                    let y = p1.y + (p2.y - p1.y)*t;
+                    let nx = p1.x + (p2.x - p1.x) * t;
+                    let ny = p1.y + (p2.y - p1.y) * t;
+                    interpolated.push({
+                        x: nx, 
+                        y: ny, 
+                        type: (j===steps ? p2.type : 'point') 
+                    });
+                }
+            }
 
-                    // Pass previous Base steps to IK so it knows how to handle the center
-                    let ik = calculateIK(x, y, prevBase, prevElbow, L1, L2, gearRatio, stepsPerRad);
-                    let dBase = Math.round(ik.base_steps - prevBase);
-                    let dElbow = Math.round(ik.elbow_steps - prevElbow);
+            // 2. Step Generation (Matching generateSteps from script.html)
+            let cmds = [];
+            let prevBase = 0;
+            let prevElbow = 0;
 
-                    if(dBase !== 0 || dElbow !== 0) {
-                        let r = Math.hypot(x, y);
-                        let rFactor = r / tableRadius;
-                        if(rFactor > 1) rFactor = 1;
-                        let delay = Math.round(centerDelay + ((perimDelay - centerDelay) * rFactor));
-                        
-                        cmds.push(`G1 ${dElbow} ${dBase} ${delay}`);
-                        prevBase += dBase; prevElbow += dElbow;
-                    }
+            // Init Start IK
+            let startIK = calculateIK(interpolated[0].x, interpolated[0].y, 0, 0, L1, L2, gearRatio, stepsPerRad);
+            prevBase = startIK.base_steps;
+            prevElbow = startIK.elbow_steps;
+
+            for(let i=1; i<interpolated.length; i++) {
+                let p = interpolated[i];
+
+                if(p.type === 'exit') {
+                    cmds.push("M0");
+                }
+
+                let ik = calculateIK(p.x, p.y, prevBase, prevElbow, L1, L2, gearRatio, stepsPerRad);
+                
+                let dBase = Math.round(ik.base_steps - prevBase);
+                let dElbow = Math.round(ik.elbow_steps - prevElbow);
+
+                if(dBase !== 0 || dElbow !== 0) {
+                    let r = Math.hypot(p.x, p.y);
+                    let rFactor = r / tableRadius;
+                    if(rFactor > 1.0) rFactor = 1.0;
+
+                    let delay = Math.round(centerDelay + ((perimDelay - centerDelay) * rFactor));
+
+                    cmds.push(`G1 ${dElbow} ${dBase} ${delay}`);
+                    
+                    prevBase += dBase;
+                    prevElbow += dElbow;
                 }
             }
             return cmds.join('\n');
