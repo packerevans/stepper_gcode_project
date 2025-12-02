@@ -1,6 +1,6 @@
 // ==========================================
-//      ARDUINO SAND TABLE FIRMWARE v2
-//      Optimized with Bresenham's Algorithm
+//      ARDUINO SAND TABLE FIRMWARE v3
+//      Buffer Overflow Fix & Bresenham
 // ==========================================
 
 // --- MOTOR PIN DEFINITIONS ---
@@ -46,7 +46,9 @@ void setup() {
 }
 
 void loop() {
-  handleSerial();
+  // Always check for new data, even when idle
+  if (Serial.available()) handleSerial();
+
   if (!paused && queueCount > 0) {
     executeNextCommand();
   }
@@ -79,7 +81,7 @@ void handleSerial() {
 }
 
 void parseAndEnqueue(String cmd) {
-  // G1 <Elbow> <Base> <Speed>
+  // Expected Format: G1 <Elbow> <Base> <Speed>
   long armSteps = 0;
   long baseSteps = 0;
   int speed = 1000;
@@ -114,7 +116,6 @@ void executeNextCommand() {
   queueHead = (queueHead + 1) % MAX_QUEUE_SIZE;
   queueCount--;
   
-  // Use pure integer Bresenham algorithm
   moveBresenham(cmd.armSteps, cmd.baseSteps, cmd.speed);
   
   Serial.println(F("Done"));
@@ -123,23 +124,24 @@ void executeNextCommand() {
 void moveBresenham(long da, long db, int delayUs) {
   digitalWrite(enPin, LOW); // Enable motors
 
-  // Set Directions
   digitalWrite(dirArm, (da >= 0) ? HIGH : LOW);
   digitalWrite(dirBase, (db >= 0) ? HIGH : LOW);
 
   long ad = abs(da);
   long bd = abs(db);
   
-  long steps = max(ad, bd); // Total steps for the dominant axis
+  long steps = max(ad, bd); 
 
-  // Bresenham's accumulators (start at half threshold to distribute error evenly)
   long accA = steps / 2;
   long accB = steps / 2;
 
   for (long i = 0; i < steps; i++) {
-    // Check Serial strictly every 200 steps to prevent stuttering on fast moves
-    // but still allow pausing long moves
-    if (i % 200 == 0 && Serial.available()) handleSerial();
+    // --- CRITICAL FIX ---
+    // Check Serial EVERY step. 
+    // This prevents the hardware buffer (64 bytes) from overflowing 
+    // when many short lines are sent quickly.
+    if (Serial.available()) handleSerial();
+    
     if (paused) break;
 
     accA -= ad;
@@ -160,6 +162,6 @@ void moveBresenham(long da, long db, int delayUs) {
 
 void pulsePin(int pin) {
   digitalWrite(pin, HIGH);
-  delayMicroseconds(2); // Short pulse is sufficient for drivers
+  delayMicroseconds(2); 
   digitalWrite(pin, LOW);
 }
