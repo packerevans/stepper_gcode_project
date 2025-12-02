@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Packers Sand Pro (Auto-Clear)</title>
+    <title>Packers Sand Pro (Auto-Pause)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -340,6 +340,7 @@
             ctx.beginPath(); ctx.arc(0, 0, tableR*scale, 0, Math.PI*2);
             ctx.strokeStyle = dark ? '#444' : '#ddd'; ctx.lineWidth = 2; ctx.stroke();
 
+            // RENDER LOGIC:
             const showingFinal = (processedPoints.length > 0);
             const dataToShow = showingFinal ? processedPoints : rawPoints;
             const limit = Math.floor(dataToShow.length * (prog/100));
@@ -477,7 +478,7 @@
             render();
         }
 
-        // --- OPTIMIZER (THE PERIMETER RIDER) ---
+        // --- OPTIMIZER (PERIMETER RIDER) ---
         function prepareGCode() {
             if(rawPoints.length === 0) return showToast("Draw something first!", "error");
             showToast("Optimizing Path...", "info");
@@ -591,7 +592,8 @@
                 let last = sortedShapes[sortedShapes.length-1];
                 let lPt = last[last.length-1];
                 let lAng = Math.atan2(lPt.y, lPt.x);
-                last.push({x: tableR*Math.cos(lAng), y: tableR*Math.sin(lAng), type:'point'});
+                // Mark final point as 'exit' for the pause logic
+                last.push({x: tableR*Math.cos(lAng), y: tableR*Math.sin(lAng), type:'exit'});
             }
 
             processedPoints = [];
@@ -677,6 +679,11 @@
                 let dist = Math.hypot(p2.x-p1.x, p2.y-p1.y);
                 let steps = Math.max(1, Math.ceil(dist / 1.0)); 
                 
+                // --- INSERT PAUSE BEFORE EXIT ---
+                if(p2.type === 'exit') {
+                    cmds.push("M0 ; Pause: Design Done");
+                }
+
                 for(let j=1; j<=steps; j++) {
                     let t = j/steps;
                     let x = p1.x + (p2.x - p1.x)*t;
@@ -700,7 +707,7 @@
             return cmds.join('\n');
         }
 
-        // --- IK MATH (EXACT COPY) ---
+        // --- IK MATH ---
         function getShortestRotation(raw, last) {
             let diff = (raw - last) / (2 * Math.PI);
             let offset = Math.round(diff);
@@ -757,9 +764,8 @@
             if(autoClear) {
                 showToast("Fetching Clear Pattern...", "info");
                 try {
-                    // Try to fetch clear.TXT first (user preference)
                     let response = await fetch('./designs/clear.TXT');
-                    if(!response.ok) response = await fetch('./designs/clear.txt'); // Fallback
+                    if(!response.ok) response = await fetch('./designs/clear.txt'); 
                     
                     if(response.ok) {
                         const clearCode = await response.text();
