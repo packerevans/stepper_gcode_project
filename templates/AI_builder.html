@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Packers Sand Pro (Center Fix)</title>
+    <title>AI Sandify (Theta-Rho Output)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -131,7 +131,7 @@
 
     <div class="nav-bar">
         <button style="flex:0; background:none; font-size:24px; color:var(--text); padding:0;" onclick="openNav()">☰</button>
-        <h1 style="margin:0; font-size:1.2rem;">Sand Controller</h1>
+        <h1 style="margin:0; font-size:1.2rem;">AI to Theta-Rho</h1>
         <button style="flex:0; background:none; font-size:20px;" onclick="toggleTheme()">☀️</button>
     </div>
 
@@ -178,39 +178,28 @@
             </div>
 
             <div class="slider-row">
-                <div class="slider-header"><span>SIMULATION (Start ⮕ Finish)</span> <span id="progVal">100%</span></div>
+                <div class="slider-header"><span>PREVIEW</span> <span id="progVal">100%</span></div>
                 <input type="range" id="progressSlider" min="0" max="100" value="100" oninput="render()">
             </div>
 
-            <button class="action" onclick="prepareGCode()" style="margin-bottom:15px; font-size:1.1em;">⚙️ Prepare Path</button>
+            <button class="action" onclick="prepareGCode()" style="margin-bottom:15px; font-size:1.1em;">⚙️ Prepare .thr File</button>
 
             <div style="text-align:center; font-size:12px; margin-bottom:10px; color:#666;">
                 Status: <span id="statusTxt" style="font-weight:bold; color:var(--primary);">Drawing Mode</span>
             </div>
 
-            <div class="toggle-row" style="background:rgba(0,0,0,0.03); padding:8px; border-radius:8px; margin-bottom:10px;">
-                <span style="font-weight:600; font-size:13px;">✨ Auto-Clear Before Run</span>
-                <label class="switch">
-                    <input type="checkbox" id="autoClearMode" checked>
-                    <span class="slider-tog"></span>
-                </label>
-            </div>
-
             <div class="btn-group">
-                <button onclick="sendToTable()" class="active">🚀 Run</button>
-                <button onclick="saveToPi()" class="secondary">💾 Save to Pi</button>
+                <button onclick="downloadGcode()" class="active">💾 Download .thr</button>
             </div>
+            <p style="font-size:11px; color:#666; text-align:center; margin-top:5px;">
+                Use the downloaded file in <b>Sand Table Controller v17</b>
+            </p>
 
             <details>
-                <summary>⚙️ Machine Settings</summary>
+                <summary>⚙️ Table Settings</summary>
                 <div class="settings-grid">
-                    <div><label>Radius</label><input type="number" id="cfgRadius" value="202.6" onchange="resizeCanvas()"></div>
-                    <div><label>Center Speed</label><input type="number" id="cfgCenterDelay" value="500"></div>
-                    <div><label>Rim Speed</label><input type="number" id="cfgPerimDelay" value="3000"></div>
-                    <div><label>Steps/Deg</label><input type="number" id="cfgStepsPerDeg" value="8.888888"></div>
-                    <div><label>Gear Ratio</label><input type="number" id="cfgGearRatio" value="1.125" step="0.001"></div>
-                    <div><label>Arm 1</label><input type="number" id="cfgL1" value="101.3"></div>
-                    <div><label>Arm 2</label><input type="number" id="cfgL2" value="101.3"></div>
+                    <div><label>Radius (mm)</label><input type="number" id="cfgRadius" value="202.6" onchange="resizeCanvas()"></div>
+                    <div><label>Interpolation</label><input type="number" id="cfgResolution" value="1.0"></div>
                 </div>
             </details>
         </div>
@@ -226,11 +215,10 @@
         let currentTool = 'draw';
         let origin = {x:0, y:0};
         let scale = 1;
-        let generatedGCode = null;
+        let generatedThr = null;
 
         const canvas = document.getElementById('drawCanvas');
         const ctx = canvas.getContext('2d');
-        const BASE_URL = window.location.origin;
 
         function init() {
             resizeCanvas();
@@ -309,7 +297,7 @@
         }
 
         function resetStatus() {
-            generatedGCode = null;
+            generatedThr = null;
             processedPoints = [];
             document.getElementById('statusTxt').innerText = "Drawing Mode";
             document.getElementById('statusTxt').style.color = "orange";
@@ -355,7 +343,7 @@
                 let isMove = true;
                 for(let i=0; i<limit; i++) {
                     const p = dataToShow[i];
-                    if(p.type === 'break') { isMove = true; continue; }
+                    if(p.type === 'break' || p.type === 'exit') { isMove = true; continue; }
                     
                     const px = p.x * scale;
                     const py = -p.y * scale;
@@ -367,7 +355,7 @@
                 
                 if(limit > 0 && limit < dataToShow.length) {
                     const tip = dataToShow[limit];
-                    if(tip.type !== 'break') {
+                    if(tip.type !== 'break' && tip.type !== 'exit') {
                         ctx.beginPath(); 
                         ctx.arc(tip.x*scale, -tip.y*scale, 4, 0, Math.PI*2);
                         ctx.fillStyle = color; ctx.fill();
@@ -468,11 +456,11 @@
             rawPoints.push({type:'break'});
 
             resetStatus();
-            showToast("Trace Loaded (Click Prepare)", "info");
+            showToast("Trace Loaded", "info");
             render();
         }
 
-        // --- OPTIMIZER ---
+        // --- OPTIMIZER (XY PATHS) ---
         function prepareGCode() {
             if(rawPoints.length === 0) return showToast("Draw something first!", "error");
             showToast("Optimizing Path...", "info");
@@ -480,10 +468,11 @@
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
             const sym = parseInt(document.getElementById('symSlider').value);
             
+            // 1. Group raw points into shapes
             let shapes = [];
             let curShape = [];
             rawPoints.forEach(p => {
-                if(p.type === 'break') {
+                if(p.type === 'break' || p.type === 'exit') {
                     if(curShape.length > 0) shapes.push(curShape);
                     curShape = [];
                 } else {
@@ -492,6 +481,7 @@
             });
             if(curShape.length > 0) shapes.push(curShape);
 
+            // 2. Symmetry
             let pool = [];
             for(let s=0; s<sym; s++) {
                 const ang = s * (Math.PI*2/sym);
@@ -506,350 +496,122 @@
                 });
             }
 
-            let bestShapeIdx = -1, bestPointIdx = -1, maxDist = -1;
+            // 3. Simple Optimization (Join Nearest)
+            // Start at max distance from center to begin on outside
+            let bestShapeIdx = -1, maxDist = -1;
             for (let i=0; i<pool.length; i++) {
-                for (let j=0; j<pool[i].length; j++) {
-                    let d = Math.hypot(pool[i][j].x, pool[i][j].y);
-                    if (d > maxDist) { maxDist = d; bestShapeIdx = i; bestPointIdx = j; }
+                if (Math.hypot(pool[i][0].x, pool[i][0].y) > maxDist) {
+                    maxDist = Math.hypot(pool[i][0].x, pool[i][0].y);
+                    bestShapeIdx = i;
                 }
             }
+            if (bestShapeIdx === -1) bestShapeIdx = 0;
 
-            let startShape = pool[bestShapeIdx];
-            pool.splice(bestShapeIdx, 1);
-            let dClose = Math.hypot(startShape[0].x - startShape[startShape.length-1].x, startShape[0].y - startShape[startShape.length-1].y);
-            
-            if(dClose < 5.0) { 
-                let p1 = startShape.slice(bestPointIdx);
-                let p2 = startShape.slice(0, bestPointIdx);
-                startShape = p1.concat(p2);
-                startShape.push(startShape[0]);
-            } else { 
-                let dStart = Math.hypot(startShape[0].x, startShape[0].y);
-                let dEnd = Math.hypot(startShape[startShape.length-1].x, startShape[startShape.length-1].y);
-                if(dEnd > dStart) startShape.reverse();
-            }
-
-            let sortedShapes = [startShape];
-            let curPos = startShape[startShape.length-1];
+            let sortedShapes = [];
+            let current = pool.splice(bestShapeIdx, 1)[0];
+            sortedShapes.push(current);
 
             while(pool.length > 0) {
-                let bestIdx = -1;
-                let bestDist = Infinity;
-                let bestStartIdx = 0;
-                let bestIsReverse = false;
+                let lastPt = current[current.length-1];
+                let bestNextIdx = -1;
+                let minDist = Infinity;
+                let reverse = false;
 
                 for(let i=0; i<pool.length; i++) {
                     let s = pool[i];
-                    let isClosed = Math.hypot(s[0].x - s[s.length-1].x, s[0].y - s[s.length-1].y) < 5.0;
-
-                    if(isClosed) {
-                        for(let k=0; k<s.length; k++) {
-                            let d = Math.hypot(curPos.x - s[k].x, curPos.y - s[k].y);
-                            if(d < bestDist) { bestDist = d; bestIdx = i; bestStartIdx = k; bestIsReverse = false; }
-                        }
-                    } else {
-                        let dStart = Math.hypot(curPos.x - s[0].x, curPos.y - s[0].y);
-                        if(dStart < bestDist) { bestDist=dStart; bestIdx=i; bestStartIdx=0; bestIsReverse=false; }
-                        let dEnd = Math.hypot(curPos.x - s[s.length-1].x, curPos.y - s[s.length-1].y);
-                        if(dEnd < bestDist) { bestDist=dEnd; bestIdx=i; bestStartIdx=0; bestIsReverse=true; }
-                    }
+                    let dStart = Math.hypot(lastPt.x - s[0].x, lastPt.y - s[0].y);
+                    let dEnd = Math.hypot(lastPt.x - s[s.length-1].x, lastPt.y - s[s.length-1].y);
+                    
+                    if(dStart < minDist) { minDist = dStart; bestNextIdx = i; reverse = false; }
+                    if(dEnd < minDist) { minDist = dEnd; bestNextIdx = i; reverse = true; }
                 }
 
-                let winner = pool[bestIdx];
-                let isWinnerClosed = Math.hypot(winner[0].x - winner[winner.length-1].x, winner[0].y - winner[winner.length-1].y) < 5.0;
-
-                if(isWinnerClosed) {
-                    let p1 = winner.slice(bestStartIdx);
-                    let p2 = winner.slice(0, bestStartIdx);
-                    winner = p1.concat(p2);
-                    winner.push(winner[0]);
-                } else {
-                    if(bestIsReverse) winner.reverse();
+                let nextShape = pool[bestNextIdx];
+                if(reverse) nextShape.reverse();
+                
+                // Linear connection (add points between shapes)
+                const res = parseFloat(document.getElementById('cfgResolution').value) || 1.0;
+                let jumpDist = minDist;
+                let steps = Math.ceil(jumpDist/res);
+                for(let k=1; k<=steps; k++) {
+                    let t = k/steps;
+                    sortedShapes.push([{
+                        x: lastPt.x + (nextShape[0].x - lastPt.x)*t,
+                        y: lastPt.y + (nextShape[0].y - lastPt.y)*t,
+                        type: 'point'
+                    }]);
                 }
 
-                sortedShapes.push(winner);
-                curPos = winner[winner.length-1];
-                pool.splice(bestIdx, 1);
+                sortedShapes.push(nextShape);
+                current = nextShape;
+                pool.splice(bestNextIdx, 1);
             }
 
-            if(sortedShapes.length > 0) {
-                let first = sortedShapes[0];
-                let fPt = first[0];
-                let fAng = Math.atan2(fPt.y, fPt.x);
-                first.unshift({x: tableR*Math.cos(fAng), y: tableR*Math.sin(fAng), type:'point'});
-
-                let last = sortedShapes[sortedShapes.length-1];
-                let lPt = last[last.length-1];
-                let lAng = Math.atan2(lPt.y, lPt.x);
-                // Mark exit for pause
-                last.push({x: tableR*Math.cos(lAng), y: tableR*Math.sin(lAng), type:'exit'});
-            }
-
+            // Flatten
             processedPoints = [];
-            const res = 1.0; 
+            sortedShapes.forEach(s => s.forEach(p => processedPoints.push(p)));
+
+            // 4. Generate Theta-Rho
+            generatedThr = generateThetaRho(processedPoints);
             
-            for(let i=0; i<sortedShapes.length; i++) {
-                let s = sortedShapes[i];
-                if(i > 0) {
-                    let prev = sortedShapes[i-1];
-                    let currStart = s[0];
-                    let bestExitIdx = -1;
-                    let minDist = Infinity;
-                    for(let k=0; k<prev.length; k++) {
-                        let d = Math.hypot(prev[k].x - currStart.x, prev[k].y - currStart.y);
-                        if(d < minDist) { minDist = d; bestExitIdx = k; }
-                    }
-
-                    let isPrevClosed = Math.hypot(prev[0].x - prev[prev.length-1].x, prev[0].y - prev[prev.length-1].y) < 5.0;
-                    let retracePath = [];
-                    if(isPrevClosed) {
-                        let distFwd = bestExitIdx; 
-                        let distBk = (prev.length-1) - bestExitIdx;
-                        if(distFwd < distBk) {
-                            for(let m=0; m<=bestExitIdx; m++) retracePath.push(prev[m]);
-                        } else {
-                            for(let m=prev.length-1; m>=bestExitIdx; m--) retracePath.push(prev[m]);
-                        }
-                    } else {
-                        for(let m=prev.length-1; m>=bestExitIdx; m--) retracePath.push(prev[m]);
-                    }
-
-                    retracePath.forEach(p => processedPoints.push(p));
-                    
-                    let startJump = prev[bestExitIdx];
-                    let jumpDist = Math.hypot(currStart.x - startJump.x, currStart.y - startJump.y);
-                    let steps = Math.ceil(jumpDist/res);
-                    for(let k=1; k<=steps; k++) {
-                        let t = k/steps;
-                        processedPoints.push({
-                            x: startJump.x + (currStart.x-startJump.x)*t,
-                            y: startJump.y + (currStart.y-startJump.y)*t,
-                            type: 'point'
-                        });
-                    }
-                }
-                s.forEach(p => processedPoints.push(p));
-            }
-
-            generatedGCode = generateGCodeStringFromProcessed();
-            
-            document.getElementById('statusTxt').innerText = "Path Optimized (Red)";
+            document.getElementById('statusTxt').innerText = "Theta-Rho Ready";
             document.getElementById('statusTxt').style.color = "green";
-            document.getElementById('progressSlider').value = 0;
             render(); 
-            showToast("Perimeter Rider Path Ready!", "success");
+            showToast("Conversion Complete!", "success");
         }
 
-        // --- G-CODE GENERATION (EXACT LOGIC FROM SCRIPT.HTML) ---
-        function generateGCodeStringFromProcessed() {
-            const L1 = parseFloat(document.getElementById('cfgL1').value);
-            const L2 = parseFloat(document.getElementById('cfgL2').value);
-            const gearRatio = parseFloat(document.getElementById('cfgGearRatio').value); 
-            const tableRadius = parseFloat(document.getElementById('cfgRadius').value);
-            const stepsPerDeg = parseFloat(document.getElementById('cfgStepsPerDeg').value);
-            const stepsPerRad = stepsPerDeg * (180 / Math.PI);
+        // --- CORE: THETA-RHO CONVERTER (SANDIFY STYLE) ---
+        function generateThetaRho(points) {
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            let lines = ["# format: thetarho"]; // Header for script.html auto-detect
             
-            const centerDelay = parseFloat(document.getElementById('cfgCenterDelay').value);
-            const perimDelay = parseFloat(document.getElementById('cfgPerimDelay').value);
-            const res = 1.0; 
-
-            if(processedPoints.length === 0) return "";
-
-            // 1. Interpolation (Matching interpolateAndGenerate from script.html)
-            let interpolated = [];
-            interpolated.push(processedPoints[0]);
-
-            for(let i=0; i<processedPoints.length-1; i++) {
-                let p1 = processedPoints[i];
-                let p2 = processedPoints[i+1];
-                let dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-                let steps = Math.ceil(dist / res);
-                steps = Math.max(1, steps);
-
-                for(let j=1; j<=steps; j++) {
-                    let t = j/steps;
-                    let nx = p1.x + (p2.x - p1.x) * t;
-                    let ny = p1.y + (p2.y - p1.y) * t;
-                    interpolated.push({
-                        x: nx, 
-                        y: ny, 
-                        type: (j===steps ? p2.type : 'point') 
-                    });
-                }
-            }
-
-            // 2. Step Generation (Matching generateSteps from script.html)
-            let cmds = [];
-            let prevBase = 0;
-            let prevElbow = 0;
-
-            // Init Start IK
-            let startIK = calculateIK(interpolated[0].x, interpolated[0].y, 0, 0, L1, L2, gearRatio, stepsPerRad);
-            prevBase = startIK.base_steps;
-            prevElbow = startIK.elbow_steps;
-
-            for(let i=1; i<interpolated.length; i++) {
-                let p = interpolated[i];
-
-                if(p.type === 'exit') {
-                    cmds.push("M0");
-                }
-
-                let ik = calculateIK(p.x, p.y, prevBase, prevElbow, L1, L2, gearRatio, stepsPerRad);
-                
-                let dBase = Math.round(ik.base_steps - prevBase);
-                let dElbow = Math.round(ik.elbow_steps - prevElbow);
-
-                if(dBase !== 0 || dElbow !== 0) {
-                    let r = Math.hypot(p.x, p.y);
-                    let rFactor = r / tableRadius;
-                    if(rFactor > 1.0) rFactor = 1.0;
-
-                    let delay = Math.round(centerDelay + ((perimDelay - centerDelay) * rFactor));
-
-                    cmds.push(`G1 ${dElbow} ${dBase} ${delay}`);
-                    
-                    prevBase += dBase;
-                    prevElbow += dElbow;
-                }
-            }
-            return cmds.join('\n');
-        }
-
-        // --- EXACT KINEMATICS FROM SCRIPT.HTML ---
-        function getShortestRotation(raw, last) {
-            let diff = (raw - last) / (2 * Math.PI);
-            let offset = Math.round(diff);
-            return raw - (offset * 2 * Math.PI);
-        }
-
-        function calculateIK(x, y, lastBaseSteps, lastElbowSteps, L1, L2, gearRatio, stepsPerRad) {
-            let dist = Math.hypot(x, y);
-            const maxReach = L1 + L2;
+            let prevRawTheta = 0;
+            let cumulativeTheta = 0;
             
-            if (dist > maxReach) {
-                x = (x / dist) * maxReach;
-                y = (y / dist) * maxReach;
-                dist = maxReach;
+            // Initialize with the first point's angle
+            // This prevents the table from spinning wildly to get to the start
+            if (points.length > 0) {
+                const first = points[0];
+                prevRawTheta = Math.atan2(first.y, first.x);
+                cumulativeTheta = prevRawTheta;
             }
 
-            // --- CENTER PASS-THROUGH LOGIC (EXACTLY AS IN SCRIPT.HTML) ---
-            if (dist < 1.0) { // Within 1mm of center
-                // We want the base to stay exactly where it was
-                const targetBaseSteps = lastBaseSteps; 
+            for (let i = 0; i < points.length; i++) {
+                let p = points[i];
+                let x = p.x;
+                let y = p.y;
                 
-                // At center (dist=0), the internal angle is PI (180 deg).
-                // Elbow Steps = -(PI + GearRatio * BaseAngle) * StepsPerRad
-                // We need to reverse-engineer BaseAngle from lastBaseSteps
-                const currentBaseAngle = -lastBaseSteps / stepsPerRad;
-                const targetElbowSteps = -(Math.PI + gearRatio * currentBaseAngle) * stepsPerRad;
+                // Calculate Rho (Normalized 0 to 1)
+                let r = Math.hypot(x, y);
+                let rho = r / tableR;
+                if (rho > 1.0) rho = 1.0; // Clamp to table edge
                 
-                return { base_steps: targetBaseSteps, elbow_steps: targetElbowSteps };
+                // Calculate Theta (Continuous/Unwrapped)
+                let rawTheta = Math.atan2(y, x);
+                let delta = rawTheta - prevRawTheta;
+                
+                // Normalize delta to be the shortest path (-PI to +PI)
+                while (delta <= -Math.PI) delta += 2 * Math.PI;
+                while (delta > Math.PI) delta -= 2 * Math.PI;
+                
+                cumulativeTheta += delta;
+                prevRawTheta = rawTheta;
+                
+                // Output format: angle(radians)  radius(0-1)
+                lines.push(`${cumulativeTheta.toFixed(5)} ${rho.toFixed(5)}`);
             }
-
-            // Standard Math for non-center points
-            const lastT1 = -lastBaseSteps / stepsPerRad; 
-            let cosBend = (dist*dist - L1*L1 - L2*L2) / (2 * L1 * L2);
-            cosBend = Math.max(-1, Math.min(1, cosBend));
             
-            const bend1 = Math.acos(cosBend);
-            const bend2 = -Math.acos(cosBend);
-
-            const k1_1 = L1 + L2 * Math.cos(bend1);
-            const k2_1 = L2 * Math.sin(bend1);
-            let t1_1 = Math.atan2(y, x) - Math.atan2(k2_1, k1_1);
-            t1_1 = getShortestRotation(t1_1, lastT1);
-
-            const k1_2 = L1 + L2 * Math.cos(bend2);
-            const k2_2 = L2 * Math.sin(bend2);
-            let t1_2 = Math.atan2(y, x) - Math.atan2(k2_2, k1_2);
-            t1_2 = getShortestRotation(t1_2, lastT1);
-
-            const b1_steps = -t1_1 * stepsPerRad;
-            const e1_steps = -(bend1 + gearRatio * t1_1) * stepsPerRad;
-            const b2_steps = -t1_2 * stepsPerRad;
-            const e2_steps = -(bend2 + gearRatio * t1_2) * stepsPerRad;
-
-            const cost1 = Math.abs(b1_steps - lastBaseSteps) + Math.abs(e1_steps - lastElbowSteps);
-            const cost2 = Math.abs(b2_steps - lastBaseSteps) + Math.abs(e2_steps - lastElbowSteps);
-
-            return (cost1 <= cost2) ? { base_steps: b1_steps, elbow_steps: e1_steps } 
-                                    : { base_steps: b2_steps, elbow_steps: e2_steps };
+            return lines.join('\n');
         }
 
         // --- ACTIONS ---
-        async function sendToTable() {
-            if(!generatedGCode) return showToast("Click 'Prepare Path' first!", "error");
-            
-            let finalCode = generatedGCode;
-            const autoClear = document.getElementById('autoClearMode').checked;
-
-            if(autoClear) {
-                showToast("Fetching Clear Pattern...", "info");
-                try {
-                    let response = await fetch('./designs/clear.TXT');
-                    if(!response.ok) response = await fetch('./designs/clear.txt'); 
-                    
-                    if(response.ok) {
-                        const clearCode = await response.text();
-                        finalCode = clearCode + "\n" + finalCode;
-                        showToast("Auto-Clear Added.", "success");
-                    } else {
-                        showToast("Clear file not found!", "error");
-                    }
-                } catch(e) {
-                    console.error(e);
-                    showToast("Clear file error (check console)", "error");
-                }
-            }
-
-            showToast("Sending...", "info");
-            fetch(BASE_URL + '/send_gcode_block', {
-                method:'POST', headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({gcode: finalCode, speed_override: null})
-            }).then(r=>r.json()).then(d=>{
-                if(d.success) showToast("Sent Successfully!", "success");
-                else showToast("Error: " + d.error, "error");
-            }).catch(()=>showToast("Network Error", "error"));
-        }
-        
-        // --- NEW SAVE FUNCTIONALITY ---
-        async function saveToPi() {
-            if(!generatedGCode) return showToast("Click 'Prepare Path' first!", "error");
-            
-            let name = prompt("Name your design:", "my_pattern");
-            if(name === null) return; // Cancelled
-            
-            // cleanup name
-            name = name.trim().replace(/[^a-zA-Z0-9_-]/g, "_");
-            if(name === "") name = "pattern_" + Date.now();
-            if(!name.toLowerCase().endsWith(".txt")) name += ".txt";
-
-            showToast("Saving to Pi...", "info");
-
-            try {
-                // We assume an endpoint '/save_design' exists on the server
-                // that accepts JSON { filename: "...", gcode: "..." }
-                const response = await fetch(BASE_URL + '/save_design', {
-                    method: 'POST', 
-                    headers: {'Content-Type':'application/json'},
-                    body: JSON.stringify({
-                        filename: name,
-                        gcode: generatedGCode
-                    })
-                });
-                
-                const data = await response.json();
-                
-                if(data.success) {
-                    showToast("✅ Saved: " + name, "success");
-                } else {
-                    showToast("❌ Error: " + (data.error || "Server denied"), "error");
-                }
-            } catch(e) {
-                console.error(e);
-                showToast("❌ Network Error (Check Server)", "error");
-            }
+        function downloadGcode() {
+            if(!generatedThr) return showToast("Click 'Prepare' first!", "error");
+            const blob = new Blob([generatedThr], {type:'text/plain'});
+            const a = document.createElement('a');
+            a.download = 'sandify_pattern.thr'; 
+            a.href = URL.createObjectURL(blob); 
+            a.click();
         }
 
         // --- UTILS ---
@@ -862,7 +624,7 @@
             ctx.scale(dpr, dpr);
             origin = { x: size/2, y: size/2 };
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
-            scale = (size/2) / (tableR * 1.05);
+            scale = (size/2) / (tableR * 1.1); 
             render();
         }
         function saveState() {
@@ -907,5 +669,3 @@
     </script>
 </body>
 </html>
-
-
