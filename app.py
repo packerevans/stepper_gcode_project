@@ -5,6 +5,9 @@ import re
 import asyncio
 import socket
 from collections import deque
+import cv2  # <--- ADDED
+import numpy as np  # <--- ADDED
+
 # Assuming these modules exist in your project folder
 import wifi_tools 
 import ble_controller 
@@ -305,6 +308,7 @@ def delete_design():
             return jsonify(success=True)
         else: return jsonify(success=False, error="File not found")
     except Exception as e: return jsonify(success=False, error=str(e))
+
 @app.route("/save_design", methods=["POST"])
 def save_design():
     data = request.json
@@ -360,6 +364,70 @@ def send_command():
         with lock: arduino.write((cmd + "\n").encode())
         return jsonify(success=True)
     return jsonify(success=False, error="Not connected")
+
+# === OPENCV TRACING LOGIC (ADDED) ===
+
+def skeletonize(img):
+    """ Reduces binary image to 1-pixel wide skeleton """
+    size = np.size(img)
+    skel = np.zeros(img.shape, np.uint8)
+    
+    element = cv2.getStructuringElement(cv2.MORPH_CROSS, (3, 3))
+    done = False
+    
+    while not done:
+        eroded = cv2.erode(img, element)
+        temp = cv2.dilate(eroded, element)
+        temp = cv2.subtract(img, temp)
+        skel = cv2.bitwise_or(skel, temp)
+        img = eroded.copy()
+        
+        zeros = size - cv2.countNonZero(img)
+        if zeros == size:
+            done = True
+    return skel
+
+@app.route("/api/trace_image", methods=["POST"])
+def trace_image_route():
+    file = request.files.get('image')
+    if not file: return jsonify(success=False, error="No file uploaded")
+
+    # 1. Decode Image from Memory
+    file_bytes = np.frombuffer(file.read(), np.uint8)
+    img = cv2.imdecode(file_bytes, cv2.IMREAD_GRAYSCALE)
+
+    # 2. Threshold (Make it strictly Black & White)
+    # Use Adaptive thresholding to handle uneven lighting
+    binary = cv2.adaptiveThreshold(img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+                                   cv2.THRESH_BINARY_INV, 11, 2)
+
+    # 3. Skeletonize (The magic step: reduce lines to 1 pixel width)
+    skeleton = skeletonize(binary)
+
+    # 4. Find Contours (Turn pixels into X,Y lists)
+    # RETR_LIST gets all curves, CHAIN_APPROX_SIMPLE compresses straight lines
+    contours, _ = cv2.findContours(skeleton, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+
+    # 5. Format for Frontend
+    # Filter out tiny noise (length < 20)
+    paths = []
+    for cnt in contours:
+        if cv2.arcLength(cnt, False) > 20: 
+            # Simplify curve (reduce point count for smoother motion)
+            epsilon = 0.005 * cv2.arcLength(cnt, False)
+            approx = cv2.approxPolyDP(cnt, epsilon, False)
+            
+            # Convert numpy array to standard list of dicts
+            path_points = []
+            for point in approx:
+                x, y = point[0]
+                # Flip Y because computer vision origin is Top-Left, Table is Bottom-Left
+                path_points.append({'x': int(x), 'y': int(y)})
+            paths.append(path_points)
+
+    return jsonify(success=True, paths=paths, width=img.shape[1], height=img.shape[0])
+
+# ====================================
 
 # === ORIGINAL ROUTES ===
 @app.route("/wifi_setup")
