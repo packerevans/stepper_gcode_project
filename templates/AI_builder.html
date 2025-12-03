@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Packers Sand Pro (Synced v27 - Proximity Linker)</title>
+    <title>Packers Sand Pro (Synced v28 - Strict Logic)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -385,7 +385,7 @@
             ctx.restore();
         }
 
-        // --- AI TRACER ---
+        // --- AI TRACER (High Contrast) ---
         function handleImageUpload(input) {
             const file = input.files[0];
             if(!file) return;
@@ -489,17 +489,17 @@
             render();
         }
 
-        // --- OPTIMIZER v27 (Proximity Priority) ---
+        // --- SIMPLIFIED OPTIMIZER (v28 - Robust Logic) ---
         async function prepareGCode() {
             if(rawPoints.length === 0) return showToast("Draw something first!", "error");
-            showToast("Optimizing (Proximity Mode)...", "info");
+            showToast("Calculating Optimized Path...", "info");
 
             await new Promise(r => setTimeout(r, 50));
 
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
             const sym = parseInt(document.getElementById('symSlider').value);
             
-            // 1. Grouping
+            // --- STEP 1: PARSE SHAPES ---
             let shapes = [];
             let curShape = [];
             rawPoints.forEach(p => {
@@ -512,7 +512,7 @@
             });
             if(curShape.length > 0) shapes.push(curShape);
 
-            // 2. Symmetry
+            // --- STEP 2: SYMMETRY ---
             let pool = [];
             for(let s=0; s<sym; s++) {
                 const ang = s * (Math.PI*2/sym);
@@ -528,99 +528,96 @@
 
             if(pool.length === 0) return;
 
-            // 3. Metadata & Aggressive Loop Detection (v27: 20mm tolerance)
+            // --- STEP 3: METADATA & CLOSURE ---
             let shapeMeta = pool.map((s, idx) => {
                 const dStartEnd = Math.hypot(s[0].x - s[s.length-1].x, s[0].y - s[s.length-1].y);
-                const isClosed = dStartEnd < 20.0; // Higher tolerance for eyes/circles
-                if(isClosed) s[s.length-1] = {x: s[0].x, y: s[0].y};
-                
-                return {
-                    id: idx,
-                    points: s,
-                    isClosed: isClosed
-                };
+                const isClosed = dStartEnd < 15.0; // Moderate tolerance for loops
+                if(isClosed) {
+                    s[s.length-1] = {x: s[0].x, y: s[0].y}; // Force close
+                }
+                return { id: idx, points: s, isClosed: isClosed };
             });
 
-            // 4. Proximity Solver
-            // Find closest shape to Rim to start
-            let startId = -1, minD = Infinity;
-            let rimPoint = {x: tableR, y:0};
-            
-            for(let m of shapeMeta) {
-                 let d = distSq(rimPoint, m.points[0]);
-                 if(d < minD) { minD = d; startId = m.id; }
-            }
+            // --- STEP 4: GREEDY NEAREST NEIGHBOR ---
+            // "Recalculate best starting/ending points to decrease travel lines"
             
             let unvisited = new Set(shapeMeta.map(m => m.id));
             let optimizedPath = [];
+            let currentHead = {x: tableR, y: 0}; // Start at Rim
             
-            // Initial Shape Setup
+            // Start with shape closest to Rim
+            let startId = -1, minD = Infinity;
+            for(let m of shapeMeta) {
+                 let d = distSq(currentHead, m.points[0]);
+                 if(d < minD) { minD = d; startId = m.id; }
+            }
+            
             let currentMeta = shapeMeta[startId];
             unvisited.delete(startId);
-            let currentPoints = [...currentMeta.points];
             
-            if(currentMeta.isClosed) currentPoints = rotateToClosest(currentPoints, rimPoint);
-            else if (distSq(rimPoint, currentPoints[currentPoints.length-1]) < distSq(rimPoint, currentPoints[0])) {
+            let currentPoints = [...currentMeta.points];
+            // If closed loop, rotate so start is closest to Rim
+            if(currentMeta.isClosed) currentPoints = rotateToClosest(currentPoints, currentHead);
+            // If open line, flip if end is closer to Rim
+            else if (distSq(currentHead, currentPoints[currentPoints.length-1]) < distSq(currentHead, currentPoints[0])) {
                 currentPoints.reverse();
             }
 
             optimizedPath.push(currentPoints);
-            let currentHead = currentPoints[currentPoints.length-1];
+            currentHead = currentPoints[currentPoints.length-1];
 
             while(unvisited.size > 0) {
                 let bestNextId = -1;
                 let bestEntryMode = 'start'; 
                 let bestLoopIdx = -1;
-                let bestExitIdx = -1; 
                 let minJumpDist = Infinity;
+                let bestBacktrackIdx = -1; // Index in CURRENT shape to backtrack to
 
-                // Max retrace limit (15% of shape length or 20 points)
-                let maxRetrace = Math.min(20, Math.floor(currentPoints.length * 0.15));
-                let searchLimit = Math.max(0, currentPoints.length - 1 - maxRetrace);
-
-                // Scan all unvisited shapes
+                // Check every unvisited shape
                 for(let id of unvisited) {
                     const cand = shapeMeta[id];
 
-                    // Check interaction between [Tail of Current] and [Candidate]
-                    // We scan backwards from the end of current shape, but ONLY a little bit (Retrace Limit)
-                    
-                    for(let i=currentPoints.length-1; i >= searchLimit; i-=2) {
+                    // Check connections from the TAIL of current shape
+                    // We check every 5th point backwards up to 20% of shape length (Retrace Limit)
+                    let retraceLimit = Math.floor(currentPoints.length * 0.8); // Stop at 80% mark (go back 20%)
+                    if (retraceLimit < 0) retraceLimit = 0;
+
+                    for(let i=currentPoints.length-1; i >= retraceLimit; i-=3) {
                         let exitPt = currentPoints[i];
 
                         if(cand.isClosed) {
-                            // Candidate is loop: Check all points
+                            // Loop: check all points
                             for(let k=0; k<cand.points.length; k+=4) {
                                 let d = distSq(exitPt, cand.points[k]);
                                 if(d < minJumpDist) {
-                                    minJumpDist = d; bestNextId = id; bestEntryMode = 'loop_idx'; bestLoopIdx = k; bestExitIdx = i;
+                                    minJumpDist = d; bestNextId = id; bestEntryMode = 'loop_idx'; bestLoopIdx = k; bestBacktrackIdx = i;
                                 }
                             }
                         } else {
-                            // Candidate is line: Check Start/End
+                            // Line: check start/end
                             let dStart = distSq(exitPt, cand.points[0]);
                             if(dStart < minJumpDist) {
-                                minJumpDist = dStart; bestNextId = id; bestEntryMode = 'start'; bestExitIdx = i;
+                                minJumpDist = dStart; bestNextId = id; bestEntryMode = 'start'; bestBacktrackIdx = i;
                             }
                             let dEnd = distSq(exitPt, cand.points[cand.points.length-1]);
                             if(dEnd < minJumpDist) {
-                                minJumpDist = dEnd; bestNextId = id; bestEntryMode = 'end'; bestExitIdx = i;
+                                minJumpDist = dEnd; bestNextId = id; bestEntryMode = 'end'; bestBacktrackIdx = i;
                             }
                         }
                     }
                 }
 
                 if(bestNextId !== -1) {
-                    // Perform Retrace if needed (Back up along the line)
-                    if(bestExitIdx < currentPoints.length - 1) {
-                         let retraceSeg = [];
-                         for(let k=currentPoints.length-2; k>=bestExitIdx; k--) {
-                             retraceSeg.push(currentPoints[k]);
-                         }
-                         optimizedPath.push(retraceSeg);
+                    // 1. Perform Backtrack if optimal exit wasn't the last point
+                    if(bestBacktrackIdx < currentPoints.length - 1) {
+                        let backtrackSeg = [];
+                        for(let k=currentPoints.length-2; k>=bestBacktrackIdx; k--) {
+                            backtrackSeg.push(currentPoints[k]);
+                        }
+                        optimizedPath.push(backtrackSeg);
                     }
 
-                    // Prepare Next Shape
+                    // 2. Add next shape
                     let nextMeta = shapeMeta[bestNextId];
                     let nextPoints = [...nextMeta.points];
                     
@@ -635,34 +632,41 @@
                     currentHead = currentPoints[currentPoints.length-1];
                     unvisited.delete(bestNextId);
                 } else {
-                    break;
+                    break; 
                 }
             }
 
-            // 5. Final Assembly (No Forced Return to Rim)
+            // --- STEP 5: CONNECT & EXPORT ---
             processedPoints = [];
-            // Entry
+            
+            // Rim Entry
             let startP = optimizedPath[0][0];
             let ang = Math.atan2(startP.y, startP.x);
             processedPoints.push({x: tableR*Math.cos(ang), y: tableR*Math.sin(ang), type:'point'});
 
+            // Add all path segments
             for(let pts of optimizedPath) {
                 pts.forEach(p => processedPoints.push({x:p.x, y:p.y, type:'point'}));
             }
+
+            // Exit to Rim
+            let lastP = processedPoints[processedPoints.length-1];
+            let exAng = Math.atan2(lastP.y, lastP.x);
+            processedPoints.push({x: tableR*Math.cos(exAng), y: tableR*Math.sin(exAng), type:'exit'});
 
             // Simplification
             processedPoints = simplifyPath(processedPoints, 0.5);
 
             generateKinematicsGCode(processedPoints);
             
-            document.getElementById('statusTxt').innerText = "AI Path: Proximity Linked";
+            document.getElementById('statusTxt').innerText = "AI Path: Optimized";
             document.getElementById('statusTxt').style.color = "#2ecc71";
             document.getElementById('progressSlider').value = 0;
             render(); 
-            showToast("Complete! (Retrace Limit Applied)", "success");
+            showToast("Path Optimized!", "success");
         }
 
-        // --- SOLVER UTILS ---
+        // --- UTILS ---
         function distSq(p1, p2) { return (p1.x-p2.x)**2 + (p1.y-p2.y)**2; }
 
         function rotateToClosest(points, target) {
