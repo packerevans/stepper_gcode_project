@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Packers Sand Pro (Synced v28 - Strict Logic)</title>
+    <title>Packers Sand Pro (Synced v29 - Weighted Retrace)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -385,7 +385,7 @@
             ctx.restore();
         }
 
-        // --- AI TRACER (High Contrast) ---
+        // --- AI TRACER ---
         function handleImageUpload(input) {
             const file = input.files[0];
             if(!file) return;
@@ -408,6 +408,7 @@
                     tCtx.fillStyle = "white"; tCtx.fillRect(0,0,tw,th);
                     tCtx.drawImage(img, 0, 0, tw, th);
                     
+                    // High Contrast Binarization
                     const imgData = tCtx.getImageData(0,0,tw,th);
                     const d = imgData.data;
                     for (let i=0; i<d.length; i+=4) {
@@ -489,17 +490,17 @@
             render();
         }
 
-        // --- SIMPLIFIED OPTIMIZER (v28 - Robust Logic) ---
+        // --- WEIGHTED RETRACE SOLVER (v29) ---
         async function prepareGCode() {
             if(rawPoints.length === 0) return showToast("Draw something first!", "error");
-            showToast("Calculating Optimized Path...", "info");
+            showToast("Calculating Weighted Path...", "info");
 
             await new Promise(r => setTimeout(r, 50));
 
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
             const sym = parseInt(document.getElementById('symSlider').value);
             
-            // --- STEP 1: PARSE SHAPES ---
+            // 1. Grouping
             let shapes = [];
             let curShape = [];
             rawPoints.forEach(p => {
@@ -512,7 +513,7 @@
             });
             if(curShape.length > 0) shapes.push(curShape);
 
-            // --- STEP 2: SYMMETRY ---
+            // 2. Symmetry
             let pool = [];
             for(let s=0; s<sym; s++) {
                 const ang = s * (Math.PI*2/sym);
@@ -528,96 +529,109 @@
 
             if(pool.length === 0) return;
 
-            // --- STEP 3: METADATA & CLOSURE ---
+            // 3. Metadata & Loop Detection
             let shapeMeta = pool.map((s, idx) => {
                 const dStartEnd = Math.hypot(s[0].x - s[s.length-1].x, s[0].y - s[s.length-1].y);
-                const isClosed = dStartEnd < 15.0; // Moderate tolerance for loops
-                if(isClosed) {
-                    s[s.length-1] = {x: s[0].x, y: s[0].y}; // Force close
-                }
+                const isClosed = dStartEnd < 15.0; 
+                if(isClosed) s[s.length-1] = {x: s[0].x, y: s[0].y};
                 return { id: idx, points: s, isClosed: isClosed };
             });
 
-            // --- STEP 4: GREEDY NEAREST NEIGHBOR ---
-            // "Recalculate best starting/ending points to decrease travel lines"
+            // 4. FIND START ANCHOR (Rim Proximity)
+            let startId = -1, minD = Infinity;
+            let rimPoint = {x: tableR, y:0};
+            for(let m of shapeMeta) {
+                 // Check all points in shape for closeness to Rim
+                 for(let p of m.points) {
+                     let d = distSq(rimPoint, p);
+                     if(d < minD) { minD = d; startId = m.id; }
+                 }
+            }
             
             let unvisited = new Set(shapeMeta.map(m => m.id));
             let optimizedPath = [];
-            let currentHead = {x: tableR, y: 0}; // Start at Rim
             
-            // Start with shape closest to Rim
-            let startId = -1, minD = Infinity;
-            for(let m of shapeMeta) {
-                 let d = distSq(currentHead, m.points[0]);
-                 if(d < minD) { minD = d; startId = m.id; }
-            }
-            
+            // Setup First Shape
             let currentMeta = shapeMeta[startId];
             unvisited.delete(startId);
-            
             let currentPoints = [...currentMeta.points];
-            // If closed loop, rotate so start is closest to Rim
-            if(currentMeta.isClosed) currentPoints = rotateToClosest(currentPoints, currentHead);
-            // If open line, flip if end is closer to Rim
-            else if (distSq(currentHead, currentPoints[currentPoints.length-1]) < distSq(currentHead, currentPoints[0])) {
+            
+            // Orient first shape to start near rim
+            if(currentMeta.isClosed) currentPoints = rotateToClosest(currentPoints, rimPoint);
+            else if (distSq(rimPoint, currentPoints[currentPoints.length-1]) < distSq(rimPoint, currentPoints[0])) {
                 currentPoints.reverse();
             }
 
             optimizedPath.push(currentPoints);
-            currentHead = currentPoints[currentPoints.length-1];
+            // We track the FULL flattened path to allow deep retracing
+            let fullFlatPath = [...currentPoints]; 
 
+            // 5. GREEDY SOLVER WITH WEIGHTED RETRACING
             while(unvisited.size > 0) {
                 let bestNextId = -1;
                 let bestEntryMode = 'start'; 
                 let bestLoopIdx = -1;
-                let minJumpDist = Infinity;
-                let bestBacktrackIdx = -1; // Index in CURRENT shape to backtrack to
+                let bestRetraceIdx = -1; // Where in fullFlatPath to retrace to
+                let minCost = Infinity;
 
-                // Check every unvisited shape
+                let headIdx = fullFlatPath.length - 1;
+                let headPt = fullFlatPath[headIdx];
+
+                // Scan all unvisited shapes
                 for(let id of unvisited) {
                     const cand = shapeMeta[id];
 
-                    // Check connections from the TAIL of current shape
-                    // We check every 5th point backwards up to 20% of shape length (Retrace Limit)
-                    let retraceLimit = Math.floor(currentPoints.length * 0.8); // Stop at 80% mark (go back 20%)
-                    if (retraceLimit < 0) retraceLimit = 0;
+                    // Check cost to jump from HEAD (Simple jump)
+                    // vs cost to retrace backwards (Weighted jump)
+                    
+                    // Limit retrace search to last 100 points or 20% of path to save CPU
+                    let searchStart = Math.max(0, fullFlatPath.length - 150);
+                    
+                    for(let i=headIdx; i >= searchStart; i-=2) {
+                        let sourcePt = fullFlatPath[i];
+                        // Cost = (Distance through Air * 10) + (Distance Retraced * 1)
+                        // Jumping is expensive. Walking back is cheap.
+                        let retraceDist = distSq(headPt, sourcePt); // Squared approx
+                        let retracePenalty = retraceDist * 0.05; // Weight factor (low)
 
-                    for(let i=currentPoints.length-1; i >= retraceLimit; i-=3) {
-                        let exitPt = currentPoints[i];
-
+                        // Candidate entry points
+                        let entryPoints = [];
                         if(cand.isClosed) {
-                            // Loop: check all points
-                            for(let k=0; k<cand.points.length; k+=4) {
-                                let d = distSq(exitPt, cand.points[k]);
-                                if(d < minJumpDist) {
-                                    minJumpDist = d; bestNextId = id; bestEntryMode = 'loop_idx'; bestLoopIdx = k; bestBacktrackIdx = i;
-                                }
-                            }
+                            for(let k=0; k<cand.points.length; k+=4) entryPoints.push({idx:k, pt:cand.points[k], mode:'loop_idx'});
                         } else {
-                            // Line: check start/end
-                            let dStart = distSq(exitPt, cand.points[0]);
-                            if(dStart < minJumpDist) {
-                                minJumpDist = dStart; bestNextId = id; bestEntryMode = 'start'; bestBacktrackIdx = i;
-                            }
-                            let dEnd = distSq(exitPt, cand.points[cand.points.length-1]);
-                            if(dEnd < minJumpDist) {
-                                minJumpDist = dEnd; bestNextId = id; bestEntryMode = 'end'; bestBacktrackIdx = i;
+                            entryPoints.push({idx:0, pt:cand.points[0], mode:'start'});
+                            entryPoints.push({idx:cand.points.length-1, pt:cand.points[cand.points.length-1], mode:'end'});
+                        }
+
+                        for(let ep of entryPoints) {
+                            let jumpDist = distSq(sourcePt, ep.pt);
+                            let jumpPenalty = jumpDist * 1.5; // Weight factor (High)
+                            
+                            let totalCost = retracePenalty + jumpPenalty;
+                            
+                            if(totalCost < minCost) {
+                                minCost = totalCost;
+                                bestNextId = id;
+                                bestEntryMode = ep.mode;
+                                bestLoopIdx = ep.idx;
+                                bestRetraceIdx = i;
                             }
                         }
                     }
                 }
 
                 if(bestNextId !== -1) {
-                    // 1. Perform Backtrack if optimal exit wasn't the last point
-                    if(bestBacktrackIdx < currentPoints.length - 1) {
-                        let backtrackSeg = [];
-                        for(let k=currentPoints.length-2; k>=bestBacktrackIdx; k--) {
-                            backtrackSeg.push(currentPoints[k]);
+                    // 1. ADD RETRACE SEGMENT (If needed)
+                    if(bestRetraceIdx < headIdx) {
+                        let retraceSeg = [];
+                        for(let k=headIdx-1; k>=bestRetraceIdx; k--) {
+                            retraceSeg.push(fullFlatPath[k]);
                         }
-                        optimizedPath.push(backtrackSeg);
+                        optimizedPath.push(retraceSeg);
+                        fullFlatPath.push(...retraceSeg);
                     }
 
-                    // 2. Add next shape
+                    // 2. ADD NEXT SHAPE
                     let nextMeta = shapeMeta[bestNextId];
                     let nextPoints = [...nextMeta.points];
                     
@@ -628,23 +642,39 @@
                     }
 
                     optimizedPath.push(nextPoints);
-                    currentPoints = nextPoints;
-                    currentHead = currentPoints[currentPoints.length-1];
+                    fullFlatPath.push(...nextPoints);
                     unvisited.delete(bestNextId);
                 } else {
-                    break; 
+                    break;
                 }
             }
 
-            // --- STEP 5: CONNECT & EXPORT ---
-            processedPoints = [];
+            // 6. EXIT STRATEGY (Retrace to Rim)
+            // Find point on entire drawn path closest to Rim
+            let exitIdx = 0;
+            let minExitD = Infinity;
+            for(let i=0; i<fullFlatPath.length; i+=5) {
+                let d = distSq(rimPoint, fullFlatPath[i]);
+                if(d < minExitD) { minExitD = d; exitIdx = i; }
+            }
             
+            // If the end of the path isn't already the closest, retrace
+            if(exitIdx < fullFlatPath.length - 1) {
+                let exitRetrace = [];
+                for(let k=fullFlatPath.length-2; k>=exitIdx; k--) {
+                    exitRetrace.push(fullFlatPath[k]);
+                }
+                optimizedPath.push(exitRetrace);
+                fullFlatPath.push(...exitRetrace);
+            }
+
+            // 7. FINAL EXPORT
+            processedPoints = [];
             // Rim Entry
-            let startP = optimizedPath[0][0];
-            let ang = Math.atan2(startP.y, startP.x);
+            let entryP = fullFlatPath[0];
+            let ang = Math.atan2(entryP.y, entryP.x);
             processedPoints.push({x: tableR*Math.cos(ang), y: tableR*Math.sin(ang), type:'point'});
 
-            // Add all path segments
             for(let pts of optimizedPath) {
                 pts.forEach(p => processedPoints.push({x:p.x, y:p.y, type:'point'}));
             }
@@ -659,11 +689,11 @@
 
             generateKinematicsGCode(processedPoints);
             
-            document.getElementById('statusTxt').innerText = "AI Path: Optimized";
+            document.getElementById('statusTxt').innerText = "AI Path: Weighted Retrace";
             document.getElementById('statusTxt').style.color = "#2ecc71";
             document.getElementById('progressSlider').value = 0;
             render(); 
-            showToast("Path Optimized!", "success");
+            showToast("Optimized with Weighted Retracing!", "success");
         }
 
         // --- UTILS ---
