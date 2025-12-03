@@ -1,6 +1,6 @@
 // ==========================================
-//      ARDUINO SAND TABLE FIRMWARE v6
-//      M0 Removed + G0 (Homing/Rapid) Added
+//      ARDUINO SAND TABLE FIRMWARE v5
+//      Restored Pins + Auto-Pause (M0)
 // ==========================================
 
 // --- YOUR SPECIFIC MOTOR PINS ---
@@ -10,24 +10,25 @@ const int stepArm  = 10;
 const int dirArm   = 11;
 const int enPin    = 3;
 
-// Microstepping Pins
+// Microstepping Pins (Optional, keep if you use them)
 const int ms1 = 4;
 const int ms2 = 5;
 const int ms3 = 6;
 
 // --- SETTINGS ---
+// MUST match your Python script (usually 9600 for older scripts)
 #define BAUD_RATE 9600 
 
 // --- STATE VARIABLES ---
-bool paused = true;
+bool paused = true; 
 const int MAX_QUEUE_SIZE = 50;
 
 // Command Types
 const int CMD_MOVE = 0;
-// CMD_WAIT (M0) removed
+const int CMD_WAIT = 1;
 
 struct GCommand {
-  int type;       // Always 0 (Move) now, kept for structure
+  int type;       // 0 = Move, 1 = Wait (M0)
   long armSteps;
   long baseSteps;
   int speed;
@@ -45,10 +46,9 @@ void setup() {
   pinMode(stepArm, OUTPUT);  pinMode(dirArm, OUTPUT);
   pinMode(enPin, OUTPUT);
 
-  // 1/32 Microstepping Setup
+  // 1/32 Microstepping Setup (from your original file)
   pinMode(ms1, OUTPUT); pinMode(ms2, OUTPUT); pinMode(ms3, OUTPUT);
-  digitalWrite(ms1, HIGH); digitalWrite(ms2, HIGH);
-  digitalWrite(ms3, HIGH);
+  digitalWrite(ms1, HIGH); digitalWrite(ms2, HIGH); digitalWrite(ms3, HIGH);
 
   digitalWrite(enPin, HIGH); // Start Disabled
   Serial.println(F("READY"));
@@ -89,22 +89,31 @@ void handleSerial() {
     else if (cmd.startsWith("G1")) {
       parseAndEnqueueMove(cmd);
     }
-    // ADDED: G0 Command Handling
-    // Interprets G0 as a move to the parameters provided (e.g., G0 0 0)
-    else if (cmd.startsWith("G0") || cmd.startsWith("g0")) {
-      parseAndEnqueueMove(cmd); 
+    else if (cmd.startsWith("M0") || cmd.startsWith("m0")) {
+      enqueuePause();
     }
-    // REMOVED: M0 / m0 handler
   }
 }
 
-// NOTE: enqueuePause() removed as M0 feature is deleted.
+void enqueuePause() {
+  if (queueCount < MAX_QUEUE_SIZE) {
+    queue[queueTail].type = CMD_WAIT;
+    queue[queueTail].armSteps = 0;
+    queue[queueTail].baseSteps = 0;
+    queue[queueTail].speed = 0;
+    
+    queueTail = (queueTail + 1) % MAX_QUEUE_SIZE;
+    queueCount++;
+  } else {
+    Serial.println(F("ERROR:OVERFLOW"));
+  }
+}
 
 void parseAndEnqueueMove(String cmd) {
-  // Expected Format: G1/G0 <Elbow> <Base> <Speed>
+  // Expected Format: G1 <Elbow> <Base> <Speed>
   long armSteps = 0;
   long baseSteps = 0;
-  int speed = 1000; // Default delay (lower is faster)
+  int speed = 1000;
 
   int s1 = cmd.indexOf(' ');
   int s2 = cmd.indexOf(' ', s1 + 1);
@@ -113,13 +122,14 @@ void parseAndEnqueueMove(String cmd) {
   if (s1 > 0) {
     // Parse Elbow (Arm)
     armSteps = cmd.substring(s1 + 1, s2).toInt();
+    
     if (s2 > 0) {
       if (s3 > 0) {
         // Parse Base & Speed
         baseSteps = cmd.substring(s2 + 1, s3).toInt();
         speed = cmd.substring(s3 + 1).toInt();
       } else {
-        // Parse Base only (use default speed)
+        // Parse Base only (default speed)
         baseSteps = cmd.substring(s2 + 1).toInt();
       }
     }
@@ -145,12 +155,39 @@ void executeNextCommand() {
   
   if (cmd.type == CMD_MOVE) {
     moveBresenham(cmd.armSteps, cmd.baseSteps, cmd.speed);
-    Serial.println(F("Done")); // Signal to Python
+    Serial.println(F("Done")); // Signal to Python that we are ready for more
   } 
-  // REMOVED: CMD_WAIT (M0) handling
+  else if (cmd.type == CMD_WAIT) {
+    performProgrammedPause();
+  }
 }
 
-// NOTE: performProgrammedPause() removed.
+// Blocks everything until "R" or "RESUME" is received
+void performProgrammedPause() {
+  Serial.println(F("Done")); // Tell Python the "M0" command is processed so it doesn't timeout
+  // NOTE: Depending on your Python script, you might want to send a specific status here.
+  // But usually sending "Done" satisfies the script to wait.
+  
+  digitalWrite(enPin, HIGH); // Disable motors (Pause state)
+  
+  bool waiting = true;
+  while (waiting) {
+    if (Serial.available()) {
+      String input = Serial.readStringUntil('\n');
+      input.trim();
+      if (input.equalsIgnoreCase("R") || input.equalsIgnoreCase("RESUME")) {
+        waiting = false;
+        digitalWrite(enPin, LOW); // Re-enable motors
+        // Serial.println(F("Resumed")); // Optional debug
+      }
+      // Handle immediate stop even during M0
+      if (input.equalsIgnoreCase("PAUSE")) {
+        paused = true; 
+      }
+    }
+    delay(50);
+  }
+}
 
 void moveBresenham(long da, long db, int delayUs) {
   digitalWrite(enPin, LOW); // Enable motors
@@ -167,7 +204,7 @@ void moveBresenham(long da, long db, int delayUs) {
   long accB = steps / 2;
 
   for (long i = 0; i < steps; i++) {
-    // Check Serial frequently
+    // Check Serial frequently to prevent buffer overflow
     if (Serial.available()) handleSerial();
     
     // Immediate pause check
@@ -191,6 +228,6 @@ void moveBresenham(long da, long db, int delayUs) {
 
 void pulsePin(int pin) {
   digitalWrite(pin, HIGH);
-  delayMicroseconds(2);
+  delayMicroseconds(2); 
   digitalWrite(pin, LOW);
 }
