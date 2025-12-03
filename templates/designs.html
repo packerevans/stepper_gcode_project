@@ -9,9 +9,13 @@
         /* --- Modern Variables --- */
         :root {
             --color-accent: #d2b48c; 
+            --color-selected: #4ade80; /* Vibrant Light Green */
+            --color-selected-ring: #22c55e; /* Slightly darker green for border */
+            
             --color-bg: #f8f9fa;
             --color-surface: #ffffff;
             --color-text: #222222;
+            
             --shadow-subtle: 0 4px 6px -1px rgba(0,0,0,0.05);
             --shadow-float: 0 10px 15px -3px rgba(0,0,0,0.1);
             --radius: 16px;
@@ -50,7 +54,7 @@
         .header-title { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.5px; }
         .icon-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--color-text); }
 
-        /* --- Hero Image (Restored) --- */
+        /* --- Hero Image --- */
         .hero-container {
             width: 100%; max-width: 1200px; margin: 0 auto;
             padding: 20px 15px 0;
@@ -98,27 +102,46 @@
             background: var(--color-surface); border-radius: var(--radius);
             overflow: hidden; position: relative;
             box-shadow: var(--shadow-subtle);
-            transition: transform 0.2s;
+            transition: transform 0.2s, box-shadow 0.2s;
             cursor: pointer;
+            border: 2px solid transparent; /* Prepare for border */
         }
 
         .card:hover { transform: translateY(-2px); }
-        .card.selected { ring: 2px solid var(--color-accent); transform: scale(0.98); }
+        
+        /* SELECTED STATE (Green) */
+        .card.selected { 
+            border-color: var(--color-selected-ring); 
+            background-color: rgba(74, 222, 128, 0.05);
+            transform: scale(0.98); 
+        }
 
-        .card-img-wrap { position: relative; aspect-ratio: 1/1; background: #fff; }
-        .card canvas { width: 100%; height: 100%; display: block; }
+        .card-img-wrap { 
+            position: relative; 
+            aspect-ratio: 1/1; 
+            background: #fff; 
+            width: 100%;
+        }
+        
+        .card canvas { 
+            width: 100%; 
+            height: 100%; 
+            display: block; 
+        }
         
         /* Select Dot */
         .select-dot {
             position: absolute; top: 10px; right: 10px;
             width: 24px; height: 24px; border-radius: 50%;
-            background: rgba(0,0,0,0.3); border: 2px solid #fff;
+            background: rgba(0,0,0,0.2); border: 2px solid #fff;
             z-index: 10; transition: 0.2s;
         }
         
+        /* Dot when selected */
         .card.selected .select-dot {
-            background: var(--color-accent);
+            background: var(--color-selected);
             box-shadow: 0 0 0 2px var(--color-surface);
+            border-color: var(--color-selected);
         }
         
         .card-body { padding: 12px; }
@@ -221,13 +244,26 @@
         let selectedFiles = new Set();
         let allFiles = [];
 
-        // --- KINEMATIC MATH (Restored for accurate rendering) ---
+        // --- KINEMATIC VARIABLES ---
         const L1 = 101.3;
         const L2 = 101.3;
         const GEAR_RATIO = 9/8;
         const STEPS_PER_DEG = 3200/360;
         const STEPS_PER_RAD = STEPS_PER_DEG * (180 / Math.PI);
         const lerp = (a, b, t) => a + (b - a) * t;
+
+        // --- OBSERVER FOR LAZY LOADING ---
+        // This makes the page load instantly by only calculating math for visible cards
+        const observer = new IntersectionObserver((entries, obs) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const canvas = entry.target;
+                    const filename = canvas.dataset.filename;
+                    loadPreviewForCanvas(canvas, filename);
+                    obs.unobserve(canvas); // Only load once
+                }
+            });
+        }, { rootMargin: "100px" });
 
         function calculateFK(p0, base_steps, elbow_steps) {
             const alpha_rad = -base_steps / STEPS_PER_RAD;
@@ -237,16 +273,16 @@
             const theta2_global = theta1 + theta_bend;
             const p1 = { x: p0.x + L1 * Math.cos(theta1), y: p0.y + L1 * Math.sin(theta1) };
             const p2 = { x: p1.x + L2 * Math.cos(theta2_global), y: p1.y + L2 * Math.sin(theta2_global) };
-            return { p0, p1, p2, target_base_steps: base_steps, target_elbow_steps: elbow_steps, theta1_rad: theta1, theta2_global_rad: theta2_global };
+            return { p1, p2, target_base_steps: base_steps, target_elbow_steps: elbow_steps, theta1_rad: theta1, theta2_global_rad: theta2_global };
         }
 
         function getInterpolatedState(from, to, progress) {
             const theta1_rad = lerp(from.theta1_rad, to.theta1_rad, progress);
             const theta2_global_rad = lerp(from.theta2_global_rad, to.theta2_global_rad, progress);
-            const p0 = from.p0;
+            const p0 = {x:0, y:0};
             const p1 = { x: p0.x + L1 * Math.cos(theta1_rad), y: p0.y + L1 * Math.sin(theta1_rad) };
             const p2 = { x: p1.x + L2 * Math.cos(theta2_global_rad), y: p1.y + L2 * Math.sin(theta2_global_rad) };
-            return { p0, p1, p2 };
+            return { p2 };
         }
 
         function calculateTracePath(commands) {
@@ -273,10 +309,12 @@
                 
                 const base_delta = Math.abs(toState.target_base_steps - fromState.target_base_steps);
                 const elbow_delta = Math.abs(toState.target_elbow_steps - fromState.target_elbow_steps);
-                
-                // Resolution: Draw a point every X steps
                 const max_step_delta = Math.max(base_delta, elbow_delta);
-                const stepsPerSegment = Math.max(5, Math.ceil(max_step_delta / 200)); 
+
+                // --- OPTIMIZATION: Reduce resolution for faster rendering ---
+                // Previous: / 200. New: / 600. Draws 3x fewer points per line. 
+                // Still looks smooth on mobile screens.
+                const stepsPerSegment = Math.max(2, Math.ceil(max_step_delta / 600)); 
 
                 for (let j = 1; j <= stepsPerSegment; j++) {
                     const progress = j / stepsPerSegment;
@@ -291,10 +329,8 @@
             const ctx = canvas.getContext('2d');
             const width = canvas.width;
             const height = canvas.height;
-            ctx.fillStyle = '#ffffff'; 
-            ctx.fillRect(0, 0, width, height);
+            ctx.clearRect(0, 0, width, height); // Transparent background
 
-            // Parse Commands
             const commands = text.split('\n')
                 .filter(line => line.trim().toUpperCase().startsWith('G1'))
                 .map(line => {
@@ -306,16 +342,24 @@
 
             const tracePath = calculateTracePath(commands);
 
-            // Auto-Scale
-            let minX = tracePath[0].x, maxX = tracePath[0].x;
-            let minY = tracePath[0].y, maxY = tracePath[0].y;
+            // --- AUTO-SCALING LOGIC (Fixing Squish) ---
+            let minX = Infinity, maxX = -Infinity;
+            let minY = Infinity, maxY = -Infinity;
 
             for (const p of tracePath) {
                 if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
                 if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
             }
 
-            const scale = Math.min(width / ((maxX - minX)||1), height / ((maxY - minY)||1)) * 0.9;
+            // Calculate width and height of the drawing itself
+            const drawingW = maxX - minX || 1;
+            const drawingH = maxY - minY || 1;
+
+            // Use the LARGER dimension to determine scale. 
+            // This ensures aspect ratio is 1:1.
+            const maxDim = Math.max(drawingW, drawingH);
+            const scale = (width / maxDim) * 0.9; // 90% fill
+
             const cx = (minX + maxX)/2;
             const cy = (minY + maxY)/2;
             const w2 = width/2;
@@ -325,12 +369,18 @@
             ctx.strokeStyle = '#333333';
             ctx.lineWidth = 1.5;
 
-            for (let i = 0; i < tracePath.length; i++) {
+            // Draw with optimized path
+            if(tracePath.length > 0) {
+                 const startX = w2 + (tracePath[0].x - cx) * scale;
+                 const startY = h2 + (tracePath[0].y - cy) * -scale; 
+                 ctx.moveTo(startX, startY);
+            }
+
+            for (let i = 1; i < tracePath.length; i++) {
                 const p = tracePath[i];
                 const x = w2 + (p.x - cx) * scale;
                 const y = h2 + (p.y - cy) * -scale; 
-                if (i === 0) ctx.moveTo(x, y);
-                else ctx.lineTo(x, y);
+                ctx.lineTo(x, y);
             }
             ctx.stroke();
         }
@@ -349,7 +399,6 @@
             setTimeout(()=>el.style.opacity='0', 3000);
         }
 
-        // --- SELECTION & DELETION ---
         function toggleSelect(filename, event) {
             event.stopPropagation();
             if(selectedFiles.has(filename)) selectedFiles.delete(filename);
@@ -376,13 +425,11 @@
         }
 
         async function deleteSelected() {
-            // Filter out protected files (ones with PNGs)
             let filesToDelete = [];
             let protectedCount = 0;
 
             for(let f of selectedFiles) {
                 let card = document.querySelector(`.card[data-name="${f}"]`);
-                // If it has "has-png" flag, we protect it
                 if(card && card.dataset.hasPng === "true") {
                     protectedCount++;
                 } else {
@@ -391,12 +438,12 @@
             }
 
             if(filesToDelete.length === 0) {
-                if(protectedCount > 0) alert("Selected designs are protected (they have PNGs) and cannot be deleted.");
+                if(protectedCount > 0) alert("Selected designs are protected (they have PNGs).");
                 return;
             }
 
             let confirmMsg = `Delete ${filesToDelete.length} designs?`;
-            if(protectedCount > 0) confirmMsg += `\n(${protectedCount} files were skipped because they are protected).`;
+            if(protectedCount > 0) confirmMsg += `\n(${protectedCount} skipped because protected).`;
             
             if(!confirm(confirmMsg)) return;
             
@@ -423,18 +470,17 @@
                 try {
                     let res = await fetch(`${BASE_URL}/designs/${f}`);
                     let txt = await res.text();
-                    fullText += `; --- START ${f} ---\n${txt}\n; --- END ${f} ---\n\n`;
+                    fullText += `; ${f}\n${txt}\n`;
                 } catch(e) {}
             }
             
             navigator.clipboard.writeText(fullText).then(() => {
-                showStatus("Copied to Clipboard!");
+                showStatus("Copied!");
                 selectedFiles.clear();
                 renderSelectionState();
             });
         }
 
-        // --- QUEUE/RUN ---
         async function runDesign(filename) {
             let spd = document.getElementById('speedSelect').value;
             showStatus("Queueing...");
@@ -484,7 +530,6 @@
             } catch(e){}
         }
 
-        // --- GRID RENDERING ---
         async function loadLibrary() {
             let g = document.getElementById('grid');
             g.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:40px;">Loading...</div>';
@@ -493,8 +538,8 @@
                 let res = await fetch(`${BASE_URL}/api/designs`);
                 let files = await res.json();
                 allFiles = files;
-                renderGrid(files.slice(0, 12)); 
-                if(files.length > 12) document.getElementById('more-btn').style.display='inline-block';
+                renderGrid(files.slice(0, 15)); 
+                if(files.length > 15) document.getElementById('more-btn').style.display='inline-block';
             } catch(e) {
                 g.innerHTML = 'Error loading files.';
             }
@@ -505,6 +550,7 @@
             document.getElementById('more-btn').style.display='none';
         }
 
+        // --- RENDER GRID WITH LAZY LOADING ---
         function renderGrid(files) {
             let g = document.getElementById('grid');
             g.innerHTML = '';
@@ -514,10 +560,8 @@
                 let div = document.createElement('div');
                 div.className = 'card';
                 div.setAttribute('data-name', f);
-                // Default protected state false, updated on PNG load
                 div.dataset.hasPng = "false"; 
 
-                // Click body to run
                 div.onclick = (e) => {
                    if(e.target.className !== 'select-dot') runDesign(f);
                 };
@@ -528,7 +572,7 @@
                 
                 div.innerHTML = `
                     <div class="card-img-wrap">
-                        <canvas id="cvs-${clean}"></canvas>
+                        <canvas id="cvs-${clean}" data-filename="${f}" width="300" height="300"></canvas>
                     </div>
                     <div class="card-body">
                         <h3 class="card-title">${clean}</h3>
@@ -537,30 +581,36 @@
                 `;
                 div.querySelector('.card-img-wrap').appendChild(dot);
                 g.appendChild(div);
-                
-                // Load Preview
-                setTimeout(() => {
-                    let cvs = document.getElementById(`cvs-${clean}`);
-                    let img = new Image();
-                    img.src = `${BASE_URL}/designs/${clean}.png`;
-                    
-                    // IF IMAGE EXISTS
-                    img.onload = () => {
-                        cvs.getContext('2d').drawImage(img,0,0,cvs.width,cvs.height);
-                        // MARK AS PROTECTED
-                        div.dataset.hasPng = "true";
-                    };
-                    
-                    // IF IMAGE MISSING
-                    img.onerror = () => {
-                        // Mark as NOT protected (deletable)
-                        div.dataset.hasPng = "false";
-                        // Draw vector trace
-                        fetch(`${BASE_URL}/designs/${f}`).then(r=>r.text()).then(t=>drawTrace(cvs,t));
-                    };
-                    
-                    // Time Est
-                    fetch(`${BASE_URL}/designs/${f}`).then(r=>r.text()).then(t=>{
+
+                // Observe the canvas for lazy loading
+                const canvas = div.querySelector('canvas');
+                observer.observe(canvas);
+            });
+            renderSelectionState();
+        }
+
+        // Called when canvas scrolls into view
+        function loadPreviewForCanvas(canvas, filename) {
+            const clean = filename.replace('.txt', '');
+            const card = canvas.closest('.card');
+            
+            const img = new Image();
+            img.src = `${BASE_URL}/designs/${clean}.png`;
+            
+            img.onload = () => {
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                card.dataset.hasPng = "true";
+            };
+            
+            img.onerror = () => {
+                card.dataset.hasPng = "false";
+                // Fetch text and calculate trace
+                fetch(`${BASE_URL}/designs/${filename}`)
+                    .then(r => r.text())
+                    .then(t => {
+                        drawTrace(canvas, t);
+                        // Calc time only if we had to fetch the text anyway
                         let time=0;
                         t.split('\n').forEach(l=>{
                              if(l.toUpperCase().startsWith('G1')) {
@@ -571,9 +621,7 @@
                         });
                         document.getElementById(`time-${clean}`).textContent = Math.ceil(time/60000000) + " min";
                     });
-                }, 0);
-            });
-            renderSelectionState();
+            };
         }
 
         function openNav() { document.getElementById('mySidebar').style.width="250px"; document.getElementById('overlay').style.display="block"; }
