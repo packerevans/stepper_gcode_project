@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Packers Sand Pro (Synced v21 - Smart Pathing)</title>
+    <title>Packers Sand Pro (Synced v24 - Deep Optimization)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -385,7 +385,7 @@
             ctx.restore();
         }
 
-        // --- AI TRACER (UPDATED: High Contrast) ---
+        // --- AI TRACER (High Contrast) ---
         function handleImageUpload(input) {
             const file = input.files[0];
             if(!file) return;
@@ -405,11 +405,9 @@
                     tCan.width = tw; tCan.height = th;
                     const tCtx = tCan.getContext('2d');
                     
-                    // White BG
                     tCtx.fillStyle = "white"; tCtx.fillRect(0,0,tw,th);
                     tCtx.drawImage(img, 0, 0, tw, th);
                     
-                    // High Contrast (Binarization)
                     const imgData = tCtx.getImageData(0,0,tw,th);
                     const d = imgData.data;
                     for (let i=0; i<d.length; i+=4) {
@@ -491,19 +489,17 @@
             render();
         }
 
-        // --- OPTIMIZER (UPDATED: Smart Entry) ---
-        // --- ADVANCED OPTIMIZER v23 (Dynamic Seam Hiding & Multi-Start) ---
+        // --- ADVANCED OPTIMIZER v24 (2-OPT + Seam Hiding + Pruning) ---
         async function prepareGCode() {
             if(rawPoints.length === 0) return showToast("Draw something first!", "error");
-            showToast("Simulating best paths...", "info");
+            showToast("Running Deep Optimization (Please wait)...", "info");
 
-            // Allow UI update
             await new Promise(r => setTimeout(r, 50));
 
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
             const sym = parseInt(document.getElementById('symSlider').value);
             
-            // --- 1. GROUP POINTS INTO SHAPES ---
+            // 1. GROUPING
             let shapes = [];
             let curShape = [];
             rawPoints.forEach(p => {
@@ -516,7 +512,7 @@
             });
             if(curShape.length > 0) shapes.push(curShape);
 
-            // --- 2. SYMMETRY EXPANSION ---
+            // 2. SYMMETRY
             let pool = [];
             for(let s=0; s<sym; s++) {
                 const ang = s * (Math.PI*2/sym);
@@ -532,201 +528,164 @@
 
             if(pool.length === 0) return;
 
-            // --- 3. METADATA ANALYSIS ---
-            // Pre-calculate properties to speed up the solver
+            // 3. ANALYSIS & CENTROIDS
             let shapeMeta = pool.map((s, idx) => {
                 const dStartEnd = Math.hypot(s[0].x - s[s.length-1].x, s[0].y - s[s.length-1].y);
-                const isClosed = dStartEnd < 8.0; // Tolerance for loops
+                const isClosed = dStartEnd < 8.0;
+                // Close loop exactly
+                if(isClosed) s[s.length-1] = {x: s[0].x, y: s[0].y};
                 
-                // If closed, ensure start and end are exactly the same point
-                if(isClosed) {
-                    s[s.length-1] = {x: s[0].x, y: s[0].y};
-                }
-
-                // Calculate distance to Rim (using the first point as approximation)
-                const distToRim = Math.abs(tableR - Math.hypot(s[0].x, s[0].y));
+                // Calculate Centroid (Average position)
+                let cx=0, cy=0;
+                s.forEach(p=>{cx+=p.x; cy+=p.y});
+                cx/=s.length; cy/=s.length;
 
                 return {
                     id: idx,
                     points: s,
                     isClosed: isClosed,
-                    distToRim: distToRim
+                    centroid: {x:cx, y:cy},
+                    distToRim: Math.abs(tableR - Math.hypot(cx, cy))
                 };
             });
 
-            // --- 4. IDENTIFY PERIMETER CANDIDATES ---
-            // We only want to start drawing from shapes near the edge (Perimeter)
-            // Sort by closeness to Rim
-            let sortedByRim = [...shapeMeta].sort((a,b) => a.distToRim - b.distToRim);
+            // 4. TSP OPTIMIZATION (2-Opt)
+            // Initial Order: Sort by distance to Rim (Perimeter First Strategy)
+            shapeMeta.sort((a,b) => a.distToRim - b.distToRim);
             
-            // Pick the top 15 shapes closest to the rim as potential start points
-            // If the design is small, just take all of them.
-            let startCandidates = sortedByRim.slice(0, Math.min(15, sortedByRim.length));
+            // Apply 2-Opt Optimization on Centroids
+            // This reorders the shapes to minimize the travel between their centers
+            shapeMeta = runTwoOpt(shapeMeta);
 
-            let bestPath = null;
-            let minTotalJump = Infinity;
+            // 5. SEAM ALIGNMENT (Rotation/Reversal)
+            // Now that order is fixed, align starts/ends
+            let optimizedPath = [];
+            let headPos = {x: tableR, y: 0}; // Start at Rim
 
-            // --- 5. MULTI-START SIMULATION ---
-            // Try starting from *each* candidate and see which produces the shortest connection lines
-            
-            for(let startNode of startCandidates) {
-                const result = solveGreedyPath(startNode.id, shapeMeta, tableR);
-                if(result.totalJump < minTotalJump) {
-                    minTotalJump = result.totalJump;
-                    bestPath = result.path;
+            for(let meta of shapeMeta) {
+                let bestPts = [...meta.points];
+                
+                if(meta.isClosed) {
+                    // Rotate loop to start closest to headPos
+                    let bestIdx = 0;
+                    let minDist = Infinity;
+                    for(let k=0; k<meta.points.length; k+=3) {
+                        let d = (headPos.x-meta.points[k].x)**2 + (headPos.y-meta.points[k].y)**2;
+                        if(d < minDist) { minDist = d; bestIdx = k; }
+                    }
+                    if(bestIdx > 0) {
+                        let p1 = bestPts.slice(bestIdx);
+                        let p2 = bestPts.slice(0, bestIdx);
+                        bestPts = p1.concat(p2);
+                        bestPts.push({x:bestPts[0].x, y:bestPts[0].y});
+                    }
+                } else {
+                    // Reverse line if end is closer than start
+                    let dStart = (headPos.x-bestPts[0].x)**2 + (headPos.y-bestPts[0].y)**2;
+                    let dEnd = (headPos.x-bestPts[bestPts.length-1].x)**2 + (headPos.y-bestPts[bestPts.length-1].y)**2;
+                    if(dEnd < dStart) bestPts.reverse();
                 }
+                
+                optimizedPath.push(bestPts);
+                headPos = bestPts[bestPts.length-1];
             }
 
-            // --- 6. OUTPUT GENERATION ---
+            // 6. PATH GENERATION (Continuous)
             processedPoints = [];
             
-            // Entry Move (Rim -> First Shape)
-            if(bestPath && bestPath.length > 0) {
-                const firstPt = bestPath[0][0];
-                const ang = Math.atan2(firstPt.y, firstPt.x);
-                processedPoints.push({x: tableR*Math.cos(ang), y: tableR*Math.sin(ang), type:'point'});
+            // Entry
+            let entryAng = Math.atan2(optimizedPath[0][0].y, optimizedPath[0][0].x);
+            processedPoints.push({x: tableR*Math.cos(entryAng), y: tableR*Math.sin(entryAng), type:'point'});
 
-                for(let i=0; i<bestPath.length; i++) {
-                    let s = bestPath[i];
-                    s.forEach(p => processedPoints.push({x:p.x, y:p.y, type:'point'}));
-                }
-
-                // Exit Move (Last Shape -> Rim)
-                const lastSh = bestPath[bestPath.length-1];
-                const lastPt = lastSh[lastSh.length-1];
-                const exitAng = Math.atan2(lastPt.y, lastPt.x);
-                processedPoints.push({x: tableR*Math.cos(exitAng), y: tableR*Math.sin(exitAng), type:'exit'});
+            for(let shapePts of optimizedPath) {
+                // Add all points of the shape
+                shapePts.forEach(p => processedPoints.push({x:p.x, y:p.y, type:'point'}));
             }
+
+            // Exit
+            let lastSh = optimizedPath[optimizedPath.length-1];
+            let lastPt = lastSh[lastSh.length-1];
+            let exitAng = Math.atan2(lastPt.y, lastPt.x);
+            processedPoints.push({x: tableR*Math.cos(exitAng), y: tableR*Math.sin(exitAng), type:'exit'});
+
+            // 7. SIMPLIFICATION (Pruning)
+            processedPoints = simplifyPath(processedPoints, 0.5); // 0.5mm tolerance
 
             generateKinematicsGCode(processedPoints);
             
-            document.getElementById('statusTxt').innerText = "Smart Path: Optimized";
+            document.getElementById('statusTxt').innerText = "AI Path: Deep Optimized";
             document.getElementById('statusTxt').style.color = "#2ecc71";
             document.getElementById('progressSlider').value = 0;
             render(); 
-            showToast(`Optimized! (Travel reduced to ${(minTotalJump/10).toFixed(0)}cm)`, "success");
+            showToast(`Complete! Path simplified & optimized.`, "success");
         }
 
-        // --- SOLVER ENGINE ---
+        // --- SOLVERS ---
 
-        function distSq(p1, p2) {
-            return (p1.x-p2.x)**2 + (p1.y-p2.y)**2;
-        }
-
-        function solveGreedyPath(startId, allMeta, tableR) {
-            let unvisited = new Set(allMeta.map(m => m.id));
-            let path = [];
-            let totalJump = 0;
+        function runTwoOpt(tour) {
+            // Simple 2-Opt implementation for Shape Sequencing
+            // We use centroids for distance to be fast
+            const maxIter = 2000; // Limit iterations for speed
+            let bestDist = calculateTourDist(tour);
             
-            // Initialize with start shape
-            let currentMeta = allMeta[startId];
-            unvisited.delete(startId);
-            
-            // For the first shape, we want to enter at the point closest to the RIM
-            let currentPoints = [...currentMeta.points];
-            if(currentMeta.isClosed) {
-                currentPoints = rotateToClosest(currentPoints, {x: tableR, y: 0}, true); // Heuristic: Closest to rim magnitude
-            }
-            path.push(currentPoints);
-            
-            let headPos = currentPoints[currentPoints.length-1];
+            for(let i=0; i<maxIter; i++) {
+                // Pick two random edges
+                let a = Math.floor(Math.random() * (tour.length - 1));
+                let b = Math.floor(Math.random() * (tour.length - 1));
+                if(a === b) continue;
+                if(a > b) [a,b] = [b,a]; // Swap so a < b
 
-            while(unvisited.size > 0) {
-                let bestNextId = -1;
-                let minDist = Infinity;
-                let bestPoints = null;
-
-                // Scan all unvisited neighbors
-                for(let id of unvisited) {
-                    const cand = allMeta[id];
-                    
-                    // Optimization: Quick Bounds Check?
-                    // (Skipped for JS simplicity, performant enough for <1000 shapes)
-
-                    if(cand.isClosed) {
-                        // CLOSED LOOP LOGIC:
-                        // Find the point on the loop closest to 'headPos'
-                        // We check every 4th point for speed (high enough resolution for sand)
-                        let bestIdx = 0;
-                        let bestPtDist = Infinity;
-                        
-                        for(let k=0; k<cand.points.length; k+=4) {
-                            const d = distSq(headPos, cand.points[k]);
-                            if(d < bestPtDist) {
-                                bestPtDist = d;
-                                bestIdx = k;
-                            }
-                        }
-                        
-                        if(bestPtDist < minDist) {
-                            minDist = bestPtDist;
-                            bestNextId = id;
-                            // Create the rotated shape NOW so we don't have to recalc later
-                            bestPoints = rotateArray(cand.points, bestIdx);
-                        }
-                    } else {
-                        // OPEN LINE LOGIC:
-                        // Check Start vs End
-                        const dStart = distSq(headPos, cand.points[0]);
-                        const dEnd = distSq(headPos, cand.points[cand.points.length-1]);
-                        
-                        if(dStart < minDist) {
-                            minDist = dStart;
-                            bestNextId = id;
-                            bestPoints = [...cand.points];
-                        }
-                        if(dEnd < minDist) {
-                            minDist = dEnd;
-                            bestNextId = id;
-                            bestPoints = [...cand.points].reverse();
-                        }
-                    }
-                }
-
-                if(bestNextId !== -1) {
-                    totalJump += Math.sqrt(minDist);
-                    path.push(bestPoints);
-                    unvisited.delete(bestNextId);
-                    headPos = bestPoints[bestPoints.length-1];
+                // Swap segment
+                reverseSegment(tour, a, b);
+                let newDist = calculateTourDist(tour);
+                
+                if(newDist < bestDist) {
+                    bestDist = newDist; // Keep swap
                 } else {
-                    break;
+                    reverseSegment(tour, a, b); // Revert swap
                 }
             }
-            
-            return { path, totalJump };
+            return tour;
         }
 
-        function rotateToClosest(points, target, useMagnitude) {
-            let bestIdx = 0;
-            let bestVal = Infinity;
+        function reverseSegment(arr, i, j) {
+            while(i < j) {
+                let temp = arr[i];
+                arr[i] = arr[j];
+                arr[j] = temp;
+                i++; j--;
+            }
+        }
+
+        function calculateTourDist(tour) {
+            let d = 0;
+            for(let i=0; i<tour.length-1; i++) {
+                let c1 = tour[i].centroid;
+                let c2 = tour[i+1].centroid;
+                d += (c1.x-c2.x)**2 + (c1.y-c2.y)**2;
+            }
+            return d;
+        }
+
+        // Visvalingam-Whyatt Simplification (Fast approximate)
+        function simplifyPath(points, tolerance) {
+            if(points.length < 3) return points;
+            let newPts = [points[0]];
+            let lastP = points[0];
             
-            // If useMagnitude is true, we just want the point with highest radius (closest to rim)
-            // If false, we want point closest to target coordinate
-            
-            if(useMagnitude) {
-                bestVal = -1;
-                for(let i=0; i<points.length; i+=2) {
-                    const d = Math.hypot(points[i].x, points[i].y);
-                    if(d > bestVal) { bestVal = d; bestIdx = i; }
-                }
-            } else {
-                for(let i=0; i<points.length; i+=2) {
-                    const d = distSq(points[i], target);
-                    if(d < bestVal) { bestVal = d; bestIdx = i; }
+            for(let i=1; i<points.length-1; i++) {
+                let p = points[i];
+                let dist = Math.hypot(p.x - lastP.x, p.y - lastP.y);
+                // If point is very close to last point, skip it (Pruning)
+                if(dist > tolerance) {
+                    newPts.push(p);
+                    lastP = p;
                 }
             }
-            return rotateArray(points, bestIdx);
+            newPts.push(points[points.length-1]);
+            return newPts;
         }
 
-        function rotateArray(arr, idx) {
-            if(idx === 0) return [...arr];
-            const part1 = arr.slice(idx);
-            const part2 = arr.slice(0, idx);
-            const newArr = part1.concat(part2);
-            // Close the loop perfectly
-            newArr.push({x: newArr[0].x, y: newArr[0].y});
-            return newArr;
-        }
         // --- G-CODE GENERATION ---
         function generateKinematicsGCode(pathPoints) {
             const L1 = parseFloat(document.getElementById('cfgL1').value);
