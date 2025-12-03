@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Packers Sand Pro (Synced v17)</title>
+    <title>Packers Sand Pro (Synced v18)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -200,6 +200,10 @@
                 <button onclick="sendToTable()" class="active">🚀 Run</button>
                 <button onclick="downloadGcode()" class="secondary">💾 Save</button>
             </div>
+            
+            <div class="btn-group">
+                <button onclick="downloadThetaRho()" class="secondary" style="border-color:#2ecc71; color:#2ecc71;">📥 Copy .THR</button>
+            </div>
 
             <details>
                 <summary>⚙️ Machine Settings</summary>
@@ -228,6 +232,7 @@
         let origin = {x:0, y:0};
         let scale = 1;
         let generatedGCode = null;
+        let generatedThr = null;
 
         const canvas = document.getElementById('drawCanvas');
         const ctx = canvas.getContext('2d');
@@ -311,6 +316,7 @@
 
         function resetStatus() {
             generatedGCode = null;
+            generatedThr = null;
             processedPoints = [];
             document.getElementById('statusTxt').innerText = "Drawing Mode";
             document.getElementById('statusTxt').style.color = "orange";
@@ -637,8 +643,8 @@
             let lAng = Math.atan2(lPt.y, lPt.x);
             processedPoints.push({x: tableR*Math.cos(lAng), y: tableR*Math.sin(lAng), type:'exit'});
 
-            // 5. Generate Machine Code
-            generatedGCode = generateKinematicsGCode(processedPoints);
+            // 5. Generate Machine Code (Including Home-to-Start Move!)
+            generateKinematicsGCode(processedPoints);
             
             document.getElementById('statusTxt').innerText = "Path Optimized (Red)";
             document.getElementById('statusTxt').style.color = "green";
@@ -664,20 +670,19 @@
             let prevBase = 0;
             let prevElbow = 0;
             
-            // Initial IK Position
-            if(pathPoints.length > 0) {
-                let startIK = calculateIK(pathPoints[0].x, pathPoints[0].y, 0, 0, L1, L2, gearRatio, stepsPerRad);
-                prevBase = startIK.base_steps;
-                prevElbow = startIK.elbow_steps;
-            }
+            // --- FIX FOR SCRIPT.HTML RENDERING ---
+            // Script.html assumes simulation starts at 0,0 (Home). 
+            // We must insert the "Travel to Start" moves so the simulator tracks correctly.
+            
+            let fullPath = [{x:0, y:0}].concat(pathPoints); // Prepend Home (0,0)
 
-            for (let i = 0; i < pathPoints.length - 1; i++) {
-                let p1 = pathPoints[i];
-                let p2 = pathPoints[i+1];
+            for (let i = 0; i < fullPath.length - 1; i++) {
+                let p1 = fullPath[i];
+                let p2 = fullPath[i+1];
                 
-                if (p2.type === 'exit') commands.push("M0"); // Pause at end
+                if (p2.type === 'exit') commands.push("M0"); 
 
-                // Interpolate (Break long lines into tiny segments for SCARA)
+                // Interpolate
                 let dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
                 let steps = Math.ceil(dist / res);
                 steps = Math.max(1, steps);
@@ -687,19 +692,17 @@
                     let x = p1.x + (p2.x - p1.x) * t;
                     let y = p1.y + (p2.y - p1.y) * t;
 
-                    // Calculate IK based on PREVIOUS motors state (to minimize rotation)
+                    // Calculate IK
                     let ik = calculateIK(x, y, prevBase, prevElbow, L1, L2, gearRatio, stepsPerRad);
                     
                     let dBase = Math.round(ik.base_steps - prevBase);
                     let dElbow = Math.round(ik.elbow_steps - prevElbow);
 
                     if (dBase !== 0 || dElbow !== 0) {
-                        // Speed Math (Ramping)
                         let distFromCenter = Math.hypot(x, y);
                         let rFactor = distFromCenter / tableRadius;
                         if (rFactor > 1.0) rFactor = 1.0;
                         
-                        // Linear Speed Scaling
                         let calculatedDelay = centerDelay + ((perimDelay - centerDelay) * rFactor);
                         calculatedDelay = Math.round(calculatedDelay);
 
@@ -711,10 +714,21 @@
                 }
             }
 
-            return commands.join('\n');
+            generatedGCode = commands.join('\n');
+            
+            // Generate Theta-Rho for export (Universal Format)
+            let thrLines = [];
+            for(let p of pathPoints) {
+                if(p.type !== 'exit') {
+                    let rho = Math.hypot(p.x, p.y) / tableRadius;
+                    let theta = Math.atan2(p.y, p.x);
+                    thrLines.push(`${theta.toFixed(5)} ${rho.toFixed(5)}`);
+                }
+            }
+            generatedThr = thrLines.join('\n');
         }
 
-        // --- KINEMATICS ENGINE (PORTED FROM SCRIPT.HTML) ---
+        // --- KINEMATICS ENGINE (EXACT MATCH TO SCRIPT.HTML) ---
         
         function getShortestRotation(raw, last) {
             let diff = (raw - last) / (2 * Math.PI);
@@ -732,17 +746,15 @@
                 dist = maxReach;
             }
 
-            // --- CENTER PASS-THROUGH LOGIC ---
-            // If close to center, lock base to prevent spin.
+            // Center Lock
             if (dist < 1.0) { 
                 const targetBaseSteps = lastBaseSteps; 
-                // Reverse-engineer BaseAngle
                 const currentBaseAngle = -lastBaseSteps / stepsPerRad;
                 const targetElbowSteps = -(Math.PI + gearRatio * currentBaseAngle) * stepsPerRad;
                 return { base_steps: targetBaseSteps, elbow_steps: targetElbowSteps };
             }
 
-            // Standard Math
+            // Polar Trig
             const lastT1 = -lastBaseSteps / stepsPerRad; 
             let cosBend = (dist*dist - L1*L1 - L2*L2) / (2 * L1 * L2);
             cosBend = Math.max(-1, Math.min(1, cosBend));
@@ -812,7 +824,20 @@
             if(!generatedGCode) return showToast("Click 'Prepare Path' first!", "error");
             const blob = new Blob([generatedGCode], {type:'text/plain'});
             const a = document.createElement('a');
-            a.download = 'pattern.txt'; a.href = URL.createObjectURL(blob); a.click();
+            a.download = 'pattern_steps.txt'; a.href = URL.createObjectURL(blob); a.click();
+        }
+
+        function downloadThetaRho() {
+            if(!generatedThr) return showToast("Click 'Prepare Path' first!", "error");
+            // Copy to Clipboard logic
+            navigator.clipboard.writeText(generatedThr).then(() => {
+                showToast("Copied Theta-Rho to Clipboard!", "success");
+            }).catch(() => {
+                showToast("Clipboard failed, downloading file...", "info");
+                const blob = new Blob([generatedThr], {type:'text/plain'});
+                const a = document.createElement('a');
+                a.download = 'pattern.thr'; a.href = URL.createObjectURL(blob); a.click();
+            });
         }
 
         // --- UTILS ---
@@ -826,7 +851,7 @@
             origin = { x: size/2, y: size/2 };
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
             // SCALE FIX: Make sure the visual radius matches the config radius
-            scale = (size/2) / (tableR * 1.1); // 1.1 provides slight padding
+            scale = (size/2) / (tableR * 1.1); 
             render();
         }
         function saveState() {
