@@ -1,6 +1,6 @@
 // ==========================================
-//      ARDUINO SAND TABLE FIRMWARE v8
-//      Deep Debugging + G0 Homing
+//      ARDUINO SAND TABLE FIRMWARE v5
+//      Restored Pins + Auto-Pause (M0)
 // ==========================================
 
 // --- YOUR SPECIFIC MOTOR PINS ---
@@ -10,28 +10,25 @@ const int stepArm  = 10;
 const int dirArm   = 11;
 const int enPin    = 3;
 
-// Microstepping Pins
+// Microstepping Pins (Optional, keep if you use them)
 const int ms1 = 4;
 const int ms2 = 5;
 const int ms3 = 6;
 
 // --- SETTINGS ---
+// MUST match your Python script (usually 9600 for older scripts)
 #define BAUD_RATE 9600 
-
-// Gear Ratio: "Arm moves 1.125 of base"
-const float ARM_BASE_RATIO = 1.125;
-
-// Homing Speed for G0
-const int HOMING_SPEED = 1000;
 
 // --- STATE VARIABLES ---
 bool paused = true; 
 const int MAX_QUEUE_SIZE = 50;
 
-// Track the theoretical physical position of the arm
-double currentArmAngleSteps = 0.0;
+// Command Types
+const int CMD_MOVE = 0;
+const int CMD_WAIT = 1;
 
 struct GCommand {
+  int type;       // 0 = Move, 1 = Wait (M0)
   long armSteps;
   long baseSteps;
   int speed;
@@ -49,23 +46,19 @@ void setup() {
   pinMode(stepArm, OUTPUT);  pinMode(dirArm, OUTPUT);
   pinMode(enPin, OUTPUT);
 
-  // 1/32 Microstepping Setup
+  // 1/32 Microstepping Setup (from your original file)
   pinMode(ms1, OUTPUT); pinMode(ms2, OUTPUT); pinMode(ms3, OUTPUT);
   digitalWrite(ms1, HIGH); digitalWrite(ms2, HIGH); digitalWrite(ms3, HIGH);
 
-  // STARTUP CHECK: Briefly Enable Motors to show power
-  digitalWrite(enPin, LOW); 
-  delay(100);
-  digitalWrite(enPin, HIGH); // Then Disable
-
-  currentArmAngleSteps = 0.0;
-  
+  digitalWrite(enPin, HIGH); // Start Disabled
   Serial.println(F("READY"));
 }
 
 void loop() {
+  // Always check for new data
   if (Serial.available()) handleSerial();
 
+  // Execute queue if not paused by user
   if (!paused && queueCount > 0) {
     executeNextCommand();
   }
@@ -77,6 +70,7 @@ void handleSerial() {
     cmd.trim();
     if (cmd.length() == 0) continue;
 
+    // --- IMMEDIATE COMMANDS ---
     if (cmd.equalsIgnoreCase("PAUSE")) {
       paused = true;
       digitalWrite(enPin, HIGH);
@@ -89,42 +83,24 @@ void handleSerial() {
     }
     else if (cmd.equalsIgnoreCase("CLEAR")) {
       queueHead = queueTail = queueCount = 0;
-      currentArmAngleSteps = 0.0; 
       Serial.println(F("Cleared"));
     }
-    else if (cmd.startsWith("G1") || cmd.startsWith("g1")) {
+    // --- QUEUED COMMANDS ---
+    else if (cmd.startsWith("G1")) {
       parseAndEnqueueMove(cmd);
     }
-    else if (cmd.startsWith("G0") || cmd.startsWith("g0")) {
-      Serial.println(F("DEBUG: G0 Command Received")); 
-      enqueueHome();
+    else if (cmd.startsWith("M0") || cmd.startsWith("m0")) {
+      enqueuePause();
     }
   }
 }
 
-void enqueueHome() {
+void enqueuePause() {
   if (queueCount < MAX_QUEUE_SIZE) {
-    // Print current tracking info
-    Serial.print(F("DEBUG: Current Arm Tracked Pos: ")); 
-    Serial.println(currentArmAngleSteps);
-
-    // Calculate correction
-    long correctionSteps = (long)round(-currentArmAngleSteps);
-    
-    Serial.print(F("DEBUG: Homing Correction Steps: ")); 
-    Serial.println(correctionSteps);
-
-    if (correctionSteps == 0) {
-       Serial.println(F("DEBUG: Already Home (0 steps)"));
-    }
-
-    // Add to queue
-    queue[queueTail].armSteps = correctionSteps;
-    queue[queueTail].baseSteps = 0; 
-    queue[queueTail].speed = HOMING_SPEED;
-    
-    // Update tracking (should now be 0)
-    currentArmAngleSteps += correctionSteps;
+    queue[queueTail].type = CMD_WAIT;
+    queue[queueTail].armSteps = 0;
+    queue[queueTail].baseSteps = 0;
+    queue[queueTail].speed = 0;
     
     queueTail = (queueTail + 1) % MAX_QUEUE_SIZE;
     queueCount++;
@@ -134,45 +110,37 @@ void enqueueHome() {
 }
 
 void parseAndEnqueueMove(String cmd) {
+  // Expected Format: G1 <Elbow> <Base> <Speed>
   long armSteps = 0;
   long baseSteps = 0;
   int speed = 1000;
 
-  // IMPORTANT: This parser expects "G1 100 200 1000"
-  // It will NOT work with "G1 X100 Y200"
-  
   int s1 = cmd.indexOf(' ');
   int s2 = cmd.indexOf(' ', s1 + 1);
   int s3 = cmd.indexOf(' ', s2 + 1);
 
   if (s1 > 0) {
-    String armStr = cmd.substring(s1 + 1, s2 > 0 ? s2 : cmd.length());
-    armSteps = armStr.toInt();
+    // Parse Elbow (Arm)
+    armSteps = cmd.substring(s1 + 1, s2).toInt();
     
     if (s2 > 0) {
       if (s3 > 0) {
+        // Parse Base & Speed
         baseSteps = cmd.substring(s2 + 1, s3).toInt();
         speed = cmd.substring(s3 + 1).toInt();
       } else {
+        // Parse Base only (default speed)
         baseSteps = cmd.substring(s2 + 1).toInt();
       }
     }
   }
-  
-  Serial.print(F("DEBUG: G1 Parsed -> Arm:"));
-  Serial.print(armSteps);
-  Serial.print(F(" Base:"));
-  Serial.println(baseSteps);
 
   if (queueCount < MAX_QUEUE_SIZE) {
+    queue[queueTail].type = CMD_MOVE;
     queue[queueTail].armSteps = armSteps;
     queue[queueTail].baseSteps = baseSteps;
     queue[queueTail].speed = speed;
     
-    // --- TRACKING LOGIC ---
-    currentArmAngleSteps += armSteps;
-    currentArmAngleSteps -= (baseSteps * ARM_BASE_RATIO);
-
     queueTail = (queueTail + 1) % MAX_QUEUE_SIZE;
     queueCount++;
   } else {
@@ -185,14 +153,40 @@ void executeNextCommand() {
   queueHead = (queueHead + 1) % MAX_QUEUE_SIZE;
   queueCount--;
   
-  if (cmd.armSteps == 0 && cmd.baseSteps == 0) {
-     // Don't bother moving, just print done
-     Serial.println(F("Done (Zero Move)"));
-     return;
+  if (cmd.type == CMD_MOVE) {
+    moveBresenham(cmd.armSteps, cmd.baseSteps, cmd.speed);
+    Serial.println(F("Done")); // Signal to Python that we are ready for more
+  } 
+  else if (cmd.type == CMD_WAIT) {
+    performProgrammedPause();
   }
+}
 
-  moveBresenham(cmd.armSteps, cmd.baseSteps, cmd.speed);
-  Serial.println(F("Done")); 
+// Blocks everything until "R" or "RESUME" is received
+void performProgrammedPause() {
+  Serial.println(F("Done")); // Tell Python the "M0" command is processed so it doesn't timeout
+  // NOTE: Depending on your Python script, you might want to send a specific status here.
+  // But usually sending "Done" satisfies the script to wait.
+  
+  digitalWrite(enPin, HIGH); // Disable motors (Pause state)
+  
+  bool waiting = true;
+  while (waiting) {
+    if (Serial.available()) {
+      String input = Serial.readStringUntil('\n');
+      input.trim();
+      if (input.equalsIgnoreCase("R") || input.equalsIgnoreCase("RESUME")) {
+        waiting = false;
+        digitalWrite(enPin, LOW); // Re-enable motors
+        // Serial.println(F("Resumed")); // Optional debug
+      }
+      // Handle immediate stop even during M0
+      if (input.equalsIgnoreCase("PAUSE")) {
+        paused = true; 
+      }
+    }
+    delay(50);
+  }
 }
 
 void moveBresenham(long da, long db, int delayUs) {
@@ -210,7 +204,10 @@ void moveBresenham(long da, long db, int delayUs) {
   long accB = steps / 2;
 
   for (long i = 0; i < steps; i++) {
+    // Check Serial frequently to prevent buffer overflow
     if (Serial.available()) handleSerial();
+    
+    // Immediate pause check
     if (paused) break;
 
     accA -= ad;
@@ -234,5 +231,3 @@ void pulsePin(int pin) {
   delayMicroseconds(2); 
   digitalWrite(pin, LOW);
 }
-
-
