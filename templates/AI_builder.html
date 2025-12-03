@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Packers Sand Pro (Synced v18 - Fixes)</title>
+    <title>Packers Sand Pro (Synced v20 - Server Integrated)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -16,7 +16,7 @@
             --secondary: #b08d5c; 
             --bg: #f4f4f4; 
             --panel: #ffffff; 
-            --text: #333;
+            --text: #333; 
             --accent: #2ecc71;
             --danger: #e74c3c;
             --btn-text: #fff;
@@ -198,7 +198,7 @@
 
             <div class="btn-group">
                 <button onclick="sendToTable()" class="active">🚀 Run</button>
-                <button onclick="downloadGcode()" class="secondary">💾 Save</button>
+                <button onclick="saveToServer()" class="secondary">💾 Save to Pi</button>
             </div>
             
             <div class="btn-group">
@@ -653,7 +653,7 @@
             showToast("Perimeter Rider Path Ready!", "success");
         }
 
-        // --- G-CODE GENERATION (SYNCED WITH SCRIPT.HTML) ---
+        // --- G-CODE GENERATION ---
         function generateKinematicsGCode(pathPoints) {
             const L1 = parseFloat(document.getElementById('cfgL1').value);
             const L2 = parseFloat(document.getElementById('cfgL2').value);
@@ -669,10 +669,6 @@
             let commands = [];
             let prevBase = 0;
             let prevElbow = 0;
-            
-            // --- FIX FOR SCRIPT.HTML RENDERING ---
-            // Script.html assumes simulation starts at 0,0 (Home). 
-            // We must insert the "Travel to Start" moves so the simulator tracks correctly.
             
             let fullPath = [{x:0, y:0}].concat(pathPoints); // Prepend Home (0,0)
 
@@ -716,9 +712,9 @@
 
             generatedGCode = commands.join('\n');
             
-            // --- FIX: Generate Theta-Rho for export (Universal Format / Sandify) ---
+            // --- THETA-RHO GENERATION (SANDIFY FORMAT) ---
             let thrLines = [];
-            thrLines.push("# format: thetarho"); // Good practice header
+            thrLines.push("# format: thetarho"); 
             
             let prevTheta = 0;
             let cumulativeTheta = 0;
@@ -753,7 +749,7 @@
             generatedThr = thrLines.join('\n');
         }
 
-        // --- KINEMATICS ENGINE (EXACT MATCH TO SCRIPT.HTML) ---
+        // --- KINEMATICS ENGINE ---
         
         function getShortestRotation(raw, last) {
             let diff = (raw - last) / (2 * Math.PI);
@@ -844,18 +840,46 @@
                 else showToast("Error: " + d.error, "error");
             }).catch(()=>showToast("Network Error", "error"));
         }
-        
-        function downloadGcode() {
-            if(!generatedGCode) return showToast("Click 'Prepare Path' first!", "error");
-            const blob = new Blob([generatedGCode], {type:'text/plain'});
-            const a = document.createElement('a');
-            a.download = 'pattern_steps.txt'; a.href = URL.createObjectURL(blob); a.click();
-        }
 
-        // --- UPDATED: ROBUST COPY FUNCTION WITH FALLBACK ---
+        // --- SAVE TO SERVER ---
+        async function saveToServer() {
+            if(!generatedGCode) return showToast("Click 'Prepare Path' first!", "error");
+
+            let filename = prompt("Name your design:", "pattern");
+            if(!filename) return;
+            
+            // Your Python script forces the .txt extension automatically
+            // and saves it to the designs folder.
+            
+            showToast("Saving to server...", "info");
+
+            try {
+                // We use the existing /save_design route in your app.py
+                const response = await fetch(BASE_URL + '/save_design', { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        filename: filename, 
+                        gcode: generatedGCode  // app.py expects 'gcode'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if(data.success) {
+                    showToast("Saved to Designs!", "success");
+                } else {
+                    showToast("Server Error: " + (data.error || "Unknown"), "error");
+                }
+
+            } catch (e) {
+                console.error(e);
+                showToast("Network/Server Error", "error");
+            }
+        }
+        
         function downloadThetaRho() {
             if(!generatedThr) return showToast("Click 'Prepare Path' first!", "error");
-            
             // Try Standard Clipboard API (Works on localhost/HTTPS)
             if (navigator.clipboard && window.isSecureContext) {
                 navigator.clipboard.writeText(generatedThr).then(() => {
@@ -870,28 +894,18 @@
         function fallbackCopyTextToClipboard(text) {
             var textArea = document.createElement("textarea");
             textArea.value = text;
-            
-            // Ensure textarea is not visible but part of DOM
-            textArea.style.top = "0";
-            textArea.style.left = "0";
-            textArea.style.position = "fixed";
-            textArea.style.opacity = "0";
-
+            textArea.style.top = "0"; textArea.style.left = "0"; textArea.style.position = "fixed"; textArea.style.opacity = "0";
             document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
-
+            textArea.focus(); textArea.select();
             try {
                 var successful = document.execCommand('copy');
                 if(successful) showToast("Copied (Fallback Method)!", "success");
                 else showToast("Copy failed, downloading...", "error");
             } catch (err) {
-                // If all else fails, download the file
                 const blob = new Blob([text], {type:'text/plain'});
                 const a = document.createElement('a');
                 a.download = 'pattern.thr'; a.href = URL.createObjectURL(blob); a.click();
             }
-
             document.body.removeChild(textArea);
         }
 
