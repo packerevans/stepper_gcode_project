@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Packers Sand Pro (Synced v30 - Rim-to-Rim Logic)</title>
+    <title>Packers Sand Pro (Synced v31 - The Outliner)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -385,7 +385,7 @@
             ctx.restore();
         }
 
-        // --- AI TRACER ---
+        // --- AI TRACER (High Contrast) ---
         function handleImageUpload(input) {
             const file = input.files[0];
             if(!file) return;
@@ -489,17 +489,16 @@
             render();
         }
 
-        // --- RIM-TO-RIM SOLVER (v30) ---
+        // --- V31: THE OUTLINER (A* GRID ROUTING) ---
         async function prepareGCode() {
             if(rawPoints.length === 0) return showToast("Draw something first!", "error");
-            showToast("Calculating Rim-to-Rim Path...", "info");
-
+            showToast("Step 1: Analyzing Shapes...", "info");
             await new Promise(r => setTimeout(r, 50));
 
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
             const sym = parseInt(document.getElementById('symSlider').value);
             
-            // 1. Grouping
+            // --- STEP 2: IDENTIFY ALL SHAPES ---
             let shapes = [];
             let curShape = [];
             rawPoints.forEach(p => {
@@ -512,7 +511,7 @@
             });
             if(curShape.length > 0) shapes.push(curShape);
 
-            // 2. Symmetry
+            // Expand Symmetry
             let pool = [];
             for(let s=0; s<sym; s++) {
                 const ang = s * (Math.PI*2/sym);
@@ -525,159 +524,158 @@
                     pool.push(newSh);
                 });
             }
-
             if(pool.length === 0) return;
 
-            // 3. Metadata
+            // Analyze Shapes
             let shapeMeta = pool.map((s, idx) => {
                 const dStartEnd = Math.hypot(s[0].x - s[s.length-1].x, s[0].y - s[s.length-1].y);
                 const isClosed = dStartEnd < 15.0; 
                 if(isClosed) s[s.length-1] = {x: s[0].x, y: s[0].y};
                 
-                // Calculate minimum distance to Rim for ANY point in the shape
                 let minD = Infinity;
                 let rimP = {x: tableR, y: 0};
-                // We use origin dist as approximation since Rim is circular
                 for(let p of s) {
                     let d = Math.abs(tableR - Math.hypot(p.x, p.y));
                     if(d < minD) minD = d;
                 }
-
                 return { id: idx, points: s, isClosed: isClosed, distToRim: minD };
             });
 
-            // 4. IDENTIFY START & END ANCHORS (Steps 1 & 3)
-            // Sort shapes by proximity to rim
+            // --- STEP 1: IDENTIFY 2 POINTS CLOSEST TO PERIMETER ---
             shapeMeta.sort((a,b) => a.distToRim - b.distToRim);
-            
             let startMeta = shapeMeta[0];
             let endMeta = (shapeMeta.length > 1) ? shapeMeta[1] : shapeMeta[0];
-            
-            // 5. GREEDY TRAVERSAL (Step 4)
-            // We lock the End Shape and traverse everything else first
+
+            // --- STEP 4: CALCULATE ORDER (TSP) ---
+            // Exclude Start/End from standard ordering
             let unvisited = new Set(shapeMeta.map(m => m.id));
             unvisited.delete(startMeta.id);
-            unvisited.delete(endMeta.id); // Reserve End Shape for last
-            
+            unvisited.delete(endMeta.id);
+
             let optimizedPath = [];
-            let rimPoint = {x: tableR, y: 0};
             
-            // SETUP START SHAPE
+            // Setup Start Shape
             let currentPoints = [...startMeta.points];
-            // Orient so it starts near rim
+            let rimPoint = {x: tableR, y: 0};
+            // Step 3: Best Start/End for Shape 1
             if(startMeta.isClosed) currentPoints = rotateToClosest(currentPoints, rimPoint);
-            else if (distSq(rimPoint, currentPoints[currentPoints.length-1]) < distSq(rimPoint, currentPoints[0])) {
-                currentPoints.reverse();
-            }
-            optimizedPath.push(currentPoints);
+            else if (distSq(rimPoint, currentPoints[currentPoints.length-1]) < distSq(rimPoint, currentPoints[0])) currentPoints.reverse();
+            
+            optimizedPath.push({points: currentPoints});
             let currentHead = currentPoints[currentPoints.length-1];
 
-            // MAIN LOOP
+            // Greedy TSP
             while(unvisited.size > 0) {
                 let bestNextId = -1;
                 let bestEntryMode = 'start'; 
                 let bestLoopIdx = -1;
                 let minJumpDist = Infinity;
-                let bestBacktrackIdx = -1; 
 
                 for(let id of unvisited) {
-                    const cand = shapeMeta.find(m => m.id === id); // Find in original array to get points
+                    const cand = shapeMeta.find(m => m.id === id);
                     
-                    // Retrace Limiter: Check last 20% of current path
-                    let retraceLimit = Math.floor(currentPoints.length * 0.8);
-                    
-                    for(let i=currentPoints.length-1; i >= retraceLimit; i-=3) {
-                        let exitPt = currentPoints[i];
-
-                        if(cand.isClosed) {
-                            for(let k=0; k<cand.points.length; k+=4) {
-                                let d = distSq(exitPt, cand.points[k]);
-                                if(d < minJumpDist) {
-                                    minJumpDist = d; bestNextId = id; bestEntryMode = 'loop_idx'; bestLoopIdx = k; bestBacktrackIdx = i;
-                                }
+                    if(cand.isClosed) {
+                        for(let k=0; k<cand.points.length; k+=4) {
+                            let d = distSq(currentHead, cand.points[k]);
+                            if(d < minJumpDist) {
+                                minJumpDist = d; bestNextId = id; bestEntryMode = 'loop_idx'; bestLoopIdx = k;
                             }
-                        } else {
-                            let dStart = distSq(exitPt, cand.points[0]);
-                            if(dStart < minJumpDist) {
-                                minJumpDist = dStart; bestNextId = id; bestEntryMode = 'start'; bestBacktrackIdx = i;
-                            }
-                            let dEnd = distSq(exitPt, cand.points[cand.points.length-1]);
-                            if(dEnd < minJumpDist) {
-                                minJumpDist = dEnd; bestNextId = id; bestEntryMode = 'end'; bestBacktrackIdx = i;
-                            }
+                        }
+                    } else {
+                        let dStart = distSq(currentHead, cand.points[0]);
+                        if(dStart < minJumpDist) {
+                            minJumpDist = dStart; bestNextId = id; bestEntryMode = 'start'; 
+                        }
+                        let dEnd = distSq(currentHead, cand.points[cand.points.length-1]);
+                        if(dEnd < minJumpDist) {
+                            minJumpDist = dEnd; bestNextId = id; bestEntryMode = 'end';
                         }
                     }
                 }
 
                 if(bestNextId !== -1) {
-                    // Backtrack
-                    if(bestBacktrackIdx < currentPoints.length - 1) {
-                        let backtrackSeg = [];
-                        for(let k=currentPoints.length-2; k>=bestBacktrackIdx; k--) {
-                            backtrackSeg.push(currentPoints[k]);
-                        }
-                        optimizedPath.push(backtrackSeg);
-                    }
-
-                    // Add Shape
                     let nextMeta = shapeMeta.find(m => m.id === bestNextId);
                     let nextPoints = [...nextMeta.points];
-                    
+                    // Step 3: Recalculate Start/End for Next Shape
                     if(bestEntryMode === 'loop_idx') nextPoints = rotateArray(nextPoints, bestLoopIdx);
                     else if(bestEntryMode === 'end') nextPoints.reverse();
 
-                    optimizedPath.push(nextPoints);
-                    currentPoints = nextPoints;
-                    currentHead = currentPoints[currentPoints.length-1];
+                    optimizedPath.push({points: nextPoints});
+                    currentHead = nextPoints[nextPoints.length-1];
                     unvisited.delete(bestNextId);
                 } else {
                     break;
                 }
             }
 
-            // 6. CONNECT TO END ANCHOR (Step 4 continued)
-            if(endMeta && endMeta.id !== startMeta.id) {
-                // Find best connection from current head to End Shape
+            // Append End Shape
+            if(endMeta.id !== startMeta.id) {
                 let cand = endMeta;
                 let bestEntryMode = 'start'; 
                 let bestLoopIdx = -1;
                 let minD = Infinity;
-                
-                let exitPt = currentPoints[currentPoints.length-1]; // Just use tip
-
                 if(cand.isClosed) {
                     for(let k=0; k<cand.points.length; k+=4) {
-                        let d = distSq(exitPt, cand.points[k]);
+                        let d = distSq(currentHead, cand.points[k]);
                         if(d < minD) { minD = d; bestEntryMode = 'loop_idx'; bestLoopIdx = k; }
                     }
                 } else {
-                    let dStart = distSq(exitPt, cand.points[0]);
+                    let dStart = distSq(currentHead, cand.points[0]);
                     if(dStart < minD) { minD = dStart; bestEntryMode = 'start'; }
-                    let dEnd = distSq(exitPt, cand.points[cand.points.length-1]);
+                    let dEnd = distSq(currentHead, cand.points[cand.points.length-1]);
                     if(dEnd < minD) { minD = dEnd; bestEntryMode = 'end'; }
                 }
-                
                 let endPoints = [...cand.points];
                 if(bestEntryMode === 'loop_idx') endPoints = rotateArray(endPoints, bestLoopIdx);
                 else if(bestEntryMode === 'end') endPoints.reverse();
-                
-                optimizedPath.push(endPoints);
+                optimizedPath.push({points: endPoints});
             }
 
-            // 7. EXPORT
+            // --- STEP 4 (REARRANGE TRAVEL LINES): A* ROUTER ---
+            showToast("Step 4: Outlining Objects (A*)...", "info");
+            await new Promise(r => setTimeout(r, 50));
+
+            // Build Occupancy Grid
+            const gridSize = 4.0; // 4mm grid for speed
+            const grid = new Map();
+            const toKey = (x,y) => `${Math.floor(x/gridSize)},${Math.floor(y/gridSize)}`;
+            
+            // Mark all drawing points as "SAFE" (Cost 1)
+            for(let shapeObj of optimizedPath) {
+                for(let p of shapeObj.points) {
+                    grid.set(toKey(p.x, p.y), 1);
+                }
+            }
+
             processedPoints = [];
+            
             // Rim Entry
-            let entryP = optimizedPath[0][0];
-            let ang = Math.atan2(entryP.y, entryP.x);
+            let startP = optimizedPath[0].points[0];
+            let ang = Math.atan2(startP.y, startP.x);
             processedPoints.push({x: tableR*Math.cos(ang), y: tableR*Math.sin(ang), type:'point'});
 
-            for(let pts of optimizedPath) {
-                pts.forEach(p => processedPoints.push({x:p.x, y:p.y, type:'point'}));
+            for(let i=0; i<optimizedPath.length; i++) {
+                // Add Shape
+                optimizedPath[i].points.forEach(p => processedPoints.push({x:p.x, y:p.y, type:'point'}));
+                
+                // Route to Next?
+                if(i < optimizedPath.length - 1) {
+                    let currEnd = optimizedPath[i].points[optimizedPath[i].points.length-1];
+                    let nextStart = optimizedPath[i+1].points[0];
+                    let dist = Math.hypot(nextStart.x-currEnd.x, nextStart.y-currEnd.y);
+                    
+                    if(dist > 5.0) {
+                        // A* Pathfinding to outline objects
+                        let route = findAStarPath(currEnd, nextStart, grid, gridSize);
+                        if(route.length > 0) {
+                            route.forEach(p => processedPoints.push({x:p.x, y:p.y, type:'point'}));
+                        }
+                    }
+                }
             }
 
-            // Rim Exit (From End Anchor)
-            let lastGroup = optimizedPath[optimizedPath.length-1];
-            let lastP = lastGroup[lastGroup.length-1];
+            // Rim Exit
+            let lastP = processedPoints[processedPoints.length-1];
             let exAng = Math.atan2(lastP.y, lastP.x);
             processedPoints.push({x: tableR*Math.cos(exAng), y: tableR*Math.sin(exAng), type:'exit'});
 
@@ -686,11 +684,65 @@
 
             generateKinematicsGCode(processedPoints);
             
-            document.getElementById('statusTxt').innerText = "AI Path: Rim-to-Rim";
+            document.getElementById('statusTxt').innerText = "AI Path: Outlined";
             document.getElementById('statusTxt').style.color = "#2ecc71";
             document.getElementById('progressSlider').value = 0;
             render(); 
-            showToast("Rim-to-Rim Path Generated!", "success");
+            showToast("Objects Outlined!", "success");
+        }
+
+        // --- A* ROUTER ---
+        function findAStarPath(start, end, grid, gridSize) {
+            let startKey = `${Math.floor(start.x/gridSize)},${Math.floor(start.y/gridSize)}`;
+            let endKey = `${Math.floor(end.x/gridSize)},${Math.floor(end.y/gridSize)}`;
+            
+            let open = [{x:start.x, y:start.y, g:0, f:0, parent:null}];
+            let closed = new Set();
+            let count = 0;
+            let maxNodes = 800; // Limit search
+
+            while(open.length > 0 && count++ < maxNodes) {
+                open.sort((a,b) => a.f - b.f);
+                let curr = open.shift();
+                
+                let distToEnd = Math.hypot(curr.x-end.x, curr.y-end.y);
+                if(distToEnd < gridSize * 1.5) {
+                    // Reconstruct
+                    let path = [];
+                    while(curr.parent) {
+                        path.push({x:curr.x, y:curr.y});
+                        curr = curr.parent;
+                    }
+                    return path.reverse();
+                }
+
+                let ck = `${Math.floor(curr.x/gridSize)},${Math.floor(curr.y/gridSize)}`;
+                if(closed.has(ck)) continue;
+                closed.add(ck);
+
+                // Neighbors (8 directions)
+                let directions = [
+                    {dx:0, dy:1}, {dx:0, dy:-1}, {dx:1, dy:0}, {dx:-1, dy:0},
+                    {dx:1, dy:1}, {dx:1, dy:-1}, {dx:-1, dy:1}, {dx:-1, dy:-1}
+                ];
+
+                for(let dir of directions) {
+                    let nx = curr.x + dir.dx * gridSize;
+                    let ny = curr.y + dir.dy * gridSize;
+                    let nk = `${Math.floor(nx/gridSize)},${Math.floor(ny/gridSize)}`;
+                    
+                    // Cost Logic:
+                    // 1 = Safe (Existing Line)
+                    // 10 = Empty Space (Avoid)
+                    let cellCost = grid.has(nk) ? 1 : 8; 
+                    
+                    let newG = curr.g + cellCost;
+                    let h = Math.hypot(nx-end.x, ny-end.y);
+                    
+                    open.push({x:nx, y:ny, g:newG, f:newG+h, parent:curr});
+                }
+            }
+            return []; // Fallback to straight line
         }
 
         // --- UTILS ---
