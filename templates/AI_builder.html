@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Packers Sand Pro (Sandify Logic)</title>
+    <title>Sand Controller Pro</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -353,7 +353,12 @@
                 let isMove = true;
                 for(let i=0; i<limit; i++) {
                     const p = dataToShow[i];
-                    if(p.type === 'break' || p.type === 'cmd') { isMove = true; continue; }
+                    
+                    // Handle Breaks and M0
+                    if(p.type === 'break' || p.type === 'cmd') { 
+                        isMove = true; 
+                        continue; 
+                    }
                     
                     const px = p.x * scale;
                     const py = -p.y * scale;
@@ -363,6 +368,7 @@
                 }
                 ctx.stroke();
                 
+                // Draw endpoint if we aren't done
                 if(limit > 0 && limit < dataToShow.length) {
                     const tip = dataToShow[limit];
                     if(tip.type !== 'break' && tip.type !== 'cmd') {
@@ -376,7 +382,7 @@
             ctx.restore();
         }
 
-        // --- AI TRACER (SOPHISTICATED) ---
+        // --- AI TRACER ---
         function handleImageUpload(input) {
             const file = input.files[0];
             if(!file) return;
@@ -388,7 +394,7 @@
                 const img = new Image();
                 img.onload = function() {
                     const tCan = document.createElement('canvas');
-                    const MAX = 1200; // Increased res for better detail
+                    const MAX = 1000;
                     let tw = img.width, th = img.height;
                     if(tw>th && tw>MAX){ th*=MAX/tw; tw=MAX; } 
                     else if(th>MAX){ tw*=MAX/th; th=MAX; }
@@ -396,22 +402,13 @@
                     tCan.width = tw; tCan.height = th;
                     const tCtx = tCan.getContext('2d');
                     tCtx.fillStyle = "white"; tCtx.fillRect(0,0,tw,th);
-                    // Higher contrast preprocessing
-                    tCtx.filter = "grayscale(100%) contrast(200%) brightness(100%)";
+                    tCtx.filter = "grayscale(100%) contrast(150%)";
                     tCtx.drawImage(img, 0, 0, tw, th);
                     
-                    // Improved Tracing Settings (Sharper, less blobby)
+                    // Tracing options tuned for cleaner lines
                     ImageTracer.imageToSVG(tCan.toDataURL(), function(svgStr){
                         processTrace(svgStr, tw, th);
-                    }, { 
-                        ltres: 0.1, // Lower = more precision
-                        qtres: 0.1, 
-                        pathomit: 2, 
-                        colorsampling: 2, 
-                        numberofcolors: 4, 
-                        blurradius: 0, 
-                        blurdelta: 0 
-                    });
+                    }, { ltres:0.1, qtres:0.1, pathomit:5, colorsampling:2, numberofcolors:2 });
                 };
                 img.src = e.target.result;
             };
@@ -428,7 +425,7 @@
             for(let i=0; i<paths.length; i++) {
                 const p = paths[i];
                 const len = p.getTotalLength();
-                if(len < 10) continue; // Ignore tiny noise
+                if(len < 10) continue; // Skip tiny noise
                 
                 let pts = [];
                 let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
@@ -439,13 +436,16 @@
                     if(pt.x<minX) minX=pt.x; if(pt.x>maxX) maxX=pt.x;
                     if(pt.y<minY) minY=pt.y; if(pt.y>maxY) maxY=pt.y;
                 }
-                // Only add if it's not a full bounding box rect
-                if (maxX - minX < imgW * 0.99) strokes.push(pts);
+                
+                const w = maxX - minX;
+                const h = maxY - minY;
+                // Ignore bounding box borders
+                if (w > imgW * 0.98 || h > imgH * 0.98) continue; 
+                strokes.push(pts);
             }
 
             if(strokes.length === 0) return showToast("No shapes found", "error");
 
-            // Normalize and Scale
             let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
             strokes.flat().forEach(p => {
                 if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
@@ -466,45 +466,19 @@
                 })).filter(p => Math.hypot(p.x, p.y) < tableR);
             });
 
-            // --- SANDIFY-STYLE OPTIMIZATION (Greedy Nearest Neighbor) ---
-            // This prevents lines crossing over faces by finding closest next shape
             rawPoints = [];
-            let currentPos = {x: 0, y: 0}; // Start at center
-            let pool = normalizedStrokes; 
-            
-            while(pool.length > 0) {
-                let bestIdx = -1;
-                let minDist = Infinity;
-                let reverseBest = false;
-
-                // Find closest start or end of any remaining shape
-                for(let i=0; i<pool.length; i++) {
-                    let s = pool[i];
-                    let dStart = Math.hypot(s[0].x - currentPos.x, s[0].y - currentPos.y);
-                    let dEnd = Math.hypot(s[s.length-1].x - currentPos.x, s[s.length-1].y - currentPos.y);
-
-                    if(dStart < minDist) { minDist = dStart; bestIdx = i; reverseBest = false; }
-                    if(dEnd < minDist) { minDist = dEnd; bestIdx = i; reverseBest = true; }
-                }
-
-                if(bestIdx !== -1) {
-                    let shape = pool[bestIdx];
-                    if(reverseBest) shape.reverse();
-                    
-                    rawPoints.push({type:'break'}); // Lift pen (travel line)
-                    shape.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
-                    currentPos = shape[shape.length-1];
-                    pool.splice(bestIdx, 1);
-                } else { break; }
-            }
+            normalizedStrokes.forEach(s => {
+                rawPoints.push({type:'break'});
+                s.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
+            });
             rawPoints.push({type:'break'});
 
             resetStatus();
-            showToast("Trace Loaded & Optimized!", "info");
+            showToast("Trace Loaded (Click Prepare)", "info");
             render();
         }
 
-        // --- OPTIMIZER & M0 INSERTION ---
+        // --- OPTIMIZER (IMPROVED: PERIMETER RIDING) ---
         function prepareGCode() {
             if(rawPoints.length === 0) return showToast("Draw something first!", "error");
             showToast("Optimizing Path...", "info");
@@ -512,17 +486,20 @@
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
             const sym = parseInt(document.getElementById('symSlider').value);
             
-            // 1. Process Symmetry and Optimization (Standard Logic)
+            // 1. Separate raw points into distinct shapes
             let shapes = [];
             let curShape = [];
             rawPoints.forEach(p => {
-                if(p.type === 'break') {
+                if(p.type === 'break' || p.type === 'cmd') {
                     if(curShape.length > 0) shapes.push(curShape);
                     curShape = [];
-                } else { curShape.push(p); }
+                } else {
+                    curShape.push(p);
+                }
             });
             if(curShape.length > 0) shapes.push(curShape);
 
+            // 2. Generate Symmetry Copies
             let pool = [];
             for(let s=0; s<sym; s++) {
                 const ang = s * (Math.PI*2/sym);
@@ -537,89 +514,133 @@
                 });
             }
 
-            // Simple re-optimization after symmetry to ensure flow
-            let sortedShapes = [];
-            if(pool.length > 0) {
-                let startShape = pool[0]; // Just take first for now
-                pool.splice(0, 1);
-                sortedShapes.push(startShape);
-                let curPos = startShape[startShape.length-1];
-
-                while(pool.length > 0) {
-                    let bestIdx = -1;
-                    let bestDist = Infinity;
-                    let bestIsReverse = false;
-
-                    for(let i=0; i<pool.length; i++) {
-                        let s = pool[i];
-                        let dStart = Math.hypot(curPos.x - s[0].x, curPos.y - s[0].y);
-                        let dEnd = Math.hypot(curPos.x - s[s.length-1].x, curPos.y - s[s.length-1].y);
-                        if(dStart < bestDist) { bestDist=dStart; bestIdx=i; bestIsReverse=false; }
-                        if(dEnd < bestDist) { bestDist=dEnd; bestIdx=i; bestIsReverse=true; }
-                    }
-                    if(bestIdx === -1) break;
-                    let winner = pool[bestIdx];
-                    if(bestIsReverse) winner.reverse();
-                    sortedShapes.push(winner);
-                    curPos = winner[winner.length-1];
-                    pool.splice(bestIdx, 1);
-                }
+            // 3. Greedy Nearest Neighbor Sort (Find closest start point to current end point)
+            // Start with shape closest to center or existing logic
+            let bestShapeIdx = -1, bestPointIdx = -1, minD = Infinity;
+            // Find start point closest to (0,0) or perimeter? Let's assume (0,0) start usually
+            for (let i=0; i<pool.length; i++) {
+                let d = Math.hypot(pool[i][0].x, pool[i][0].y); // Check start
+                if(d < minD) { minD=d; bestShapeIdx=i; bestPointIdx=0; }
+                
+                let d2 = Math.hypot(pool[i][pool[i].length-1].x, pool[i][pool[i].length-1].y); // Check end (reverse)
+                if(d2 < minD) { minD=d2; bestShapeIdx=i; bestPointIdx=pool[i].length-1; }
             }
 
-            processedPoints = [];
+            let sortedShapes = [];
+            let currentShape = pool[bestShapeIdx];
             
-            // 2. Generate Points for the ART
+            // If we picked the end, reverse it so we start there
+            if(bestPointIdx > 0) currentShape.reverse();
+            
+            sortedShapes.push(currentShape);
+            pool.splice(bestShapeIdx, 1);
+            
+            let curPos = currentShape[currentShape.length-1];
+
+            while(pool.length > 0) {
+                let bestIdx = -1;
+                let bestDist = Infinity;
+                let shouldReverse = false;
+
+                for(let i=0; i<pool.length; i++) {
+                    let s = pool[i];
+                    // Distance to start of shape S
+                    let dStart = Math.hypot(curPos.x - s[0].x, curPos.y - s[0].y);
+                    // Distance to end of shape S (if we run it backwards)
+                    let dEnd = Math.hypot(curPos.x - s[s.length-1].x, curPos.y - s[s.length-1].y);
+
+                    if(dStart < bestDist) {
+                        bestDist = dStart; bestIdx = i; shouldReverse = false;
+                    }
+                    if(dEnd < bestDist) {
+                        bestDist = dEnd; bestIdx = i; shouldReverse = true;
+                    }
+                }
+
+                let nextShape = pool[bestIdx];
+                if(shouldReverse) nextShape.reverse();
+                
+                sortedShapes.push(nextShape);
+                curPos = nextShape[nextShape.length-1];
+                pool.splice(bestIdx, 1);
+            }
+
+            // 4. Connect Shapes with PERIMETER RIDING if gap is large
+            processedPoints = [];
+            const res = 1.0; 
+            const JUMP_THRESHOLD = 20.0; // mm
+
+            // Add enter from edge
             if(sortedShapes.length > 0) {
                 let first = sortedShapes[0];
                 let fPt = first[0];
                 let fAng = Math.atan2(fPt.y, fPt.x);
-                // Entry from rim
                 processedPoints.push({x: tableR*Math.cos(fAng), y: tableR*Math.sin(fAng), type:'point'});
-                
-                // Add all art shapes
-                sortedShapes.forEach((s, idx) => {
-                    if(idx > 0) {
-                        // Interpolate jump
-                        let prev = sortedShapes[idx-1];
-                        let p1 = prev[prev.length-1];
-                        let p2 = s[0];
-                        let dist = Math.hypot(p2.x-p1.x, p2.y-p1.y);
-                        let steps = Math.ceil(dist);
-                        for(let k=1; k<=steps; k++) {
-                            let t = k/steps;
-                            processedPoints.push({
-                                x: p1.x + (p2.x-p1.x)*t,
-                                y: p1.y + (p2.y-p1.y)*t,
-                                type: 'point'
-                            });
-                        }
-                    }
-                    s.forEach(p => processedPoints.push(p));
-                });
             }
 
-            // 3. INSERT PAUSE (M0) COMMAND
-            // This happens AFTER the art is drawn, but BEFORE moving to rim
-            processedPoints.push({type: 'cmd', code: 'M0'});
+            for(let i=0; i<sortedShapes.length; i++) {
+                let s = sortedShapes[i];
+                
+                if(i > 0) {
+                    let prevEnd = sortedShapes[i-1][sortedShapes[i-1].length-1];
+                    let currStart = s[0];
+                    let gap = Math.hypot(currStart.x - prevEnd.x, currStart.y - prevEnd.y);
 
-            // 4. Generate Exit Path (Park at Rim)
-            if(processedPoints.length > 0) {
-                // Find last actual point (skip if it was just the M0 cmd)
-                let lastPt = processedPoints[processedPoints.length-2]; 
-                if(lastPt) {
-                    let lAng = Math.atan2(lastPt.y, lastPt.x);
-                    // Add exit point
-                    processedPoints.push({x: tableR*Math.cos(lAng), y: tableR*Math.sin(lAng), type:'point'});
+                    if (gap > JUMP_THRESHOLD) {
+                        // --- PERIMETER RIDE LOGIC ---
+                        // 1. Go out to rim from prevEnd
+                        let ang1 = Math.atan2(prevEnd.y, prevEnd.x);
+                        processedPoints.push({x: tableR*Math.cos(ang1), y: tableR*Math.sin(ang1), type:'point'});
+
+                        // 2. Arc along rim to currStart angle
+                        let ang2 = Math.atan2(currStart.y, currStart.x);
+                        
+                        // Determine shortest direction
+                        let diff = ang2 - ang1;
+                        while(diff <= -Math.PI) diff += 2*Math.PI;
+                        while(diff > Math.PI) diff -= 2*Math.PI;
+                        
+                        let arcSteps = Math.ceil(Math.abs(diff * tableR) / 2.0); // 2mm resolution
+                        for(let k=1; k<=arcSteps; k++) {
+                            let t = k/arcSteps;
+                            let a = ang1 + diff * t;
+                            processedPoints.push({x: tableR*Math.cos(a), y: tableR*Math.sin(a), type:'point'});
+                        }
+
+                        // 3. We are now at the rim aligned with start of next shape.
+                        // The loop below adds the points, so the line from Rim -> Start happens automatically.
+                    } else {
+                        // Small gap, just draw straight line (lift pen logic not possible)
+                    }
                 }
+                
+                // Add the shape points
+                s.forEach(p => processedPoints.push(p));
+            }
+
+            // 5. ADD EXIT LOGIC (M0 + Escape)
+            if(processedPoints.length > 0) {
+                let lastPt = processedPoints[processedPoints.length-1];
+                
+                // Add M0 Command Marker
+                processedPoints.push({type: 'cmd', val: 'M0'});
+
+                // Add Escape Move (Straight to nearest Rim)
+                let exitAng = Math.atan2(lastPt.y, lastPt.x);
+                processedPoints.push({
+                    x: tableR * Math.cos(exitAng),
+                    y: tableR * Math.sin(exitAng),
+                    type: 'point'
+                });
             }
 
             generatedGCode = generateGCodeStringFromProcessed();
             
-            document.getElementById('statusTxt').innerText = "Path Optimized (Red)";
+            document.getElementById('statusTxt').innerText = "Optimized (Rim Travel)";
             document.getElementById('statusTxt').style.color = "green";
             document.getElementById('progressSlider').value = 0;
             render(); 
-            showToast("Path Ready (With Auto-Pause)!", "success");
+            showToast("Perimeter Rider Path Ready!", "success");
         }
 
         // --- G-CODE GENERATION ---
@@ -638,8 +659,9 @@
             let prevBase = 0;
             let prevElbow = 0;
 
-            let firstPt = processedPoints.find(p => p.type === 'point');
-            if(!firstPt) return "";
+            let firstPt = processedPoints[0];
+            // If first point is M0? Unlikely, but handle
+            if(firstPt.type === 'cmd') return "";
 
             let startIK = calculateIK(firstPt.x, firstPt.y, 0, 0, L1, L2, gearRatio, stepsPerRad);
             prevBase = startIK.base_steps;
@@ -649,21 +671,47 @@
                 let p1 = processedPoints[i];
                 let p2 = processedPoints[i+1];
 
-                // --- HANDLING M0 PAUSE ---
-                if(p1.type === 'cmd' && p1.code === 'M0') {
+                // Check if P1 is a command (M0)
+                if (p1.type === 'cmd' && p1.val === 'M0') {
                     cmds.push("M0");
+                    // p1 is virtual, so we don't move from it physically, 
+                    // but the logic below expects p1 to be a coordinate.
+                    // We need to effectively skip to p2, but p1's coordinates are needed.
+                    // Actually, M0 is inserted *between* points. 
+                    // Let's look at how we pushed it: point -> M0 -> point
                     continue; 
                 }
-                if(p2.type === 'cmd') { continue; } // Handle next loop
-                // -------------------------
+                
+                // If P2 is M0, we process the move to P2 (which doesn't exist really), 
+                // wait, actually M0 has no coords.
+                if (p2.type === 'cmd' && p2.val === 'M0') {
+                    cmds.push("M0");
+                    continue;
+                }
+                
+                // If P1 was M0, we need to move from the point BEFORE M0 to P2.
+                // We need to track 'last physical point'.
+                // Easier logic: Filter commands out for geometry, insert them back in index?
+                // No, let's just handle it here.
+                
+                let startX, startY;
+                if(p1.type === 'cmd') {
+                   // Look back
+                   let back = i-1;
+                   while(back >= 0 && processedPoints[back].type === 'cmd') back--;
+                   if(back < 0) { startX=0; startY=0; }
+                   else { startX = processedPoints[back].x; startY = processedPoints[back].y; }
+                } else {
+                    startX = p1.x; startY = p1.y;
+                }
 
-                let dist = Math.hypot(p2.x-p1.x, p2.y-p1.y);
+                let dist = Math.hypot(p2.x-startX, p2.y-startY);
                 let steps = Math.max(1, Math.ceil(dist / 1.0)); 
 
                 for(let j=1; j<=steps; j++) {
                     let t = j/steps;
-                    let x = p1.x + (p2.x - p1.x)*t;
-                    let y = p1.y + (p2.y - p1.y)*t;
+                    let x = startX + (p2.x - startX)*t;
+                    let y = startY + (p2.y - startY)*t;
 
                     let ik = calculateIK(x, y, prevBase, prevElbow, L1, L2, gearRatio, stepsPerRad);
                     let dBase = Math.round(ik.base_steps - prevBase);
@@ -672,7 +720,7 @@
                     if(dBase !== 0 || dElbow !== 0) {
                         let r = Math.hypot(x, y);
 
-                        // Scanner / Filter (Prevent center spin)
+                        // Scanner Filter (3200 step jump fix)
                         if (r < 5.0 && (Math.abs(dBase) > 2000 || Math.abs(dElbow) > 2000)) {
                             prevBase += dBase; 
                             prevElbow += dElbow;
@@ -702,13 +750,14 @@
             let dist = Math.hypot(x, y);
             
             // --- SINGULARITY FIX: CENTER LOCK ---
-            if (dist < 2.0) { 
+            if (dist < 2.0) { // If within 2mm of center
                 const targetBaseSteps = lastBaseSteps; 
                 const currentBaseAngle = -lastBaseSteps / stepsPerRad;
                 const targetElbowSteps = -(Math.PI + gearRatio * currentBaseAngle) * stepsPerRad;
                 return { base_steps: targetBaseSteps, elbow_steps: targetElbowSteps };
             }
 
+            // Normal IK Logic
             const maxReach = L1 + L2;
             if (dist > maxReach) { 
                 x = (x / dist) * maxReach; 
@@ -772,7 +821,6 @@
             let n = prompt("Enter filename (will be saved as .txt):"); 
             if(n) {
                 if(!n.toLowerCase().endsWith('.txt')) n += ".txt";
-
                 showToast("Saving...", "info");
 
                 fetch(BASE_URL+'/save_design', {
