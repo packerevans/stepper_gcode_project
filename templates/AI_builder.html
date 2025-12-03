@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Packers Sand Pro (Synced v31 - The Outliner)</title>
+    <title>Packers Sand Pro (Synced v32 - The Grandmaster)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -224,6 +224,7 @@
     <div id="status-toast"></div>
 
     <script>
+        // === GLOBAL STATE ===
         let rawPoints = []; 
         let processedPoints = []; 
         let historyStack = [];
@@ -238,551 +239,316 @@
         const ctx = canvas.getContext('2d');
         const BASE_URL = window.location.origin;
 
+        // === INITIALIZATION ===
         function init() {
             resizeCanvas();
             window.addEventListener('resize', resizeCanvas);
-            
             canvas.addEventListener('pointerdown', startDraw);
             canvas.addEventListener('pointermove', moveDraw);
             canvas.addEventListener('pointerup', endDraw);
             canvas.addEventListener('pointerleave', endDraw);
             canvas.style.touchAction = "none";
-            
             updateUI();
         }
 
-        // --- DRAWING LOGIC ---
-        function startDraw(e) {
-            e.preventDefault();
-            const smart = document.getElementById('smartPenMode').checked;
-            if(smart) {
-                if(e.pointerType === 'pen') setTool('draw');
-                else if(e.pointerType === 'touch') setTool('erase');
-            }
-            saveState();
-            isDrawing = true;
-            canvas.setPointerCapture(e.pointerId);
-            processPointer(e);
-            resetStatus();
-        }
-
-        function moveDraw(e) {
-            e.preventDefault();
-            const pos = getPos(e);
-            document.getElementById('coordDisplay').textContent = `X:${pos.x.toFixed(0)} Y:${pos.y.toFixed(0)}`;
-            if(!isDrawing) { render(); drawCursor(pos); return; }
-            processPointer(e);
-        }
-
-        function endDraw(e) {
-            if(!isDrawing) return;
-            isDrawing = false;
-            if(currentTool === 'draw') rawPoints.push({type:'break'});
-            canvas.releasePointerCapture(e.pointerId);
-            render();
-        }
-
-        function getPos(e) {
-            return {
-                x: (e.offsetX - origin.x) / scale,
-                y: -(e.offsetY - origin.y) / scale
-            };
-        }
-
-        function processPointer(e) {
-            const p = getPos(e);
-            if(currentTool === 'draw') {
-                rawPoints.push({x: p.x, y: p.y, type: 'point'});
-            } else {
-                const r = 10;
-                rawPoints = rawPoints.filter(pt => {
-                    if(pt.type === 'break') return true;
-                    return Math.hypot(pt.x - p.x, pt.y - p.y) > r;
-                });
-            }
-            render();
-            if(currentTool==='erase') drawCursor(p);
-        }
-
-        function drawCursor(p) {
-            if(currentTool !== 'erase') return;
-            const r = 10 * scale;
-            const px = origin.x + p.x * scale;
-            const py = origin.y - p.y * scale;
-            ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI*2);
-            ctx.strokeStyle = "#999"; ctx.fillStyle = "rgba(200,200,200,0.3)";
-            ctx.stroke(); ctx.fill();
-        }
-
-        function resetStatus() {
-            generatedGCode = null;
-            generatedThr = null;
-            processedPoints = [];
-            document.getElementById('statusTxt').innerText = "Drawing Mode";
-            document.getElementById('statusTxt').style.color = "orange";
-            document.getElementById('progressSlider').value = 100;
-        }
-
-        // --- RENDERER ---
-        function render() {
-            const w = canvas.width / window.devicePixelRatio;
-            const h = canvas.height / window.devicePixelRatio;
-            ctx.clearRect(0, 0, w, h);
-            
-            const tableR = parseFloat(document.getElementById('cfgRadius').value);
-            const sym = parseInt(document.getElementById('symSlider').value);
-            const dark = document.body.getAttribute('data-theme') === 'dark';
-            const prog = parseInt(document.getElementById('progressSlider').value);
-            document.getElementById('progVal').textContent = prog + '%';
-
-            ctx.save();
-            ctx.translate(origin.x, origin.y);
-
-            // Table Circle
-            ctx.beginPath(); ctx.arc(0, 0, tableR*scale, 0, Math.PI*2);
-            ctx.strokeStyle = dark ? '#444' : '#ddd'; ctx.lineWidth = 2; ctx.stroke();
-
-            const showingFinal = (processedPoints.length > 0);
-            const dataToShow = showingFinal ? processedPoints : rawPoints;
-            const limit = Math.floor(dataToShow.length * (prog/100));
-            const color = showingFinal ? '#ff0000' : (dark ? 'cyan' : '#007bff');
-
-            ctx.lineWidth = 1.5;
-            
-            const loopCount = showingFinal ? 1 : sym;
-
-            for(let s=0; s<loopCount; s++) {
-                const ang = s * (Math.PI*2/sym);
-                ctx.save(); 
-                if(!showingFinal) ctx.rotate(ang); 
-                
-                ctx.beginPath();
-                ctx.strokeStyle = color;
-                
-                let isMove = true;
-                for(let i=0; i<limit; i++) {
-                    const p = dataToShow[i];
-                    if(p.type === 'break' || p.type === 'exit') { isMove = true; continue; }
-                    
-                    const px = p.x * scale;
-                    const py = -p.y * scale;
-                    
-                    if(isMove) { ctx.moveTo(px, py); isMove = false; }
-                    else ctx.lineTo(px, py);
-                }
-                ctx.stroke();
-                
-                if(limit > 0 && limit < dataToShow.length) {
-                    const tip = dataToShow[limit];
-                    if(tip.type !== 'break' && tip.type !== 'exit') {
-                        ctx.beginPath(); 
-                        ctx.arc(tip.x*scale, -tip.y*scale, 4, 0, Math.PI*2);
-                        ctx.fillStyle = color; ctx.fill();
-                    }
-                }
-                ctx.restore();
-            }
-            ctx.restore();
-        }
-
-        // --- AI TRACER (High Contrast) ---
-        function handleImageUpload(input) {
-            const file = input.files[0];
-            if(!file) return;
-            showToast("Scanning & Enhancing...", "info");
-            saveState();
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const img = new Image();
-                img.onload = function() {
-                    const tCan = document.createElement('canvas');
-                    const MAX = 1000;
-                    let tw = img.width, th = img.height;
-                    if(tw>th && tw>MAX){ th*=MAX/tw; tw=MAX; } 
-                    else if(th>MAX){ tw*=MAX/th; th=MAX; }
-                    
-                    tCan.width = tw; tCan.height = th;
-                    const tCtx = tCan.getContext('2d');
-                    
-                    tCtx.fillStyle = "white"; tCtx.fillRect(0,0,tw,th);
-                    tCtx.drawImage(img, 0, 0, tw, th);
-                    
-                    const imgData = tCtx.getImageData(0,0,tw,th);
-                    const d = imgData.data;
-                    for (let i=0; i<d.length; i+=4) {
-                        const r=d[i], g=d[i+1], b=d[i+2];
-                        const v = 0.2126*r + 0.7152*g + 0.0722*b;
-                        const val = (v > 128) ? 255 : 0;
-                        d[i] = d[i+1] = d[i+2] = val;
-                    }
-                    tCtx.putImageData(imgData, 0, 0);
-                    
-                    ImageTracer.imageToSVG(tCan.toDataURL(), function(svgStr){
-                        processTrace(svgStr, tw, th);
-                    }, { ltres:0.1, qtres:0.1, pathomit:5, colorsampling:0, numberofcolors:2, mincolorratio:0.02 });
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        }
-
-        function processTrace(svgStr, imgW, imgH) {
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(svgStr, "image/svg+xml");
-            const paths = doc.getElementsByTagName("path");
-            let strokes = [];
-            const res = 2.0; 
-
-            for(let i=0; i<paths.length; i++) {
-                const p = paths[i];
-                const len = p.getTotalLength();
-                if(len < 5) continue; 
-                
-                let pts = [];
-                let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
-
-                for(let d=0; d<=len; d+=res) {
-                    const pt = p.getPointAtLength(d);
-                    pts.push({x: pt.x, y: pt.y});
-                    if(pt.x<minX) minX=pt.x; if(pt.x>maxX) maxX=pt.x;
-                    if(pt.y<minY) minY=pt.y; if(pt.y>maxY) maxY=pt.y;
-                }
-                
-                const w = maxX - minX;
-                const h = maxY - minY;
-                if (w > imgW * 0.98 || h > imgH * 0.98) continue; 
-                strokes.push(pts);
-            }
-
-            if(strokes.length === 0) return showToast("No shapes found", "error");
-
-            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
-            strokes.flat().forEach(p => {
-                if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
-                if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
-            });
-            
-            const contentW = maxX - minX;
-            const contentH = maxY - minY;
-            const tableR = parseFloat(document.getElementById('cfgRadius').value);
-            const scaleFac = (tableR * 2 * 0.9) / Math.max(contentW, contentH);
-            const cx = (minX + maxX)/2;
-            const cy = (minY + maxY)/2;
-
-            let normalizedStrokes = strokes.map(s => {
-                return s.map(p => ({
-                    x: (p.x - cx) * scaleFac,
-                    y: -(p.y - cy) * scaleFac 
-                })).filter(p => Math.hypot(p.x, p.y) < tableR);
-            });
-
-            rawPoints = [];
-            normalizedStrokes.forEach(s => {
-                rawPoints.push({type:'break'});
-                s.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
-            });
-            rawPoints.push({type:'break'});
-
-            resetStatus();
-            showToast("Trace Loaded (Click Prepare)", "info");
-            render();
-        }
-
-        // --- V31: THE OUTLINER (A* GRID ROUTING) ---
+        // === V32: THE GRANDMASTER SOLVER (Strict 4-Step Logic) ===
         async function prepareGCode() {
             if(rawPoints.length === 0) return showToast("Draw something first!", "error");
-            showToast("Step 1: Analyzing Shapes...", "info");
-            await new Promise(r => setTimeout(r, 50));
-
+            
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
             const sym = parseInt(document.getElementById('symSlider').value);
             
             // --- STEP 2: IDENTIFY ALL SHAPES ---
-            let shapes = [];
-            let curShape = [];
-            rawPoints.forEach(p => {
-                if(p.type === 'break' || p.type === 'exit') {
-                    if(curShape.length > 0) shapes.push(curShape);
-                    curShape = [];
-                } else {
-                    curShape.push({x:p.x, y:p.y});
-                }
-            });
-            if(curShape.length > 0) shapes.push(curShape);
+            showToast("Step 2: Identifying Shapes...", "info");
+            await new Promise(r => setTimeout(r, 20));
 
-            // Expand Symmetry
+            let shapes = groupPointsToShapes(rawPoints);
+            // Apply Symmetry
             let pool = [];
             for(let s=0; s<sym; s++) {
                 const ang = s * (Math.PI*2/sym);
                 const c = Math.cos(ang), si = Math.sin(ang);
                 shapes.forEach(sh => {
-                    let newSh = sh.map(p => ({
+                    pool.push(sh.map(p => ({
                         x: p.x*c - p.y*si,
                         y: p.x*si + p.y*c
-                    }));
-                    pool.push(newSh);
+                    })));
                 });
             }
             if(pool.length === 0) return;
 
-            // Analyze Shapes
+            // --- STEP 1: IDENTIFY ANCHORS (Closest to Perimeter) ---
+            showToast("Step 1: Identifying Anchors...", "info");
+            // Metadata: Closest dist to Rim for every shape
             let shapeMeta = pool.map((s, idx) => {
                 const dStartEnd = Math.hypot(s[0].x - s[s.length-1].x, s[0].y - s[s.length-1].y);
                 const isClosed = dStartEnd < 15.0; 
                 if(isClosed) s[s.length-1] = {x: s[0].x, y: s[0].y};
                 
-                let minD = Infinity;
-                let rimP = {x: tableR, y: 0};
+                let minRimD = Infinity;
                 for(let p of s) {
                     let d = Math.abs(tableR - Math.hypot(p.x, p.y));
-                    if(d < minD) minD = d;
+                    if(d < minRimD) minRimD = d;
                 }
-                return { id: idx, points: s, isClosed: isClosed, distToRim: minD };
+                return { id: idx, points: s, isClosed: isClosed, distToRim: minRimD };
             });
 
-            // --- STEP 1: IDENTIFY 2 POINTS CLOSEST TO PERIMETER ---
+            // Sort: 0 is closest to rim (Start), 1 is 2nd closest (End)
             shapeMeta.sort((a,b) => a.distToRim - b.distToRim);
             let startMeta = shapeMeta[0];
             let endMeta = (shapeMeta.length > 1) ? shapeMeta[1] : shapeMeta[0];
 
-            // --- STEP 4: CALCULATE ORDER (TSP) ---
-            // Exclude Start/End from standard ordering
-            let unvisited = new Set(shapeMeta.map(m => m.id));
-            unvisited.delete(startMeta.id);
-            unvisited.delete(endMeta.id);
+            // --- STEP 4 (Part 1): BEST ORDER (Simulated Annealing) ---
+            showToast("Step 4: Calculating Best Order...", "info");
+            await new Promise(r => setTimeout(r, 20));
 
-            let optimizedPath = [];
+            // Exclude Anchors from the shuffle
+            let middleShapes = shapeMeta.filter(m => m.id !== startMeta.id && m.id !== endMeta.id);
             
-            // Setup Start Shape
-            let currentPoints = [...startMeta.points];
-            let rimPoint = {x: tableR, y: 0};
-            // Step 3: Best Start/End for Shape 1
-            if(startMeta.isClosed) currentPoints = rotateToClosest(currentPoints, rimPoint);
-            else if (distSq(rimPoint, currentPoints[currentPoints.length-1]) < distSq(rimPoint, currentPoints[0])) currentPoints.reverse();
+            // Run Simulated Annealing to find order with least "Air Travel" (Centroid to Centroid)
+            // This is a rough pass to get the general sequence right
+            let optimizedOrder = runSimulatedAnnealing(middleShapes);
             
-            optimizedPath.push({points: currentPoints});
-            let currentHead = currentPoints[currentPoints.length-1];
+            // Final Sequence: Start -> Middle Optimized -> End
+            let finalSequence = [startMeta, ...optimizedOrder];
+            if(endMeta.id !== startMeta.id) finalSequence.push(endMeta);
 
-            // Greedy TSP
-            while(unvisited.size > 0) {
-                let bestNextId = -1;
-                let bestEntryMode = 'start'; 
-                let bestLoopIdx = -1;
-                let minJumpDist = Infinity;
+            // --- STEP 3: RECALCULATE START/END POINTS (Fine Tuning) ---
+            showToast("Step 3: Optimizing Start/End Points...", "info");
+            let optimizedShapes = optimizeSeams(finalSequence, tableR);
 
-                for(let id of unvisited) {
-                    const cand = shapeMeta.find(m => m.id === id);
-                    
-                    if(cand.isClosed) {
-                        for(let k=0; k<cand.points.length; k+=4) {
-                            let d = distSq(currentHead, cand.points[k]);
-                            if(d < minJumpDist) {
-                                minJumpDist = d; bestNextId = id; bestEntryMode = 'loop_idx'; bestLoopIdx = k;
-                            }
-                        }
-                    } else {
-                        let dStart = distSq(currentHead, cand.points[0]);
-                        if(dStart < minJumpDist) {
-                            minJumpDist = dStart; bestNextId = id; bestEntryMode = 'start'; 
-                        }
-                        let dEnd = distSq(currentHead, cand.points[cand.points.length-1]);
-                        if(dEnd < minJumpDist) {
-                            minJumpDist = dEnd; bestNextId = id; bestEntryMode = 'end';
-                        }
-                    }
-                }
-
-                if(bestNextId !== -1) {
-                    let nextMeta = shapeMeta.find(m => m.id === bestNextId);
-                    let nextPoints = [...nextMeta.points];
-                    // Step 3: Recalculate Start/End for Next Shape
-                    if(bestEntryMode === 'loop_idx') nextPoints = rotateArray(nextPoints, bestLoopIdx);
-                    else if(bestEntryMode === 'end') nextPoints.reverse();
-
-                    optimizedPath.push({points: nextPoints});
-                    currentHead = nextPoints[nextPoints.length-1];
-                    unvisited.delete(bestNextId);
-                } else {
-                    break;
-                }
-            }
-
-            // Append End Shape
-            if(endMeta.id !== startMeta.id) {
-                let cand = endMeta;
-                let bestEntryMode = 'start'; 
-                let bestLoopIdx = -1;
-                let minD = Infinity;
-                if(cand.isClosed) {
-                    for(let k=0; k<cand.points.length; k+=4) {
-                        let d = distSq(currentHead, cand.points[k]);
-                        if(d < minD) { minD = d; bestEntryMode = 'loop_idx'; bestLoopIdx = k; }
-                    }
-                } else {
-                    let dStart = distSq(currentHead, cand.points[0]);
-                    if(dStart < minD) { minD = dStart; bestEntryMode = 'start'; }
-                    let dEnd = distSq(currentHead, cand.points[cand.points.length-1]);
-                    if(dEnd < minD) { minD = dEnd; bestEntryMode = 'end'; }
-                }
-                let endPoints = [...cand.points];
-                if(bestEntryMode === 'loop_idx') endPoints = rotateArray(endPoints, bestLoopIdx);
-                else if(bestEntryMode === 'end') endPoints.reverse();
-                optimizedPath.push({points: endPoints});
-            }
-
-            // --- STEP 4 (REARRANGE TRAVEL LINES): A* ROUTER ---
+            // --- STEP 4 (Part 2): REARRANGE TRAVEL LINES (A* Outlining) ---
             showToast("Step 4: Outlining Objects (A*)...", "info");
             await new Promise(r => setTimeout(r, 50));
 
-            // Build Occupancy Grid
-            const gridSize = 4.0; // 4mm grid for speed
+            // Build High-Res Grid for Pathfinding
+            const gridSize = 3.0; // 3mm resolution
             const grid = new Map();
             const toKey = (x,y) => `${Math.floor(x/gridSize)},${Math.floor(y/gridSize)}`;
             
-            // Mark all drawing points as "SAFE" (Cost 1)
-            for(let shapeObj of optimizedPath) {
-                for(let p of shapeObj.points) {
+            // Mark drawn pixels as "Cheap" (Cost 1)
+            for(let shapePts of optimizedShapes) {
+                for(let p of shapePts) {
                     grid.set(toKey(p.x, p.y), 1);
                 }
             }
 
             processedPoints = [];
             
-            // Rim Entry
-            let startP = optimizedPath[0].points[0];
-            let ang = Math.atan2(startP.y, startP.x);
+            // 1. Entry from Perimeter to Start Shape
+            let firstPt = optimizedShapes[0][0];
+            let ang = Math.atan2(firstPt.y, firstPt.x);
             processedPoints.push({x: tableR*Math.cos(ang), y: tableR*Math.sin(ang), type:'point'});
 
-            for(let i=0; i<optimizedPath.length; i++) {
-                // Add Shape
-                optimizedPath[i].points.forEach(p => processedPoints.push({x:p.x, y:p.y, type:'point'}));
+            // 2. Connect Shapes
+            for(let i=0; i<optimizedShapes.length; i++) {
+                // Add Shape Points
+                optimizedShapes[i].forEach(p => processedPoints.push({x:p.x, y:p.y, type:'point'}));
                 
-                // Route to Next?
-                if(i < optimizedPath.length - 1) {
-                    let currEnd = optimizedPath[i].points[optimizedPath[i].points.length-1];
-                    let nextStart = optimizedPath[i+1].points[0];
+                // Route to Next Shape?
+                if(i < optimizedShapes.length - 1) {
+                    let currEnd = optimizedShapes[i][optimizedShapes[i].length-1];
+                    let nextStart = optimizedShapes[i+1][0];
                     let dist = Math.hypot(nextStart.x-currEnd.x, nextStart.y-currEnd.y);
                     
                     if(dist > 5.0) {
-                        // A* Pathfinding to outline objects
-                        let route = findAStarPath(currEnd, nextStart, grid, gridSize);
-                        if(route.length > 0) {
-                            route.forEach(p => processedPoints.push({x:p.x, y:p.y, type:'point'}));
-                        }
+                        // THE "OUTLINER": Use A* with heavy penalty for empty space
+                        let route = findSafeRoute(currEnd, nextStart, grid, gridSize);
+                        route.forEach(p => processedPoints.push({x:p.x, y:p.y, type:'point'}));
                     }
                 }
             }
 
-            // Rim Exit
-            let lastP = processedPoints[processedPoints.length-1];
-            let exAng = Math.atan2(lastP.y, lastP.x);
+            // 3. Exit to Perimeter from End Shape
+            let lastPt = processedPoints[processedPoints.length-1];
+            let exAng = Math.atan2(lastPt.y, lastPt.x);
             processedPoints.push({x: tableR*Math.cos(exAng), y: tableR*Math.sin(exAng), type:'exit'});
 
-            // Simplify
+            // Simplify final path
             processedPoints = simplifyPath(processedPoints, 0.5);
 
             generateKinematicsGCode(processedPoints);
             
-            document.getElementById('statusTxt').innerText = "AI Path: Outlined";
+            document.getElementById('statusTxt').innerText = "AI Path: Grandmaster";
             document.getElementById('statusTxt').style.color = "#2ecc71";
             document.getElementById('progressSlider').value = 0;
             render(); 
-            showToast("Objects Outlined!", "success");
+            showToast("Optimization Complete!", "success");
         }
 
-        // --- A* ROUTER ---
-        function findAStarPath(start, end, grid, gridSize) {
-            let startKey = `${Math.floor(start.x/gridSize)},${Math.floor(start.y/gridSize)}`;
-            let endKey = `${Math.floor(end.x/gridSize)},${Math.floor(end.y/gridSize)}`;
+        // --- ALGORITHMS ---
+
+        function groupPointsToShapes(points) {
+            let shapes = [];
+            let cur = [];
+            points.forEach(p => {
+                if(p.type === 'break' || p.type === 'exit') {
+                    if(cur.length > 0) shapes.push(cur);
+                    cur = [];
+                } else {
+                    cur.push({x:p.x, y:p.y});
+                }
+            });
+            if(cur.length > 0) shapes.push(cur);
+            return shapes;
+        }
+
+        // Simulated Annealing for Shape Ordering
+        function runSimulatedAnnealing(shapes) {
+            if(shapes.length < 2) return shapes;
             
+            let currentOrder = [...shapes];
+            let bestOrder = [...shapes];
+            let bestDist = calculateTotalDist(bestOrder);
+            
+            let temp = 1000;
+            let coolingRate = 0.995;
+
+            // Compute Centroids once for speed
+            currentOrder.forEach(s => {
+                let cx=0, cy=0;
+                s.points.forEach(p=>{cx+=p.x; cy+=p.y});
+                s.centroid = {x:cx/s.points.length, y:cy/s.points.length};
+            });
+
+            for(let i=0; i<5000; i++) { // 5000 iterations
+                // Swap two random elements
+                let p1 = Math.floor(Math.random() * currentOrder.length);
+                let p2 = Math.floor(Math.random() * currentOrder.length);
+                
+                // Calculate delta
+                let d1 = getSegDist(currentOrder, p1-1, p1) + getSegDist(currentOrder, p1, p1+1) +
+                         getSegDist(currentOrder, p2-1, p2) + getSegDist(currentOrder, p2, p2+1);
+                
+                swap(currentOrder, p1, p2);
+                
+                let d2 = getSegDist(currentOrder, p1-1, p1) + getSegDist(currentOrder, p1, p1+1) +
+                         getSegDist(currentOrder, p2-1, p2) + getSegDist(currentOrder, p2, p2+1);
+                
+                // Accept?
+                if(d2 < d1 || Math.random() < Math.exp((d1 - d2) / temp)) {
+                    // Keep change
+                    let total = calculateTotalDist(currentOrder);
+                    if(total < bestDist) {
+                        bestDist = total;
+                        bestOrder = [...currentOrder];
+                    }
+                } else {
+                    swap(currentOrder, p1, p2); // Revert
+                }
+                temp *= coolingRate;
+            }
+            return bestOrder;
+        }
+
+        function calculateTotalDist(order) {
+            let d = 0;
+            for(let i=0; i<order.length-1; i++) {
+                d += distSq(order[i].centroid, order[i+1].centroid);
+            }
+            return d;
+        }
+        function getSegDist(arr, i, j) {
+            if(i<0 || j<0 || i>=arr.length || j>=arr.length) return 0;
+            return distSq(arr[i].centroid, arr[j].centroid);
+        }
+        function swap(arr, a, b) { let t=arr[a]; arr[a]=arr[b]; arr[b]=t; }
+
+        // Fine Tune Entry/Exit Points
+        function optimizeSeams(sequence, tableR) {
+            let optimized = [];
+            let headPos = {x: tableR, y: 0}; // Start at Rim
+
+            for(let meta of sequence) {
+                let bestPts = [...meta.points];
+                
+                if(meta.isClosed) {
+                    // Find point closest to headPos
+                    let bestIdx = 0, minD = Infinity;
+                    for(let k=0; k<meta.points.length; k+=3) {
+                        let d = distSq(headPos, meta.points[k]);
+                        if(d < minD) { minD = d; bestIdx = k; }
+                    }
+                    bestPts = rotateArray(bestPts, bestIdx);
+                } else {
+                    // Start or End?
+                    let dStart = distSq(headPos, bestPts[0]);
+                    let dEnd = distSq(headPos, bestPts[bestPts.length-1]);
+                    if(dEnd < dStart) bestPts.reverse();
+                }
+                
+                optimized.push(bestPts);
+                headPos = bestPts[bestPts.length-1];
+            }
+            return optimized;
+        }
+
+        // Weighted A* Router
+        function findSafeRoute(start, end, grid, gridSize) {
+            // Heuristic: Distance * 100 (Since 1mm empty space = 100 points)
+            const h = (n) => Math.hypot(n.x-end.x, n.y-end.y) * 100;
+            const toKey = (x,y) => `${Math.floor(x/gridSize)},${Math.floor(y/gridSize)}`;
+
             let open = [{x:start.x, y:start.y, g:0, f:0, parent:null}];
             let closed = new Set();
             let count = 0;
-            let maxNodes = 800; // Limit search
-
-            while(open.length > 0 && count++ < maxNodes) {
-                open.sort((a,b) => a.f - b.f);
+            
+            // Limit to prevent browser freeze
+            while(open.length > 0 && count++ < 2000) {
+                open.sort((a,b) => a.f - b.f); // Priority Queue
                 let curr = open.shift();
-                
-                let distToEnd = Math.hypot(curr.x-end.x, curr.y-end.y);
-                if(distToEnd < gridSize * 1.5) {
-                    // Reconstruct
+
+                // Goal Reached?
+                if(Math.hypot(curr.x-end.x, curr.y-end.y) < gridSize*1.5) {
                     let path = [];
-                    while(curr.parent) {
-                        path.push({x:curr.x, y:curr.y});
-                        curr = curr.parent;
-                    }
+                    while(curr.parent) { path.push({x:curr.x, y:curr.y}); curr = curr.parent; }
                     return path.reverse();
                 }
 
-                let ck = `${Math.floor(curr.x/gridSize)},${Math.floor(curr.y/gridSize)}`;
-                if(closed.has(ck)) continue;
-                closed.add(ck);
+                let k = toKey(curr.x, curr.y);
+                if(closed.has(k)) continue;
+                closed.add(k);
 
-                // Neighbors (8 directions)
-                let directions = [
-                    {dx:0, dy:1}, {dx:0, dy:-1}, {dx:1, dy:0}, {dx:-1, dy:0},
-                    {dx:1, dy:1}, {dx:1, dy:-1}, {dx:-1, dy:1}, {dx:-1, dy:-1}
-                ];
-
-                for(let dir of directions) {
-                    let nx = curr.x + dir.dx * gridSize;
-                    let ny = curr.y + dir.dy * gridSize;
-                    let nk = `${Math.floor(nx/gridSize)},${Math.floor(ny/gridSize)}`;
+                // Check neighbors
+                let dirs = [{x:0,y:gridSize}, {x:0,y:-gridSize}, {x:gridSize,y:0}, {x:-gridSize,y:0}];
+                
+                for(let d of dirs) {
+                    let nx = curr.x + d.x, ny = curr.y + d.y;
+                    let nk = toKey(nx, ny);
                     
-                    // Cost Logic:
-                    // 1 = Safe (Existing Line)
-                    // 10 = Empty Space (Avoid)
-                    let cellCost = grid.has(nk) ? 1 : 8; 
+                    // COST FUNCTION:
+                    // If neighbor is on a line (grid has it) -> Cost = 1
+                    // If neighbor is empty space -> Cost = 100
+                    let moveCost = grid.has(nk) ? 1 : 100;
                     
-                    let newG = curr.g + cellCost;
-                    let h = Math.hypot(nx-end.x, ny-end.y);
-                    
-                    open.push({x:nx, y:ny, g:newG, f:newG+h, parent:curr});
+                    let newG = curr.g + moveCost;
+                    open.push({x:nx, y:ny, g:newG, f:newG + h({x:nx, y:ny}), parent:curr});
                 }
             }
-            return []; // Fallback to straight line
+            return []; // Fallback direct line
         }
 
-        // --- UTILS ---
+        // --- UTILS & CORE ---
         function distSq(p1, p2) { return (p1.x-p2.x)**2 + (p1.y-p2.y)**2; }
-
-        function rotateToClosest(points, target) {
-            let bestIdx = 0, minD = Infinity;
-            for(let i=0; i<points.length; i+=3) {
-                let d = distSq(points[i], target);
-                if(d < minD) { minD = d; bestIdx = i; }
-            }
-            return rotateArray(points, bestIdx);
-        }
-
         function rotateArray(arr, idx) {
             if(idx === 0) return [...arr];
-            let p1 = arr.slice(idx);
-            let p2 = arr.slice(0, idx);
-            let n = p1.concat(p2);
-            n.push({x:n[0].x, y:n[0].y});
+            let p1 = arr.slice(idx), p2 = arr.slice(0, idx);
+            let n = p1.concat(p2); n.push({x:n[0].x, y:n[0].y});
             return n;
         }
-
-        function simplifyPath(points, tolerance) {
+        function simplifyPath(points, tol) {
             if(points.length < 3) return points;
-            let newPts = [points[0]];
-            let lastP = points[0];
+            let newPts = [points[0]], last = points[0];
             for(let i=1; i<points.length-1; i++) {
-                let p = points[i];
-                let dist = Math.hypot(p.x - lastP.x, p.y - lastP.y);
-                if(dist > tolerance) {
-                    newPts.push(p);
-                    lastP = p;
+                if(Math.hypot(points[i].x-last.x, points[i].y-last.y) > tol) {
+                    newPts.push(points[i]); last = points[i];
                 }
             }
             newPts.push(points[points.length-1]);
             return newPts;
         }
 
-        // --- G-CODE GENERATION ---
+        // --- G-CODE & KINEMATICS (Standard) ---
         function generateKinematicsGCode(pathPoints) {
             const L1 = parseFloat(document.getElementById('cfgL1').value);
             const L2 = parseFloat(document.getElementById('cfgL2').value);
@@ -792,19 +558,14 @@
             const centerDelay = parseFloat(document.getElementById('cfgCenterDelay').value);
             const perimDelay = parseFloat(document.getElementById('cfgPerimDelay').value);
             const res = parseFloat(document.getElementById('cfgResolution').value) || 1.0;
-
             const stepsPerRad = stepsPerDeg * (180 / Math.PI);
 
             let commands = [];
-            let prevBase = 0;
-            let prevElbow = 0;
-            
+            let prevBase = 0, prevElbow = 0;
             let fullPath = [{x:0, y:0}].concat(pathPoints); 
 
             for (let i = 0; i < fullPath.length - 1; i++) {
-                let p1 = fullPath[i];
-                let p2 = fullPath[i+1];
-                
+                let p1 = fullPath[i], p2 = fullPath[i+1];
                 if (p2.type === 'exit') commands.push("M0"); 
 
                 let dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
@@ -817,249 +578,93 @@
                     let y = p1.y + (p2.y - p1.y) * t;
 
                     let ik = calculateIK(x, y, prevBase, prevElbow, L1, L2, gearRatio, stepsPerRad);
-                    
                     let dBase = Math.round(ik.base_steps - prevBase);
                     let dElbow = Math.round(ik.elbow_steps - prevElbow);
 
                     if (dBase !== 0 || dElbow !== 0) {
-                        let distFromCenter = Math.hypot(x, y);
-                        let rFactor = distFromCenter / tableRadius;
-                        if (rFactor > 1.0) rFactor = 1.0;
-                        
-                        let calculatedDelay = centerDelay + ((perimDelay - centerDelay) * rFactor);
-                        calculatedDelay = Math.round(calculatedDelay);
-
-                        commands.push(`G1 ${dElbow} ${dBase} ${calculatedDelay}`);
-
-                        prevBase += dBase;
-                        prevElbow += dElbow;
+                        let rFactor = Math.min(1.0, Math.hypot(x, y) / tableRadius);
+                        let delay = Math.round(centerDelay + ((perimDelay - centerDelay) * rFactor));
+                        commands.push(`G1 ${dElbow} ${dBase} ${delay}`);
+                        prevBase += dBase; prevElbow += dElbow;
                     }
                 }
             }
-
             generatedGCode = commands.join('\n');
             
-            // --- THETA-RHO GENERATION ---
-            let thrLines = [];
-            thrLines.push("# format: thetarho"); 
-            
-            let prevTheta = 0;
-            let cumulativeTheta = 0;
-            let isFirst = true;
-
+            // Theta-Rho Gen
+            let thrLines = ["# format: thetarho"];
+            let prevTheta = 0, cumTheta = 0, isFirst = true;
             for(let p of pathPoints) {
                 if(p.type !== 'exit') {
-                    let rho = Math.hypot(p.x, p.y) / tableRadius;
-                    if(rho > 1.0) rho = 1.0; 
+                    let rho = Math.min(1.0, Math.hypot(p.x, p.y) / tableRadius);
                     let rawTheta = Math.atan2(p.y, p.x);
-                    
-                    if(isFirst) {
-                        cumulativeTheta = rawTheta;
-                        prevTheta = rawTheta;
-                        isFirst = false;
-                    } else {
+                    if(isFirst) { cumTheta = rawTheta; prevTheta = rawTheta; isFirst = false; }
+                    else {
                         let diff = rawTheta - prevTheta;
-                        while (diff <= -Math.PI) diff += 2 * Math.PI;
-                        while (diff > Math.PI) diff -= 2 * Math.PI;
-                        cumulativeTheta += diff;
-                        prevTheta = rawTheta;
+                        while(diff <= -Math.PI) diff += 2*Math.PI;
+                        while(diff > Math.PI) diff -= 2*Math.PI;
+                        cumTheta += diff; prevTheta = rawTheta;
                     }
-                    
-                    thrLines.push(`${cumulativeTheta.toFixed(5)} ${rho.toFixed(5)}`);
+                    thrLines.push(`${cumTheta.toFixed(5)} ${rho.toFixed(5)}`);
                 }
             }
             generatedThr = thrLines.join('\n');
         }
 
-        // --- KINEMATICS ENGINE ---
-        
-        function getShortestRotation(raw, last) {
-            let diff = (raw - last) / (2 * Math.PI);
-            let offset = Math.round(diff);
-            return raw - (offset * 2 * Math.PI);
-        }
-
-        function calculateIK(x, y, lastBaseSteps, lastElbowSteps, L1, L2, gearRatio, stepsPerRad) {
+        function calculateIK(x, y, lastBase, lastElbow, L1, L2, gr, spr) {
             let dist = Math.hypot(x, y);
             const maxReach = L1 + L2;
-            
-            if (dist > maxReach) {
-                x = (x / dist) * maxReach;
-                y = (y / dist) * maxReach;
-                dist = maxReach;
-            }
-
+            if (dist > maxReach) { x = (x/dist)*maxReach; y = (y/dist)*maxReach; dist = maxReach; }
             if (dist < 1.0) { 
-                const targetBaseSteps = lastBaseSteps; 
-                const currentBaseAngle = -lastBaseSteps / stepsPerRad;
-                const targetElbowSteps = -(Math.PI + gearRatio * currentBaseAngle) * stepsPerRad;
-                return { base_steps: targetBaseSteps, elbow_steps: targetElbowSteps };
+                return { base_steps: lastBase, elbow_steps: -(Math.PI + gr * (-lastBase/spr)) * spr };
             }
-
-            const lastT1 = -lastBaseSteps / stepsPerRad; 
-            let cosBend = (dist*dist - L1*L1 - L2*L2) / (2 * L1 * L2);
+            let cosBend = (dist*dist - L1*L1 - L2*L2) / (2*L1*L2);
             cosBend = Math.max(-1, Math.min(1, cosBend));
-            
-            const bend1 = Math.acos(cosBend);
-            const bend2 = -Math.acos(cosBend);
+            const bend1 = Math.acos(cosBend), bend2 = -Math.acos(cosBend);
+            const lastT1 = -lastBase / spr;
 
-            const k1_1 = L1 + L2 * Math.cos(bend1);
-            const k2_1 = L2 * Math.sin(bend1);
+            const k1_1 = L1 + L2 * Math.cos(bend1), k2_1 = L2 * Math.sin(bend1);
             let t1_1 = Math.atan2(y, x) - Math.atan2(k2_1, k1_1);
-            t1_1 = getShortestRotation(t1_1, lastT1);
+            t1_1 = getShortest(t1_1, lastT1);
 
-            const k1_2 = L1 + L2 * Math.cos(bend2);
-            const k2_2 = L2 * Math.sin(bend2);
+            const k1_2 = L1 + L2 * Math.cos(bend2), k2_2 = L2 * Math.sin(bend2);
             let t1_2 = Math.atan2(y, x) - Math.atan2(k2_2, k1_2);
-            t1_2 = getShortestRotation(t1_2, lastT1);
+            t1_2 = getShortest(t1_2, lastT1);
 
-            const b1_steps = -t1_1 * stepsPerRad;
-            const e1_steps = -(bend1 + gearRatio * t1_1) * stepsPerRad;
-            const b2_steps = -t1_2 * stepsPerRad;
-            const e2_steps = -(bend2 + gearRatio * t1_2) * stepsPerRad;
-
-            const cost1 = Math.abs(b1_steps - lastBaseSteps) + Math.abs(e1_steps - lastElbowSteps);
-            const cost2 = Math.abs(b2_steps - lastBaseSteps) + Math.abs(e2_steps - lastElbowSteps);
-
-            return (cost1 <= cost2) ? { base_steps: b1_steps, elbow_steps: e1_steps } 
-                                    : { base_steps: b2_steps, elbow_steps: e2_steps };
+            const b1 = -t1_1 * spr, e1 = -(bend1 + gr * t1_1) * spr;
+            const b2 = -t1_2 * spr, e2 = -(bend2 + gr * t1_2) * spr;
+            const cost1 = Math.abs(b1 - lastBase) + Math.abs(e1 - lastElbow);
+            const cost2 = Math.abs(b2 - lastBase) + Math.abs(e2 - lastElbow);
+            return (cost1 <= cost2) ? {base_steps:b1, elbow_steps:e1} : {base_steps:b2, elbow_steps:e2};
+        }
+        function getShortest(raw, last) {
+            let diff = (raw - last) / (2 * Math.PI);
+            return raw - (Math.round(diff) * 2 * Math.PI);
         }
 
-        // --- ACTIONS ---
-        async function sendToTable() {
-            if(!generatedGCode) return showToast("Click 'Prepare Path' first!", "error");
-            
-            let finalCode = generatedGCode;
-            const autoClear = document.getElementById('autoClearMode').checked;
-
-            if(autoClear) {
-                showToast("Fetching Clear Pattern...", "info");
-                try {
-                    let response = await fetch('./designs/clear.TXT');
-                    if(!response.ok) response = await fetch('./designs/clear.txt'); 
-                    
-                    if(response.ok) {
-                        const clearCode = await response.text();
-                        finalCode = clearCode + "\n" + finalCode;
-                        showToast("Auto-Clear Added.", "success");
-                    } else {
-                        showToast("Clear file not found!", "error");
-                    }
-                } catch(e) {
-                    console.error(e);
-                    showToast("Clear file error (check console)", "error");
-                }
-            }
-
-            showToast("Sending...", "info");
-            fetch(BASE_URL + '/send_gcode_block', {
-                method:'POST', headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({gcode: finalCode, speed_override: null})
-            }).then(r=>r.json()).then(d=>{
-                if(d.success) showToast("Sent Successfully!", "success");
-                else showToast("Error: " + d.error, "error");
-            }).catch(()=>showToast("Network Error", "error"));
-        }
-
-        async function saveToServer() {
-            if(!generatedGCode) return showToast("Click 'Prepare Path' first!", "error");
-            let filename = prompt("Name your design:", "pattern");
-            if(!filename) return;
-            showToast("Saving to server...", "info");
-            try {
-                const response = await fetch(BASE_URL + '/save_design', { 
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ filename: filename, gcode: generatedGCode })
-                });
-                const data = await response.json();
-                if(data.success) showToast("Saved to Designs!", "success");
-                else showToast("Server Error: " + (data.error || "Unknown"), "error");
-            } catch (e) {
-                console.error(e);
-                showToast("Network/Server Error", "error");
-            }
-        }
+        // --- DRAWING ---
+        function startDraw(e) { e.preventDefault(); if(document.getElementById('smartPenMode').checked) currentTool = e.pointerType==='pen'?'draw':'erase'; saveState(); isDrawing=true; canvas.setPointerCapture(e.pointerId); processPointer(e); resetStatus(); }
+        function moveDraw(e) { e.preventDefault(); if(!isDrawing) { render(); drawCursor(getPos(e)); return; } processPointer(e); }
+        function endDraw(e) { if(!isDrawing) return; isDrawing=false; if(currentTool==='draw') rawPoints.push({type:'break'}); canvas.releasePointerCapture(e.pointerId); render(); }
+        function getPos(e) { return { x: (e.offsetX - origin.x)/scale, y: -(e.offsetY - origin.y)/scale }; }
+        function processPointer(e) { const p=getPos(e); if(currentTool==='draw') rawPoints.push({x:p.x, y:p.y, type:'point'}); else rawPoints=rawPoints.filter(pt=>Math.hypot(pt.x-p.x, pt.y-p.y)>10); render(); if(currentTool==='erase') drawCursor(p); }
         
-        function downloadThetaRho() {
-            if(!generatedThr) return showToast("Click 'Prepare Path' first!", "error");
-            if (navigator.clipboard && window.isSecureContext) {
-                navigator.clipboard.writeText(generatedThr).then(() => {
-                    showToast("Copied Theta-Rho to Clipboard!", "success");
-                }).catch(() => fallbackCopyTextToClipboard(generatedThr));
-            } else {
-                fallbackCopyTextToClipboard(generatedThr);
-            }
-        }
-
-        function fallbackCopyTextToClipboard(text) {
-            var textArea = document.createElement("textarea");
-            textArea.value = text;
-            textArea.style.top = "0"; textArea.style.left = "0"; textArea.style.position = "fixed"; textArea.style.opacity = "0";
-            document.body.appendChild(textArea);
-            textArea.focus(); textArea.select();
-            try {
-                var successful = document.execCommand('copy');
-                if(successful) showToast("Copied (Fallback Method)!", "success");
-                else showToast("Copy failed, downloading...", "error");
-            } catch (err) {
-                const blob = new Blob([text], {type:'text/plain'});
-                const a = document.createElement('a');
-                a.download = 'pattern.thr'; a.href = URL.createObjectURL(blob); a.click();
-            }
-            document.body.removeChild(textArea);
-        }
-
-        // --- UTILS ---
-        function resizeCanvas() {
-            const container = document.getElementById('canvasContainer');
-            const size = container.getBoundingClientRect().width;
-            const dpr = window.devicePixelRatio || 1;
-            canvas.width = size * dpr;
-            canvas.height = size * dpr;
-            ctx.scale(dpr, dpr);
-            origin = { x: size/2, y: size/2 };
-            const tableR = parseFloat(document.getElementById('cfgRadius').value);
-            scale = (size/2) / (tableR * 1.1); 
-            render();
-        }
-        function saveState() {
-            if(historyStack.length>10) historyStack.shift();
-            historyStack.push(JSON.stringify(rawPoints));
-        }
-        function undo() {
-            if(historyStack.length===0) return;
-            rawPoints = JSON.parse(historyStack.pop());
-            resetStatus();
-            render();
-        }
-        function clearCanvas() {
-            saveState();
-            rawPoints = [];
-            resetStatus();
-            render();
-        }
-        function setTool(t) {
-            currentTool = t;
-            document.getElementById('btnDraw').className = t==='draw'?'active':'secondary';
-            document.getElementById('btnErase').className = t==='erase'?'active':'secondary';
-        }
-        function updateUI() {
-            document.getElementById('symVal').textContent = document.getElementById('symSlider').value + 'x';
-            render();
-        }
-        function showToast(msg, type) {
-            const t = document.getElementById('status-toast');
-            t.textContent = msg; t.className = type; t.style.opacity = 1;
-            setTimeout(()=>t.style.opacity=0, 3000);
-        }
+        async function sendToTable() { if(!generatedGCode) return showToast("Click Prepare first", "error"); let code=generatedGCode; if(document.getElementById('autoClearMode').checked) { try{let r=await fetch('./designs/clear.txt'); if(r.ok) code=(await r.text())+"\n"+code;}catch(e){} } fetch(BASE_URL+'/send_gcode_block', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({gcode:code})}).then(r=>r.json()).then(d=>showToast(d.success?"Sent!":"Error","success")); }
+        async function saveToServer() { let n=prompt("Name:"); if(n) fetch(BASE_URL+'/save_design', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({filename:n, gcode:generatedGCode})}).then(r=>r.json()).then(d=>showToast("Saved","success")); }
+        function downloadThetaRho() { if(!generatedThr) return; if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(generatedThr); else fallbackCopyTextToClipboard(generatedThr); showToast("Copied","success"); }
+        function fallbackCopyTextToClipboard(text) { var t=document.createElement("textarea"); t.value=text; document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t); }
+        
+        // --- BOILERPLATE ---
+        function resizeCanvas() { const c=document.getElementById('canvasContainer'); canvas.width=c.clientWidth; canvas.height=c.clientHeight; origin={x:canvas.width/2, y:canvas.height/2}; scale=(canvas.width/2)/(parseFloat(document.getElementById('cfgRadius').value)*1.1); render(); }
+        function saveState() { if(historyStack.length>10) historyStack.shift(); historyStack.push(JSON.stringify(rawPoints)); }
+        function undo() { if(historyStack.length) { rawPoints=JSON.parse(historyStack.pop()); render(); } }
+        function clearCanvas() { saveState(); rawPoints=[]; render(); }
+        function setTool(t) { currentTool=t; document.getElementById('btnDraw').className=t==='draw'?'active':'secondary'; document.getElementById('btnErase').className=t==='erase'?'active':'secondary'; }
+        function updateUI() { document.getElementById('symVal').textContent = document.getElementById('symSlider').value + 'x'; render(); }
+        function showToast(msg, type) { const t=document.getElementById('status-toast'); t.textContent=msg; t.className=type; t.style.opacity=1; setTimeout(()=>t.style.opacity=0, 3000); }
         function openNav() { document.getElementById("mySidebar").style.width = "250px"; }
         function closeNav() { document.getElementById("mySidebar").style.width = "0"; }
-        function toggleTheme() {
-            const b = document.body;
-            b.setAttribute('data-theme', b.getAttribute('data-theme')==='dark'?'light':'dark');
-            render();
-        }
+        function toggleTheme() { document.body.setAttribute('data-theme', document.body.getAttribute('data-theme')==='dark'?'light':'dark'); render(); }
 
         init();
     </script>
