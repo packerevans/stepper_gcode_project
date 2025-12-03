@@ -492,14 +492,18 @@
         }
 
         // --- OPTIMIZER (UPDATED: Smart Entry) ---
-        function prepareGCode() {
+        // --- ADVANCED OPTIMIZER (v22 - Smart Seam Hiding & Perimeter Bias) ---
+        async function prepareGCode() {
             if(rawPoints.length === 0) return showToast("Draw something first!", "error");
-            showToast("Calculating Smart Path...", "info");
+            showToast("Running Path Simulations...", "info");
+
+            // Give UI a moment to update toast before heavy math
+            await new Promise(r => setTimeout(r, 50));
 
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
             const sym = parseInt(document.getElementById('symSlider').value);
             
-            // 1. Group raw points
+            // --- 1. GROUP POINTS INTO SHAPES ---
             let shapes = [];
             let curShape = [];
             rawPoints.forEach(p => {
@@ -507,12 +511,12 @@
                     if(curShape.length > 0) shapes.push(curShape);
                     curShape = [];
                 } else {
-                    curShape.push({x:p.x, y:p.y, type:'point'});
+                    curShape.push({x:p.x, y:p.y});
                 }
             });
             if(curShape.length > 0) shapes.push(curShape);
 
-            // 2. Symmetry
+            // --- 2. SYMMETRY EXPANSION ---
             let pool = [];
             for(let s=0; s<sym; s++) {
                 const ang = s * (Math.PI*2/sym);
@@ -520,8 +524,7 @@
                 shapes.forEach(sh => {
                     let newSh = sh.map(p => ({
                         x: p.x*c - p.y*si,
-                        y: p.x*si + p.y*c,
-                        type: 'point'
+                        y: p.x*si + p.y*c
                     }));
                     pool.push(newSh);
                 });
@@ -529,98 +532,201 @@
 
             if(pool.length === 0) return;
 
-            // 3. Smart Nearest Neighbor
-            const distSq = (p1, p2) => (p1.x-p2.x)**2 + (p1.y-p2.y)**2;
-            let bestIdx = -1, minD = Infinity;
-            // Start closest to center
-            for(let i=0; i<pool.length; i++) {
-                let d = distSq(pool[i][0], {x:0, y:0});
-                if(d < minD) { minD = d; bestIdx = i; }
+            // --- 3. PRE-CALCULATE METADATA ---
+            // Mark shapes as closed (loops) or open (lines)
+            let shapeMeta = pool.map((s, idx) => {
+                const dStartEnd = Math.hypot(s[0].x - s[s.length-1].x, s[0].y - s[s.length-1].y);
+                return {
+                    id: idx,
+                    points: s,
+                    isClosed: dStartEnd < 5.0, // Tolerance for "closed"
+                    center: getCentroid(s)
+                };
+            });
+
+            // --- 4. MULTI-START SIMULATION ---
+            // We want to start at the perimeter. Find top 10 shapes closest to radius.
+            
+            // Calc distance to rim for every shape
+            let candidates = shapeMeta.map(s => {
+                // Approximate distance of shape to origin
+                const d = Math.hypot(s.points[0].x, s.points[0].y); 
+                // Score: closer to tableR is better. 
+                return { id: s.id, score: Math.abs(tableR - d) };
+            });
+
+            // Sort by closest to rim
+            candidates.sort((a,b) => a.score - b.score);
+            
+            // Take top 5 candidates (or fewer if not many shapes)
+            let startCandidates = candidates.slice(0, 5).map(c => c.id);
+            
+            // Also add the shape closest to current arm position (Home 0,0) just in case
+            // actually, usually for sand tables we WANT to start at rim.
+            
+            let bestPath = null;
+            let minTravelDist = Infinity;
+
+            console.log(`Simulating ${startCandidates.length} different starting paths...`);
+
+            // RUN SIMULATIONS
+            for(let startId of startCandidates) {
+                const result = runGreedyPath(startId, shapeMeta, tableR);
+                if(result.totalJumpDist < minTravelDist) {
+                    minTravelDist = result.totalJumpDist;
+                    bestPath = result.path;
+                }
             }
 
-            let sortedShapes = [];
-            let currentShape = pool[bestIdx];
-            pool.splice(bestIdx, 1);
-            sortedShapes.push(currentShape);
+            // --- 5. GENERATE OUTPUT ---
+            // Connect the finalized shapes
+            processedPoints = [];
             
-            let headPos = currentShape[currentShape.length-1];
+            // Entry from Rim to first shape
+            if(bestPath.length > 0) {
+                const firstPt = bestPath[0][0];
+                const ang = Math.atan2(firstPt.y, firstPt.x);
+                processedPoints.push({x: tableR*Math.cos(ang), y: tableR*Math.sin(ang), type:'point'});
+            }
 
-            while(pool.length > 0) {
-                let bestShapeIdx = -1;
-                let bestEntryIdx = -1;
+            for(let i=0; i<bestPath.length; i++) {
+                let s = bestPath[i];
+                s.forEach(p => processedPoints.push({x:p.x, y:p.y, type:'point'}));
+            }
+
+            // Exit to Rim
+            if(bestPath.length > 0) {
+                const lastSh = bestPath[bestPath.length-1];
+                const lastPt = lastSh[lastSh.length-1];
+                const ang = Math.atan2(lastPt.y, lastPt.x);
+                processedPoints.push({x: tableR*Math.cos(ang), y: tableR*Math.sin(ang), type:'exit'});
+            }
+
+            generateKinematicsGCode(processedPoints);
+            
+            document.getElementById('statusTxt').innerText = "AI Path: Optimized";
+            document.getElementById('statusTxt').style.color = "#2ecc71";
+            document.getElementById('progressSlider').value = 0;
+            render(); 
+            showToast(`Path Optimized! (Travel reduced to ${(minTravelDist/10).toFixed(0)}cm)`, "success");
+        }
+
+        // --- HELPER ALGORITHMS ---
+
+        function getCentroid(points) {
+            let x=0, y=0;
+            points.forEach(p=>{x+=p.x; y+=p.y});
+            return {x:x/points.length, y:y/points.length};
+        }
+
+        function distSq(p1, p2) {
+            return (p1.x-p2.x)**2 + (p1.y-p2.y)**2;
+        }
+
+        // Core "Smart Greedy" Solver
+        function runGreedyPath(startIdx, allShapes, tableR) {
+            let unvisited = new Set(allShapes.map(s => s.id));
+            let path = [];
+            let totalJumpDist = 0;
+            
+            // Start with the chosen candidate
+            let currentMeta = allShapes[startIdx];
+            unvisited.delete(startIdx);
+            
+            // For the very first shape, if it's a loop, rotate it to start closest to Rim
+            let currentPoints = [...currentMeta.points];
+            if(currentMeta.isClosed) {
+                 // Find point closest to Rim
+                 let bestK = 0, maxD = -1;
+                 for(let k=0; k<currentPoints.length; k+=2) {
+                     let d = Math.hypot(currentPoints[k].x, currentPoints[k].y);
+                     if(d > maxD) { maxD = d; bestK = k; }
+                 }
+                 currentPoints = rotateLoop(currentPoints, bestK);
+            }
+            
+            path.push(currentPoints);
+            
+            let headPos = currentPoints[currentPoints.length-1];
+
+            while(unvisited.size > 0) {
+                let bestNextId = -1;
+                let bestEntryIdx = 0;
                 let bestIsReverse = false;
-                let closestDist = Infinity;
+                let minDist = Infinity;
 
-                for(let i=0; i<pool.length; i++) {
-                    const candidate = pool[i];
-                    const isClosed = distSq(candidate[0], candidate[candidate.length-1]) < 25;
-
-                    if(isClosed) {
-                        let bestPtIdx = 0;
-                        let bestPtDist = Infinity;
-                        for(let k=0; k<candidate.length; k+=3) { 
-                            let d = distSq(headPos, candidate[k]);
-                            if(d < bestPtDist) { bestPtDist = d; bestPtIdx = k; }
-                        }
-                        if(bestPtDist < closestDist) {
-                            closestDist = bestPtDist; bestShapeIdx = i; bestEntryIdx = bestPtIdx; bestIsReverse = false;
+                // Look at all remaining shapes
+                for(let id of unvisited) {
+                    const cand = allShapes[id];
+                    
+                    if(cand.isClosed) {
+                        // SMART LOOP ENTRY:
+                        // Don't just check start/end. Check the closest point on the loop.
+                        // We check every 4th point to keep performance high
+                        for(let k=0; k<cand.points.length; k+=4) {
+                            const d = distSq(headPos, cand.points[k]);
+                            if(d < minDist) {
+                                minDist = d;
+                                bestNextId = id;
+                                bestEntryIdx = k;
+                                bestIsReverse = false; // rotation handles direction
+                            }
                         }
                     } else {
-                        let dStart = distSq(headPos, candidate[0]);
-                        let dEnd = distSq(headPos, candidate[candidate.length-1]);
-                        if(dStart < closestDist) {
-                            closestDist = dStart; bestShapeIdx = i; bestEntryIdx = 0; bestIsReverse = false;
+                        // OPEN LINE OPTIMIZATION:
+                        // Check Start vs End
+                        const dStart = distSq(headPos, cand.points[0]);
+                        const dEnd = distSq(headPos, cand.points[cand.points.length-1]);
+                        
+                        if(dStart < minDist) {
+                            minDist = dStart;
+                            bestNextId = id;
+                            bestEntryIdx = 0;
+                            bestIsReverse = false;
                         }
-                        if(dEnd < closestDist) {
-                            closestDist = dEnd; bestShapeIdx = i; bestEntryIdx = 0; bestIsReverse = true;
+                        if(dEnd < minDist) {
+                            minDist = dEnd;
+                            bestNextId = id;
+                            bestEntryIdx = 0;
+                            bestIsReverse = true;
                         }
                     }
                 }
 
-                let winner = pool[bestShapeIdx];
-                const isWinnerClosed = distSq(winner[0], winner[winner.length-1]) < 25;
+                // If we found a valid next step
+                if(bestNextId !== -1) {
+                    totalJumpDist += Math.sqrt(minDist);
+                    let nextShapeMeta = allShapes[bestNextId];
+                    let nextPoints = [...nextShapeMeta.points];
 
-                if(isWinnerClosed && bestEntryIdx > 0) {
-                    let part1 = winner.slice(bestEntryIdx);
-                    let part2 = winner.slice(0, bestEntryIdx);
-                    winner = part1.concat(part2);
-                    winner.push({x: winner[0].x, y: winner[0].y, type: 'point'});
-                } else if(bestIsReverse) {
-                    winner.reverse();
+                    if(nextShapeMeta.isClosed) {
+                        // Rotate the loop so we enter at the best index
+                        nextPoints = rotateLoop(nextPoints, bestEntryIdx);
+                    } else {
+                        if(bestIsReverse) nextPoints.reverse();
+                    }
+
+                    path.push(nextPoints);
+                    unvisited.delete(bestNextId);
+                    headPos = nextPoints[nextPoints.length-1];
+                } else {
+                    break; // Should not happen
                 }
-
-                sortedShapes.push(winner);
-                headPos = winner[winner.length-1];
-                pool.splice(bestShapeIdx, 1);
             }
-
-            // 4. Connect
-            processedPoints = [];
-            let first = sortedShapes[0];
-            let fPt = first[0];
-            let fAng = Math.atan2(fPt.y, fPt.x);
-            processedPoints.push({x: tableR*Math.cos(fAng), y: tableR*Math.sin(fAng), type:'point'});
-
-            for(let i=0; i<sortedShapes.length; i++) {
-                let s = sortedShapes[i];
-                s.forEach(p => processedPoints.push(p));
-            }
-
-            let last = sortedShapes[sortedShapes.length-1];
-            let lPt = last[last.length-1];
-            let lAng = Math.atan2(lPt.y, lPt.x);
-            processedPoints.push({x: tableR*Math.cos(lAng), y: tableR*Math.sin(lAng), type:'exit'});
-
-            // 5. Generate
-            generateKinematicsGCode(processedPoints);
             
-            document.getElementById('statusTxt').innerText = "Smart Path Optimized";
-            document.getElementById('statusTxt').style.color = "green";
-            document.getElementById('progressSlider').value = 0;
-            render(); 
-            showToast("Smart Path Ready!", "success");
+            return { path, totalJumpDist };
         }
 
+        function rotateLoop(points, newStartIndex) {
+            if(newStartIndex === 0) return points;
+            // Slice and re-order
+            let part1 = points.slice(newStartIndex);
+            let part2 = points.slice(0, newStartIndex);
+            let newArr = part1.concat(part2);
+            // Ensure loop closure (last point == first point)
+            newArr.push({x: newArr[0].x, y: newArr[0].y});
+            return newArr;
+        }
         // --- G-CODE GENERATION ---
         function generateKinematicsGCode(pathPoints) {
             const L1 = parseFloat(document.getElementById('cfgL1').value);
