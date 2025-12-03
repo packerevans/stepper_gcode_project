@@ -8,16 +8,10 @@
     <style>
         /* --- Modern Variables --- */
         :root {
-            /* 1. Main Accent (The Tan) */
             --color-accent: #d2b48c; 
-            
-            /* 2. Background */
             --color-bg: #f8f9fa;
-            
-            /* 3. Surface/Text (High Contrast) */
             --color-surface: #ffffff;
             --color-text: #222222;
-            
             --shadow-subtle: 0 4px 6px -1px rgba(0,0,0,0.05);
             --shadow-float: 0 10px 15px -3px rgba(0,0,0,0.1);
             --radius: 16px;
@@ -34,14 +28,14 @@
             background: var(--color-bg);
             color: var(--color-text);
             margin: 0;
-            padding-bottom: 80px; /* Space for floating bar */
+            padding-bottom: 100px;
             transition: background 0.3s, color 0.3s;
         }
 
-        /* --- Minimal Header --- */
+        /* --- Header --- */
         header {
             position: sticky; top: 0; z-index: 100;
-            background: rgba(255, 255, 255, 0.85);
+            background: rgba(255, 255, 255, 0.90);
             backdrop-filter: blur(10px);
             border-bottom: 1px solid rgba(0,0,0,0.05);
             display: flex; justify-content: space-between; align-items: center;
@@ -49,12 +43,23 @@
         }
         
         body[data-theme='dark'] header { 
-            background: rgba(30, 30, 30, 0.85); 
+            background: rgba(30, 30, 30, 0.90); 
             border-bottom: 1px solid rgba(255,255,255,0.05);
         }
 
         .header-title { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.5px; }
         .icon-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--color-text); }
+
+        /* --- Hero Image (Restored) --- */
+        .hero-container {
+            width: 100%; max-width: 1200px; margin: 0 auto;
+            padding: 20px 15px 0;
+        }
+        .hero-image {
+            width: 100%; height: 200px; object-fit: cover;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-subtle);
+        }
 
         /* --- Controls --- */
         .controls-wrapper {
@@ -103,7 +108,7 @@
         .card-img-wrap { position: relative; aspect-ratio: 1/1; background: #fff; }
         .card canvas { width: 100%; height: 100%; display: block; }
         
-        /* Selection Dot */
+        /* Select Dot */
         .select-dot {
             position: absolute; top: 10px; right: 10px;
             width: 24px; height: 24px; border-radius: 50%;
@@ -125,7 +130,7 @@
 
         /* --- Floating Selection Bar --- */
         .selection-bar {
-            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(100px);
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(150px);
             background: var(--color-text); color: var(--color-bg);
             padding: 12px 20px; border-radius: 50px;
             display: flex; gap: 15px; align-items: center;
@@ -178,6 +183,10 @@
         <a href="/terminal">Terminal</a>
     </div>
 
+    <div class="hero-container">
+        <img src="/static/sand.png" alt="Sand Table" class="hero-image">
+    </div>
+
     <div class="controls-wrapper">
         <div id="status-pill" class="status-pill">Ready</div>
         
@@ -212,52 +221,121 @@
         let selectedFiles = new Set();
         let allFiles = [];
 
-        // --- KINEMATICS (Minified for visuals) ---
-        const L1=101.3, L2=101.3, R=9/8, S_DEG=3200/360, S_RAD=S_DEG*(180/Math.PI);
-        const lerp=(a,b,t)=>a+(b-a)*t;
-        function calcFK(b,e){
-            let t1 = -b/S_RAD, tb = -e/S_RAD - (R*(-b/S_RAD));
-            let t2 = t1+tb;
-            return { x: L1*Math.cos(t1)+L2*Math.cos(t2), y: L1*Math.sin(t1)+L2*Math.sin(t2) };
+        // --- KINEMATIC MATH (Restored for accurate rendering) ---
+        const L1 = 101.3;
+        const L2 = 101.3;
+        const GEAR_RATIO = 9/8;
+        const STEPS_PER_DEG = 3200/360;
+        const STEPS_PER_RAD = STEPS_PER_DEG * (180 / Math.PI);
+        const lerp = (a, b, t) => a + (b - a) * t;
+
+        function calculateFK(p0, base_steps, elbow_steps) {
+            const alpha_rad = -base_steps / STEPS_PER_RAD;
+            const beta_rad = -elbow_steps / STEPS_PER_RAD;
+            const theta1 = alpha_rad;
+            const theta_bend = beta_rad - (GEAR_RATIO * alpha_rad);
+            const theta2_global = theta1 + theta_bend;
+            const p1 = { x: p0.x + L1 * Math.cos(theta1), y: p0.y + L1 * Math.sin(theta1) };
+            const p2 = { x: p1.x + L2 * Math.cos(theta2_global), y: p1.y + L2 * Math.sin(theta2_global) };
+            return { p0, p1, p2, target_base_steps: base_steps, target_elbow_steps: elbow_steps, theta1_rad: theta1, theta2_global_rad: theta2_global };
         }
-        // Basic Trace Generator
+
+        function getInterpolatedState(from, to, progress) {
+            const theta1_rad = lerp(from.theta1_rad, to.theta1_rad, progress);
+            const theta2_global_rad = lerp(from.theta2_global_rad, to.theta2_global_rad, progress);
+            const p0 = from.p0;
+            const p1 = { x: p0.x + L1 * Math.cos(theta1_rad), y: p0.y + L1 * Math.sin(theta1_rad) };
+            const p2 = { x: p1.x + L2 * Math.cos(theta2_global_rad), y: p1.y + L2 * Math.sin(theta2_global_rad) };
+            return { p0, p1, p2 };
+        }
+
+        function calculateTracePath(commands) {
+            let tracePath = [];
+            let cumulativeStates = [];
+            let total_base_steps = 0;
+            let total_elbow_steps = 0;
+            const p0 = {x:0, y:0};
+
+            cumulativeStates.push(calculateFK(p0, 0, 0));
+
+            for (const cmd of commands) {
+                total_base_steps += cmd.base;
+                total_elbow_steps += cmd.elbow;
+                cumulativeStates.push(calculateFK(p0, total_base_steps, total_elbow_steps));
+            }
+
+            if (cumulativeStates.length < 2) return [];
+            tracePath.push(cumulativeStates[0].p2);
+
+            for (let i = 0; i < cumulativeStates.length - 1; i++) {
+                const fromState = cumulativeStates[i];
+                const toState = cumulativeStates[i+1];
+                
+                const base_delta = Math.abs(toState.target_base_steps - fromState.target_base_steps);
+                const elbow_delta = Math.abs(toState.target_elbow_steps - fromState.target_elbow_steps);
+                
+                // Resolution: Draw a point every X steps
+                const max_step_delta = Math.max(base_delta, elbow_delta);
+                const stepsPerSegment = Math.max(5, Math.ceil(max_step_delta / 200)); 
+
+                for (let j = 1; j <= stepsPerSegment; j++) {
+                    const progress = j / stepsPerSegment;
+                    const interpolatedState = getInterpolatedState(fromState, toState, progress);
+                    tracePath.push(interpolatedState.p2);
+                }
+            }
+            return tracePath;
+        }
+
         function drawTrace(canvas, text) {
             const ctx = canvas.getContext('2d');
-            const w=canvas.width, h=canvas.height;
-            ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h);
-            
-            let cmds = text.split('\n').filter(l=>l.trim().toUpperCase().startsWith('G1'))
-                .map(l=>{let p=l.substring(2).trim().split(/\s+/); return {b:parseInt(p[1])||0, e:parseInt(p[0])||0}});
-            
-            if(cmds.length<2) return;
-            
-            let path=[]; let b=0, e=0;
-            path.push(calcFK(0,0));
-            
-            // Subsampling for performance
-            let step = Math.max(1, Math.floor(cmds.length/500));
-            for(let i=0; i<cmds.length; i+=step) {
-                b+=cmds[i].b; e+=cmds[i].e;
-                path.push(calcFK(b,e));
+            const width = canvas.width;
+            const height = canvas.height;
+            ctx.fillStyle = '#ffffff'; 
+            ctx.fillRect(0, 0, width, height);
+
+            // Parse Commands
+            const commands = text.split('\n')
+                .filter(line => line.trim().toUpperCase().startsWith('G1'))
+                .map(line => {
+                    const parts = line.trim().substring(2).trim().split(/\s+/).map(s => parseInt(s.trim(), 10));
+                    return { elbow: parts[0] || 0, base: parts[1] || 0 };
+                });
+
+            if (commands.length === 0) return;
+
+            const tracePath = calculateTracePath(commands);
+
+            // Auto-Scale
+            let minX = tracePath[0].x, maxX = tracePath[0].x;
+            let minY = tracePath[0].y, maxY = tracePath[0].y;
+
+            for (const p of tracePath) {
+                if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+                if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
             }
-            
-            // Bounds
-            let minX=path[0].x, maxX=path[0].x, minY=path[0].y, maxY=path[0].y;
-            path.forEach(p=>{if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y;});
-            
-            let sc = Math.min(w/(maxX-minX||1), h/(maxY-minY||1))*0.8;
-            let cx=(minX+maxX)/2, cy=(minY+maxY)/2;
-            
-            ctx.strokeStyle='#333'; ctx.lineWidth=1.5; ctx.beginPath();
-            path.forEach((p,i)=>{
-                let x = w/2 + (p.x-cx)*sc;
-                let y = h/2 + (p.y-cy)*(-sc);
-                if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-            });
+
+            const scale = Math.min(width / ((maxX - minX)||1), height / ((maxY - minY)||1)) * 0.9;
+            const cx = (minX + maxX)/2;
+            const cy = (minY + maxY)/2;
+            const w2 = width/2;
+            const h2 = height/2;
+
+            ctx.beginPath();
+            ctx.strokeStyle = '#333333';
+            ctx.lineWidth = 1.5;
+
+            for (let i = 0; i < tracePath.length; i++) {
+                const p = tracePath[i];
+                const x = w2 + (p.x - cx) * scale;
+                const y = h2 + (p.y - cy) * -scale; 
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
             ctx.stroke();
         }
 
-        // --- CORE LOGIC ---
+        // --- APP LOGIC ---
 
         function toggleTheme() {
             let b = document.body;
@@ -271,26 +349,21 @@
             setTimeout(()=>el.style.opacity='0', 3000);
         }
 
-        // --- SELECTION HANDLING ---
+        // --- SELECTION & DELETION ---
         function toggleSelect(filename, event) {
-            event.stopPropagation(); // Don't trigger run
+            event.stopPropagation();
             if(selectedFiles.has(filename)) selectedFiles.delete(filename);
             else selectedFiles.add(filename);
             renderSelectionState();
         }
 
         function renderSelectionState() {
-            // Update Dots
             document.querySelectorAll('.card').forEach(card => {
                 let fname = card.getAttribute('data-name');
-                if(selectedFiles.has(fname)) {
-                    card.classList.add('selected');
-                } else {
-                    card.classList.remove('selected');
-                }
+                if(selectedFiles.has(fname)) card.classList.add('selected');
+                else card.classList.remove('selected');
             });
 
-            // Update Bar
             let bar = document.getElementById('selection-bar');
             let count = document.getElementById('sel-count');
             
@@ -303,9 +376,31 @@
         }
 
         async function deleteSelected() {
-            if(!confirm(`Delete ${selectedFiles.size} files?`)) return;
-            
+            // Filter out protected files (ones with PNGs)
+            let filesToDelete = [];
+            let protectedCount = 0;
+
             for(let f of selectedFiles) {
+                let card = document.querySelector(`.card[data-name="${f}"]`);
+                // If it has "has-png" flag, we protect it
+                if(card && card.dataset.hasPng === "true") {
+                    protectedCount++;
+                } else {
+                    filesToDelete.push(f);
+                }
+            }
+
+            if(filesToDelete.length === 0) {
+                if(protectedCount > 0) alert("Selected designs are protected (they have PNGs) and cannot be deleted.");
+                return;
+            }
+
+            let confirmMsg = `Delete ${filesToDelete.length} designs?`;
+            if(protectedCount > 0) confirmMsg += `\n(${protectedCount} files were skipped because they are protected).`;
+            
+            if(!confirm(confirmMsg)) return;
+            
+            for(let f of filesToDelete) {
                 try {
                     await fetch(`${BASE_URL}/delete_design`, {
                         method: "POST", headers:{"Content-Type":"application/json"},
@@ -313,10 +408,11 @@
                     });
                 } catch(e) { console.error(e); }
             }
+            
             selectedFiles.clear();
             renderSelectionState();
-            loadLibrary(); // Refresh grid
-            showStatus("Files deleted");
+            loadLibrary(); 
+            showStatus("Deletion Complete");
         }
 
         async function copySelected() {
@@ -338,45 +434,20 @@
             });
         }
 
-        // --- RUNNING ---
+        // --- QUEUE/RUN ---
         async function runDesign(filename) {
-            // If we are in selection mode (bar active) and click a card, maybe just select it?
-            // For now, clicking the *Body* runs, clicking *Dot* selects.
-            
             let spd = document.getElementById('speedSelect').value;
             showStatus("Queueing...");
             
-            // Fetch text to apply speed multiplier locally (simplified logic from previous)
             try {
                 let res = await fetch(`${BASE_URL}/designs/${filename}`);
                 let txt = await res.text();
-                
-                // Simple modifier
-                let lines = txt.split('\n').map(l => {
-                    if(l.trim().startsWith('G1')) {
-                        let p = l.split(/\s+/);
-                        // Assuming G1 E B Delay
-                        if(p.length >= 3) {
-                           let d = Math.round(parseInt(p[2]) * parseFloat(spd));
-                           return `G1 ${p[1]} ${p[2]} ${d}`; // Reconstruct carefully, split index 0 is 'G1' usually? 
-                           // Actually parsing standard Gcode usually is G1 X Y. Your format is custom.
-                           // Let's rely on the previous logic: G1 Elbow Base Delay
-                        }
-                    }
-                    return l;
-                });
-                
-                // Re-using the robust logic from previous version in a condensed way is risky without full parser.
-                // Let's just send the file name and speed override if backend supported it, 
-                // OR just send raw text. For this UI demo, I'll send the raw text unmodified for safety 
-                // unless I duplicate the exact parsing logic.
-                // *Self-correction*: I will use the exact parsing logic from your previous file.
                 
                 let modLines = [];
                 for(let line of txt.split('\n')) {
                     let trim = line.trim();
                     if(trim.toUpperCase().startsWith('G1')) {
-                        let parts = trim.substring(2).trim().split(/\s+/); // [Elbow, Base, Delay]
+                        let parts = trim.substring(2).trim().split(/\s+/);
                         let d = parts[2] ? parseInt(parts[2]) : 1000;
                         d = Math.round(d * parseFloat(spd));
                         modLines.push(`G1 ${parts[0]} ${parts[1]} ${d}`);
@@ -395,7 +466,6 @@
             } catch(e) { showStatus("Error"); }
         }
 
-        // --- CONTROLS ---
         function sendCmd(c) { 
             fetch(`${BASE_URL}/send`, {
                 method:"POST",headers:{"Content-Type":"application/json"},
@@ -414,7 +484,7 @@
             } catch(e){}
         }
 
-        // --- LOADING ---
+        // --- GRID RENDERING ---
         async function loadLibrary() {
             let g = document.getElementById('grid');
             g.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:40px;">Loading...</div>';
@@ -422,8 +492,8 @@
             try {
                 let res = await fetch(`${BASE_URL}/api/designs`);
                 let files = await res.json();
-                allFiles = files; // Store
-                renderGrid(files.slice(0, 12)); // Show first 12
+                allFiles = files;
+                renderGrid(files.slice(0, 12)); 
                 if(files.length > 12) document.getElementById('more-btn').style.display='inline-block';
             } catch(e) {
                 g.innerHTML = 'Error loading files.';
@@ -444,9 +514,14 @@
                 let div = document.createElement('div');
                 div.className = 'card';
                 div.setAttribute('data-name', f);
-                div.onclick = () => runDesign(f);
+                // Default protected state false, updated on PNG load
+                div.dataset.hasPng = "false"; 
+
+                // Click body to run
+                div.onclick = (e) => {
+                   if(e.target.className !== 'select-dot') runDesign(f);
+                };
                 
-                // Selection Dot Logic
                 let dot = document.createElement('div');
                 dot.className = 'select-dot';
                 dot.onclick = (e) => toggleSelect(f, e);
@@ -463,17 +538,28 @@
                 div.querySelector('.card-img-wrap').appendChild(dot);
                 g.appendChild(div);
                 
-                // Async Load Preview
+                // Load Preview
                 setTimeout(() => {
                     let cvs = document.getElementById(`cvs-${clean}`);
                     let img = new Image();
                     img.src = `${BASE_URL}/designs/${clean}.png`;
-                    img.onload = () => cvs.getContext('2d').drawImage(img,0,0,cvs.width,cvs.height);
+                    
+                    // IF IMAGE EXISTS
+                    img.onload = () => {
+                        cvs.getContext('2d').drawImage(img,0,0,cvs.width,cvs.height);
+                        // MARK AS PROTECTED
+                        div.dataset.hasPng = "true";
+                    };
+                    
+                    // IF IMAGE MISSING
                     img.onerror = () => {
+                        // Mark as NOT protected (deletable)
+                        div.dataset.hasPng = "false";
+                        // Draw vector trace
                         fetch(`${BASE_URL}/designs/${f}`).then(r=>r.text()).then(t=>drawTrace(cvs,t));
                     };
                     
-                    // Calc Time
+                    // Time Est
                     fetch(`${BASE_URL}/designs/${f}`).then(r=>r.text()).then(t=>{
                         let time=0;
                         t.split('\n').forEach(l=>{
@@ -487,7 +573,7 @@
                     });
                 }, 0);
             });
-            renderSelectionState(); // Re-apply selections if needed
+            renderSelectionState();
         }
 
         function openNav() { document.getElementById('mySidebar').style.width="250px"; document.getElementById('overlay').style.display="block"; }
