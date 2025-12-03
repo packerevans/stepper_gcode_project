@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Packers Sand Table Designs</title>
+    <title>Packers Sand Table</title>
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
     <style>
@@ -15,8 +15,7 @@
             --color-surface: #ffffff;
             --color-text: #333333;
             --color-shadow: rgba(0, 0, 0, 0.08);
-            --color-icon: #000000;
-            --border-radius: 8px; /* Slightly tighter radius */
+            --border-radius: 10px;
         }
 
         body[data-theme='dark'] {
@@ -24,7 +23,6 @@
             --color-surface: #2c2c2c;
             --color-text: #e0e0e0;
             --color-shadow: rgba(255, 255, 255, 0.08);
-            --color-icon: #ffffff;
         }
 
         body {
@@ -32,15 +30,33 @@
             background: var(--color-background);
             color: var(--color-text);
             margin: 0;
+            padding: 0;
             transition: background 0.3s, color 0.3s;
         }
 
-        /* --- Sidebar & Header --- */
+        /* --- STICKY HEADER (FIXED LAYOUT) --- */
+        header {
+            position: sticky; top: 0; z-index: 1000;
+            background-color: var(--color-primary);
+            color: var(--color-text);
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0 15px; height: 60px;
+            box-shadow: 0 2px 6px var(--color-shadow);
+        }
+
+        .header-title { font-size: 1.2rem; font-weight: 600; }
+        
+        .icon-btn {
+            background: none; border: none; color: inherit;
+            font-size: 24px; cursor: pointer; padding: 5px;
+        }
+
+        /* --- Sidebar --- */
         .sidebar {
             height: 100%; width: 0; position: fixed;
             top: 0; left: 0;
             background-color: var(--color-primary); overflow-x: hidden;
-            transition: 0.3s; padding-top: 60px; z-index: 1000;
+            transition: 0.3s; padding-top: 60px; z-index: 999;
             box-shadow: 2px 0 5px var(--color-shadow);
         }
         .sidebar a {
@@ -49,41 +65,15 @@
             color: var(--color-text); display: block; transition: 0.2s; font-weight: 500;
         }
         .sidebar a:hover { background-color: var(--color-secondary); color: var(--color-surface); }
-        
-        .openbtn {
-            font-size: 26px; cursor: pointer; background-color: var(--color-primary);
-            color: var(--color-text); padding: 5px 12px; border: none;
-            border-radius: 6px; position: fixed; top: 10px;
-            left: 10px; z-index: 1100;
-            box-shadow: 0 2px 5px var(--color-shadow);
-        }
 
-        #themeToggle {
-            position: fixed; top: 10px;
-            right: 10px; background: var(--color-surface);
-            color: var(--color-icon); border: 1px solid var(--color-icon);
-            padding: 5px 10px; border-radius: 20px; z-index: 1200;
-            font-size: 14px;
-        }
-
+        /* --- Main Content --- */
         .main-content {
-            margin-left: 0; transition: margin-left 0.3s;
-            padding: 10px;
-            max-width: 1200px; margin: 0 auto; padding-top: 50px;
+            padding: 15px;
+            max-width: 1200px; margin: 0 auto;
+            transition: margin-left 0.3s;
         }
 
-        h1 {
-            text-align: center; margin-top: 10px; margin-bottom: 20px;
-            font-weight: 300; color: var(--color-secondary); font-size: 1.8rem;
-        }
-
-        .header-image {
-            width: 100%; max-height: 180px; object-fit: cover;
-            border-radius: var(--border-radius); margin-bottom: 20px;
-            box-shadow: 0 4px 15px var(--color-shadow);
-        }
-
-        /* --- Control / Status Panel --- */
+        /* --- Control Panel --- */
         .control-panel {
             background-color: var(--color-surface); padding: 15px;
             border-radius: var(--border-radius); box-shadow: 0 4px 10px var(--color-shadow);
@@ -92,96 +82,92 @@
 
         .controls-row {
             display: flex; justify-content: center; align-items: center;
-            gap: 10px; flex-wrap: wrap;
+            gap: 12px; flex-wrap: wrap;
         }
 
         #status-banner {
             padding: 10px; border-radius: var(--border-radius); margin-bottom: 15px;
-            text-align: center;
-            font-weight: 600; opacity: 0; transition: opacity 0.3s;
-            min-height: 30px; font-size: 0.9rem;
+            text-align: center; font-weight: 600; opacity: 0; transition: opacity 0.3s;
+            font-size: 0.9rem;
         }
         .status-success { background-color: #d4edda; color: #155724; }
         .status-error { background-color: #f8d7da; color: #721c24; }
-        .status-info { background-color: #cce5ff; color: #004085; }
 
         select {
-            padding: 8px; border-radius: 6px; border: 1px solid #ccc;
+            padding: 10px; border-radius: 6px; border: 1px solid #ccc;
             background-color: var(--color-background); color: var(--color-text);
-            font-size: 14px; font-weight: 600; cursor: pointer; min-width: 120px;
+            font-weight: 600; min-width: 120px;
         }
 
-        /* --- Design Grid Styles (UPDATED FOR PORTRAIT/LANDSCAPE) --- */
+        /* --- Design Grid --- */
         .design-grid {
-            display: grid; 
-            gap: 15px;
-            /* Default fallback */
+            display: grid; gap: 15px;
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
         }
 
-        /* Portrait (Mobile/Tablet vertical) - 2 Columns */
-        @media (orientation: portrait) {
-            .design-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-
-        /* Landscape (Desktop/Tablet horizontal) - 3 Columns */
-        @media (orientation: landscape) {
-            .design-grid {
-                grid-template-columns: repeat(3, 1fr);
-            }
-        }
+        /* Responsive Columns */
+        @media (orientation: portrait) { .design-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (orientation: landscape) { .design-grid { grid-template-columns: repeat(3, 1fr); } }
 
         .design-card {
             background-color: var(--color-surface); border-radius: var(--border-radius);
             box-shadow: 0 2px 5px var(--color-shadow); overflow: hidden;
             display: flex; flex-direction: column;
             transition: box-shadow 0.2s;
+            position: relative;
         }
-
-        .design-card.hidden-card { display: none; }
         
-        /* Shrunk previews */
         .design-card canvas {
             width: 100%; aspect-ratio: 1/1; display: block; background-color: #fff;
         }
 
-        .design-card .card-content {
-            padding: 10px; display: flex; flex-direction: column; flex-grow: 1;
+        .card-content {
+            padding: 10px; display: flex; flex-direction: column; flex-grow: 1; gap: 8px;
         }
 
         .design-card h3 {
-            margin: 5px 0; font-size: 0.95rem; font-weight: 600;
-            color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            margin: 0; font-size: 0.9rem; font-weight: 600;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
         
-        .design-card .duration-label {
-            font-size: 0.8em; color: var(--color-secondary); margin-bottom: 8px; font-weight: 500;
-        }
+        .duration-label { font-size: 0.75em; color: var(--color-secondary); font-weight: 500; }
 
-        button {
+        /* Buttons */
+        .btn-primary {
             background-color: var(--color-primary); color: var(--color-text);
-            border: none; padding: 8px 15px; border-radius: 6px; font-size: 14px;
-            cursor: pointer; font-weight: 600; width: 100%; margin-top: auto;
+            border: none; padding: 10px; border-radius: 6px; font-weight: 600; cursor: pointer;
+            width: 100%;
         }
-        button:hover { background-color: var(--color-secondary); }
-        .action-buttons { display: flex; gap: 8px; flex: 2;}
-        .action-buttons button { width: auto; flex-grow: 1; }
+        .btn-primary:hover { background-color: var(--color-secondary); }
 
-        /* Queue Count Indicator */
+        .btn-danger {
+            background-color: #ffcccc; color: #8a0000;
+            border: 1px solid #ff9999; padding: 5px; border-radius: 6px;
+            font-size: 12px; cursor: pointer; margin-top: 5px; width: 100%;
+            display: none; /* Hidden by default */
+        }
+        .btn-danger:hover { background-color: #ff9999; }
+
+        .action-buttons { display: flex; gap: 8px; flex: 2;}
+        .action-buttons button { flex-grow: 1; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+        
+        /* Queue Count Badge */
         #queue-count {
-            display: inline-block; background: var(--color-secondary); color: white;
+            background: #fff; color: var(--color-primary);
             border-radius: 12px; padding: 2px 8px; font-size: 12px; margin-left: 5px;
-            vertical-align: middle; visibility: hidden;
+            visibility: hidden; font-weight: 800;
         }
 
         #show-more-container { text-align: center; margin: 30px 0; }
-        #btn-show-more { width: auto; padding: 10px 30px; }
-
     </style>
 </head>
 <body data-theme="light">
+
+    <header>
+        <button class="icon-btn" onclick="openNav()">☰</button>
+        <div class="header-title">Sand Table <span id="queue-count">Q: 0</span></div>
+        <button class="icon-btn" id="themeToggle" onclick="toggleDarkMode()">🌙</button>
+    </header>
 
     <div id="mySidebar" class="sidebar">
         <a href="javascript:void(0)" onclick="closeNav()">× Close</a>
@@ -191,14 +177,7 @@
         <a href="/terminal">Terminal</a>
     </div>
 
-    <button class="openbtn" onclick="openNav()">☰</button>
-    <button id="themeToggle" onclick="toggleDarkMode()"><span id="themeIcon">🌙</span></button>
-
     <div class="main-content">
-        <img src="/static/sand.png" alt="Header" class="header-image">
-        
-        <h1>Design Library <span id="queue-count">Q: 0</span></h1>
-
         <div id="status-banner"></div>
 
         <div class="control-panel">
@@ -212,9 +191,9 @@
                     </select>
                 </div>
                 <div class="action-buttons">
-                    <button onclick="clearQueue()" style="background-color:#d9534f; color:white;">Clear All</button>
-                    <button onclick="pauseDesign()">PAUSE</button>
-                    <button onclick="resumeDesign()">RESUME</button>
+                    <button onclick="clearQueue()" style="background-color:#d9534f; color:white;">Clear</button>
+                    <button onclick="pauseDesign()" style="background-color:var(--color-primary);">Pause</button>
+                    <button onclick="resumeDesign()" style="background-color:var(--color-primary);">Resume</button>
                 </div>
             </div>
         </div>
@@ -225,24 +204,18 @@
         </div>
 
         <div id="show-more-container">
-            <button id="btn-show-more" onclick="revealHiddenDesigns()">Show All</button>
+            <button id="btn-show-more" class="btn-primary" style="width:auto; padding: 10px 30px;" onclick="revealHiddenDesigns()">Show All</button>
         </div>
     </div>
 
     <script>
         const BASE_URL = `${window.location.protocol}//${window.location.host}`;
 
-        // --- Kinematic Variables ---
-        const L1 = 101.3, L2 = 101.3;
-        const GEAR_RATIO = 9/8;
-        const STEPS_PER_DEG = 3200/360;
-        const STEPS_PER_RAD = STEPS_PER_DEG * (180 / Math.PI);
+        // --- Kinematic Math (Same as before) ---
+        const L1 = 101.3, L2 = 101.3, GEAR_RATIO = 9/8;
+        const STEPS_PER_DEG = 3200/360, STEPS_PER_RAD = STEPS_PER_DEG * (180 / Math.PI);
         const lerp = (a, b, t) => a + (b - a) * t;
 
-        // ... (Include your existing Kinematic helper functions: calculateFK, getInterpolatedState, calculateAllStates, calculateTracePath here) ...
-        // For brevity in this paste, assume the kinematic math functions from your original file are here.
-        // Copy calculateFK, getInterpolatedState, calculateAllStates, calculateTracePath from your original file.
-        
         function calculateFK(p0, base_steps, elbow_steps) {
             const alpha_rad = -base_steps / STEPS_PER_RAD;
             const beta_rad = -elbow_steps / STEPS_PER_RAD;
@@ -306,7 +279,6 @@
             const ctx = canvas.getContext('2d');
             ctx.fillStyle = 'white'; ctx.fillRect(0, 0, canvas.width, canvas.height);
             if (tracePath.length < 2) return;
-            // Auto-scale logic
             let minX = tracePath[0].x, maxX = tracePath[0].x, minY = tracePath[0].y, maxY = tracePath[0].y;
             for (const p of tracePath) {
                 if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
@@ -326,15 +298,15 @@
             ctx.stroke();
         }
 
-        // --- UI Logic ---
+        // --- App Logic ---
         const statusBanner = document.getElementById('status-banner');
         
         function showStatus(message, type = 'success') {
             statusBanner.textContent = message;
-            statusBanner.className = type === 'success' ? 'status-success' : (type === 'error' ? 'status-error' : 'status-info');
+            statusBanner.className = type === 'success' ? 'status-success' : 'status-error';
             statusBanner.style.opacity = '1';
-            setTimeout(() => { statusBanner.style.opacity = '0'; }, 5000);
-            updateQueueCount(); 
+            setTimeout(() => { statusBanner.style.opacity = '0'; }, 4000);
+            updateQueueCount();
         }
 
         async function updateQueueCount() {
@@ -347,31 +319,48 @@
             } catch(e) {}
         }
 
-        function sendCommand(cmd, msg="Command sent.") {
+        function sendCommand(cmd, msg) {
             fetch(`${BASE_URL}/send`, {
                 method: "POST", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ command: cmd })
             }).then(r=>r.json()).then(d=>{
-                if(d.success) showStatus(msg, 'success');
+                if(d.success) showStatus(msg || "Done", 'success');
                 else showStatus(`Error: ${d.error}`, 'error');
             }).catch(e=>showStatus(`Network Error`, 'error'));
         }
 
-        function clearQueue() { sendCommand('CLEAR', 'Queue Cleared & Stopped.'); }
-        function pauseDesign() { sendCommand('PAUSE', 'Paused.'); }
-        function resumeDesign() { sendCommand('RESUME', 'Resumed.'); }
+        function clearQueue() { sendCommand('CLEAR', 'Queue Cleared'); }
+        function pauseDesign() { sendCommand('PAUSE', 'Paused'); }
+        function resumeDesign() { sendCommand('RESUME', 'Resumed'); }
+
+        async function deleteFile(filename) {
+            if(!confirm(`Delete "${filename}"? This cannot be undone.`)) return;
+            try {
+                const res = await fetch(`${BASE_URL}/delete_design`, {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ filename: filename })
+                });
+                const data = await res.json();
+                if(data.success) {
+                    showStatus("File Deleted", 'success');
+                    // Remove card from UI
+                    const card = document.getElementById(`card-${filename}`);
+                    if(card) card.remove();
+                } else {
+                    showStatus(data.error, 'error');
+                }
+            } catch(e) { showStatus(e.message, 'error'); }
+        }
 
         async function runDesign(filename) {
             const speedMultiplier = parseFloat(document.getElementById('speedSelect').value);
-            showStatus(`Processing ${filename}...`, 'info');
-
+            showStatus(`Processing...`, 'success');
             try {
                 const txtPath = `${BASE_URL}/designs/${filename}`;
                 const response = await fetch(txtPath);
                 if (!response.ok) throw new Error('File not found');
                 const originalGcode = await response.text();
 
-                // Apply Speed Multiplier JS side
                 let modifiedGcodeLines = [];
                 const lines = originalGcode.split('\n');
                 for(let line of lines) {
@@ -392,20 +381,12 @@
                     body: JSON.stringify({ gcode: finalGcode, filename: filename })
                 });
                 const data = await res.json();
-                
-                if (data.success) {
-                    showStatus(data.message, 'success'); // "Started" or "Added to Queue"
-                } else {
-                    showStatus(data.error, 'error');
-                }
+                showStatus(data.success ? data.message : data.error, data.success ? 'success' : 'error');
                 updateQueueCount();
 
-            } catch (e) {
-                showStatus(e.message, 'error');
-            }
+            } catch (e) { showStatus(e.message, 'error'); }
         }
 
-        // --- Load Library ---
         async function loadDesignLibrary() {
             const grid = document.getElementById('designGridContainer');
             const loader = document.getElementById('loading-indicator');
@@ -419,7 +400,6 @@
                 let files = await res.json();
                 if (files.length === 0) { errMsg.style.display = 'block'; return; }
                 
-                // Sort by recent
                 let recents = JSON.parse(localStorage.getItem('recentDesigns') || '[]');
                 files.sort((a,b) => {
                     let ia = recents.indexOf(a), ib = recents.indexOf(b);
@@ -428,22 +408,23 @@
                     return 0;
                 });
 
-                const TOP_COUNT = 9; // Show more now that they are smaller
+                const TOP_COUNT = 9;
                 const first = files.slice(0, TOP_COUNT);
                 const rest = files.slice(TOP_COUNT);
 
                 const createCard = (f, hidden) => {
                     const c = document.createElement('div');
+                    c.id = `card-${f}`;
                     c.className = `design-card ${hidden ? 'hidden-card' : ''}`;
                     c.innerHTML = `
                         <canvas id="canvas-${f}" width="300" height="300"></canvas>
                         <div class="card-content">
                             <h3>${f.replace('.txt','')}</h3>
                             <span id="time-${f}" class="duration-label">...</span>
-                            <button onclick="runDesign('${f}')">Queue</button>
+                            <button class="btn-primary" onclick="runDesign('${f}')">Queue</button>
+                            <button id="del-${f}" class="btn-danger" onclick="deleteFile('${f}')">Delete File</button>
                         </div>`;
                     
-                    // Quick Time Estimate
                     fetch(`${BASE_URL}/designs/${f}`).then(r=>r.text()).then(t => {
                          let time = 0;
                          t.split('\n').forEach(l => {
@@ -456,7 +437,6 @@
                          });
                          document.getElementById(`time-${f}`).textContent = Math.ceil(time/60000000) + " min";
                     });
-
                     return c;
                 };
 
@@ -470,7 +450,6 @@
                         moreBtn.style.display = 'none';
                     };
                 }
-
             } catch (e) { console.error(e); errMsg.style.display = 'block'; }
             finally { loader.style.display = 'none'; }
         }
@@ -481,30 +460,38 @@
             const base = filename.replace('.txt','');
             const img = new Image();
             img.src = `${BASE_URL}/designs/${base}.png`;
+            
+            // Image Loads Successfully: Do normal draw
             img.onload = () => cvs.getContext('2d').drawImage(img,0,0,cvs.width,cvs.height);
+            
+            // Image FAILS to load (Missing): Draw trace AND show Delete button
             img.onerror = () => {
                 fetch(`${BASE_URL}/designs/${filename}`).then(r=>r.text()).then(t=>{
                     drawTraceOnCanvas(cvs, generateTracePathFromText(t));
                 });
+                
+                // Show Delete Button
+                const delBtn = document.getElementById(`del-${filename}`);
+                if(delBtn) delBtn.style.display = "block";
             }
         }
 
-        function openNav() { document.getElementById("mySidebar").style.width = "200px"; document.querySelector(".main-content").style.marginLeft = "200px"; }
-        function closeNav() { document.getElementById("mySidebar").style.width = "0"; document.querySelector(".main-content").style.marginLeft = "0"; }
+        function openNav() { document.getElementById("mySidebar").style.width = "200px"; }
+        function closeNav() { document.getElementById("mySidebar").style.width = "0"; }
         function toggleDarkMode() {
             const b = document.body;
             const n = b.getAttribute('data-theme')==='dark'?'light':'dark';
             b.setAttribute('data-theme', n); localStorage.setItem('theme',n);
-            document.getElementById('themeIcon').textContent = n==='dark'?'☀️':'🌙';
+            document.getElementById('themeToggle').textContent = n==='dark'?'☀️':'🌙';
         }
 
         document.addEventListener('DOMContentLoaded', () => {
             const t = localStorage.getItem('theme')||'light';
             document.body.setAttribute('data-theme', t);
-            document.getElementById('themeIcon').textContent = t==='dark'?'☀️':'🌙';
+            document.getElementById('themeToggle').textContent = t==='dark'?'☀️':'🌙';
             loadDesignLibrary();
             updateQueueCount();
-            setInterval(updateQueueCount, 5000); // Poll queue count
+            setInterval(updateQueueCount, 5000); 
         });
     </script>
 </body>
