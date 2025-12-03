@@ -1,6 +1,6 @@
 // ==========================================
-//      ARDUINO SAND TABLE FIRMWARE v7
-//      G0 Homing + Debug Prints
+//      ARDUINO SAND TABLE FIRMWARE v8
+//      Deep Debugging + G0 Homing
 // ==========================================
 
 // --- YOUR SPECIFIC MOTOR PINS ---
@@ -53,8 +53,11 @@ void setup() {
   pinMode(ms1, OUTPUT); pinMode(ms2, OUTPUT); pinMode(ms3, OUTPUT);
   digitalWrite(ms1, HIGH); digitalWrite(ms2, HIGH); digitalWrite(ms3, HIGH);
 
-  digitalWrite(enPin, HIGH); // Start Disabled
-  
+  // STARTUP CHECK: Briefly Enable Motors to show power
+  digitalWrite(enPin, LOW); 
+  delay(100);
+  digitalWrite(enPin, HIGH); // Then Disable
+
   currentArmAngleSteps = 0.0;
   
   Serial.println(F("READY"));
@@ -93,7 +96,7 @@ void handleSerial() {
       parseAndEnqueueMove(cmd);
     }
     else if (cmd.startsWith("G0") || cmd.startsWith("g0")) {
-      Serial.println(F("DEBUG: G0 Received")); // <--- DEBUG 1
+      Serial.println(F("DEBUG: G0 Command Received")); 
       enqueueHome();
     }
   }
@@ -102,14 +105,18 @@ void handleSerial() {
 void enqueueHome() {
   if (queueCount < MAX_QUEUE_SIZE) {
     // Print current tracking info
-    Serial.print(F("DEBUG: Current Arm Pos: ")); 
+    Serial.print(F("DEBUG: Current Arm Tracked Pos: ")); 
     Serial.println(currentArmAngleSteps);
 
     // Calculate correction
     long correctionSteps = (long)round(-currentArmAngleSteps);
     
-    Serial.print(F("DEBUG: Correcting by: ")); 
+    Serial.print(F("DEBUG: Homing Correction Steps: ")); 
     Serial.println(correctionSteps);
+
+    if (correctionSteps == 0) {
+       Serial.println(F("DEBUG: Already Home (0 steps)"));
+    }
 
     // Add to queue
     queue[queueTail].armSteps = correctionSteps;
@@ -131,6 +138,9 @@ void parseAndEnqueueMove(String cmd) {
   long baseSteps = 0;
   int speed = 1000;
 
+  // IMPORTANT: This parser expects "G1 100 200 1000"
+  // It will NOT work with "G1 X100 Y200"
+  
   int s1 = cmd.indexOf(' ');
   int s2 = cmd.indexOf(' ', s1 + 1);
   int s3 = cmd.indexOf(' ', s2 + 1);
@@ -148,6 +158,11 @@ void parseAndEnqueueMove(String cmd) {
       }
     }
   }
+  
+  Serial.print(F("DEBUG: G1 Parsed -> Arm:"));
+  Serial.print(armSteps);
+  Serial.print(F(" Base:"));
+  Serial.println(baseSteps);
 
   if (queueCount < MAX_QUEUE_SIZE) {
     queue[queueTail].armSteps = armSteps;
@@ -155,7 +170,6 @@ void parseAndEnqueueMove(String cmd) {
     queue[queueTail].speed = speed;
     
     // --- TRACKING LOGIC ---
-    // Update tracking BEFORE move execution so we know where we are going
     currentArmAngleSteps += armSteps;
     currentArmAngleSteps -= (baseSteps * ARM_BASE_RATIO);
 
@@ -171,12 +185,18 @@ void executeNextCommand() {
   queueHead = (queueHead + 1) % MAX_QUEUE_SIZE;
   queueCount--;
   
+  if (cmd.armSteps == 0 && cmd.baseSteps == 0) {
+     // Don't bother moving, just print done
+     Serial.println(F("Done (Zero Move)"));
+     return;
+  }
+
   moveBresenham(cmd.armSteps, cmd.baseSteps, cmd.speed);
   Serial.println(F("Done")); 
 }
 
 void moveBresenham(long da, long db, int delayUs) {
-  digitalWrite(enPin, LOW); 
+  digitalWrite(enPin, LOW); // Enable motors
 
   digitalWrite(dirArm, (da >= 0) ? HIGH : LOW);
   digitalWrite(dirBase, (db >= 0) ? HIGH : LOW);
