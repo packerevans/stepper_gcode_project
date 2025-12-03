@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Packers Sand Pro (Synced v24 - Deep Optimization)</title>
+    <title>Packers Sand Pro (Synced v25 - Retrace Routing)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -385,7 +385,7 @@
             ctx.restore();
         }
 
-        // --- AI TRACER (High Contrast) ---
+        // --- AI TRACER ---
         function handleImageUpload(input) {
             const file = input.files[0];
             if(!file) return;
@@ -489,17 +489,17 @@
             render();
         }
 
-        // --- ADVANCED OPTIMIZER v24 (2-OPT + Seam Hiding + Pruning) ---
+        // --- DEEP OPTIMIZER (2-OPT + RETRACE ROUTING) ---
         async function prepareGCode() {
             if(rawPoints.length === 0) return showToast("Draw something first!", "error");
-            showToast("Running Deep Optimization (Please wait)...", "info");
+            showToast("Running Deep Optimization...", "info");
 
             await new Promise(r => setTimeout(r, 50));
 
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
             const sym = parseInt(document.getElementById('symSlider').value);
             
-            // 1. GROUPING
+            // 1. Grouping
             let shapes = [];
             let curShape = [];
             rawPoints.forEach(p => {
@@ -512,7 +512,7 @@
             });
             if(curShape.length > 0) shapes.push(curShape);
 
-            // 2. SYMMETRY
+            // 2. Symmetry
             let pool = [];
             for(let s=0; s<sym; s++) {
                 const ang = s * (Math.PI*2/sym);
@@ -528,14 +528,12 @@
 
             if(pool.length === 0) return;
 
-            // 3. ANALYSIS & CENTROIDS
+            // 3. Metadata & Centroids
             let shapeMeta = pool.map((s, idx) => {
                 const dStartEnd = Math.hypot(s[0].x - s[s.length-1].x, s[0].y - s[s.length-1].y);
                 const isClosed = dStartEnd < 8.0;
-                // Close loop exactly
                 if(isClosed) s[s.length-1] = {x: s[0].x, y: s[0].y};
                 
-                // Calculate Centroid (Average position)
                 let cx=0, cy=0;
                 s.forEach(p=>{cx+=p.x; cy+=p.y});
                 cx/=s.length; cy/=s.length;
@@ -549,24 +547,18 @@
                 };
             });
 
-            // 4. TSP OPTIMIZATION (2-Opt)
-            // Initial Order: Sort by distance to Rim (Perimeter First Strategy)
+            // 4. TSP (2-Opt) - Order Shapes
             shapeMeta.sort((a,b) => a.distToRim - b.distToRim);
-            
-            // Apply 2-Opt Optimization on Centroids
-            // This reorders the shapes to minimize the travel between their centers
             shapeMeta = runTwoOpt(shapeMeta);
 
-            // 5. SEAM ALIGNMENT (Rotation/Reversal)
-            // Now that order is fixed, align starts/ends
-            let optimizedPath = [];
-            let headPos = {x: tableR, y: 0}; // Start at Rim
+            // 5. Seam Alignment (Rotation)
+            let optimizedShapes = [];
+            let headPos = {x: tableR, y: 0}; 
 
             for(let meta of shapeMeta) {
                 let bestPts = [...meta.points];
                 
                 if(meta.isClosed) {
-                    // Rotate loop to start closest to headPos
                     let bestIdx = 0;
                     let minDist = Infinity;
                     for(let k=0; k<meta.points.length; k+=3) {
@@ -580,79 +572,172 @@
                         bestPts.push({x:bestPts[0].x, y:bestPts[0].y});
                     }
                 } else {
-                    // Reverse line if end is closer than start
                     let dStart = (headPos.x-bestPts[0].x)**2 + (headPos.y-bestPts[0].y)**2;
                     let dEnd = (headPos.x-bestPts[bestPts.length-1].x)**2 + (headPos.y-bestPts[bestPts.length-1].y)**2;
                     if(dEnd < dStart) bestPts.reverse();
                 }
                 
-                optimizedPath.push(bestPts);
+                optimizedShapes.push(bestPts);
                 headPos = bestPts[bestPts.length-1];
             }
 
-            // 6. PATH GENERATION (Continuous)
+            // 6. RETRACE ROUTING (Smart Interconnects)
+            showToast("Routing connections...", "info");
+            await new Promise(r => setTimeout(r, 20));
+
             processedPoints = [];
             
-            // Entry
-            let entryAng = Math.atan2(optimizedPath[0][0].y, optimizedPath[0][0].x);
-            processedPoints.push({x: tableR*Math.cos(entryAng), y: tableR*Math.sin(entryAng), type:'point'});
+            // Spatial Grid for A*
+            const grid = new SpatialGrid(5.0); // 5mm grid
+            optimizedShapes.forEach(shape => {
+                shape.forEach(p => grid.add(p));
+            });
 
-            for(let shapePts of optimizedPath) {
-                // Add all points of the shape
-                shapePts.forEach(p => processedPoints.push({x:p.x, y:p.y, type:'point'}));
+            // Initial Entry
+            let startP = optimizedShapes[0][0];
+            let ang = Math.atan2(startP.y, startP.x);
+            processedPoints.push({x: tableR*Math.cos(ang), y: tableR*Math.sin(ang), type:'point'});
+
+            for(let i=0; i<optimizedShapes.length; i++) {
+                // Add current shape
+                optimizedShapes[i].forEach(p => processedPoints.push({x:p.x, y:p.y, type:'point'}));
+                
+                // Route to next shape?
+                if(i < optimizedShapes.length - 1) {
+                    let currEnd = optimizedShapes[i][optimizedShapes[i].length-1];
+                    let nextStart = optimizedShapes[i+1][0];
+                    let dist = Math.hypot(nextStart.x-currEnd.x, nextStart.y-currEnd.y);
+                    
+                    if(dist > 5.0) {
+                        // Use A* to find path through existing lines
+                        let route = findSafePath(currEnd, nextStart, grid);
+                        if(route.length > 0) {
+                            route.forEach(p => processedPoints.push({x:p.x, y:p.y, type:'point'}));
+                        }
+                    }
+                }
             }
 
             // Exit
-            let lastSh = optimizedPath[optimizedPath.length-1];
-            let lastPt = lastSh[lastSh.length-1];
-            let exitAng = Math.atan2(lastPt.y, lastPt.x);
-            processedPoints.push({x: tableR*Math.cos(exitAng), y: tableR*Math.sin(exitAng), type:'exit'});
+            let lastS = optimizedShapes[optimizedShapes.length-1];
+            let lastP = lastS[lastS.length-1];
+            let exAng = Math.atan2(lastP.y, lastP.x);
+            processedPoints.push({x: tableR*Math.cos(exAng), y: tableR*Math.sin(exAng), type:'exit'});
 
-            // 7. SIMPLIFICATION (Pruning)
-            processedPoints = simplifyPath(processedPoints, 0.5); // 0.5mm tolerance
+            // 7. Pruning
+            processedPoints = simplifyPath(processedPoints, 0.5);
 
             generateKinematicsGCode(processedPoints);
             
-            document.getElementById('statusTxt').innerText = "AI Path: Deep Optimized";
+            document.getElementById('statusTxt').innerText = "AI Path: Retrace Routing";
             document.getElementById('statusTxt').style.color = "#2ecc71";
             document.getElementById('progressSlider').value = 0;
             render(); 
-            showToast(`Complete! Path simplified & optimized.`, "success");
+            showToast(`Complete! Routing optimized.`, "success");
+        }
+
+        // --- PATHFINDING & GRID ---
+
+        class SpatialGrid {
+            constructor(cellSize) {
+                this.cellSize = cellSize;
+                this.cells = new Map();
+            }
+            key(p) { return `${Math.floor(p.x/this.cellSize)},${Math.floor(p.y/this.cellSize)}`; }
+            add(p) {
+                let k = this.key(p);
+                if(!this.cells.has(k)) this.cells.set(k, []);
+                this.cells.get(k).push(p);
+            }
+            getNeighbors(p) {
+                let neighbors = [];
+                let cx = Math.floor(p.x/this.cellSize);
+                let cy = Math.floor(p.y/this.cellSize);
+                for(let x=cx-1; x<=cx+1; x++) {
+                    for(let y=cy-1; y<=cy+1; y++) {
+                        let k = `${x},${y}`;
+                        if(this.cells.has(k)) neighbors.push(...this.cells.get(k));
+                    }
+                }
+                return neighbors;
+            }
+        }
+
+        function findSafePath(start, end, grid) {
+            // A* Pathfinder
+            // Nodes are geometric points from the grid
+            // Costs: 
+            // - Travel between grid neighbors (Retrace): Low Cost
+            // - Travel through air (Jump): High Cost (Simulated by not finding neighbor)
+            
+            // Limit search to prevent hanging
+            const maxNodes = 1000;
+            let open = [{p: start, g:0, f:0, parent:null}];
+            let closed = new Set();
+            let count = 0;
+
+            // Simple Euclidean
+            const h = (p) => Math.hypot(p.x-end.x, p.y-end.y);
+
+            while(open.length > 0 && count++ < maxNodes) {
+                open.sort((a,b) => a.f - b.f);
+                let current = open.shift();
+
+                // Goal check (within 5mm)
+                if(Math.hypot(current.p.x-end.x, current.p.y-end.y) < 5.0) {
+                    let path = [];
+                    let curr = current;
+                    while(curr.parent) {
+                        path.push(curr.p);
+                        curr = curr.parent;
+                    }
+                    return path.reverse();
+                }
+
+                let key = `${current.p.x.toFixed(1)},${current.p.y.toFixed(1)}`;
+                if(closed.has(key)) continue;
+                closed.add(key);
+
+                // Neighbors: Points in the drawing grid close to current point
+                let potential = grid.getNeighbors(current.p);
+                
+                for(let neighbor of potential) {
+                    let d = Math.hypot(neighbor.x-current.p.x, neighbor.y-current.p.y);
+                    if(d > 0.1 && d < 6.0) { // Valid move along drawing
+                        let gScore = current.g + d; // Low cost to ride lines
+                        open.push({
+                            p: neighbor,
+                            g: gScore,
+                            f: gScore + h(neighbor),
+                            parent: current
+                        });
+                    }
+                }
+            }
+            return []; // Fail -> Straight line will happen automatically by logic in main loop
         }
 
         // --- SOLVERS ---
 
         function runTwoOpt(tour) {
-            // Simple 2-Opt implementation for Shape Sequencing
-            // We use centroids for distance to be fast
-            const maxIter = 2000; // Limit iterations for speed
+            const maxIter = 2000; 
             let bestDist = calculateTourDist(tour);
-            
             for(let i=0; i<maxIter; i++) {
-                // Pick two random edges
                 let a = Math.floor(Math.random() * (tour.length - 1));
                 let b = Math.floor(Math.random() * (tour.length - 1));
                 if(a === b) continue;
-                if(a > b) [a,b] = [b,a]; // Swap so a < b
-
-                // Swap segment
+                if(a > b) [a,b] = [b,a];
                 reverseSegment(tour, a, b);
                 let newDist = calculateTourDist(tour);
-                
-                if(newDist < bestDist) {
-                    bestDist = newDist; // Keep swap
-                } else {
-                    reverseSegment(tour, a, b); // Revert swap
-                }
+                if(newDist < bestDist) bestDist = newDist; 
+                else reverseSegment(tour, a, b);
             }
             return tour;
         }
 
         function reverseSegment(arr, i, j) {
             while(i < j) {
-                let temp = arr[i];
-                arr[i] = arr[j];
-                arr[j] = temp;
+                let temp = arr[i]; arr[i] = arr[j]; arr[j] = temp;
                 i++; j--;
             }
         }
@@ -667,16 +752,13 @@
             return d;
         }
 
-        // Visvalingam-Whyatt Simplification (Fast approximate)
         function simplifyPath(points, tolerance) {
             if(points.length < 3) return points;
             let newPts = [points[0]];
             let lastP = points[0];
-            
             for(let i=1; i<points.length-1; i++) {
                 let p = points[i];
                 let dist = Math.hypot(p.x - lastP.x, p.y - lastP.y);
-                // If point is very close to last point, skip it (Pruning)
                 if(dist > tolerance) {
                     newPts.push(p);
                     lastP = p;
