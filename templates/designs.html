@@ -3,496 +3,499 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Packers Sand Table</title>
+    <title>Sand Table Controller</title>
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
-    <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
     <style>
-        /* --- Root Variables (Light Mode) --- */
+        /* --- Modern Variables --- */
         :root {
-            --color-primary: #d2b48c;
-            --color-secondary: #b08d5c;
-            --color-background: #f0f0f0;
+            /* 1. Main Accent (The Tan) */
+            --color-accent: #d2b48c; 
+            
+            /* 2. Background */
+            --color-bg: #f8f9fa;
+            
+            /* 3. Surface/Text (High Contrast) */
             --color-surface: #ffffff;
-            --color-text: #333333;
-            --color-shadow: rgba(0, 0, 0, 0.08);
-            --border-radius: 10px;
+            --color-text: #222222;
+            
+            --shadow-subtle: 0 4px 6px -1px rgba(0,0,0,0.05);
+            --shadow-float: 0 10px 15px -3px rgba(0,0,0,0.1);
+            --radius: 16px;
         }
 
         body[data-theme='dark'] {
-            --color-background: #1e1e1e;
-            --color-surface: #2c2c2c;
+            --color-bg: #121212;
+            --color-surface: #1e1e1e;
             --color-text: #e0e0e0;
-            --color-shadow: rgba(255, 255, 255, 0.08);
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: var(--color-background);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--color-bg);
             color: var(--color-text);
             margin: 0;
-            padding: 0;
+            padding-bottom: 80px; /* Space for floating bar */
             transition: background 0.3s, color 0.3s;
         }
 
-        /* --- STICKY HEADER (FIXED LAYOUT) --- */
+        /* --- Minimal Header --- */
         header {
-            position: sticky; top: 0; z-index: 1000;
-            background-color: var(--color-primary);
-            color: var(--color-text);
+            position: sticky; top: 0; z-index: 100;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0,0,0,0.05);
             display: flex; justify-content: space-between; align-items: center;
-            padding: 0 15px; height: 60px;
-            box-shadow: 0 2px 6px var(--color-shadow);
+            padding: 0 20px; height: 60px;
         }
-
-        .header-title { font-size: 1.2rem; font-weight: 600; }
         
-        .icon-btn {
-            background: none; border: none; color: inherit;
-            font-size: 24px; cursor: pointer; padding: 5px;
+        body[data-theme='dark'] header { 
+            background: rgba(30, 30, 30, 0.85); 
+            border-bottom: 1px solid rgba(255,255,255,0.05);
         }
 
-        /* --- Sidebar --- */
-        .sidebar {
-            height: 100%; width: 0; position: fixed;
-            top: 0; left: 0;
-            background-color: var(--color-primary); overflow-x: hidden;
-            transition: 0.3s; padding-top: 60px; z-index: 999;
-            box-shadow: 2px 0 5px var(--color-shadow);
-        }
-        .sidebar a {
-            padding: 15px 24px;
-            text-decoration: none; font-size: 18px;
-            color: var(--color-text); display: block; transition: 0.2s; font-weight: 500;
-        }
-        .sidebar a:hover { background-color: var(--color-secondary); color: var(--color-surface); }
+        .header-title { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.5px; }
+        .icon-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--color-text); }
 
-        /* --- Main Content --- */
-        .main-content {
-            padding: 15px;
+        /* --- Controls --- */
+        .controls-wrapper {
+            max-width: 1200px; margin: 20px auto 10px; padding: 0 15px;
+        }
+        
+        .status-pill {
+            background: var(--color-accent); color: #fff;
+            padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600;
+            opacity: 0; transition: opacity 0.3s; display: inline-block; margin-bottom: 10px;
+        }
+
+        .main-actions {
+            display: flex; gap: 10px; overflow-x: auto; padding-bottom: 5px;
+        }
+        
+        select, button.action-btn {
+            background: var(--color-surface); color: var(--color-text);
+            border: 1px solid rgba(0,0,0,0.1); padding: 10px 16px;
+            border-radius: 12px; font-weight: 600; font-size: 0.9rem;
+            cursor: pointer; box-shadow: var(--shadow-subtle);
+            white-space: nowrap;
+        }
+        
+        button.action-btn:active { transform: scale(0.98); }
+        .btn-primary { background: var(--color-accent) !important; color: white !important; border: none !important; }
+
+        /* --- Grid --- */
+        .grid {
+            display: grid; gap: 16px; padding: 15px;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
             max-width: 1200px; margin: 0 auto;
-            transition: margin-left 0.3s;
         }
 
-        /* --- Control Panel --- */
-        .control-panel {
-            background-color: var(--color-surface); padding: 15px;
-            border-radius: var(--border-radius); box-shadow: 0 4px 10px var(--color-shadow);
-            margin-bottom: 20px;
+        .card {
+            background: var(--color-surface); border-radius: var(--radius);
+            overflow: hidden; position: relative;
+            box-shadow: var(--shadow-subtle);
+            transition: transform 0.2s;
+            cursor: pointer;
         }
 
-        .controls-row {
-            display: flex; justify-content: center; align-items: center;
-            gap: 12px; flex-wrap: wrap;
-        }
+        .card:hover { transform: translateY(-2px); }
+        .card.selected { ring: 2px solid var(--color-accent); transform: scale(0.98); }
 
-        #status-banner {
-            padding: 10px; border-radius: var(--border-radius); margin-bottom: 15px;
-            text-align: center; font-weight: 600; opacity: 0; transition: opacity 0.3s;
-            font-size: 0.9rem;
-        }
-        .status-success { background-color: #d4edda; color: #155724; }
-        .status-error { background-color: #f8d7da; color: #721c24; }
-
-        select {
-            padding: 10px; border-radius: 6px; border: 1px solid #ccc;
-            background-color: var(--color-background); color: var(--color-text);
-            font-weight: 600; min-width: 120px;
-        }
-
-        /* --- Design Grid --- */
-        .design-grid {
-            display: grid; gap: 15px;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-        }
-
-        /* Responsive Columns */
-        @media (orientation: portrait) { .design-grid { grid-template-columns: repeat(2, 1fr); } }
-        @media (orientation: landscape) { .design-grid { grid-template-columns: repeat(3, 1fr); } }
-
-        .design-card {
-            background-color: var(--color-surface); border-radius: var(--border-radius);
-            box-shadow: 0 2px 5px var(--color-shadow); overflow: hidden;
-            display: flex; flex-direction: column;
-            transition: box-shadow 0.2s;
-            position: relative;
+        .card-img-wrap { position: relative; aspect-ratio: 1/1; background: #fff; }
+        .card canvas { width: 100%; height: 100%; display: block; }
+        
+        /* Selection Dot */
+        .select-dot {
+            position: absolute; top: 10px; right: 10px;
+            width: 24px; height: 24px; border-radius: 50%;
+            background: rgba(0,0,0,0.3); border: 2px solid #fff;
+            z-index: 10; transition: 0.2s;
         }
         
-        .design-card canvas {
-            width: 100%; aspect-ratio: 1/1; display: block; background-color: #fff;
+        .card.selected .select-dot {
+            background: var(--color-accent);
+            box-shadow: 0 0 0 2px var(--color-surface);
         }
-
-        .card-content {
-            padding: 10px; display: flex; flex-direction: column; flex-grow: 1; gap: 8px;
-        }
-
-        .design-card h3 {
+        
+        .card-body { padding: 12px; }
+        .card-title {
             margin: 0; font-size: 0.9rem; font-weight: 600;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
+        .card-meta { font-size: 0.75rem; opacity: 0.6; margin-top: 4px; }
+
+        /* --- Floating Selection Bar --- */
+        .selection-bar {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(100px);
+            background: var(--color-text); color: var(--color-bg);
+            padding: 12px 20px; border-radius: 50px;
+            display: flex; gap: 15px; align-items: center;
+            box-shadow: var(--shadow-float); z-index: 1000;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            min-width: 300px; justify-content: space-between;
+        }
         
-        .duration-label { font-size: 0.75em; color: var(--color-secondary); font-weight: 500; }
-
-        /* Buttons */
-        .btn-primary {
-            background-color: var(--color-primary); color: var(--color-text);
-            border: none; padding: 10px; border-radius: 6px; font-weight: 600; cursor: pointer;
-            width: 100%;
-        }
-        .btn-primary:hover { background-color: var(--color-secondary); }
-
-        .btn-danger {
-            background-color: #ffcccc; color: #8a0000;
-            border: 1px solid #ff9999; padding: 5px; border-radius: 6px;
-            font-size: 12px; cursor: pointer; margin-top: 5px; width: 100%;
-            display: none; /* Hidden by default */
-        }
-        .btn-danger:hover { background-color: #ff9999; }
-
-        .action-buttons { display: flex; gap: 8px; flex: 2;}
-        .action-buttons button { flex-grow: 1; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+        .selection-bar.active { transform: translateX(-50%) translateY(0); }
         
-        /* Queue Count Badge */
-        #queue-count {
-            background: #fff; color: var(--color-primary);
-            border-radius: 12px; padding: 2px 8px; font-size: 12px; margin-left: 5px;
-            visibility: hidden; font-weight: 800;
+        .bar-actions { display: flex; gap: 10px; }
+        .bar-btn {
+            background: rgba(255,255,255,0.2); border: none; color: inherit;
+            padding: 8px 16px; border-radius: 20px; cursor: pointer; font-size: 0.9rem; font-weight: 600;
+        }
+        .bar-btn.danger { background: #ff4d4d; color: white; }
+
+        /* --- Sidebar --- */
+        .sidebar {
+            height: 100%; width: 0; position: fixed; top: 0; left: 0;
+            background: var(--color-surface); overflow-x: hidden; z-index: 1100;
+            transition: 0.3s; padding-top: 20px;
+            border-right: 1px solid rgba(0,0,0,0.1);
+        }
+        .sidebar a {
+            padding: 15px 25px; text-decoration: none; font-size: 1.1rem;
+            color: var(--color-text); display: block; font-weight: 600;
+        }
+        .overlay {
+            position: fixed; top:0; left:0; width:100%; height:100%;
+            background: rgba(0,0,0,0.5); z-index: 1050; display: none;
         }
 
-        #show-more-container { text-align: center; margin: 30px 0; }
     </style>
 </head>
 <body data-theme="light">
 
     <header>
         <button class="icon-btn" onclick="openNav()">☰</button>
-        <div class="header-title">Sand Table <span id="queue-count">Q: 0</span></div>
-        <button class="icon-btn" id="themeToggle" onclick="toggleDarkMode()">🌙</button>
+        <div class="header-title">Design Library <span id="q-badge" style="font-size:0.8em; opacity:0.5; margin-left:5px;"></span></div>
+        <button class="icon-btn" onclick="toggleTheme()">◑</button>
     </header>
 
+    <div id="overlay" class="overlay" onclick="closeNav()"></div>
     <div id="mySidebar" class="sidebar">
-        <a href="javascript:void(0)" onclick="closeNav()">× Close</a>
+        <div style="padding:0 25px; margin-bottom:20px; opacity:0.5; font-size:0.9rem;">MENU</div>
         <a href="/">Designs</a>
         <a href="/AI_builder">AI Builder</a>
         <a href="/led_controls">LED Controls</a>
         <a href="/terminal">Terminal</a>
     </div>
 
-    <div class="main-content">
-        <div id="status-banner"></div>
-
-        <div class="control-panel">
-            <div class="controls-row">
-                <div style="display: flex; flex-direction:column; gap:2px; flex: 1;">
-                    <label style="font-size:12px; font-weight:600;">Speed:</label>
-                    <select id="speedSelect">
-                        <option value="0.5">Fast (2x)</option>
-                        <option value="1.0" selected>Normal</option>
-                        <option value="2.0">Slow (0.5x)</option>
-                    </select>
-                </div>
-                <div class="action-buttons">
-                    <button onclick="clearQueue()" style="background-color:#d9534f; color:white;">Clear</button>
-                    <button onclick="pauseDesign()" style="background-color:var(--color-primary);">Pause</button>
-                    <button onclick="resumeDesign()" style="background-color:var(--color-primary);">Resume</button>
-                </div>
-            </div>
+    <div class="controls-wrapper">
+        <div id="status-pill" class="status-pill">Ready</div>
+        
+        <div class="main-actions">
+            <select id="speedSelect">
+                <option value="0.5">Speed: Fast</option>
+                <option value="1.0" selected>Speed: Normal</option>
+                <option value="2.0">Speed: Slow</option>
+            </select>
+            <button class="action-btn btn-primary" onclick="resumeDesign()">Resume</button>
+            <button class="action-btn" onclick="pauseDesign()">Pause</button>
+            <button class="action-btn" onclick="clearQueue()">Clear Queue</button>
         </div>
+    </div>
 
-        <div id="designGridContainer" class="design-grid">
-            <div id="loading-indicator">Loading...</div>
-            <div id="error-message" style="display:none; text-align:center; grid-column: 1/-1;">No designs found.</div>
+    <div id="grid" class="grid">
         </div>
+    <div style="text-align:center; margin-top:20px;">
+        <button id="more-btn" class="action-btn" style="display:none;" onclick="showAll()">Show All Designs</button>
+    </div>
 
-        <div id="show-more-container">
-            <button id="btn-show-more" class="btn-primary" style="width:auto; padding: 10px 30px;" onclick="revealHiddenDesigns()">Show All</button>
+    <div id="selection-bar" class="selection-bar">
+        <span style="font-weight:600; padding-left:5px;" id="sel-count">0 Selected</span>
+        <div class="bar-actions">
+            <button class="bar-btn" onclick="copySelected()">Copy Code</button>
+            <button class="bar-btn danger" onclick="deleteSelected()">Delete</button>
         </div>
     </div>
 
     <script>
         const BASE_URL = `${window.location.protocol}//${window.location.host}`;
+        let selectedFiles = new Set();
+        let allFiles = [];
 
-        // --- Kinematic Math (Same as before) ---
-        const L1 = 101.3, L2 = 101.3, GEAR_RATIO = 9/8;
-        const STEPS_PER_DEG = 3200/360, STEPS_PER_RAD = STEPS_PER_DEG * (180 / Math.PI);
-        const lerp = (a, b, t) => a + (b - a) * t;
-
-        function calculateFK(p0, base_steps, elbow_steps) {
-            const alpha_rad = -base_steps / STEPS_PER_RAD;
-            const beta_rad = -elbow_steps / STEPS_PER_RAD;
-            const theta1 = alpha_rad;
-            const theta_bend = beta_rad - (GEAR_RATIO * alpha_rad);
-            const theta2_global = theta1 + theta_bend;
-            const p1 = { x: p0.x + L1 * Math.cos(theta1), y: p0.y + L1 * Math.sin(theta1) };
-            const p2 = { x: p1.x + L2 * Math.cos(theta2_global), y: p1.y + L2 * Math.sin(theta2_global) };
-            return { p0, p1, p2, target_base_steps: base_steps, target_elbow_steps: elbow_steps, theta1_rad: theta1, theta2_global_rad: theta2_global };
+        // --- KINEMATICS (Minified for visuals) ---
+        const L1=101.3, L2=101.3, R=9/8, S_DEG=3200/360, S_RAD=S_DEG*(180/Math.PI);
+        const lerp=(a,b,t)=>a+(b-a)*t;
+        function calcFK(b,e){
+            let t1 = -b/S_RAD, tb = -e/S_RAD - (R*(-b/S_RAD));
+            let t2 = t1+tb;
+            return { x: L1*Math.cos(t1)+L2*Math.cos(t2), y: L1*Math.sin(t1)+L2*Math.sin(t2) };
         }
-        function getInterpolatedState(from, to, progress) {
-            const theta1_rad = lerp(from.theta1_rad, to.theta1_rad, progress);
-            const theta2_global_rad = lerp(from.theta2_global_rad, to.theta2_global_rad, progress);
-            const p0 = from.p0;
-            const p1 = { x: p0.x + L1 * Math.cos(theta1_rad), y: p0.y + L1 * Math.sin(theta1_rad) };
-            const p2 = { x: p1.x + L2 * Math.cos(theta2_global_rad), y: p1.y + L2 * Math.sin(theta2_global_rad) };
-            return { p0, p1, p2 };
-        }
-        function calculateAllStates(commands) {
-            let cumulativeStates = [];
-            let total_base_steps = 0, total_elbow_steps = 0;
-            const p0 = {x:0, y:0};
-            cumulativeStates.push(calculateFK(p0, 0, 0));
-            for (const cmd of commands) {
-                total_base_steps += cmd.base;
-                total_elbow_steps += cmd.elbow;
-                cumulativeStates.push(calculateFK(p0, total_base_steps, total_elbow_steps));
-            }
-            return cumulativeStates;
-        }
-        function calculateTracePath(cumulativeStates) {
-            let tracePath = [];
-            if (cumulativeStates.length < 2) return [];
-            tracePath.push(cumulativeStates[0].p2);
-            for (let i = 0; i < cumulativeStates.length - 1; i++) {
-                const fromState = cumulativeStates[i];
-                const toState = cumulativeStates[i+1];
-                const base_delta = Math.abs(toState.target_base_steps - fromState.target_base_steps);
-                const elbow_delta = Math.abs(toState.target_elbow_steps - fromState.target_elbow_steps);
-                const max_step_delta = Math.max(base_delta, elbow_delta);
-                const stepsPerSegment = Math.max(5, Math.ceil(max_step_delta / 200)); 
-                for (let j = 1; j <= stepsPerSegment; j++) {
-                    const progress = j / stepsPerSegment;
-                    const interpolatedState = getInterpolatedState(fromState, toState, progress);
-                    tracePath.push(interpolatedState.p2);
-                }
-            }
-            return tracePath;
-        }
-        function generateTracePathFromText(commandText) {
-            const commands = commandText.split('\n')
-                .filter(line => line.trim().toUpperCase().startsWith('G1'))
-                .map(line => {
-                    const parts = line.trim().substring(2).trim().split(/\s+/).map(s => parseInt(s.trim(), 10));
-                    return { elbow: parts[0] || 0, base: parts[1] || 0 };
-                });
-            if (commands.length === 0) return [];
-            return calculateTracePath(calculateAllStates(commands));
-        }
-        function drawTraceOnCanvas(canvas, tracePath) {
+        // Basic Trace Generator
+        function drawTrace(canvas, text) {
             const ctx = canvas.getContext('2d');
-            ctx.fillStyle = 'white'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-            if (tracePath.length < 2) return;
-            let minX = tracePath[0].x, maxX = tracePath[0].x, minY = tracePath[0].y, maxY = tracePath[0].y;
-            for (const p of tracePath) {
-                if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
-                if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+            const w=canvas.width, h=canvas.height;
+            ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h);
+            
+            let cmds = text.split('\n').filter(l=>l.trim().toUpperCase().startsWith('G1'))
+                .map(l=>{let p=l.substring(2).trim().split(/\s+/); return {b:parseInt(p[1])||0, e:parseInt(p[0])||0}});
+            
+            if(cmds.length<2) return;
+            
+            let path=[]; let b=0, e=0;
+            path.push(calcFK(0,0));
+            
+            // Subsampling for performance
+            let step = Math.max(1, Math.floor(cmds.length/500));
+            for(let i=0; i<cmds.length; i+=step) {
+                b+=cmds[i].b; e+=cmds[i].e;
+                path.push(calcFK(b,e));
             }
-            const scale = Math.min(canvas.width / ((maxX - minX)||1), canvas.height / ((maxY - minY)||1)) * 0.9;
-            const cx = (minX + maxX)/2, cy = (minY + maxY)/2;
-            const w2 = canvas.width/2, h2 = canvas.height/2;
-
-            ctx.beginPath(); ctx.strokeStyle = 'black'; ctx.lineWidth = 1.5;
-            for (let i = 0; i < tracePath.length; i++) {
-                const p = tracePath[i];
-                const x = w2 + (p.x - cx) * scale;
-                const y = h2 + (p.y - cy) * -scale;
-                if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-            }
+            
+            // Bounds
+            let minX=path[0].x, maxX=path[0].x, minY=path[0].y, maxY=path[0].y;
+            path.forEach(p=>{if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y;});
+            
+            let sc = Math.min(w/(maxX-minX||1), h/(maxY-minY||1))*0.8;
+            let cx=(minX+maxX)/2, cy=(minY+maxY)/2;
+            
+            ctx.strokeStyle='#333'; ctx.lineWidth=1.5; ctx.beginPath();
+            path.forEach((p,i)=>{
+                let x = w/2 + (p.x-cx)*sc;
+                let y = h/2 + (p.y-cy)*(-sc);
+                if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+            });
             ctx.stroke();
         }
 
-        // --- App Logic ---
-        const statusBanner = document.getElementById('status-banner');
-        
-        function showStatus(message, type = 'success') {
-            statusBanner.textContent = message;
-            statusBanner.className = type === 'success' ? 'status-success' : 'status-error';
-            statusBanner.style.opacity = '1';
-            setTimeout(() => { statusBanner.style.opacity = '0'; }, 4000);
-            updateQueueCount();
+        // --- CORE LOGIC ---
+
+        function toggleTheme() {
+            let b = document.body;
+            let n = b.getAttribute('data-theme')==='dark'?'light':'dark';
+            b.setAttribute('data-theme', n);
         }
 
-        async function updateQueueCount() {
-            try {
-                const res = await fetch(`${BASE_URL}/queue_count`);
-                const data = await res.json();
-                const el = document.getElementById('queue-count');
-                el.textContent = `Q: ${data.count}`;
-                el.style.visibility = data.count > 0 ? 'visible' : 'hidden';
-            } catch(e) {}
+        function showStatus(msg) {
+            let el = document.getElementById('status-pill');
+            el.textContent = msg; el.style.opacity = '1';
+            setTimeout(()=>el.style.opacity='0', 3000);
         }
 
-        function sendCommand(cmd, msg) {
-            fetch(`${BASE_URL}/send`, {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ command: cmd })
-            }).then(r=>r.json()).then(d=>{
-                if(d.success) showStatus(msg || "Done", 'success');
-                else showStatus(`Error: ${d.error}`, 'error');
-            }).catch(e=>showStatus(`Network Error`, 'error'));
+        // --- SELECTION HANDLING ---
+        function toggleSelect(filename, event) {
+            event.stopPropagation(); // Don't trigger run
+            if(selectedFiles.has(filename)) selectedFiles.delete(filename);
+            else selectedFiles.add(filename);
+            renderSelectionState();
         }
 
-        function clearQueue() { sendCommand('CLEAR', 'Queue Cleared'); }
-        function pauseDesign() { sendCommand('PAUSE', 'Paused'); }
-        function resumeDesign() { sendCommand('RESUME', 'Resumed'); }
-
-        async function deleteFile(filename) {
-            if(!confirm(`Delete "${filename}"? This cannot be undone.`)) return;
-            try {
-                const res = await fetch(`${BASE_URL}/delete_design`, {
-                    method: "POST", headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ filename: filename })
-                });
-                const data = await res.json();
-                if(data.success) {
-                    showStatus("File Deleted", 'success');
-                    // Remove card from UI
-                    const card = document.getElementById(`card-${filename}`);
-                    if(card) card.remove();
+        function renderSelectionState() {
+            // Update Dots
+            document.querySelectorAll('.card').forEach(card => {
+                let fname = card.getAttribute('data-name');
+                if(selectedFiles.has(fname)) {
+                    card.classList.add('selected');
                 } else {
-                    showStatus(data.error, 'error');
+                    card.classList.remove('selected');
                 }
-            } catch(e) { showStatus(e.message, 'error'); }
-        }
+            });
 
-        async function runDesign(filename) {
-            const speedMultiplier = parseFloat(document.getElementById('speedSelect').value);
-            showStatus(`Processing...`, 'success');
-            try {
-                const txtPath = `${BASE_URL}/designs/${filename}`;
-                const response = await fetch(txtPath);
-                if (!response.ok) throw new Error('File not found');
-                const originalGcode = await response.text();
-
-                let modifiedGcodeLines = [];
-                const lines = originalGcode.split('\n');
-                for(let line of lines) {
-                    let trimLine = line.trim();
-                    if(trimLine.toUpperCase().startsWith('G1')) {
-                        const parts = trimLine.substring(2).trim().split(/\s+/);
-                        let delay = parts.length > 2 ? parseInt(parts[2]) : 1000;
-                        let newDelay = Math.round(delay * speedMultiplier);
-                        modifiedGcodeLines.push(`G1 ${parts[0]} ${parts[1]} ${newDelay}`);
-                    } else {
-                        modifiedGcodeLines.push(trimLine);
-                    }
-                }
-                const finalGcode = modifiedGcodeLines.join('\n');
-
-                const res = await fetch(`${BASE_URL}/send_gcode_block`, {
-                    method: "POST", headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ gcode: finalGcode, filename: filename })
-                });
-                const data = await res.json();
-                showStatus(data.success ? data.message : data.error, data.success ? 'success' : 'error');
-                updateQueueCount();
-
-            } catch (e) { showStatus(e.message, 'error'); }
-        }
-
-        async function loadDesignLibrary() {
-            const grid = document.getElementById('designGridContainer');
-            const loader = document.getElementById('loading-indicator');
-            const errMsg = document.getElementById('error-message');
-            const moreBtn = document.getElementById('btn-show-more');
+            // Update Bar
+            let bar = document.getElementById('selection-bar');
+            let count = document.getElementById('sel-count');
             
-            loader.style.display = 'block'; errMsg.style.display = 'none'; grid.innerHTML = '';
-
-            try {
-                const res = await fetch(`${BASE_URL}/api/designs`);
-                let files = await res.json();
-                if (files.length === 0) { errMsg.style.display = 'block'; return; }
-                
-                let recents = JSON.parse(localStorage.getItem('recentDesigns') || '[]');
-                files.sort((a,b) => {
-                    let ia = recents.indexOf(a), ib = recents.indexOf(b);
-                    if(ia!==-1 && ib!==-1) return ia-ib;
-                    if(ia!==-1) return -1; if(ib!==-1) return 1;
-                    return 0;
-                });
-
-                const TOP_COUNT = 9;
-                const first = files.slice(0, TOP_COUNT);
-                const rest = files.slice(TOP_COUNT);
-
-                const createCard = (f, hidden) => {
-                    const c = document.createElement('div');
-                    c.id = `card-${f}`;
-                    c.className = `design-card ${hidden ? 'hidden-card' : ''}`;
-                    c.innerHTML = `
-                        <canvas id="canvas-${f}" width="300" height="300"></canvas>
-                        <div class="card-content">
-                            <h3>${f.replace('.txt','')}</h3>
-                            <span id="time-${f}" class="duration-label">...</span>
-                            <button class="btn-primary" onclick="runDesign('${f}')">Queue</button>
-                            <button id="del-${f}" class="btn-danger" onclick="deleteFile('${f}')">Delete File</button>
-                        </div>`;
-                    
-                    fetch(`${BASE_URL}/designs/${f}`).then(r=>r.text()).then(t => {
-                         let time = 0;
-                         t.split('\n').forEach(l => {
-                             if(l.toUpperCase().startsWith('G1')) {
-                                 let p = l.substring(2).split(/\s+/);
-                                 let steps = Math.max(Math.abs(parseInt(p[0])||0), Math.abs(parseInt(p[1])||0));
-                                 let d = parseInt(p[2])||1000;
-                                 time += steps*d;
-                             }
-                         });
-                         document.getElementById(`time-${f}`).textContent = Math.ceil(time/60000000) + " min";
-                    });
-                    return c;
-                };
-
-                first.forEach(f => { grid.appendChild(createCard(f, false)); loadPreview(f); });
-
-                if (rest.length > 0) {
-                    moreBtn.style.display = 'inline-block';
-                    moreBtn.innerText = `Show ${rest.length} More`;
-                    moreBtn.onclick = () => {
-                        rest.forEach(f => { grid.appendChild(createCard(f, false)); setTimeout(()=>loadPreview(f),0); });
-                        moreBtn.style.display = 'none';
-                    };
-                }
-            } catch (e) { console.error(e); errMsg.style.display = 'block'; }
-            finally { loader.style.display = 'none'; }
-        }
-
-        function loadPreview(filename) {
-            const cvs = document.getElementById(`canvas-${filename}`);
-            if(!cvs) return;
-            const base = filename.replace('.txt','');
-            const img = new Image();
-            img.src = `${BASE_URL}/designs/${base}.png`;
-            
-            // Image Loads Successfully: Do normal draw
-            img.onload = () => cvs.getContext('2d').drawImage(img,0,0,cvs.width,cvs.height);
-            
-            // Image FAILS to load (Missing): Draw trace AND show Delete button
-            img.onerror = () => {
-                fetch(`${BASE_URL}/designs/${filename}`).then(r=>r.text()).then(t=>{
-                    drawTraceOnCanvas(cvs, generateTracePathFromText(t));
-                });
-                
-                // Show Delete Button
-                const delBtn = document.getElementById(`del-${filename}`);
-                if(delBtn) delBtn.style.display = "block";
+            if(selectedFiles.size > 0) {
+                bar.classList.add('active');
+                count.textContent = `${selectedFiles.size} Selected`;
+            } else {
+                bar.classList.remove('active');
             }
         }
 
-        function openNav() { document.getElementById("mySidebar").style.width = "200px"; }
-        function closeNav() { document.getElementById("mySidebar").style.width = "0"; }
-        function toggleDarkMode() {
-            const b = document.body;
-            const n = b.getAttribute('data-theme')==='dark'?'light':'dark';
-            b.setAttribute('data-theme', n); localStorage.setItem('theme',n);
-            document.getElementById('themeToggle').textContent = n==='dark'?'☀️':'🌙';
+        async function deleteSelected() {
+            if(!confirm(`Delete ${selectedFiles.size} files?`)) return;
+            
+            for(let f of selectedFiles) {
+                try {
+                    await fetch(`${BASE_URL}/delete_design`, {
+                        method: "POST", headers:{"Content-Type":"application/json"},
+                        body: JSON.stringify({filename: f})
+                    });
+                } catch(e) { console.error(e); }
+            }
+            selectedFiles.clear();
+            renderSelectionState();
+            loadLibrary(); // Refresh grid
+            showStatus("Files deleted");
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            const t = localStorage.getItem('theme')||'light';
-            document.body.setAttribute('data-theme', t);
-            document.getElementById('themeToggle').textContent = t==='dark'?'☀️':'🌙';
-            loadDesignLibrary();
-            updateQueueCount();
-            setInterval(updateQueueCount, 5000); 
-        });
+        async function copySelected() {
+            let fullText = "";
+            showStatus("Fetching code...");
+            
+            for(let f of selectedFiles) {
+                try {
+                    let res = await fetch(`${BASE_URL}/designs/${f}`);
+                    let txt = await res.text();
+                    fullText += `; --- START ${f} ---\n${txt}\n; --- END ${f} ---\n\n`;
+                } catch(e) {}
+            }
+            
+            navigator.clipboard.writeText(fullText).then(() => {
+                showStatus("Copied to Clipboard!");
+                selectedFiles.clear();
+                renderSelectionState();
+            });
+        }
+
+        // --- RUNNING ---
+        async function runDesign(filename) {
+            // If we are in selection mode (bar active) and click a card, maybe just select it?
+            // For now, clicking the *Body* runs, clicking *Dot* selects.
+            
+            let spd = document.getElementById('speedSelect').value;
+            showStatus("Queueing...");
+            
+            // Fetch text to apply speed multiplier locally (simplified logic from previous)
+            try {
+                let res = await fetch(`${BASE_URL}/designs/${filename}`);
+                let txt = await res.text();
+                
+                // Simple modifier
+                let lines = txt.split('\n').map(l => {
+                    if(l.trim().startsWith('G1')) {
+                        let p = l.split(/\s+/);
+                        // Assuming G1 E B Delay
+                        if(p.length >= 3) {
+                           let d = Math.round(parseInt(p[2]) * parseFloat(spd));
+                           return `G1 ${p[1]} ${p[2]} ${d}`; // Reconstruct carefully, split index 0 is 'G1' usually? 
+                           // Actually parsing standard Gcode usually is G1 X Y. Your format is custom.
+                           // Let's rely on the previous logic: G1 Elbow Base Delay
+                        }
+                    }
+                    return l;
+                });
+                
+                // Re-using the robust logic from previous version in a condensed way is risky without full parser.
+                // Let's just send the file name and speed override if backend supported it, 
+                // OR just send raw text. For this UI demo, I'll send the raw text unmodified for safety 
+                // unless I duplicate the exact parsing logic.
+                // *Self-correction*: I will use the exact parsing logic from your previous file.
+                
+                let modLines = [];
+                for(let line of txt.split('\n')) {
+                    let trim = line.trim();
+                    if(trim.toUpperCase().startsWith('G1')) {
+                        let parts = trim.substring(2).trim().split(/\s+/); // [Elbow, Base, Delay]
+                        let d = parts[2] ? parseInt(parts[2]) : 1000;
+                        d = Math.round(d * parseFloat(spd));
+                        modLines.push(`G1 ${parts[0]} ${parts[1]} ${d}`);
+                    } else {
+                        modLines.push(trim);
+                    }
+                }
+                
+                await fetch(`${BASE_URL}/send_gcode_block`, {
+                    method:"POST", headers:{"Content-Type":"application/json"},
+                    body: JSON.stringify({ gcode: modLines.join('\n'), filename: filename })
+                });
+                
+                showStatus("Added to Queue");
+                updateQ();
+            } catch(e) { showStatus("Error"); }
+        }
+
+        // --- CONTROLS ---
+        function sendCmd(c) { 
+            fetch(`${BASE_URL}/send`, {
+                method:"POST",headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({command:c})
+            }).then(()=>showStatus("Sent: "+c)); 
+        }
+        function pauseDesign() { sendCmd('PAUSE'); }
+        function resumeDesign() { sendCmd('RESUME'); }
+        function clearQueue() { sendCmd('CLEAR'); updateQ(); }
+        
+        async function updateQ() {
+            try {
+                let r = await fetch(`${BASE_URL}/queue_count`);
+                let d = await r.json();
+                document.getElementById('q-badge').textContent = d.count > 0 ? `Q: ${d.count}` : '';
+            } catch(e){}
+        }
+
+        // --- LOADING ---
+        async function loadLibrary() {
+            let g = document.getElementById('grid');
+            g.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:40px;">Loading...</div>';
+            
+            try {
+                let res = await fetch(`${BASE_URL}/api/designs`);
+                let files = await res.json();
+                allFiles = files; // Store
+                renderGrid(files.slice(0, 12)); // Show first 12
+                if(files.length > 12) document.getElementById('more-btn').style.display='inline-block';
+            } catch(e) {
+                g.innerHTML = 'Error loading files.';
+            }
+        }
+        
+        function showAll() {
+            renderGrid(allFiles);
+            document.getElementById('more-btn').style.display='none';
+        }
+
+        function renderGrid(files) {
+            let g = document.getElementById('grid');
+            g.innerHTML = '';
+            
+            files.forEach(f => {
+                let clean = f.replace('.txt','');
+                let div = document.createElement('div');
+                div.className = 'card';
+                div.setAttribute('data-name', f);
+                div.onclick = () => runDesign(f);
+                
+                // Selection Dot Logic
+                let dot = document.createElement('div');
+                dot.className = 'select-dot';
+                dot.onclick = (e) => toggleSelect(f, e);
+                
+                div.innerHTML = `
+                    <div class="card-img-wrap">
+                        <canvas id="cvs-${clean}"></canvas>
+                    </div>
+                    <div class="card-body">
+                        <h3 class="card-title">${clean}</h3>
+                        <div class="card-meta">Est: <span id="time-${clean}">...</span></div>
+                    </div>
+                `;
+                div.querySelector('.card-img-wrap').appendChild(dot);
+                g.appendChild(div);
+                
+                // Async Load Preview
+                setTimeout(() => {
+                    let cvs = document.getElementById(`cvs-${clean}`);
+                    let img = new Image();
+                    img.src = `${BASE_URL}/designs/${clean}.png`;
+                    img.onload = () => cvs.getContext('2d').drawImage(img,0,0,cvs.width,cvs.height);
+                    img.onerror = () => {
+                        fetch(`${BASE_URL}/designs/${f}`).then(r=>r.text()).then(t=>drawTrace(cvs,t));
+                    };
+                    
+                    // Calc Time
+                    fetch(`${BASE_URL}/designs/${f}`).then(r=>r.text()).then(t=>{
+                        let time=0;
+                        t.split('\n').forEach(l=>{
+                             if(l.toUpperCase().startsWith('G1')) {
+                                 let p=l.substring(2).split(/\s+/);
+                                 let s=Math.max(Math.abs(parseInt(p[0])||0), Math.abs(parseInt(p[1])||0));
+                                 time += s*(parseInt(p[2])||1000);
+                             }
+                        });
+                        document.getElementById(`time-${clean}`).textContent = Math.ceil(time/60000000) + " min";
+                    });
+                }, 0);
+            });
+            renderSelectionState(); // Re-apply selections if needed
+        }
+
+        function openNav() { document.getElementById('mySidebar').style.width="250px"; document.getElementById('overlay').style.display="block"; }
+        function closeNav() { document.getElementById('mySidebar').style.width="0"; document.getElementById('overlay').style.display="none"; }
+
+        // Init
+        loadLibrary();
+        updateQ(); setInterval(updateQ, 5000);
     </script>
 </body>
 </html>
