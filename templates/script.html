@@ -1,681 +1,873 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sand Table Controller v17 (Center Pass-Through)</title>
-<style>
-    :root {
-        --bg: #f4f4f9;
-        --panel: #ffffff;
-        --text: #333;
-        --accent: #b08d5c;
-        --accent-hover: #967548;
-        --border: #ddd;
-    }
-    body {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        background-color: var(--bg);
-        color: var(--text);
-        margin: 0;
-        padding: 20px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-    }
-    h1 { margin-top: 0; color: var(--accent); }
-    .container {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 20px;
-        max-width: 1200px;
-        width: 100%;
-    }
-    @media (max-width: 768px) {
-        .container { grid-template-columns: 1fr; }
-    }
-    .card {
-        background: var(--panel);
-        padding: 20px;
-        border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        display: flex;
-        flex-direction: column;
-        gap: 15px;
-        position: relative;
-    }
-    .full-width { grid-column: 1 / -1; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Packers Sand Pro (Synced v17)</title>
     
-    label { font-weight: 600; font-size: 0.9em; display: block; margin-bottom: 5px; }
-    
-    input[type="number"], input[type="text"], select {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        box-sizing: border-box;
-    }
-    textarea {
-        width: 100%;
-        height: 150px;
-        padding: 10px;
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        font-family: monospace;
-        font-size: 12px;
-        resize: vertical;
-        box-sizing: border-box;
-        white-space: pre;
-        overflow-x: scroll;
-    }
-    
-    button {
-        background-color: var(--accent);
-        color: white;
-        border: none;
-        padding: 12px 20px;
-        border-radius: 6px;
-        cursor: pointer;
-        font-weight: bold;
-        font-size: 1em;
-        transition: background 0.2s;
-    }
-    button:hover { background-color: var(--accent-hover); }
-    button.secondary {
-        background-color: transparent;
-        border: 2px solid var(--accent);
-        color: var(--accent);
-    }
-    
-    button.send-btn { background-color: #28a745; margin-top: 10px; } 
-    button.send-btn:hover { background-color: #1e7e34; }
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
 
-    .canvas-container {
-        position: relative;
-        width: 100%;
-        padding-top: 100%;
-        background: #fff;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-    }
-    canvas {
-        position: absolute;
-        top: 0; left: 0;
-        width: 100%; height: 100%;
-        border-radius: 8px;
-    }
-    .status-bar {
-        padding: 15px;
-        background: #eef;
-        border-left: 5px solid var(--accent);
-        border-radius: 4px;
-        font-size: 0.95em;
-        color: #445;
-        white-space: pre-wrap;
-    }
-    .settings-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-    }
-</style>
+    <script src="https://cdn.jsdelivr.net/npm/imagetracerjs@1.2.6/imagetracer_v1.2.6.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #d2b48c; 
+            --secondary: #b08d5c; 
+            --bg: #f4f4f4; 
+            --panel: #ffffff; 
+            --text: #333;
+            --accent: #2ecc71;
+            --danger: #e74c3c;
+            --btn-text: #fff;
+        }
+        body[data-theme='dark'] {
+            --bg: #121212; --panel: #1e1e1e; --text: #e0e0e0; --btn-text: #000;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg); color: var(--text);
+            margin: 0; padding: 0; height: 100vh;
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+
+        .nav-bar {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 15px; background: var(--panel);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 100;
+        }
+        .sidebar {
+            height: 100%; width: 0; position: fixed; top: 0; left: 0;
+            background-color: var(--primary); overflow-x: hidden;
+            transition: 0.3s; padding-top: 60px; z-index: 2000;
+            box-shadow: 4px 0 10px rgba(0,0,0,0.3);
+        }
+        .sidebar a {
+            padding: 15px 24px; text-decoration: none; font-size: 18px;
+            color: #fff; display: block; font-weight: 500;
+        }
+
+        .app-container {
+            display: flex; flex-direction: column; height: 100%; width: 100%;
+            padding: 10px; box-sizing: border-box; gap: 10px; overflow-y: auto;
+        }
+        @media (min-width: 768px) {
+            .app-container { flex-direction: row; overflow: hidden; }
+            .drawing-panel { flex: 2; border-radius: 16px; background: var(--panel); position: relative; }
+            .controls-panel { flex: 1; max-width: 400px; border-radius: 16px; background: var(--panel); padding: 20px; overflow-y: auto; }
+        }
+        @media (max-width: 767px) {
+            .drawing-panel { width: 100%; aspect-ratio: 1/1; border-radius: 16px; background: var(--panel); flex-shrink: 0; }
+            .controls-panel { flex: 1; border-radius: 16px; background: var(--panel); padding: 15px; }
+        }
+
+        .canvas-wrapper {
+            position: relative; width: 95%; height: 95%; margin: auto;
+            aspect-ratio: 1/1; border-radius: 50%;
+            border: 4px solid var(--primary); background: #fff;
+            touch-action: none; cursor: crosshair; overflow: hidden;
+            top: 50%; transform: translateY(-50%);
+        }
+        body[data-theme='dark'] .canvas-wrapper { background: #222; border-color: var(--secondary); }
+        canvas { display: block; width: 100%; height: 100%; border-radius: 50%; }
+
+        h2 { margin: 0 0 15px 0; font-size: 1.2rem; color: var(--secondary); text-align: center; }
+        .btn-group { display: flex; gap: 8px; margin-bottom: 12px; }
+        button {
+            background: var(--primary); color: var(--btn-text); border: none;
+            padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer;
+            flex: 1; transition: 0.2s; display: flex; align-items: center; justify-content: center;
+        }
+        button:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        button.secondary { background: transparent; border: 1px solid var(--text); color: var(--text); }
+        button.active { background: var(--secondary); border: 2px solid var(--text); }
+        button.action { background: var(--accent); color: #000; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        
+        .slider-row { margin-bottom: 15px; background: rgba(0,0,0,0.05); padding: 8px; border-radius: 8px; }
+        .slider-header { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; font-weight: bold; }
+        input[type="range"] { width: 100%; accent-color: var(--secondary); }
+        
+        #progressSlider {
+            -webkit-appearance: none; width: 100%; height: 8px; border-radius: 5px; background: #d3d3d3; outline: none;
+        }
+        #progressSlider::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--secondary); cursor: pointer;
+        }
+
+        details { background: rgba(0,0,0,0.05); padding: 10px; border-radius: 8px; margin-top: 10px; }
+        summary { cursor: pointer; font-weight: bold; font-size: 13px; }
+        .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+        input[type="number"] { width: 100%; padding: 5px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box; font-family: monospace;}
+
+        #status-toast {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: #333; color: white; padding: 10px 20px; border-radius: 20px;
+            font-size: 13px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 3000;
+        }
+        .success { background: var(--accent) !important; color: #000 !important; }
+        .error { background: var(--danger) !important; color: #fff !important; }
+
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 0 5px; }
+        .switch { position: relative; display: inline-block; width: 40px; height: 22px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider-tog { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
+        .slider-tog:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider-tog { background-color: var(--secondary); }
+        input:checked + .slider-tog:before { transform: translateX(18px); }
+
+    </style>
 </head>
-<body>
+<body data-theme="light">
 
-<h1>Sand Table Controller v17</h1>
-
-<div class="container">
-    <div class="card">
-        <h2>1. Input</h2>
-        <div>
-            <label>Upload File (.thr, .gcode, .txt)</label>
-            <input type="file" id="fileInput" accept=".thr,.gcode,.txt,.nc">
-        </div>
-        <div>
-            <label>Input Format Strategy</label>
-            <select id="inputFormat">
-                <option value="auto">Auto-Detect (Recommended)</option>
-                <option value="thr">Theta-Rho (.thr) - Radians & Normalized</option>
-                <option value="polar_gcode">Polar G-Code (G1 R A) - mm & Degrees</option>
-                <option value="cartesian">Cartesian (G1 X Y)</option>
-            </select>
-        </div>
-        <textarea id="inputData" placeholder="Paste code or upload file here..."></textarea>
-        <div class="status-bar" id="inputStats">Waiting for data...</div>
+    <div id="mySidebar" class="sidebar">
+        <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
+        <a href="/">Designs</a> 
+        <a href="/controls">Drawing</a>
+        <a href="/led_controls">LED Controls</a>
+        <a href="/ai_builder">AI Builder</a>
+        <a href="/terminal">Terminal</a>
     </div>
 
-    <div class="card">
-        <h2>2. Machine Settings</h2>
-        <div class="settings-grid">
-            <div>
-                <label>Table Max Radius (mm)</label>
-                <input type="number" id="tableRadius" value="202.6">
-            </div>
-            
-            <div>
-                <label>Center Delay (Fastest - us)</label>
-                <input type="number" id="centerDelay" value="500">
-            </div>
-            <div>
-                <label>Perimeter Delay (Slowest - us)</label>
-                <input type="number" id="perimeterDelay" value="3000">
-            </div>
-            
-            <div>
-                <label>Arm 1 Length (mm)</label>
-                <input type="number" id="L1" value="101.3">
-            </div>
-            <div>
-                <label>Arm 2 Length (mm)</label>
-                <input type="number" id="L2" value="101.3">
-            </div>
-            <div>
-                <label>Gear Ratio</label>
-                <input type="number" id="gearRatio" value="1.125" step="0.001">
-            </div>
-            <div>
-                <label>Steps per Degree</label>
-                <input type="number" id="stepsPerDeg" value="8.888888" step="0.000001">
-            </div>
-        </div>
-        <label>Interpolation Resolution (mm)</label>
-        <input type="number" id="resolution" value="1.0" title="Smaller values = smoother curves but more data">
-        <button onclick="processData()">Convert & Simulate</button>
+    <div class="nav-bar">
+        <button style="flex:0; background:none; font-size:24px; color:var(--text); padding:0;" onclick="openNav()">☰</button>
+        <h1 style="margin:0; font-size:1.2rem;">Sand Controller</h1>
+        <button style="flex:0; background:none; font-size:20px;" onclick="toggleTheme()">☀️</button>
     </div>
 
-    <div class="card full-width">
-        <h2>3. Output Code & Simulation</h2>
-        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-            <div style="flex: 1; min-width: 300px;">
-                <label>Output Code (Editable)</label>
-                <textarea id="outputData" style="height: 300px;" placeholder="G-code appears here..."></textarea>
+    <div class="app-container">
+        
+        <div class="drawing-panel">
+            <div class="canvas-wrapper" id="canvasContainer">
+                <canvas id="drawCanvas"></canvas>
+            </div>
+            <div id="coordDisplay" style="position:absolute; bottom:10px; left:10px; background:rgba(0,0,0,0.5); color:white; padding:4px 8px; border-radius:4px; font-size:11px; pointer-events:none;">X:0 Y:0</div>
+        </div>
+
+        <div class="controls-panel">
+            <h2>Tools</h2>
+            
+            <div class="toggle-row">
+                <span style="font-weight:600; font-size:13px;">🖋️ Smart Pen Mode</span>
+                <label class="switch">
+                    <input type="checkbox" id="smartPenMode" checked>
+                    <span class="slider-tog"></span>
+                </label>
+            </div>
+
+            <div class="btn-group">
+                <button id="btnDraw" onclick="setTool('draw')" class="active">✏️ Draw</button>
+                <button id="btnErase" onclick="setTool('erase')" class="secondary">🧼 Erase</button>
+            </div>
+
+            <div class="btn-group">
+                <input type="file" id="imgUpload" accept="image/*" style="display:none" onchange="handleImageUpload(this)">
+                <button class="secondary" onclick="document.getElementById('imgUpload').click()">✨ Trace Image</button>
+            </div>
+
+            <div class="btn-group">
+                <button onclick="undo()" class="secondary">↶ Undo</button>
+                <button onclick="clearCanvas()" class="secondary" style="color:var(--danger); border-color:var(--danger);">✖ Clear</button>
+            </div>
+
+            <hr style="border:0; border-top:1px solid #ddd; margin: 15px 0;">
+            
+             <div class="slider-row">
+                <div class="slider-header"><span>SYMMETRY</span> <span id="symVal">1x</span></div>
+                <input type="range" id="symSlider" min="1" max="12" value="1" step="1" oninput="updateUI()">
+            </div>
+
+            <div class="slider-row">
+                <div class="slider-header"><span>SIMULATION (Start ⮕ Finish)</span> <span id="progVal">100%</span></div>
+                <input type="range" id="progressSlider" min="0" max="100" value="100" oninput="render()">
+            </div>
+
+            <button class="action" onclick="prepareGCode()" style="margin-bottom:15px; font-size:1.1em;">⚙️ Prepare Path</button>
+
+            <div style="text-align:center; font-size:12px; margin-bottom:10px; color:#666;">
+                Status: <span id="statusTxt" style="font-weight:bold; color:var(--primary);">Drawing Mode</span>
+            </div>
+
+            <div class="toggle-row" style="background:rgba(0,0,0,0.03); padding:8px; border-radius:8px; margin-bottom:10px;">
+                <span style="font-weight:600; font-size:13px;">✨ Auto-Clear Before Run</span>
+                <label class="switch">
+                    <input type="checkbox" id="autoClearMode" checked>
+                    <span class="slider-tog"></span>
+                </label>
+            </div>
+
+            <div class="btn-group">
+                <button onclick="sendToTable()" class="active">🚀 Run</button>
+                <button onclick="downloadGcode()" class="secondary">💾 Save</button>
+            </div>
+
+            <details>
+                <summary>⚙️ Machine Settings</summary>
+                <div class="settings-grid">
+                    <div><label>Radius</label><input type="number" id="cfgRadius" value="202.6" onchange="resizeCanvas()"></div>
+                    <div><label>Center (us)</label><input type="number" id="cfgCenterDelay" value="500"></div>
+                    <div><label>Rim (us)</label><input type="number" id="cfgPerimDelay" value="3000"></div>
+                    <div><label>Steps/Deg</label><input type="number" id="cfgStepsPerDeg" value="8.888888"></div>
+                    <div><label>Arm 1</label><input type="number" id="cfgL1" value="101.3"></div>
+                    <div><label>Arm 2</label><input type="number" id="cfgL2" value="101.3"></div>
+                    <div><label>Gear Ratio</label><input type="number" id="cfgGearRatio" value="1.125"></div>
+                    <div><label>Resolution</label><input type="number" id="cfgResolution" value="1.0"></div>
+                </div>
+            </details>
+        </div>
+    </div>
+
+    <div id="status-toast"></div>
+
+    <script>
+        let rawPoints = []; 
+        let processedPoints = []; 
+        let historyStack = [];
+        let isDrawing = false;
+        let currentTool = 'draw';
+        let origin = {x:0, y:0};
+        let scale = 1;
+        let generatedGCode = null;
+
+        const canvas = document.getElementById('drawCanvas');
+        const ctx = canvas.getContext('2d');
+        const BASE_URL = window.location.origin;
+
+        function init() {
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            canvas.addEventListener('pointerdown', startDraw);
+            canvas.addEventListener('pointermove', moveDraw);
+            canvas.addEventListener('pointerup', endDraw);
+            canvas.addEventListener('pointerleave', endDraw);
+            canvas.style.touchAction = "none";
+            
+            updateUI();
+        }
+
+        // --- DRAWING LOGIC ---
+        function startDraw(e) {
+            e.preventDefault();
+            const smart = document.getElementById('smartPenMode').checked;
+            if(smart) {
+                if(e.pointerType === 'pen') setTool('draw');
+                else if(e.pointerType === 'touch') setTool('erase');
+            }
+            saveState();
+            isDrawing = true;
+            canvas.setPointerCapture(e.pointerId);
+            processPointer(e);
+            resetStatus();
+        }
+
+        function moveDraw(e) {
+            e.preventDefault();
+            const pos = getPos(e);
+            document.getElementById('coordDisplay').textContent = `X:${pos.x.toFixed(0)} Y:${pos.y.toFixed(0)}`;
+            if(!isDrawing) { render(); drawCursor(pos); return; }
+            processPointer(e);
+        }
+
+        function endDraw(e) {
+            if(!isDrawing) return;
+            isDrawing = false;
+            if(currentTool === 'draw') rawPoints.push({type:'break'});
+            canvas.releasePointerCapture(e.pointerId);
+            render();
+        }
+
+        function getPos(e) {
+            return {
+                x: (e.offsetX - origin.x) / scale,
+                y: -(e.offsetY - origin.y) / scale
+            };
+        }
+
+        function processPointer(e) {
+            const p = getPos(e);
+            if(currentTool === 'draw') {
+                rawPoints.push({x: p.x, y: p.y, type: 'point'});
+            } else {
+                const r = 10;
+                rawPoints = rawPoints.filter(pt => {
+                    if(pt.type === 'break') return true;
+                    return Math.hypot(pt.x - p.x, pt.y - p.y) > r;
+                });
+            }
+            render();
+            if(currentTool==='erase') drawCursor(p);
+        }
+
+        function drawCursor(p) {
+            if(currentTool !== 'erase') return;
+            const r = 10 * scale;
+            const px = origin.x + p.x * scale;
+            const py = origin.y - p.y * scale;
+            ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI*2);
+            ctx.strokeStyle = "#999"; ctx.fillStyle = "rgba(200,200,200,0.3)";
+            ctx.stroke(); ctx.fill();
+        }
+
+        function resetStatus() {
+            generatedGCode = null;
+            processedPoints = [];
+            document.getElementById('statusTxt').innerText = "Drawing Mode";
+            document.getElementById('statusTxt').style.color = "orange";
+            document.getElementById('progressSlider').value = 100;
+        }
+
+        // --- RENDERER ---
+        function render() {
+            const w = canvas.width / window.devicePixelRatio;
+            const h = canvas.height / window.devicePixelRatio;
+            ctx.clearRect(0, 0, w, h);
+            
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            const sym = parseInt(document.getElementById('symSlider').value);
+            const dark = document.body.getAttribute('data-theme') === 'dark';
+            const prog = parseInt(document.getElementById('progressSlider').value);
+            document.getElementById('progVal').textContent = prog + '%';
+
+            ctx.save();
+            ctx.translate(origin.x, origin.y);
+
+            // Table Circle
+            ctx.beginPath(); ctx.arc(0, 0, tableR*scale, 0, Math.PI*2);
+            ctx.strokeStyle = dark ? '#444' : '#ddd'; ctx.lineWidth = 2; ctx.stroke();
+
+            const showingFinal = (processedPoints.length > 0);
+            const dataToShow = showingFinal ? processedPoints : rawPoints;
+            const limit = Math.floor(dataToShow.length * (prog/100));
+            const color = showingFinal ? '#ff0000' : (dark ? 'cyan' : '#007bff');
+
+            ctx.lineWidth = 1.5;
+            
+            const loopCount = showingFinal ? 1 : sym;
+
+            for(let s=0; s<loopCount; s++) {
+                const ang = s * (Math.PI*2/sym);
+                ctx.save(); 
+                if(!showingFinal) ctx.rotate(ang); 
                 
-                <button class="send-btn" onclick="sendToTable()">🚀 Send to Table</button>
-                <div id="sendStatus" style="margin-top:5px; font-size:0.9em; color:#666;"></div>
-
-                <div style="display:flex; gap:10px; margin-top:10px;">
-                    <button onclick="copyOutput()" class="secondary" style="flex:1;">Copy</button>
-                    <button onclick="downloadOutput()" class="secondary" style="flex:1;">Download</button>
-                </div>
-            </div>
-            <div style="flex: 1; min-width: 300px;">
-                <label>Visual Preview</label>
-                <div class="canvas-container">
-                    <canvas id="simCanvas"></canvas>
-                </div>
-                <div style="margin-top:10px; display:flex; gap:10px;">
-                     <button class="secondary" onclick="playSimulation()">▶ Play</button>
-                     <button class="secondary" onclick="stopSimulation()">⏹ Stop</button>
-                     <input type="range" id="simSlider" min="0" max="100" value="0" style="flex-grow:1;">
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-// --- CONFIGURATION ---
-const BASE_URL = window.location.origin; 
-
-// --- STATE ---
-let RAW_COORDS = []; 
-let ARM_STATES = []; 
-let animId = null;
-
-// --- DOM ELEMENTS ---
-const fileInput = document.getElementById('fileInput');
-const inputData = document.getElementById('inputData');
-const outputData = document.getElementById('outputData');
-const canvas = document.getElementById('simCanvas');
-const ctx = canvas.getContext('2d');
-const simSlider = document.getElementById('simSlider');
-
-// --- INITIALIZATION ---
-window.onload = function() {
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
-    
-    fileInput.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            inputData.value = e.target.result;
-            processData();
-        };
-        reader.readAsText(file);
-    });
-
-    simSlider.addEventListener('input', (e) => {
-        stopSimulation();
-        const idx = Math.floor((parseFloat(e.target.value) / 100) * (ARM_STATES.length - 1));
-        drawSimulation(idx);
-    });
-
-    outputData.addEventListener('input', () => {
-        parseOutputAndSimulate();
-    });
-};
-
-function resizeCanvas() {
-    const container = canvas.parentElement;
-    canvas.width = container.clientWidth;
-    canvas.height = container.clientHeight;
-    if (ARM_STATES.length > 0) {
-        const idx = Math.floor((parseFloat(simSlider.value) / 100) * (ARM_STATES.length - 1));
-        drawSimulation(idx);
-    }
-}
-
-// --- MAIN LOGIC ---
-
-function processData() {
-    const tableRadius = parseFloat(document.getElementById('tableRadius').value);
-    const format = document.getElementById('inputFormat').value;
-    const text = inputData.value;
-    const lines = text.split('\n');
-    
-    RAW_COORDS = [];
-    
-    let mode = format;
-    if (mode === 'auto') {
-        if (text.includes('thetarho')) mode = 'thr';
-        else if (text.match(/G1.*R/i)) mode = 'polar_gcode';
-        else if (text.match(/G1.*X/i)) mode = 'cartesian';
-        else mode = 'thr';
-    }
-
-    document.getElementById('inputStats').innerText = `Detected Mode: ${mode}`;
-
-    for (let line of lines) {
-        line = line.trim();
-        if (!line || line.startsWith('#') || line.startsWith(';')) continue;
-        let p = { x: 0, y: 0, theta: 0, rho: 0, type: 'cartesian' }; 
-
-        if (mode === 'thr') {
-            const parts = line.trim().split(/\s+/);
-            if (parts.length >= 2 && !isNaN(parseFloat(parts[0]))) {
-                p.theta = parseFloat(parts[0]);
-                p.rho = parseFloat(parts[1]);
-                p.type = 'polar';
-                let r_mm = p.rho * tableRadius;
-                p.x = r_mm * Math.cos(p.theta);
-                p.y = r_mm * Math.sin(p.theta);
-                RAW_COORDS.push(p);
+                ctx.beginPath();
+                ctx.strokeStyle = color;
+                
+                let isMove = true;
+                for(let i=0; i<limit; i++) {
+                    const p = dataToShow[i];
+                    if(p.type === 'break' || p.type === 'exit') { isMove = true; continue; }
+                    
+                    const px = p.x * scale;
+                    const py = -p.y * scale;
+                    
+                    if(isMove) { ctx.moveTo(px, py); isMove = false; }
+                    else ctx.lineTo(px, py);
+                }
+                ctx.stroke();
+                
+                if(limit > 0 && limit < dataToShow.length) {
+                    const tip = dataToShow[limit];
+                    if(tip.type !== 'break' && tip.type !== 'exit') {
+                        ctx.beginPath(); 
+                        ctx.arc(tip.x*scale, -tip.y*scale, 4, 0, Math.PI*2);
+                        ctx.fillStyle = color; ctx.fill();
+                    }
+                }
+                ctx.restore();
             }
-        } 
-        else if (mode === 'polar_gcode') {
-            const match = line.match(/G1\s+.*R([\d.-]+).*A([\d.-]+)/i);
-            if (match) {
-                let r = parseFloat(match[1]);
-                let deg = parseFloat(match[2]);
-                let rad = deg * (Math.PI / 180);
-                p.type = 'polar';
-                p.rho = r / tableRadius;
-                p.theta = rad;
-                p.x = r * Math.cos(rad);
-                p.y = r * Math.sin(rad);
-                RAW_COORDS.push(p);
-            }
+            ctx.restore();
         }
-        else {
-            const match = line.match(/G1\s+.*X([\d.-]+).*Y([\d.-]+)/i);
-            if (match) {
-                p.x = parseFloat(match[1]);
-                p.y = parseFloat(match[2]);
-                p.type = 'cartesian';
-                RAW_COORDS.push(p);
-            }
+
+        // --- AI TRACER ---
+        function handleImageUpload(input) {
+            const file = input.files[0];
+            if(!file) return;
+            showToast("Scanning...", "info");
+            saveState();
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const tCan = document.createElement('canvas');
+                    const MAX = 1000;
+                    let tw = img.width, th = img.height;
+                    if(tw>th && tw>MAX){ th*=MAX/tw; tw=MAX; } 
+                    else if(th>MAX){ tw*=MAX/th; th=MAX; }
+                    
+                    tCan.width = tw; tCan.height = th;
+                    const tCtx = tCan.getContext('2d');
+                    tCtx.fillStyle = "white"; tCtx.fillRect(0,0,tw,th);
+                    tCtx.filter = "grayscale(100%) contrast(150%)";
+                    tCtx.drawImage(img, 0, 0, tw, th);
+                    
+                    ImageTracer.imageToSVG(tCan.toDataURL(), function(svgStr){
+                        processTrace(svgStr, tw, th);
+                    }, { ltres:0.5, qtres:0.5, pathomit:2, colorsampling:2, numberofcolors:2 });
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
         }
-    }
 
-    if (RAW_COORDS.length === 0) {
-        alert("No valid coordinates found.");
-        return;
-    }
-    interpolateAndGenerate();
-}
+        function processTrace(svgStr, imgW, imgH) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(svgStr, "image/svg+xml");
+            const paths = doc.getElementsByTagName("path");
+            let strokes = [];
+            const res = 2.0; 
 
-function interpolateAndGenerate() {
-    const tableRadius = parseFloat(document.getElementById('tableRadius').value);
-    const res = parseFloat(document.getElementById('resolution').value);
+            for(let i=0; i<paths.length; i++) {
+                const p = paths[i];
+                const len = p.getTotalLength();
+                if(len < 5) continue; 
+                
+                let pts = [];
+                let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
 
-    let interpolated = [];
-    if (RAW_COORDS.length > 0) interpolated.push({x: RAW_COORDS[0].x, y: RAW_COORDS[0].y});
+                for(let d=0; d<=len; d+=res) {
+                    const pt = p.getPointAtLength(d);
+                    pts.push({x: pt.x, y: pt.y});
+                    if(pt.x<minX) minX=pt.x; if(pt.x>maxX) maxX=pt.x;
+                    if(pt.y<minY) minY=pt.y; if(pt.y>maxY) maxY=pt.y;
+                }
+                
+                const w = maxX - minX;
+                const h = maxY - minY;
+                if (w > imgW * 0.98 || h > imgH * 0.98) continue; 
+                strokes.push(pts);
+            }
 
-    for (let i = 0; i < RAW_COORDS.length - 1; i++) {
-        let p1 = RAW_COORDS[i];
-        let p2 = RAW_COORDS[i+1];
-        
-        if (p1.type === 'polar' && p2.type === 'polar') {
-            let avgR = (p1.rho + p2.rho) / 2 * tableRadius;
-            let dTheta = Math.abs(p2.theta - p1.theta);
-            let arcDist = avgR * dTheta; 
-            let linDist = Math.abs((p2.rho - p1.rho) * tableRadius);
-            let totalDist = Math.sqrt(arcDist*arcDist + linDist*linDist);
+            if(strokes.length === 0) return showToast("No shapes found", "error");
+
+            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+            strokes.flat().forEach(p => {
+                if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
+                if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
+            });
             
-            let steps = Math.ceil(totalDist / res);
-            steps = Math.max(1, steps);
+            const contentW = maxX - minX;
+            const contentH = maxY - minY;
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            const scaleFac = (tableR * 2 * 0.9) / Math.max(contentW, contentH);
+            const cx = (minX + maxX)/2;
+            const cy = (minY + maxY)/2;
 
-            for (let j = 1; j <= steps; j++) {
-                let t = j / steps;
-                let interpTheta = p1.theta + (p2.theta - p1.theta) * t;
-                let interpRho = p1.rho + (p2.rho - p1.rho) * t;
-                let r_mm = interpRho * tableRadius;
-                interpolated.push({
-                    x: r_mm * Math.cos(interpTheta),
-                    y: r_mm * Math.sin(interpTheta)
+            let normalizedStrokes = strokes.map(s => {
+                return s.map(p => ({
+                    x: (p.x - cx) * scaleFac,
+                    y: -(p.y - cy) * scaleFac 
+                })).filter(p => Math.hypot(p.x, p.y) < tableR);
+            });
+
+            rawPoints = [];
+            normalizedStrokes.forEach(s => {
+                rawPoints.push({type:'break'});
+                s.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
+            });
+            rawPoints.push({type:'break'});
+
+            resetStatus();
+            showToast("Trace Loaded (Click Prepare)", "info");
+            render();
+        }
+
+        // --- OPTIMIZER ---
+        function prepareGCode() {
+            if(rawPoints.length === 0) return showToast("Draw something first!", "error");
+            showToast("Optimizing Path...", "info");
+
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            const sym = parseInt(document.getElementById('symSlider').value);
+            
+            // 1. Group raw points into shapes
+            let shapes = [];
+            let curShape = [];
+            rawPoints.forEach(p => {
+                if(p.type === 'break' || p.type === 'exit') {
+                    if(curShape.length > 0) shapes.push(curShape);
+                    curShape = [];
+                } else {
+                    curShape.push(p);
+                }
+            });
+            if(curShape.length > 0) shapes.push(curShape);
+
+            // 2. Symmetry Expansion
+            let pool = [];
+            for(let s=0; s<sym; s++) {
+                const ang = s * (Math.PI*2/sym);
+                const c = Math.cos(ang), si = Math.sin(ang);
+                shapes.forEach(sh => {
+                    let newSh = sh.map(p => ({
+                        x: p.x*c - p.y*si,
+                        y: p.x*si + p.y*c,
+                        type: 'point'
+                    }));
+                    pool.push(newSh);
                 });
             }
-        } else {
-            let dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-            let steps = Math.ceil(dist / res);
-            steps = Math.max(1, steps);
-            for (let j = 1; j <= steps; j++) {
-                let t = j / steps;
-                interpolated.push({
-                    x: p1.x + (p2.x - p1.x) * t,
-                    y: p1.y + (p2.y - p1.y) * t
-                });
-            }
-        }
-    }
-    generateSteps(interpolated);
-}
 
-function generateSteps(pathPoints) {
-    const L1 = parseFloat(document.getElementById('L1').value);
-    const L2 = parseFloat(document.getElementById('L2').value);
-    const gearRatio = parseFloat(document.getElementById('gearRatio').value);
-    const stepsPerDeg = parseFloat(document.getElementById('stepsPerDeg').value);
-    const tableRadius = parseFloat(document.getElementById('tableRadius').value);
-    
-    // SPEED SETTINGS (us)
-    const centerDelay = parseFloat(document.getElementById('centerDelay').value);
-    const perimeterDelay = parseFloat(document.getElementById('perimeterDelay').value);
-
-    const stepsPerRad = stepsPerDeg * (180 / Math.PI);
-
-    let commands = [];
-    let prevBase = 0;
-    let prevElbow = 0;
-    
-    let startIK = calculateIK(pathPoints[0].x, pathPoints[0].y, 0, 0, L1, L2, gearRatio, stepsPerRad);
-    prevBase = startIK.base_steps;
-    prevElbow = startIK.elbow_steps;
-
-    for (let i = 1; i < pathPoints.length; i++) {
-        let p = pathPoints[i];
-        
-        let ik = calculateIK(p.x, p.y, prevBase, prevElbow, L1, L2, gearRatio, stepsPerRad);
-        
-        let dBase = Math.round(ik.base_steps - prevBase);
-        let dElbow = Math.round(ik.elbow_steps - prevElbow);
-
-        if (dBase !== 0 || dElbow !== 0) {
-            
-            // Speed Math
-            let distFromCenter = Math.hypot(p.x, p.y);
-            let rFactor = distFromCenter / tableRadius;
-            if (rFactor > 1.0) rFactor = 1.0;
-            
-            // Linear Speed Scaling
-            let calculatedDelay = centerDelay + ((perimeterDelay - centerDelay) * rFactor);
-            calculatedDelay = Math.round(calculatedDelay);
-
-            commands.push(`G1 ${dElbow} ${dBase} ${calculatedDelay}`);
-
-            prevBase += dBase;
-            prevElbow += dElbow;
-        }
-    }
-
-    outputData.value = commands.join('\n');
-    parseOutputAndSimulate();
-}
-
-// --- SIMULATION ---
-
-function parseOutputAndSimulate() {
-    const text = outputData.value;
-    const lines = text.split('\n');
-    
-    const L1 = parseFloat(document.getElementById('L1').value);
-    const L2 = parseFloat(document.getElementById('L2').value);
-    const gearRatio = parseFloat(document.getElementById('gearRatio').value);
-    const stepsPerDeg = parseFloat(document.getElementById('stepsPerDeg').value);
-    const stepsPerRad = stepsPerDeg * (180 / Math.PI);
-
-    ARM_STATES = [];
-    let curBase = 0;
-    let curElbow = 0;
-
-    ARM_STATES.push(calculateFK(0, 0, L1, L2, gearRatio, stepsPerRad));
-
-    for (let line of lines) {
-        const parts = line.trim().split(/\s+/);
-        if (parts[0] === 'G1' && parts.length >= 3) {
-            let deltaElbow = parseInt(parts[1]);
-            let deltaBase = parseInt(parts[2]);
-            
-            if (!isNaN(deltaElbow) && !isNaN(deltaBase)) {
-                const maxDist = Math.max(Math.abs(deltaElbow), Math.abs(deltaBase));
-                const stepSize = 40; 
-                const segments = Math.max(1, Math.ceil(maxDist / stepSize));
-                const stepBase = deltaBase / segments;
-                const stepElbow = deltaElbow / segments;
-
-                for(let i=0; i<segments; i++) {
-                    curBase += stepBase;
-                    curElbow += stepElbow;
-                    ARM_STATES.push(calculateFK(curBase, curElbow, L1, L2, gearRatio, stepsPerRad));
+            // 3. TSP Nearest Neighbor
+            let bestShapeIdx = -1, bestPointIdx = -1, maxDist = -1;
+            // Find outer-most start
+            for (let i=0; i<pool.length; i++) {
+                for (let j=0; j<pool[i].length; j++) {
+                    let d = Math.hypot(pool[i][j].x, pool[i][j].y);
+                    if (d > maxDist) { maxDist = d; bestShapeIdx = i; bestPointIdx = j; }
                 }
             }
-        }
-    }
-    const idx = Math.floor((parseFloat(simSlider.value) / 100) * (ARM_STATES.length - 1));
-    drawSimulation(idx);
-}
 
-// --- KINEMATICS ---
+            let startShape = pool[bestShapeIdx];
+            pool.splice(bestShapeIdx, 1);
+            let dClose = Math.hypot(startShape[0].x - startShape[startShape.length-1].x, startShape[0].y - startShape[startShape.length-1].y);
+            
+            // Re-order start shape to start at outer point
+            if(dClose < 5.0) { 
+                let p1 = startShape.slice(bestPointIdx);
+                let p2 = startShape.slice(0, bestPointIdx);
+                startShape = p1.concat(p2);
+                startShape.push(startShape[0]);
+            } else { 
+                let dStart = Math.hypot(startShape[0].x, startShape[0].y);
+                let dEnd = Math.hypot(startShape[startShape.length-1].x, startShape[startShape.length-1].y);
+                if(dEnd > dStart) startShape.reverse();
+            }
 
-function getShortestRotation(raw, last) {
-    let diff = (raw - last) / (2 * Math.PI);
-    let offset = Math.round(diff);
-    return raw - (offset * 2 * Math.PI);
-}
+            let sortedShapes = [startShape];
+            let curPos = startShape[startShape.length-1];
 
-function calculateIK(x, y, lastBaseSteps, lastElbowSteps, L1, L2, gearRatio, stepsPerRad) {
-    let dist = Math.hypot(x, y);
-    const maxReach = L1 + L2;
-    
-    if (dist > maxReach) {
-        x = (x / dist) * maxReach;
-        y = (y / dist) * maxReach;
-        dist = maxReach;
-    }
+            while(pool.length > 0) {
+                let bestIdx = -1;
+                let bestDist = Infinity;
+                let bestStartIdx = 0;
+                let bestIsReverse = false;
 
-    // --- CENTER PASS-THROUGH LOGIC ---
-    // If we are extremely close to the center, force the math to prioritize
-    // keeping the Base Angle steady. This prevents the "Base Spin" issue.
-    // We treat the target as a "fold" at the *current* base angle.
-    
-    if (dist < 1.0) { // Within 1mm of center
-        
-        // We want the base to stay exactly where it was
-        const targetBaseSteps = lastBaseSteps; 
-        
-        // At center (dist=0), the internal angle is PI (180 deg).
-        // Elbow Steps = -(PI + GearRatio * BaseAngle) * StepsPerRad
-        // We need to reverse-engineer BaseAngle from lastBaseSteps
-        const currentBaseAngle = -lastBaseSteps / stepsPerRad;
-        const targetElbowSteps = -(Math.PI + gearRatio * currentBaseAngle) * stepsPerRad;
-        
-        return { base_steps: targetBaseSteps, elbow_steps: targetElbowSteps };
-    }
+                for(let i=0; i<pool.length; i++) {
+                    let s = pool[i];
+                    let isClosed = Math.hypot(s[0].x - s[s.length-1].x, s[0].y - s[s.length-1].y) < 5.0;
 
-    // Standard Math for non-center points
-    const lastT1 = -lastBaseSteps / stepsPerRad; 
-    let cosBend = (dist*dist - L1*L1 - L2*L2) / (2 * L1 * L2);
-    cosBend = Math.max(-1, Math.min(1, cosBend));
-    
-    const bend1 = Math.acos(cosBend);
-    const bend2 = -Math.acos(cosBend);
+                    if(isClosed) {
+                        for(let k=0; k<s.length; k++) {
+                            let d = Math.hypot(curPos.x - s[k].x, curPos.y - s[k].y);
+                            if(d < bestDist) { bestDist = d; bestIdx = i; bestStartIdx = k; bestIsReverse = false; }
+                        }
+                    } else {
+                        let dStart = Math.hypot(curPos.x - s[0].x, curPos.y - s[0].y);
+                        if(dStart < bestDist) { bestDist=dStart; bestIdx=i; bestStartIdx=0; bestIsReverse=false; }
+                        let dEnd = Math.hypot(curPos.x - s[s.length-1].x, curPos.y - s[s.length-1].y);
+                        if(dEnd < bestDist) { bestDist=dEnd; bestIdx=i; bestStartIdx=0; bestIsReverse=true; }
+                    }
+                }
 
-    const k1_1 = L1 + L2 * Math.cos(bend1);
-    const k2_1 = L2 * Math.sin(bend1);
-    let t1_1 = Math.atan2(y, x) - Math.atan2(k2_1, k1_1);
-    t1_1 = getShortestRotation(t1_1, lastT1);
+                let winner = pool[bestIdx];
+                let isWinnerClosed = Math.hypot(winner[0].x - winner[winner.length-1].x, winner[0].y - winner[winner.length-1].y) < 5.0;
 
-    const k1_2 = L1 + L2 * Math.cos(bend2);
-    const k2_2 = L2 * Math.sin(bend2);
-    let t1_2 = Math.atan2(y, x) - Math.atan2(k2_2, k1_2);
-    t1_2 = getShortestRotation(t1_2, lastT1);
+                if(isWinnerClosed) {
+                    let p1 = winner.slice(bestStartIdx);
+                    let p2 = winner.slice(0, bestStartIdx);
+                    winner = p1.concat(p2);
+                    winner.push(winner[0]);
+                } else {
+                    if(bestIsReverse) winner.reverse();
+                }
 
-    const b1_steps = -t1_1 * stepsPerRad;
-    const e1_steps = -(bend1 + gearRatio * t1_1) * stepsPerRad;
-    const b2_steps = -t1_2 * stepsPerRad;
-    const e2_steps = -(bend2 + gearRatio * t1_2) * stepsPerRad;
+                sortedShapes.push(winner);
+                curPos = winner[winner.length-1];
+                pool.splice(bestIdx, 1);
+            }
 
-    const cost1 = Math.abs(b1_steps - lastBaseSteps) + Math.abs(e1_steps - lastElbowSteps);
-    const cost2 = Math.abs(b2_steps - lastBaseSteps) + Math.abs(e2_steps - lastElbowSteps);
+            // 4. Connect shapes (Perimeter riding)
+            processedPoints = [];
+            const res = parseFloat(document.getElementById('cfgResolution').value) || 1.0; 
 
-    return (cost1 <= cost2) ? { base_steps: b1_steps, elbow_steps: e1_steps } 
-                            : { base_steps: b2_steps, elbow_steps: e2_steps };
-}
+            // Add enter point
+            let first = sortedShapes[0];
+            let fPt = first[0];
+            let fAng = Math.atan2(fPt.y, fPt.x);
+            processedPoints.push({x: tableR*Math.cos(fAng), y: tableR*Math.sin(fAng), type:'point'});
 
-function calculateFK(baseSteps, elbowSteps, L1, L2, gearRatio, stepsPerRad) {
-    const alpha = -baseSteps / stepsPerRad;
-    const combined = -elbowSteps / stepsPerRad;
-    const beta = combined - (gearRatio * alpha);
-    const elbowX = L1 * Math.cos(alpha);
-    const elbowY = L1 * Math.sin(alpha);
-    return { 
-        x1: elbowX, y1: elbowY, 
-        x2: elbowX + L2 * Math.cos(alpha + beta), 
-        y2: elbowY + L2 * Math.sin(alpha + beta) 
-    };
-}
+            for(let i=0; i<sortedShapes.length; i++) {
+                let s = sortedShapes[i];
+                
+                // Inter-shape travel (if not first)
+                if(i > 0) {
+                    let prev = sortedShapes[i-1];
+                    let currStart = s[0];
+                    let bestExitIdx = -1;
+                    let minDist = Infinity;
+                    
+                    // Find closest point on previous shape to jump from
+                    for(let k=0; k<prev.length; k++) {
+                        let d = Math.hypot(prev[k].x - currStart.x, prev[k].y - currStart.y);
+                        if(d < minDist) { minDist = d; bestExitIdx = k; }
+                    }
 
-function drawSimulation(index) {
-    const width = canvas.width;
-    const height = canvas.height;
-    const tableRadius = parseFloat(document.getElementById('tableRadius').value);
-    
-    ctx.clearRect(0, 0, width, height);
-    ctx.save();
-    ctx.translate(width/2, height/2);
-    const scale = (width/2) / (tableRadius * 1.1);
-    ctx.scale(scale, -scale);
+                    // Backtrack the previous shape to that exit point
+                    let isPrevClosed = Math.hypot(prev[0].x - prev[prev.length-1].x, prev[0].y - prev[prev.length-1].y) < 5.0;
+                    let retracePath = [];
+                    if(isPrevClosed) {
+                        // closed shape: shortest way around
+                        let distFwd = bestExitIdx; 
+                        let distBk = (prev.length-1) - bestExitIdx;
+                        if(distFwd < distBk) {
+                            for(let m=0; m<=bestExitIdx; m++) retracePath.push(prev[m]);
+                        } else {
+                            for(let m=prev.length-1; m>=bestExitIdx; m--) retracePath.push(prev[m]);
+                        }
+                    } else {
+                        // open shape: must backtrack
+                        for(let m=prev.length-1; m>=bestExitIdx; m--) retracePath.push(prev[m]);
+                    }
 
-    ctx.beginPath();
-    ctx.arc(0, 0, tableRadius, 0, Math.PI*2);
-    ctx.strokeStyle = "#ddd";
-    ctx.lineWidth = 2 / scale;
-    ctx.stroke();
+                    retracePath.forEach(p => processedPoints.push(p));
+                    
+                    // Linear jump to new shape
+                    let startJump = prev[bestExitIdx];
+                    processedPoints.push(startJump); // Anchor
+                }
 
-    if (ARM_STATES.length > 0) {
-        ctx.beginPath();
-        ctx.strokeStyle = "rgba(255, 0, 0, 0.5)";
-        ctx.lineWidth = 1.5 / scale;
-        
-        let safeIndex = Math.min(index, ARM_STATES.length - 1);
-        if (safeIndex < 0) safeIndex = 0;
+                s.forEach(p => processedPoints.push(p));
+            }
 
-        ctx.moveTo(ARM_STATES[0].x2, ARM_STATES[0].y2);
-        for(let i=1; i<=safeIndex; i++) {
-             ctx.lineTo(ARM_STATES[i].x2, ARM_STATES[i].y2);
-        }
-        ctx.stroke();
+            // Exit point
+            let last = sortedShapes[sortedShapes.length-1];
+            let lPt = last[last.length-1];
+            let lAng = Math.atan2(lPt.y, lPt.x);
+            processedPoints.push({x: tableR*Math.cos(lAng), y: tableR*Math.sin(lAng), type:'exit'});
 
-        const state = ARM_STATES[safeIndex];
-        ctx.strokeStyle = "#333";
-        ctx.lineWidth = 4 / scale;
-        ctx.lineCap = "round";
-        ctx.beginPath();
-        ctx.moveTo(0,0);
-        ctx.lineTo(state.x1, state.y1);
-        ctx.lineTo(state.x2, state.y2);
-        ctx.stroke();
-
-        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
-        ctx.beginPath(); ctx.arc(0,0, 6/scale, 0, Math.PI*2); ctx.fill();
-        ctx.beginPath(); ctx.arc(state.x1, state.y1, 5/scale, 0, Math.PI*2); ctx.fill();
-    }
-    ctx.restore();
-}
-
-function playSimulation() {
-    if (animId) return;
-    let i = parseInt(simSlider.value) / 100 * (ARM_STATES.length - 1);
-    function loop() {
-        i += 5; 
-        if (i >= ARM_STATES.length) i = 0;
-        simSlider.value = (i / ARM_STATES.length) * 100;
-        drawSimulation(Math.floor(i));
-        animId = requestAnimationFrame(loop);
-    }
-    loop();
-}
-
-function stopSimulation() {
-    if (animId) cancelAnimationFrame(animId);
-    animId = null;
-}
-
-async function sendToTable() {
-    const code = outputData.value;
-    const statusDiv = document.getElementById('sendStatus');
-
-    if (!code) {
-        statusDiv.innerText = "❌ Generate code first!";
-        statusDiv.style.color = "red";
-        return;
-    }
-
-    statusDiv.innerText = "⏳ Sending...";
-    statusDiv.style.color = "#666";
-
-    try {
-        const response = await fetch(`${BASE_URL}/send_gcode_block`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ 
-                gcode: code,
-                speed_override: null 
-            })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            statusDiv.innerText = "✅ Sent successfully!";
-            statusDiv.style.color = "green";
-        } else {
-            statusDiv.innerText = "❌ Error: " + (data.error || "Unknown");
-            statusDiv.style.color = "red";
+            // 5. Generate Machine Code
+            generatedGCode = generateKinematicsGCode(processedPoints);
+            
+            document.getElementById('statusTxt').innerText = "Path Optimized (Red)";
+            document.getElementById('statusTxt').style.color = "green";
+            document.getElementById('progressSlider').value = 0;
+            render(); 
+            showToast("Perimeter Rider Path Ready!", "success");
         }
 
-    } catch (e) {
-        statusDiv.innerText = "❌ Network Error: " + e.message;
-        statusDiv.style.color = "red";
-    }
-}
+        // --- G-CODE GENERATION (SYNCED WITH SCRIPT.HTML) ---
+        function generateKinematicsGCode(pathPoints) {
+            const L1 = parseFloat(document.getElementById('cfgL1').value);
+            const L2 = parseFloat(document.getElementById('cfgL2').value);
+            const gearRatio = parseFloat(document.getElementById('cfgGearRatio').value);
+            const stepsPerDeg = parseFloat(document.getElementById('cfgStepsPerDeg').value);
+            const tableRadius = parseFloat(document.getElementById('cfgRadius').value);
+            const centerDelay = parseFloat(document.getElementById('cfgCenterDelay').value);
+            const perimDelay = parseFloat(document.getElementById('cfgPerimDelay').value);
+            const res = parseFloat(document.getElementById('cfgResolution').value) || 1.0;
 
-function copyOutput() {
-    outputData.select();
-    document.execCommand('copy');
-    alert("Copied!");
-}
+            const stepsPerRad = stepsPerDeg * (180 / Math.PI);
 
-function downloadOutput() {
-    const text = outputData.value;
-    const blob = new Blob([text], { type: 'text/plain' });
-    const anchor = document.createElement('a');
-    anchor.download = 'sand_gcode.txt';
-    anchor.href = window.URL.createObjectURL(blob);
-    anchor.click();
-}
-</script>
+            let commands = [];
+            let prevBase = 0;
+            let prevElbow = 0;
+            
+            // Initial IK Position
+            if(pathPoints.length > 0) {
+                let startIK = calculateIK(pathPoints[0].x, pathPoints[0].y, 0, 0, L1, L2, gearRatio, stepsPerRad);
+                prevBase = startIK.base_steps;
+                prevElbow = startIK.elbow_steps;
+            }
+
+            for (let i = 0; i < pathPoints.length - 1; i++) {
+                let p1 = pathPoints[i];
+                let p2 = pathPoints[i+1];
+                
+                if (p2.type === 'exit') commands.push("M0"); // Pause at end
+
+                // Interpolate (Break long lines into tiny segments for SCARA)
+                let dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+                let steps = Math.ceil(dist / res);
+                steps = Math.max(1, steps);
+
+                for (let j = 1; j <= steps; j++) {
+                    let t = j / steps;
+                    let x = p1.x + (p2.x - p1.x) * t;
+                    let y = p1.y + (p2.y - p1.y) * t;
+
+                    // Calculate IK based on PREVIOUS motors state (to minimize rotation)
+                    let ik = calculateIK(x, y, prevBase, prevElbow, L1, L2, gearRatio, stepsPerRad);
+                    
+                    let dBase = Math.round(ik.base_steps - prevBase);
+                    let dElbow = Math.round(ik.elbow_steps - prevElbow);
+
+                    if (dBase !== 0 || dElbow !== 0) {
+                        // Speed Math (Ramping)
+                        let distFromCenter = Math.hypot(x, y);
+                        let rFactor = distFromCenter / tableRadius;
+                        if (rFactor > 1.0) rFactor = 1.0;
+                        
+                        // Linear Speed Scaling
+                        let calculatedDelay = centerDelay + ((perimDelay - centerDelay) * rFactor);
+                        calculatedDelay = Math.round(calculatedDelay);
+
+                        commands.push(`G1 ${dElbow} ${dBase} ${calculatedDelay}`);
+
+                        prevBase += dBase;
+                        prevElbow += dElbow;
+                    }
+                }
+            }
+
+            return commands.join('\n');
+        }
+
+        // --- KINEMATICS ENGINE (PORTED FROM SCRIPT.HTML) ---
+        
+        function getShortestRotation(raw, last) {
+            let diff = (raw - last) / (2 * Math.PI);
+            let offset = Math.round(diff);
+            return raw - (offset * 2 * Math.PI);
+        }
+
+        function calculateIK(x, y, lastBaseSteps, lastElbowSteps, L1, L2, gearRatio, stepsPerRad) {
+            let dist = Math.hypot(x, y);
+            const maxReach = L1 + L2;
+            
+            if (dist > maxReach) {
+                x = (x / dist) * maxReach;
+                y = (y / dist) * maxReach;
+                dist = maxReach;
+            }
+
+            // --- CENTER PASS-THROUGH LOGIC ---
+            // If close to center, lock base to prevent spin.
+            if (dist < 1.0) { 
+                const targetBaseSteps = lastBaseSteps; 
+                // Reverse-engineer BaseAngle
+                const currentBaseAngle = -lastBaseSteps / stepsPerRad;
+                const targetElbowSteps = -(Math.PI + gearRatio * currentBaseAngle) * stepsPerRad;
+                return { base_steps: targetBaseSteps, elbow_steps: targetElbowSteps };
+            }
+
+            // Standard Math
+            const lastT1 = -lastBaseSteps / stepsPerRad; 
+            let cosBend = (dist*dist - L1*L1 - L2*L2) / (2 * L1 * L2);
+            cosBend = Math.max(-1, Math.min(1, cosBend));
+            
+            const bend1 = Math.acos(cosBend);
+            const bend2 = -Math.acos(cosBend);
+
+            const k1_1 = L1 + L2 * Math.cos(bend1);
+            const k2_1 = L2 * Math.sin(bend1);
+            let t1_1 = Math.atan2(y, x) - Math.atan2(k2_1, k1_1);
+            t1_1 = getShortestRotation(t1_1, lastT1);
+
+            const k1_2 = L1 + L2 * Math.cos(bend2);
+            const k2_2 = L2 * Math.sin(bend2);
+            let t1_2 = Math.atan2(y, x) - Math.atan2(k2_2, k1_2);
+            t1_2 = getShortestRotation(t1_2, lastT1);
+
+            const b1_steps = -t1_1 * stepsPerRad;
+            const e1_steps = -(bend1 + gearRatio * t1_1) * stepsPerRad;
+            const b2_steps = -t1_2 * stepsPerRad;
+            const e2_steps = -(bend2 + gearRatio * t1_2) * stepsPerRad;
+
+            const cost1 = Math.abs(b1_steps - lastBaseSteps) + Math.abs(e1_steps - lastElbowSteps);
+            const cost2 = Math.abs(b2_steps - lastBaseSteps) + Math.abs(e2_steps - lastElbowSteps);
+
+            return (cost1 <= cost2) ? { base_steps: b1_steps, elbow_steps: e1_steps } 
+                                    : { base_steps: b2_steps, elbow_steps: e2_steps };
+        }
+
+        // --- ACTIONS ---
+        async function sendToTable() {
+            if(!generatedGCode) return showToast("Click 'Prepare Path' first!", "error");
+            
+            let finalCode = generatedGCode;
+            const autoClear = document.getElementById('autoClearMode').checked;
+
+            if(autoClear) {
+                showToast("Fetching Clear Pattern...", "info");
+                try {
+                    let response = await fetch('./designs/clear.TXT');
+                    if(!response.ok) response = await fetch('./designs/clear.txt'); 
+                    
+                    if(response.ok) {
+                        const clearCode = await response.text();
+                        finalCode = clearCode + "\n" + finalCode;
+                        showToast("Auto-Clear Added.", "success");
+                    } else {
+                        showToast("Clear file not found!", "error");
+                    }
+                } catch(e) {
+                    console.error(e);
+                    showToast("Clear file error (check console)", "error");
+                }
+            }
+
+            showToast("Sending...", "info");
+            fetch(BASE_URL + '/send_gcode_block', {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({gcode: finalCode, speed_override: null})
+            }).then(r=>r.json()).then(d=>{
+                if(d.success) showToast("Sent Successfully!", "success");
+                else showToast("Error: " + d.error, "error");
+            }).catch(()=>showToast("Network Error", "error"));
+        }
+        
+        function downloadGcode() {
+            if(!generatedGCode) return showToast("Click 'Prepare Path' first!", "error");
+            const blob = new Blob([generatedGCode], {type:'text/plain'});
+            const a = document.createElement('a');
+            a.download = 'pattern.txt'; a.href = URL.createObjectURL(blob); a.click();
+        }
+
+        // --- UTILS ---
+        function resizeCanvas() {
+            const container = document.getElementById('canvasContainer');
+            const size = container.getBoundingClientRect().width;
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = size * dpr;
+            canvas.height = size * dpr;
+            ctx.scale(dpr, dpr);
+            origin = { x: size/2, y: size/2 };
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            // SCALE FIX: Make sure the visual radius matches the config radius
+            scale = (size/2) / (tableR * 1.1); // 1.1 provides slight padding
+            render();
+        }
+        function saveState() {
+            if(historyStack.length>10) historyStack.shift();
+            historyStack.push(JSON.stringify(rawPoints));
+        }
+        function undo() {
+            if(historyStack.length===0) return;
+            rawPoints = JSON.parse(historyStack.pop());
+            resetStatus();
+            render();
+        }
+        function clearCanvas() {
+            saveState();
+            rawPoints = [];
+            resetStatus();
+            render();
+        }
+        function setTool(t) {
+            currentTool = t;
+            document.getElementById('btnDraw').className = t==='draw'?'active':'secondary';
+            document.getElementById('btnErase').className = t==='erase'?'active':'secondary';
+        }
+        function updateUI() {
+            document.getElementById('symVal').textContent = document.getElementById('symSlider').value + 'x';
+            render();
+        }
+        function showToast(msg, type) {
+            const t = document.getElementById('status-toast');
+            t.textContent = msg; t.className = type; t.style.opacity = 1;
+            setTimeout(()=>t.style.opacity=0, 3000);
+        }
+        function openNav() { document.getElementById("mySidebar").style.width = "250px"; }
+        function closeNav() { document.getElementById("mySidebar").style.width = "0"; }
+        function toggleTheme() {
+            const b = document.body;
+            b.setAttribute('data-theme', b.getAttribute('data-theme')==='dark'?'light':'dark');
+            render();
+        }
+
+        init();
+    </script>
 </body>
 </html>
