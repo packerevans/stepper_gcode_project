@@ -217,7 +217,7 @@
                 tb+=c.b; te+=c.e;
                 let next=calcFK(tb,te);
                 let dist=Math.max(Math.abs(next.tb-cur.tb), Math.abs(next.te-cur.te));
-                let step=Math.max(2, Math.ceil(dist/600)); // Optimize
+                let step=Math.max(2, Math.ceil(dist/600)); 
                 for(let i=1; i<=step; i++) path.push(interp(cur,next,i/step));
                 cur=next;
             }
@@ -246,7 +246,6 @@
             setTimeout(()=>el.style.opacity='0', 3000);
         }
 
-        // --- SELECTION ---
         function toggleSelect(f, e) {
             e.stopPropagation();
             if(selectedFiles.has(f)) selectedFiles.delete(f); else selectedFiles.add(f);
@@ -261,19 +260,15 @@
             else bar.classList.remove('active');
         }
 
-        // --- LOOP LOGIC ---
         async function loopSelected() {
             let files = Array.from(selectedFiles);
             if(files.length === 0) return;
             showStatus("Starting Loop...");
-            
             await fetch(`${BASE_URL}/set_loop`, {
                 method:"POST", headers:{"Content-Type":"application/json"},
                 body:JSON.stringify({files:files})
             });
-            
-            selectedFiles.clear(); renderSel();
-            updateQ();
+            selectedFiles.clear(); renderSel(); updateQ();
         }
 
         async function cancelLoop() {
@@ -293,17 +288,46 @@
             selectedFiles.clear(); renderSel(); loadLib();
         }
 
+        // --- IMPROVED COPY FUNCTION (Secure & Fallback) ---
         async function copySelected() {
-            let txt="";
-            for(let f of selectedFiles) {
-                let r=await fetch(`${BASE_URL}/designs/${f}`);
-                txt += `; ${f}\n${await r.text()}\n`;
+            let txt = "";
+            showStatus("Fetching code...");
+            
+            // 1. Fetch text
+            try {
+                for(let f of selectedFiles) {
+                    let r = await fetch(`${BASE_URL}/designs/${f}`);
+                    txt += `; --- ${f} ---\n${await r.text()}\n\n`;
+                }
+            } catch(e) { showStatus("Error fetching files"); return; }
+
+            // 2. Try Modern API (HTTPS/Localhost)
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                try {
+                    await navigator.clipboard.writeText(txt);
+                    showStatus("Copied!");
+                    selectedFiles.clear(); renderSel();
+                    return;
+                } catch (err) { console.log("Clipboard API failed, trying fallback..."); }
             }
-            navigator.clipboard.writeText(txt); showStatus("Copied!");
-            selectedFiles.clear(); renderSel();
+
+            // 3. Fallback (HTTP/Mobile)
+            const ta = document.createElement("textarea");
+            ta.value = txt;
+            ta.style.position = "fixed"; ta.style.left = "-9999px";
+            document.body.appendChild(ta);
+            ta.focus(); ta.select();
+            
+            try {
+                document.execCommand('copy');
+                showStatus("Copied!");
+                selectedFiles.clear(); renderSel();
+            } catch (err) {
+                showStatus("Copy Failed");
+            }
+            document.body.removeChild(ta);
         }
 
-        // --- PLAY & QUEUE ---
         async function runDesign(f) {
             let spd = document.getElementById('speedSelect').value;
             showStatus("Queueing...");
@@ -327,8 +351,6 @@
             try {
                 let r=await fetch(`${BASE_URL}/status_full`);
                 let d=await r.json();
-                
-                // Update Header Texts
                 document.getElementById('playing-display').textContent = d.playing ? `Playing: ${d.playing}` : "Select a design";
                 
                 let qText = "Queue empty";
@@ -336,10 +358,7 @@
                 else if(d.is_looping) qText = `Next: ${d.next_up}`;
                 
                 document.getElementById('queue-display').textContent = qText;
-                
-                // Loop Indicator
                 document.getElementById('loop-indicator').style.display = d.is_looping ? 'flex' : 'none';
-                
             } catch(e){}
         }
 
