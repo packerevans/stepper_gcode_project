@@ -788,15 +788,26 @@
         }
 
         async function saveToServer() { 
-            let n = prompt("Name:"); 
+            if(!generatedGCode) return showToast("Prepare Path first!", "error");
+            
+            let n = prompt("Enter filename (will be saved as .txt):"); 
             if(n) {
+                // Force .txt extension to ensure server treats it as text
+                if(!n.toLowerCase().endsWith('.txt')) n += ".txt";
+
+                showToast("Saving...", "info");
+
                 fetch(BASE_URL+'/save_design', {
                     method:'POST', 
                     headers:{'Content-Type':'application/json'}, 
                     body:JSON.stringify({filename:n, gcode:generatedGCode})
                 })
                 .then(r => r.json())
-                .then(d => showToast("Saved", "success"));
+                .then(d => {
+                    if(d.success) showToast("Saved to Pi!", "success");
+                    else showToast("Save Failed: " + (d.error || "Unknown"), "error");
+                })
+                .catch(e => showToast("Network Error", "error"));
             }
         }
         
