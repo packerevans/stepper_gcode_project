@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Packers Sand Pro (Synced v32 - The Grandmaster)</title>
+    <title>Packers Sand Pro (Synced v33 - Fixed Drawing)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -249,6 +249,80 @@
             canvas.addEventListener('pointerleave', endDraw);
             canvas.style.touchAction = "none";
             updateUI();
+        }
+
+        // --- DRAWING LOGIC (FIXED) ---
+        function startDraw(e) {
+            e.preventDefault();
+            const smart = document.getElementById('smartPenMode').checked;
+            
+            // Only toggle tool if using Pen/Touch events explicitly
+            if(smart) {
+                if(e.pointerType === 'pen') setTool('draw');
+                else if(e.pointerType === 'touch') setTool('erase');
+                // If mouse, stick to the selected tool (don't force Erase)
+            }
+            
+            saveState();
+            isDrawing = true;
+            canvas.setPointerCapture(e.pointerId);
+            processPointer(e);
+            resetStatus();
+        }
+
+        function moveDraw(e) {
+            e.preventDefault();
+            const pos = getPos(e);
+            document.getElementById('coordDisplay').textContent = `X:${pos.x.toFixed(0)} Y:${pos.y.toFixed(0)}`;
+            if(!isDrawing) { render(); drawCursor(pos); return; }
+            processPointer(e);
+        }
+
+        function endDraw(e) {
+            if(!isDrawing) return;
+            isDrawing = false;
+            if(currentTool === 'draw') rawPoints.push({type:'break'});
+            canvas.releasePointerCapture(e.pointerId);
+            render();
+        }
+
+        function getPos(e) {
+            return {
+                x: (e.offsetX - origin.x) / scale,
+                y: -(e.offsetY - origin.y) / scale
+            };
+        }
+
+        function processPointer(e) {
+            const p = getPos(e);
+            if(currentTool === 'draw') {
+                rawPoints.push({x: p.x, y: p.y, type: 'point'});
+            } else {
+                // Eraser Logic
+                const r = 10;
+                rawPoints = rawPoints.filter(pt => {
+                    if(pt.type === 'break') return true;
+                    return Math.hypot(pt.x - p.x, pt.y - p.y) > r;
+                });
+            }
+            render();
+            if(currentTool==='erase') drawCursor(p);
+        }
+
+        function drawCursor(p) {
+            if(currentTool !== 'erase') return;
+            const r = 10 * scale;
+            const px = origin.x + p.x * scale;
+            const py = origin.y - p.y * scale;
+            ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI*2);
+            ctx.strokeStyle = "#999"; ctx.fillStyle = "rgba(200,200,200,0.3)";
+            ctx.stroke(); ctx.fill();
+        }
+
+        function setTool(t) {
+            currentTool = t;
+            document.getElementById('btnDraw').className = t==='draw'?'active':'secondary';
+            document.getElementById('btnErase').className = t==='erase'?'active':'secondary';
         }
 
         // === V32: THE GRANDMASTER SOLVER (Simulated Annealing + Weighted A*) ===
@@ -618,12 +692,76 @@
         }
 
         // --- DRAWING ---
-        function startDraw(e) { e.preventDefault(); if(document.getElementById('smartPenMode').checked) currentTool = e.pointerType==='pen'?'draw':'erase'; saveState(); isDrawing=true; canvas.setPointerCapture(e.pointerId); processPointer(e); resetStatus(); }
-        function moveDraw(e) { e.preventDefault(); if(!isDrawing) { render(); drawCursor(getPos(e)); return; } processPointer(e); }
-        function endDraw(e) { if(!isDrawing) return; isDrawing=false; if(currentTool==='draw') rawPoints.push({type:'break'}); canvas.releasePointerCapture(e.pointerId); render(); }
-        function getPos(e) { return { x: (e.offsetX - origin.x)/scale, y: -(e.offsetY - origin.y)/scale }; }
-        function processPointer(e) { const p=getPos(e); if(currentTool==='draw') rawPoints.push({x:p.x, y:p.y, type:'point'}); else rawPoints=rawPoints.filter(pt=>Math.hypot(pt.x-p.x, pt.y-p.y)>10); render(); if(currentTool==='erase') drawCursor(p); }
-        
+        function resetStatus() {
+            generatedGCode = null;
+            generatedThr = null;
+            processedPoints = [];
+            document.getElementById('statusTxt').innerText = "Drawing Mode";
+            document.getElementById('statusTxt').style.color = "orange";
+            document.getElementById('progressSlider').value = 100;
+        }
+
+        function render() {
+            const w = canvas.width / window.devicePixelRatio;
+            const h = canvas.height / window.devicePixelRatio;
+            ctx.clearRect(0, 0, w, h);
+            
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            const sym = parseInt(document.getElementById('symSlider').value);
+            const dark = document.body.getAttribute('data-theme') === 'dark';
+            const prog = parseInt(document.getElementById('progressSlider').value);
+            document.getElementById('progVal').textContent = prog + '%';
+
+            ctx.save();
+            ctx.translate(origin.x, origin.y);
+
+            // Table Circle
+            ctx.beginPath(); ctx.arc(0, 0, tableR*scale, 0, Math.PI*2);
+            ctx.strokeStyle = dark ? '#444' : '#ddd'; ctx.lineWidth = 2; ctx.stroke();
+
+            const showingFinal = (processedPoints.length > 0);
+            const dataToShow = showingFinal ? processedPoints : rawPoints;
+            const limit = Math.floor(dataToShow.length * (prog/100));
+            const color = showingFinal ? '#ff0000' : (dark ? 'cyan' : '#007bff');
+
+            ctx.lineWidth = 1.5;
+            
+            const loopCount = showingFinal ? 1 : sym;
+
+            for(let s=0; s<loopCount; s++) {
+                const ang = s * (Math.PI*2/sym);
+                ctx.save(); 
+                if(!showingFinal) ctx.rotate(ang); 
+                
+                ctx.beginPath();
+                ctx.strokeStyle = color;
+                
+                let isMove = true;
+                for(let i=0; i<limit; i++) {
+                    const p = dataToShow[i];
+                    if(p.type === 'break' || p.type === 'exit') { isMove = true; continue; }
+                    
+                    const px = p.x * scale;
+                    const py = -p.y * scale;
+                    
+                    if(isMove) { ctx.moveTo(px, py); isMove = false; }
+                    else ctx.lineTo(px, py);
+                }
+                ctx.stroke();
+                
+                if(limit > 0 && limit < dataToShow.length) {
+                    const tip = dataToShow[limit];
+                    if(tip.type !== 'break' && tip.type !== 'exit') {
+                        ctx.beginPath(); 
+                        ctx.arc(tip.x*scale, -tip.y*scale, 4, 0, Math.PI*2);
+                        ctx.fillStyle = color; ctx.fill();
+                    }
+                }
+                ctx.restore();
+            }
+            ctx.restore();
+        }
+
         async function sendToTable() { if(!generatedGCode) return showToast("Click Prepare first", "error"); let code=generatedGCode; if(document.getElementById('autoClearMode').checked) { try{let r=await fetch('./designs/clear.txt'); if(r.ok) code=(await r.text())+"\n"+code;}catch(e){} } fetch(BASE_URL+'/send_gcode_block', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({gcode:code})}).then(r=>r.json()).then(d=>showToast(d.success?"Sent!":"Error","success")); }
         async function saveToServer() { let n=prompt("Name:"); if(n) fetch(BASE_URL+'/save_design', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({filename:n, gcode:generatedGCode})}).then(r=>r.json()).then(d=>showToast("Saved","success")); }
         function downloadThetaRho() { if(!generatedThr) return; if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(generatedThr); else fallbackCopyTextToClipboard(generatedThr); showToast("Copied","success"); }
@@ -634,7 +772,6 @@
         function saveState() { if(historyStack.length>10) historyStack.shift(); historyStack.push(JSON.stringify(rawPoints)); }
         function undo() { if(historyStack.length) { rawPoints=JSON.parse(historyStack.pop()); render(); } }
         function clearCanvas() { saveState(); rawPoints=[]; render(); }
-        function setTool(t) { currentTool=t; document.getElementById('btnDraw').className=t==='draw'?'active':'secondary'; document.getElementById('btnErase').className=t==='erase'?'active':'secondary'; }
         function updateUI() { document.getElementById('symVal').textContent = document.getElementById('symSlider').value + 'x'; render(); }
         function showToast(msg, type) { const t=document.getElementById('status-toast'); t.textContent=msg; t.className=type; t.style.opacity=1; setTimeout(()=>t.style.opacity=0, 3000); }
         function openNav() { document.getElementById("mySidebar").style.width = "250px"; }
