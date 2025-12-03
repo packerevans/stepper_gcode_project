@@ -198,8 +198,8 @@
             <div class="btn-group">
                 <button onclick="sendToTable()" class="active">🚀 Run</button>
                 <button onclick="saveToServer()" class="secondary">💾 Save to Pi</button>
-                <button onclick="downloadThetaRho()" class="secondary" style="font-size:0.85em;">📋 Copy ThetaRho</button>
             </div>
+
             <details>
                 <summary>⚙️ Machine Settings</summary>
                 <div class="settings-grid">
@@ -225,7 +225,6 @@
         let origin = {x:0, y:0};
         let scale = 1;
         let generatedGCode = null;
-        let generatedThr = null; // Added for Copy ThetaRho button
 
         const canvas = document.getElementById('drawCanvas');
         const ctx = canvas.getContext('2d');
@@ -309,7 +308,6 @@
 
         function resetStatus() {
             generatedGCode = null;
-            generatedThr = null; // Reset ThetaRho
             processedPoints = [];
             document.getElementById('statusTxt').innerText = "Drawing Mode";
             document.getElementById('statusTxt').style.color = "orange";
@@ -633,16 +631,6 @@
 
             generatedGCode = generateGCodeStringFromProcessed();
             
-            // --- NEW: Generate Theta Rho for clipboard ---
-            const trRad = parseFloat(document.getElementById('cfgRadius').value);
-            generatedThr = processedPoints.map(p => {
-                let r = Math.hypot(p.x, p.y) / trRad;
-                if(r > 1) r = 1;
-                let theta = Math.atan2(p.y, p.x);
-                return `${theta.toFixed(5)} ${r.toFixed(5)}`;
-            }).join('\n');
-            // ---------------------------------------------
-
             document.getElementById('statusTxt').innerText = "Path Optimized (Red)";
             document.getElementById('statusTxt').style.color = "green";
             document.getElementById('progressSlider').value = 0;
@@ -692,8 +680,19 @@
                     let dElbow = Math.round(ik.elbow_steps - prevElbow);
 
                     if(dBase !== 0 || dElbow !== 0) {
-                        let r = Math.hypot(x, y);
-                        let rFactor = r / tableRadius;
+                        // --- SCANNER: GLITCH REMOVER ---
+                        // "looks for blocks similar to G1 3200 0 around 0,0"
+                        let distFromCenter = Math.hypot(x,y);
+                        
+                        // Condition: Close to center (<5mm) AND Elbow moves BIG (>1000) AND Base moves SMALL (<50)
+                        // This indicates a singularity flip/wind-up artifact
+                        if(distFromCenter < 5.0 && Math.abs(dElbow) > 1000 && Math.abs(dBase) < 50) {
+                            console.log(`Skipping glitch: Elbow=${dElbow} Base=${dBase} @ r=${distFromCenter}`);
+                            continue; // Skip this move, do NOT add to commands, do NOT update prev positions
+                        }
+                        // -------------------------------
+
+                        let rFactor = distFromCenter / tableRadius;
                         if(rFactor > 1) rFactor = 1;
                         let delay = Math.round(centerDelay + ((perimDelay - centerDelay) * rFactor));
                         
@@ -766,7 +765,7 @@
                                     : { base_steps: b2_steps, elbow_steps: e2_steps };
         }
 
-        // --- UPDATED ACTIONS ---
+        // --- ACTIONS ---
         async function sendToTable() { 
             if(!generatedGCode) return showToast("Click Prepare first", "error"); 
             let code = generatedGCode; 
@@ -798,25 +797,6 @@
                 .then(r => r.json())
                 .then(d => showToast("Saved", "success"));
             }
-        }
-
-        function downloadThetaRho() { 
-            if(!generatedThr) return; 
-            if(navigator.clipboard && window.isSecureContext) {
-                navigator.clipboard.writeText(generatedThr); 
-            } else {
-                fallbackCopyTextToClipboard(generatedThr); 
-            }
-            showToast("Copied", "success"); 
-        }
-
-        function fallbackCopyTextToClipboard(text) { 
-            var t = document.createElement("textarea"); 
-            t.value = text; 
-            document.body.appendChild(t); 
-            t.select(); 
-            document.execCommand('copy'); 
-            document.body.removeChild(t); 
         }
         
         // --- UTILS ---
