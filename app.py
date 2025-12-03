@@ -305,6 +305,30 @@ def delete_design():
             return jsonify(success=True)
         else: return jsonify(success=False, error="File not found")
     except Exception as e: return jsonify(success=False, error=str(e))
+@app.route("/save_design", methods=["POST"])
+def save_design():
+    data = request.json
+    filename = data.get("filename")
+    gcode = data.get("gcode")
+
+    if not filename or not gcode:
+        return jsonify(success=False, error="Missing filename or gcode")
+
+    # Security: Ensure clean filename
+    filename = os.path.basename(filename)
+    if not filename.lower().endswith(".txt"):
+        filename += ".txt"
+
+    file_path = os.path.join(DESIGNS_FOLDER, filename)
+
+    try:
+        with open(file_path, "w") as f:
+            f.write(gcode)
+        log_message(f"Design saved: {filename}")
+        return jsonify(success=True)
+    except Exception as e:
+        log_message(f"Error saving design: {e}")
+        return jsonify(success=False, error=str(e))
 
 @app.route("/send", methods=["POST"])
 def send_command():
