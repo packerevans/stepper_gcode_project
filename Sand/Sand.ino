@@ -1,6 +1,6 @@
 // ==========================================
-//      ARDUINO SAND TABLE FIRMWARE v6
-//      G0 Homing + Arm Tracking
+//      ARDUINO SAND TABLE FIRMWARE v7
+//      G0 Homing + Debug Prints
 // ==========================================
 
 // --- YOUR SPECIFIC MOTOR PINS ---
@@ -19,19 +19,16 @@ const int ms3 = 6;
 #define BAUD_RATE 9600 
 
 // Gear Ratio: "Arm moves 1.125 of base"
-// Based on your example: G1 -700 800 -> Correction 1600
-// Math: -700 - (800 * 1.125) = -1600. Correction = +1600.
 const float ARM_BASE_RATIO = 1.125;
 
 // Homing Speed for G0
 const int HOMING_SPEED = 1000;
 
 // --- STATE VARIABLES ---
-bool paused = true; // Still used for manual "PAUSE" command, but not M0
+bool paused = true; 
 const int MAX_QUEUE_SIZE = 50;
 
 // Track the theoretical physical position of the arm
-// Start at 0.0 assuming arm is homed on power up
 double currentArmAngleSteps = 0.0;
 
 struct GCommand {
@@ -58,17 +55,14 @@ void setup() {
 
   digitalWrite(enPin, HIGH); // Start Disabled
   
-  // Initialize position tracking
   currentArmAngleSteps = 0.0;
   
   Serial.println(F("READY"));
 }
 
 void loop() {
-  // Always check for new data
   if (Serial.available()) handleSerial();
 
-  // Execute queue if not paused by user
   if (!paused && queueCount > 0) {
     executeNextCommand();
   }
@@ -80,7 +74,6 @@ void handleSerial() {
     cmd.trim();
     if (cmd.length() == 0) continue;
 
-    // --- IMMEDIATE COMMANDS ---
     if (cmd.equalsIgnoreCase("PAUSE")) {
       paused = true;
       digitalWrite(enPin, HIGH);
@@ -93,15 +86,14 @@ void handleSerial() {
     }
     else if (cmd.equalsIgnoreCase("CLEAR")) {
       queueHead = queueTail = queueCount = 0;
-      currentArmAngleSteps = 0.0; // Reset tracking on clear? Optional.
+      currentArmAngleSteps = 0.0; 
       Serial.println(F("Cleared"));
     }
-    // --- QUEUED COMMANDS ---
     else if (cmd.startsWith("G1") || cmd.startsWith("g1")) {
       parseAndEnqueueMove(cmd);
     }
     else if (cmd.startsWith("G0") || cmd.startsWith("g0")) {
-      // G0 is now the Homing Command
+      Serial.println(F("DEBUG: G0 Received")); // <--- DEBUG 1
       enqueueHome();
     }
   }
@@ -109,16 +101,22 @@ void handleSerial() {
 
 void enqueueHome() {
   if (queueCount < MAX_QUEUE_SIZE) {
-    // Calculate steps needed to return to 0
-    // If current is -1600, we need +1600.
+    // Print current tracking info
+    Serial.print(F("DEBUG: Current Arm Pos: ")); 
+    Serial.println(currentArmAngleSteps);
+
+    // Calculate correction
     long correctionSteps = (long)round(-currentArmAngleSteps);
     
+    Serial.print(F("DEBUG: Correcting by: ")); 
+    Serial.println(correctionSteps);
+
     // Add to queue
     queue[queueTail].armSteps = correctionSteps;
-    queue[queueTail].baseSteps = 0; // Base does not move during homing
+    queue[queueTail].baseSteps = 0; 
     queue[queueTail].speed = HOMING_SPEED;
     
-    // Update tracking: We are theoretically back at 0 after this move
+    // Update tracking (should now be 0)
     currentArmAngleSteps += correctionSteps;
     
     queueTail = (queueTail + 1) % MAX_QUEUE_SIZE;
@@ -129,7 +127,6 @@ void enqueueHome() {
 }
 
 void parseAndEnqueueMove(String cmd) {
-  // Expected Format: G1 <Elbow> <Base> <Speed>
   long armSteps = 0;
   long baseSteps = 0;
   int speed = 1000;
@@ -139,17 +136,14 @@ void parseAndEnqueueMove(String cmd) {
   int s3 = cmd.indexOf(' ', s2 + 1);
 
   if (s1 > 0) {
-    // Parse Elbow (Arm)
     String armStr = cmd.substring(s1 + 1, s2 > 0 ? s2 : cmd.length());
     armSteps = armStr.toInt();
     
     if (s2 > 0) {
       if (s3 > 0) {
-        // Parse Base & Speed
         baseSteps = cmd.substring(s2 + 1, s3).toInt();
         speed = cmd.substring(s3 + 1).toInt();
       } else {
-        // Parse Base only (default speed)
         baseSteps = cmd.substring(s2 + 1).toInt();
       }
     }
@@ -161,8 +155,7 @@ void parseAndEnqueueMove(String cmd) {
     queue[queueTail].speed = speed;
     
     // --- TRACKING LOGIC ---
-    // Update the virtual arm position based on the move + gear ratio
-    // Based on user data: Net Change = ArmSteps - (BaseSteps * 1.125)
+    // Update tracking BEFORE move execution so we know where we are going
     currentArmAngleSteps += armSteps;
     currentArmAngleSteps -= (baseSteps * ARM_BASE_RATIO);
 
@@ -178,13 +171,12 @@ void executeNextCommand() {
   queueHead = (queueHead + 1) % MAX_QUEUE_SIZE;
   queueCount--;
   
-  // Execute Move
   moveBresenham(cmd.armSteps, cmd.baseSteps, cmd.speed);
   Serial.println(F("Done")); 
 }
 
 void moveBresenham(long da, long db, int delayUs) {
-  digitalWrite(enPin, LOW); // Enable motors
+  digitalWrite(enPin, LOW); 
 
   digitalWrite(dirArm, (da >= 0) ? HIGH : LOW);
   digitalWrite(dirBase, (db >= 0) ? HIGH : LOW);
@@ -198,10 +190,7 @@ void moveBresenham(long da, long db, int delayUs) {
   long accB = steps / 2;
 
   for (long i = 0; i < steps; i++) {
-    // Check Serial frequently
     if (Serial.available()) handleSerial();
-    
-    // Immediate pause check
     if (paused) break;
 
     accA -= ad;
@@ -225,4 +214,5 @@ void pulsePin(int pin) {
   delayMicroseconds(2); 
   digitalWrite(pin, LOW);
 }
+
 
