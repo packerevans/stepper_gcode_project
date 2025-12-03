@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Packers Sand Pro (Synced v18)</title>
+    <title>Packers Sand Pro (Synced v18 - Fixes)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -716,13 +716,38 @@
 
             generatedGCode = commands.join('\n');
             
-            // Generate Theta-Rho for export (Universal Format)
+            // --- FIX: Generate Theta-Rho for export (Universal Format / Sandify) ---
             let thrLines = [];
+            thrLines.push("# format: thetarho"); // Good practice header
+            
+            let prevTheta = 0;
+            let cumulativeTheta = 0;
+            let isFirst = true;
+
             for(let p of pathPoints) {
                 if(p.type !== 'exit') {
+                    // Normalise Rho (0.0 to 1.0) based on table radius
                     let rho = Math.hypot(p.x, p.y) / tableRadius;
-                    let theta = Math.atan2(p.y, p.x);
-                    thrLines.push(`${theta.toFixed(5)} ${rho.toFixed(5)}`);
+                    if(rho > 1.0) rho = 1.0; 
+
+                    // Calculate Raw Theta
+                    let rawTheta = Math.atan2(p.y, p.x);
+                    
+                    // Logic to unwind angle (Cumulative Theta)
+                    if(isFirst) {
+                        cumulativeTheta = rawTheta;
+                        prevTheta = rawTheta;
+                        isFirst = false;
+                    } else {
+                        let diff = rawTheta - prevTheta;
+                        // Snap unwinding to prevent 360 degree jumps
+                        while (diff <= -Math.PI) diff += 2 * Math.PI;
+                        while (diff > Math.PI) diff -= 2 * Math.PI;
+                        cumulativeTheta += diff;
+                        prevTheta = rawTheta;
+                    }
+                    
+                    thrLines.push(`${cumulativeTheta.toFixed(5)} ${rho.toFixed(5)}`);
                 }
             }
             generatedThr = thrLines.join('\n');
@@ -827,17 +852,47 @@
             a.download = 'pattern_steps.txt'; a.href = URL.createObjectURL(blob); a.click();
         }
 
+        // --- UPDATED: ROBUST COPY FUNCTION WITH FALLBACK ---
         function downloadThetaRho() {
             if(!generatedThr) return showToast("Click 'Prepare Path' first!", "error");
-            // Copy to Clipboard logic
-            navigator.clipboard.writeText(generatedThr).then(() => {
-                showToast("Copied Theta-Rho to Clipboard!", "success");
-            }).catch(() => {
-                showToast("Clipboard failed, downloading file...", "info");
-                const blob = new Blob([generatedThr], {type:'text/plain'});
+            
+            // Try Standard Clipboard API (Works on localhost/HTTPS)
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(generatedThr).then(() => {
+                    showToast("Copied Theta-Rho to Clipboard!", "success");
+                }).catch(() => fallbackCopyTextToClipboard(generatedThr));
+            } else {
+                // Fallback for HTTP/Local Network
+                fallbackCopyTextToClipboard(generatedThr);
+            }
+        }
+
+        function fallbackCopyTextToClipboard(text) {
+            var textArea = document.createElement("textarea");
+            textArea.value = text;
+            
+            // Ensure textarea is not visible but part of DOM
+            textArea.style.top = "0";
+            textArea.style.left = "0";
+            textArea.style.position = "fixed";
+            textArea.style.opacity = "0";
+
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+
+            try {
+                var successful = document.execCommand('copy');
+                if(successful) showToast("Copied (Fallback Method)!", "success");
+                else showToast("Copy failed, downloading...", "error");
+            } catch (err) {
+                // If all else fails, download the file
+                const blob = new Blob([text], {type:'text/plain'});
                 const a = document.createElement('a');
                 a.download = 'pattern.thr'; a.href = URL.createObjectURL(blob); a.click();
-            });
+            }
+
+            document.body.removeChild(textArea);
         }
 
         // --- UTILS ---
