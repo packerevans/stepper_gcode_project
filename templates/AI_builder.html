@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sand Controller Pro (Spiral Edition)</title>
+    <title>Sand Controller Pro (Spiral Fix)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -220,7 +220,7 @@
 
     <div id="status-toast"></div>
 
-        <script>
+    <script>
         let rawPoints = []; 
         let processedPoints = []; 
         let historyStack = [];
@@ -250,10 +250,14 @@
         // --- DRAWING LOGIC ---
         function startDraw(e) {
             e.preventDefault();
+            
+            // --- MANUAL FILL LOGIC ---
             if(currentTool === 'fill') {
                 handleFillClick(e);
                 return;
             }
+            // -------------------------
+
             const smart = document.getElementById('smartPenMode').checked;
             if(smart) {
                 if(e.pointerType === 'pen') setTool('draw');
@@ -322,189 +326,128 @@
             }
         }
 
-        // --- NEW: CONTOUR SPIRAL FILL ---
+        // --- ADVANCED MANUAL FILL (SPIRAL + HOLES + TRAVEL GAP FIX) ---
         function handleFillClick(e) {
             const clickPos = getPos(e);
-            // Distance between spiral loops. Adjust as needed.
-            const FILL_SPACING = 4.0; 
+            const FILL_SPACING = 3.5; 
+            const MAX_TRAVEL_JUMP = 40.0; // Any connection longer than this is treated as a break/gap
 
-            // 1. Extract Shapes and Filter out "Travel Lines"
+            // 1. Convert rawPoints into distinct shapes with GAP DETECTION
             let shapes = [];
             let currentShape = [];
+            
             rawPoints.forEach(p => {
                 if(p.type === 'break' || p.type === 'cmd') {
-                    // Only consider it a shape if it has points AND is closed
-                    if(currentShape.length > 2) {
-                        const first = currentShape[0];
-                        const last = currentShape[currentShape.length-1];
-                        const dist = Math.hypot(first.x - last.x, first.y - last.y);
-                        // If start and end are close, it's a closed shape. Otherwise, it's a travel line.
-                        if(dist < 5.0) {
-                            shapes.push(currentShape);
-                        }
-                    }
+                    if(currentShape.length > 2) shapes.push(currentShape); 
                     currentShape = [];
                 } else {
+                    // Check for invisible travel lines (jumps)
+                    if(currentShape.length > 0) {
+                        let last = currentShape[currentShape.length-1];
+                        let dist = Math.hypot(p.x - last.x, p.y - last.y);
+                        if(dist > MAX_TRAVEL_JUMP) {
+                             // This is a jump! Close current shape and start new one
+                             if(currentShape.length > 2) shapes.push(currentShape);
+                             currentShape = [];
+                        }
+                    }
                     currentShape.push(p);
                 }
             });
-            // Flush last shape
-             if(currentShape.length > 2) {
-                const first = currentShape[0];
-                const last = currentShape[currentShape.length-1];
-                if(Math.hypot(first.x - last.x, first.y - last.y) < 5.0) {
-                    shapes.push(currentShape);
-                }
-            }
+            if(currentShape.length > 2) shapes.push(currentShape);
 
-            // 2. Identify Target Shape
+            // 2. Identify the Target Shape (The smallest shape containing the click)
             let candidates = [];
             for(let i=0; i<shapes.length; i++) {
                 if(isPointInPolygon(clickPos, shapes[i])) {
                     let bounds = getBounds(shapes[i]);
-                    candidates.push({ id: i, area: bounds.area, shape: shapes[i] });
+                    candidates.push({ id: i, area: bounds.area, shape: shapes[i], bounds: bounds });
                 }
             }
 
-            if(candidates.length === 0) return showToast("Click inside a closed shape", "error");
+            if(candidates.length === 0) {
+                showToast("Click inside a closed shape", "error");
+                return;
+            }
 
-            // Pick smallest container (e.g., the hole of a donut)
+            // Sort: Smallest area first (Handles nested shapes/donuts)
             candidates.sort((a,b) => a.area - b.area);
             const target = candidates[0]; 
             
-            // 3. Identify Holes
+            // 3. Identify Holes (Shapes completely inside the target)
             let holes = [];
             shapes.forEach((s, idx) => {
-                if(idx === target.id) return;
+                if(idx === target.id) return; // Don't check self
+                
+                // If the first point of shape 's' is inside target, assume entire shape is inside
                 if(isPointInPolygon(s[0], target.shape)) {
-                     if(getBounds(s).area < target.area) holes.push(s);
+                     let sBounds = getBounds(s);
+                     if(sBounds.area < target.area) {
+                        holes.push(s);
+                     }
                 }
             });
 
-            showToast(`Genering contour fill...`, "info");
+            showToast(`Filling... (${holes.length} holes excluded)`, "info");
             saveState();
 
-            // 4. Generate Contouring Loops (Concentric Insets)
-            let currentLoop = normalizeWinding(target.shape); // Ensure CCW orientation
-            let filling = true;
-            let safetyCounter = 0;
+            // 4. Generate Spiral Texture
+            const cx = (target.bounds.minX + target.bounds.maxX) / 2;
+            const cy = (target.bounds.minY + target.bounds.maxY) / 2;
+            
+            // Calculate max radius needed to cover the box
+            const maxR = Math.hypot(target.bounds.maxX - cx, target.bounds.maxY - cy) + 10;
+            
+            let currentR = 0;
+            let angle = 0;
+            let isDrawingSpiral = false;
 
             rawPoints.push({type: 'break'});
 
-            while(filling && safetyCounter < 200) {
-                safetyCounter++;
-                // Calculate the next inner loop
-                let nextLoop = insetPolygon(currentLoop, FILL_SPACING);
-                
-                // Check if the loop has collapsed or become invalid
-                if(nextLoop.length < 3 || getBounds(nextLoop).area < (FILL_SPACING*FILL_SPACING)) {
-                    filling = false;
-                    break;
-                }
+            // Archimedean Spiral Loop
+            while(currentR < maxR) {
+                // Polar to Cartesian
+                let px = cx + currentR * Math.cos(angle);
+                let py = cy + currentR * Math.sin(angle);
 
-                // Add valid segments of the loop to rawPoints, checking against holes
-                let isDrawingLoop = false;
-                for(let i=0; i<nextLoop.length; i++) {
-                    let p = nextLoop[i];
-                    
-                    // Check if this point falls inside a hole
-                    let inHole = holes.some(h => isPointInPolygon(p, h));
-
-                    if(!inHole) {
-                        if(!isDrawingLoop) {
-                             rawPoints.push({type: 'break'});
-                             isDrawingLoop = true;
+                // Hit Test: Inside Target AND NOT Inside Any Hole
+                let valid = isPointInPolygon({x:px, y:py}, target.shape);
+                if(valid) {
+                    for(let h of holes) {
+                        if(isPointInPolygon({x:px, y:py}, h)) {
+                            valid = false;
+                            break;
                         }
-                        rawPoints.push({x: p.x, y: p.y, type: 'point'});
-                    } else {
-                        isDrawingLoop = false;
                     }
                 }
-                // Close the loop visually if it was drawing
-                if(isDrawingLoop && nextLoop.length > 0) {
-                     rawPoints.push({x: nextLoop[0].x, y: nextLoop[0].y, type: 'point'});
+
+                if(valid) {
+                    if(!isDrawingSpiral) {
+                        // Jump to new section
+                        rawPoints.push({type: 'break'});
+                        isDrawingSpiral = true;
+                    }
+                    rawPoints.push({x: px, y: py, type: 'point'});
+                } else {
+                    isDrawingSpiral = false;
                 }
 
-                currentLoop = nextLoop;
+                // Increment Angle 
+                const resolution = 2.0; 
+                const dTheta = resolution / (currentR + 1); 
+                angle += dTheta;
+                
+                // Radius growth
+                currentR = (angle / (2 * Math.PI)) * FILL_SPACING;
             }
             
             rawPoints.push({type: 'break'});
+
             render();
-            showToast("Contour Fill Complete!", "success");
+            showToast("Spiral Fill Complete!", "success");
         }
 
-        // --- GEOMETRY HELPERS FOR CONTOURING ---
-
-        // Ensure polygon is Counter-Clockwise (needed for consistent insetting)
-        function normalizeWinding(poly) {
-            let sum = 0;
-            for (let i = 0; i < poly.length; i++) {
-                let p1 = poly[i];
-                let p2 = poly[(i + 1) % poly.length];
-                sum += (p2.x - p1.x) * (p2.y + p1.y);
-            }
-            // If sum > 0 it's clockwise (assuming y-up), reverse it to be CCW
-            // Note: Canvas is y-down, but our coordinate system is y-up.
-            return (sum > 0) ? [...poly].reverse() : [...poly];
-        }
-
-        // Generates a new polygon offset inwards by a set distance
-        function insetPolygon(poly, offset) {
-            if (poly.length < 3) return [];
-            let newPoly = [];
-            
-            for (let i = 0; i < poly.length; i++) {
-                // Find vertices (prev, curr, next)
-                let pPrev = poly[(i - 1 + poly.length) % poly.length];
-                let pCurr = poly[i];
-                let pNext = poly[(i + 1) % poly.length];
-
-                // Define vectors for the two segments meeting at pCurr
-                let v1 = {x: pCurr.x - pPrev.x, y: pCurr.y - pPrev.y};
-                let v2 = {x: pNext.x - pCurr.x, y: pNext.y - pCurr.y};
-
-                // Normalize
-                let l1 = Math.hypot(v1.x, v1.y) || 1;
-                let l2 = Math.hypot(v2.x, v2.y) || 1;
-                v1.x /= l1; v1.y /= l1;
-                v2.x /= l2; v2.y /= l2;
-
-                // Find inward normals (assuming CCW winding)
-                let n1 = {x: -v1.y, y: v1.x};
-                let n2 = {x: -v2.y, y: v2.x};
-
-                // Find intersection of two lines shifted by 'offset' along their normals
-                // Line 1 defined by point (pPrev + n1*offset) and direction v1
-                let anchor1 = {x: pPrev.x + n1.x * offset, y: pPrev.y + n1.y * offset};
-                // Line 2 defined by point (pCurr + n2*offset) and direction v2
-                let anchor2 = {x: pCurr.x + n2.x * offset, y: pCurr.y + n2.y * offset};
-
-                let intersect = getLineIntersection(anchor1, v1, anchor2, v2);
-                
-                // Fallback for parallel lines (collinear segments)
-                if(!intersect) {
-                    intersect = {x: pCurr.x + n1.x*offset, y: pCurr.y + n1.y*offset};
-                }
-                newPoly.push({x: intersect.x, y: intersect.y, type:'point'});
-            }
-            return newPoly;
-        }
-
-        // Finds intersection of two infinite lines defined by anchor point and direction vector
-        function getLineIntersection(p1, v1, p2, v2) {
-            let det = v1.x * v2.y - v1.y * v2.x;
-            if (Math.abs(det) < 0.001) return null; // Parallel
-
-            let dx = p2.x - p1.x;
-            let dy = p2.y - p1.y;
-            let t = (dx * v2.y - dy * v2.x) / det;
-            return {
-                x: p1.x + t * v1.x,
-                y: p1.y + t * v1.y
-            };
-        }
-
-        // Standard Ray Casting
+        // Helper: Ray Casting Algorithm
         function isPointInPolygon(p, polygon) {
             let inside = false;
             for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
@@ -516,6 +459,7 @@
             return inside;
         }
 
+        // Helper: Get Bounds
         function getBounds(shape) {
             let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
             shape.forEach(p => {
@@ -1097,6 +1041,5 @@
 
         init();
     </script>
-
 </body>
 </html>
