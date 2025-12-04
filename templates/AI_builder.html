@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sand Controller Pro (Rotated Dunes)</title>
+    <title>Sand Controller Pro (Perimeter Travel)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -358,7 +358,7 @@
             }
         }
 
-        // --- DUNE FILL (ROTATION + MASKING + OUTLINING) ---
+        // --- DUNE FILL (ROTATION + MASK + PERIMETER TRAVEL) ---
         function handleFillClick(e) {
             const clickPos = getPos(e);
             
@@ -419,14 +419,12 @@
                 }
             });
 
-            showToast("Generating Pattern...", "info");
+            showToast("Calculated Edge Paths...", "info");
             saveState();
 
-            // --- 4. RANDOM ROTATION SETUP ---
-            // We rotate the world by a random angle so the fill direction varies
+            // 4. RANDOM ROTATION SETUP
             const fillAngle = Math.random() * Math.PI; // 0 to 180 degrees
             
-            // Function to rotate point around 0,0
             const rotatePt = (x, y, rad) => ({
                 x: x * Math.cos(rad) - y * Math.sin(rad),
                 y: x * Math.sin(rad) + y * Math.cos(rad)
@@ -440,7 +438,11 @@
             let y = rotBounds.minY + DENSITY;
             let direction = 1;
             
+            // We start fresh for the fill, no break initial
+            // But we need to jump to start
             rawPoints.push({type: 'break'});
+
+            let lastFilledPointRot = null;
 
             while(y < rotBounds.maxY) {
                 let intersections = [];
@@ -465,6 +467,7 @@
                     let segPoints = [];
                     const step = 2.0; 
                     
+                    // Generate Linear Segment Points
                     if(direction === 1) {
                         for(let x=xStart; x<=xEnd; x+=step) segPoints.push(x);
                         if(segPoints[segPoints.length-1] !== xEnd) segPoints.push(xEnd);
@@ -473,22 +476,20 @@
                         if(segPoints[segPoints.length-1] !== xStart) segPoints.push(xStart);
                     }
 
+                    // Process Points (Noise + Masking)
                     let validSegment = [];
                     let wasInside = false;
+                    let segmentStartPointRot = null;
 
                     for(let px of segPoints) {
                         // Apply NOISE to Y
                         let noiseVal = Noise.eval(px * NOISE_SCALE, y * NOISE_SCALE);
                         let py = y + (noiseVal * WAVE_AMP);
 
-                        // ROTATE BACK TO REAL WORLD COORDS
+                        // Rotate back to verify mask
                         let realPt = rotatePt(px, py, fillAngle);
-
-                        // --- CRITICAL FIX: STRICT MASKING ---
-                        // Check if this new wavy point is actually inside the ORIGINAL shape
                         let isInsideOrig = isPointInPolygon(realPt, target.shape);
-
-                        // Check Holes
+                        
                         let insideHole = false;
                         if(isInsideOrig) {
                             for(let h of holes) {
@@ -500,27 +501,46 @@
                         }
 
                         if(isInsideOrig && !insideHole) {
+                            // Valid point
+                            let ptRot = {x:px, y:py}; // Keep rotated coords for perimeter logic
+                            
                             if(!wasInside) {
-                                if(validSegment.length > 0) {
-                                     validSegment.forEach(p=>rawPoints.push(p));
-                                     rawPoints.push({type:'break'});
-                                     validSegment = [];
+                                // Start of a new visual segment
+                                segmentStartPointRot = ptRot;
+                                
+                                // --- PERIMETER TRAVEL LOGIC ---
+                                if(lastFilledPointRot) {
+                                    // We finished a line at lastFilledPointRot
+                                    // We need to start at segmentStartPointRot
+                                    // Instead of jumping, trace the perimeter of rotTarget
+                                    let trace = getPerimeterPath(lastFilledPointRot, segmentStartPointRot, rotTarget);
+                                    
+                                    // Add trace points (rotate them back first)
+                                    trace.forEach(tp => {
+                                        let rp = rotatePt(tp.x, tp.y, fillAngle);
+                                        rawPoints.push({x:rp.x, y:rp.y, type:'point'});
+                                    });
+                                } else {
+                                    // First point ever, just break/jump
+                                    if(rawPoints.length>0 && rawPoints[rawPoints.length-1].type!=='break') {
+                                         rawPoints.push({type:'break'});
+                                    }
                                 }
+
                                 wasInside = true;
                             }
-                            validSegment.push({x:realPt.x, y:realPt.y, type:'point'});
+                            
+                            // Add the fill point
+                            rawPoints.push({x:realPt.x, y:realPt.y, type:'point'});
+                            lastFilledPointRot = ptRot;
                         } else {
+                            // Hit void/hole/edge
                             if(wasInside) {
-                                // Hit boundary, end segment
-                                validSegment.forEach(p=>rawPoints.push(p));
-                                rawPoints.push({type:'break'});
-                                validSegment = [];
                                 wasInside = false;
+                                // We don't break here, we just stop adding points. 
+                                // The next valid point will trigger the Perimeter Travel logic above.
                             }
                         }
-                    }
-                    if(validSegment.length > 0) {
-                        validSegment.forEach(p=>rawPoints.push(p));
                     }
                 }
                 
@@ -530,12 +550,24 @@
             
             // --- 6. CLEAN UP EDGES (Outline) ---
             // Draw the perimeter of the target shape again to hide ragged ripple edges
-            rawPoints.push({type: 'break'});
+            // Use perimeter travel to get to the start of the outline if possible
+            if(lastFilledPointRot) {
+                 // Rotate start of shape to rot space
+                 let startP = target.shape[0];
+                 let startPRot = rotatePt(startP.x, startP.y, -fillAngle);
+                 let trace = getPerimeterPath(lastFilledPointRot, startPRot, rotTarget);
+                 trace.forEach(tp => {
+                    let rp = rotatePt(tp.x, tp.y, fillAngle);
+                    rawPoints.push({x:rp.x, y:rp.y, type:'point'});
+                 });
+            } else {
+                rawPoints.push({type: 'break'});
+            }
+
             target.shape.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
-            // Close the loop
             rawPoints.push({x:target.shape[0].x, y:target.shape[0].y, type:'point'});
             
-            // Also outline the holes
+            // Outline holes
             holes.forEach(h => {
                 rawPoints.push({type: 'break'});
                 h.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
@@ -544,7 +576,48 @@
 
             rawPoints.push({type: 'break'});
             render();
-            showToast("Pattern Complete!", "success");
+            showToast("Perimeter Fill Complete!", "success");
+        }
+
+        // --- PERIMETER TRACING HELPER ---
+        function getPerimeterPath(p1, p2, poly) {
+            // Find closest vertex indices
+            let idx1 = -1, minD1 = Infinity;
+            let idx2 = -1, minD2 = Infinity;
+
+            for(let i=0; i<poly.length; i++) {
+                let d1 = Math.hypot(poly[i].x - p1.x, poly[i].y - p1.y);
+                if(d1 < minD1) { minD1 = d1; idx1 = i; }
+                let d2 = Math.hypot(poly[i].x - p2.x, poly[i].y - p2.y);
+                if(d2 < minD2) { minD2 = d2; idx2 = i; }
+            }
+
+            if(idx1 === -1 || idx2 === -1 || idx1 === idx2) return [];
+
+            // Calculate CW Path
+            let cwPath = [];
+            let curr = idx1;
+            let cwDist = 0;
+            while(curr !== idx2) {
+                let next = (curr + 1) % poly.length;
+                cwDist += Math.hypot(poly[curr].x - poly[next].x, poly[curr].y - poly[next].y);
+                cwPath.push(poly[next]);
+                curr = next;
+            }
+
+            // Calculate CCW Path
+            let ccwPath = [];
+            curr = idx1;
+            let ccwDist = 0;
+            while(curr !== idx2) {
+                let next = (curr - 1 + poly.length) % poly.length;
+                ccwDist += Math.hypot(poly[curr].x - poly[next].x, poly[curr].y - poly[next].y);
+                ccwPath.push(poly[next]);
+                curr = next;
+            }
+
+            // Return shorter path
+            return (cwDist < ccwDist) ? cwPath : ccwPath;
         }
 
         // Helper: Ray Casting Algorithm
