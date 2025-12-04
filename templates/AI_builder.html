@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sand Controller Pro (Trace Fix)</title>
+    <title>Sand Controller Pro (Fixed Tracer)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -115,15 +115,10 @@
         .slider-tog:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
         input:checked + .slider-tog { background-color: var(--secondary); }
         input:checked + .slider-tog:before { transform: translateX(18px); }
-        
-        /* Hidden Container for SVG Processing */
-        #hidden-trace-container { display: none; visibility: hidden; position: absolute; }
 
     </style>
 </head>
 <body data-theme="light">
-
-    <div id="hidden-trace-container"></div>
 
     <div id="mySidebar" class="sidebar">
         <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
@@ -276,25 +271,17 @@
         function init() {
             resizeCanvas();
             window.addEventListener('resize', resizeCanvas);
-            
             canvas.addEventListener('pointerdown', startDraw);
             canvas.addEventListener('pointermove', moveDraw);
             canvas.addEventListener('pointerup', endDraw);
             canvas.addEventListener('pointerleave', endDraw);
             canvas.style.touchAction = "none";
-            
             updateUI();
         }
 
-        // --- DRAWING LOGIC ---
         function startDraw(e) {
             e.preventDefault();
-            
-            if(currentTool === 'fill') {
-                handleFillClick(e);
-                return;
-            }
-
+            if(currentTool === 'fill') { handleFillClick(e); return; }
             const smart = document.getElementById('smartPenMode').checked;
             if(smart) {
                 if(e.pointerType === 'pen') setTool('draw');
@@ -324,10 +311,7 @@
         }
 
         function getPos(e) {
-            return {
-                x: (e.offsetX - origin.x) / scale,
-                y: -(e.offsetY - origin.y) / scale
-            };
+            return { x: (e.offsetX - origin.x) / scale, y: -(e.offsetY - origin.y) / scale };
         }
 
         function processPointer(e) {
@@ -349,21 +333,17 @@
             const r = 10 * scale;
             const px = origin.x + p.x * scale;
             const py = origin.y - p.y * scale;
-            
             if(currentTool === 'erase') {
                 ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI*2);
                 ctx.strokeStyle = "#999"; ctx.fillStyle = "rgba(200,200,200,0.3)";
                 ctx.stroke(); ctx.fill();
             } else if (currentTool === 'fill') {
-                ctx.font = "20px Arial";
-                ctx.fillStyle = "black";
-                ctx.textAlign = "center";
-                ctx.textBaseline = "middle";
+                ctx.font = "20px Arial"; ctx.fillStyle = "black"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
                 ctx.fillText("🌊", px, py);
             }
         }
 
-        // --- MASTER DUNE FILL (OUTLINE FIRST + DUNE) ---
+        // --- MASTER DUNE FILL ---
         function handleFillClick(e) {
             const clickPos = getPos(e);
             const DENSITY = 3.0; const NOISE_SCALE = 0.05; const WAVE_AMP = 3.0; const MAX_JUMP = 30.0; 
@@ -371,7 +351,6 @@
             // 1. Convert rawPoints into distinct shapes
             let shapes = [];
             let currentShape = [];
-            
             rawPoints.forEach(p => {
                 if(p.type === 'break' || p.type === 'cmd') {
                     if(currentShape.length > 2) shapes.push(currentShape); 
@@ -417,7 +396,7 @@
             showToast("Generating Trace & Fill...", "info");
             saveState();
             
-            // --- FIX 1: DRAW OUTLINE FIRST (Reversed Order) ---
+            // DRAW OUTLINE FIRST
             rawPoints.push({type: 'break'});
             target.shape.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
             rawPoints.push({x:target.shape[0].x, y:target.shape[0].y, type:'point'});
@@ -427,7 +406,6 @@
                 h.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
                 rawPoints.push({x:h[0].x, y:h[0].y, type:'point'});
             });
-            // ---------------------------------
 
             // 4. RANDOM ROTATION SETUP
             const fillAngle = Math.random() * Math.PI; // 0 to 180
@@ -440,7 +418,7 @@
             const rotHoles = holes.map(h => h.map(p => rotatePt(p.x, p.y, -fillAngle)));
             const rotBounds = getBounds(rotTarget);
             
-            // 5. Generate Scanline on Rotated Plane
+            // 5. Generate Scanline
             let y = rotBounds.minY + DENSITY;
             let direction = 1;
             
@@ -512,7 +490,6 @@
                         for(let px of segPoints) {
                             let noiseVal = Noise.eval(px * NOISE_SCALE, y * NOISE_SCALE);
                             let py = y + (noiseVal * WAVE_AMP);
-                            
                             let realPt = rotatePt(px, py, fillAngle);
                             let safe = isPointInPolygon(realPt, target.shape);
                             if(safe) {
@@ -533,7 +510,7 @@
         }
 
         function findClosestPoly(pt, target, holes) {
-            let minD = 5.0; // Threshold
+            let minD = 5.0; 
             if(distToPoly(pt, target) < minD) return target;
             for(let h of holes) {
                 if(distToPoly(pt, h) < minD) return h;
@@ -550,7 +527,7 @@
             return minD;
         }
 
-        // --- OPTIMIZER (With Smart Obstacle Avoidance) ---
+        // --- G-CODE PREPARATION (Smart Obstacle Avoidance) ---
         function prepareGCode() {
             if(rawPoints.length === 0) return showToast("Draw something first!", "error");
             showToast("Optimizing Path...", "info");
@@ -575,16 +552,14 @@
                 const ang = s * (Math.PI*2/sym);
                 const c = Math.cos(ang), si = Math.sin(ang);
                 shapes.forEach(sh => {
-                    let newSh = sh.map(p => ({x: p.x*c - p.y*si, y: p.x*si + p.y*c, type: 'point'}));
+                    let newSh = sh.map(p => ({
+                        x: p.x*c - p.y*si,
+                        y: p.x*si + p.y*c,
+                        type: 'point'
+                    }));
                     pool.push(newSh);
                 });
             }
-
-            // Identify Obstacles (Closed Shapes)
-            let obstacleShapes = pool.filter(s => {
-                let d = Math.hypot(s[0].x - s[s.length-1].x, s[0].y - s[s.length-1].y);
-                return d < 5.0 && s.length > 5;
-            });
 
             let bestShapeIdx = -1, bestPointIdx = -1, maxDist = -1;
             for (let i=0; i<pool.length; i++) {
@@ -611,6 +586,13 @@
 
             let sortedShapes = [startShape];
             let curPos = startShape[startShape.length-1];
+
+            // Obstacle Awareness: Keep track of closed shapes
+            let obstacleShapes = pool.filter(s => {
+                let d = Math.hypot(s[0].x - s[s.length-1].x, s[0].y - s[s.length-1].y);
+                return d < 5.0 && s.length > 5;
+            });
+            if(dClose < 5.0 && startShape.length>5) obstacleShapes.push(startShape);
 
             while(pool.length > 0) {
                 let bestIdx = -1;
@@ -643,6 +625,7 @@
                     let p2 = winner.slice(0, bestStartIdx);
                     winner = p1.concat(p2);
                     winner.push(winner[0]);
+                    obstacleShapes.push(winner);
                 } else {
                     if(bestIsReverse) winner.reverse();
                 }
@@ -652,7 +635,6 @@
                 pool.splice(bestIdx, 1);
             }
 
-            // Flatten using Smart Travel
             processedPoints = [];
             
             if(sortedShapes.length > 0) {
@@ -692,7 +674,6 @@
                     retracePath.forEach(p => processedPoints.push(p));
                     
                     let startJump = prev[bestExitIdx];
-                    // Smart Avoidance for Jump
                     let safePath = getSafePath(startJump, currStart, obstacleShapes);
                     safePath.forEach(p => processedPoints.push({x:p.x, y:p.y, type:'point'}));
                 }
@@ -715,7 +696,6 @@
             showToast("Path Ready!", "success");
         }
 
-        // --- SMART TRAVEL ALGORITHMS ---
         function getSafePath(p1, p2, obstacles) {
             let closestInt = null;
             let bestDist = Infinity;
@@ -733,7 +713,7 @@
                 }
             }
 
-            if(!closestInt) return [p2];
+            if(!closestInt) return [p2]; 
 
             let exitIdx = -1, minExitDist = Infinity;
             for(let i=0; i<hitShape.length; i++) {
@@ -750,7 +730,10 @@
             let entryPt = hitShape[entryIdx];
 
             let trace = getPerimeterPath(entryPt, exitPt, hitShape);
-            let result = [entryPt, ...trace];
+            let result = [];
+            result.push(entryPt); 
+            trace.forEach(p => result.push(p));
+            
             let tail = getSafePath(exitPt, p2, obstacles);
             tail.forEach(p => result.push(p));
 
@@ -777,7 +760,6 @@
             return null;
         }
 
-        // --- UTILS ---
         function getPerimeterPath(p1, p2, poly) {
             let idx1 = -1, minD1 = Infinity;
             let idx2 = -1, minD2 = Infinity;
@@ -803,26 +785,95 @@
             return (cwDist < ccwDist) ? cwPath : ccwPath;
         }
 
-        // Helper: Ray Casting Algorithm
-        function isPointInPolygon(p, polygon) {
-            let inside = false;
-            for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-                let xi = polygon[i].x, yi = polygon[i].y;
-                let xj = polygon[j].x, yj = polygon[j].y;
-                let intersect = ((yi > p.y) !== (yj > p.y)) && (p.x < (xj - xi) * (p.y - yi) / (yj - yi) + xi);
-                if (intersect) inside = !inside;
-            }
-            return inside;
+        // --- FIXED TRACER FUNCTION ---
+        function handleImageUpload(input) {
+            const file = input.files[0];
+            if(!file) return;
+            showToast("Scanning...", "info");
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const tCan = document.createElement('canvas');
+                    const MAX = 1000;
+                    let tw = img.width, th = img.height;
+                    if(tw>th && tw>MAX){ th*=MAX/tw; tw=MAX; } 
+                    else if(th>MAX){ tw*=MAX/th; th=MAX; }
+                    tCan.width = tw; tCan.height = th;
+                    const tCtx = tCan.getContext('2d');
+                    // Draw white background then image
+                    tCtx.fillStyle = "white"; tCtx.fillRect(0,0,tw,th);
+                    // High Contrast Filter
+                    tCtx.filter = "grayscale(100%) contrast(200%) brightness(100%)";
+                    tCtx.drawImage(img, 0, 0, tw, th);
+                    
+                    // Robust Trace Settings
+                    ImageTracer.imageToSVG(tCan.toDataURL(), function(svgStr){
+                        processTrace(svgStr, tw, th);
+                    }, { ltres:1, qtres:1, pathomit:8, colorsampling:0, numberofcolors:2, mincolorratio:0.02, colorquantcycles:3, scale:1 });
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
         }
 
-        // Helper: Get Bounds
-        function getBounds(shape) {
+        function processTrace(svgStr, imgW, imgH) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(svgStr, "image/svg+xml");
+            const paths = doc.getElementsByTagName("path");
+            let strokes = [];
+            const res = 3.0; 
+
+            for(let i=0; i<paths.length; i++) {
+                const p = paths[i];
+                const len = p.getTotalLength();
+                if(len < 10) continue; 
+                let pts = [];
+                let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+                for(let d=0; d<=len; d+=res) {
+                    const pt = p.getPointAtLength(d);
+                    pts.push({x: pt.x, y: pt.y});
+                    if(pt.x<minX) minX=pt.x; if(pt.x>maxX) maxX=pt.x;
+                    if(pt.y<minY) minY=pt.y; if(pt.y>maxY) maxY=pt.y;
+                }
+                const w = maxX - minX;
+                const h = maxY - minY;
+                if (w > imgW * 0.99 && h > imgH * 0.99) continue; // Ignore box around image
+                strokes.push(pts);
+            }
+
+            if(strokes.length === 0) return showToast("No shapes found (try higher contrast)", "error");
+
             let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
-            shape.forEach(p => {
+            strokes.flat().forEach(p => {
                 if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
                 if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
             });
-            return { minX, maxX, minY, maxY, area: (maxX-minX)*(maxY-minY) };
+            
+            const contentW = maxX - minX;
+            const contentH = maxY - minY;
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            const scaleFac = (tableR * 2 * 0.9) / Math.max(contentW, contentH);
+            const cx = (minX + maxX)/2;
+            const cy = (minY + maxY)/2;
+
+            let normalizedStrokes = strokes.map(s => {
+                return s.map(p => ({
+                    x: (p.x - cx) * scaleFac,
+                    y: -(p.y - cy) * scaleFac 
+                })).filter(p => Math.hypot(p.x, p.y) < tableR);
+            });
+
+            rawPoints = [];
+            normalizedStrokes.forEach(s => {
+                rawPoints.push({type:'break'});
+                s.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
+            });
+            rawPoints.push({type:'break'});
+
+            resetStatus();
+            showToast(`Trace Loaded (${strokes.length} curves)`, "success");
+            render();
         }
 
         // --- G-CODE GENERATION ---
@@ -833,7 +884,6 @@
             const tableRadius = parseFloat(document.getElementById('cfgRadius').value);
             const stepsPerDeg = parseFloat(document.getElementById('cfgStepsPerDeg').value);
             const stepsPerRad = stepsPerDeg * (180 / Math.PI);
-            
             const centerDelay = parseFloat(document.getElementById('cfgCenterDelay').value);
             const perimDelay = parseFloat(document.getElementById('cfgPerimDelay').value);
 
@@ -931,92 +981,178 @@
             return (cost1 <= cost2) ? { base_steps: b1_steps, elbow_steps: e1_steps } : { base_steps: b2_steps, elbow_steps: e2_steps };
         }
 
-        // --- TRACE FIX (Using Hidden DOM) ---
-        function handleImageUpload(input) {
-            const file = input.files[0];
-            if(!file) return;
-            showToast("Scanning...", "info");
+        // --- UTILS (Save/Load/Undo) ---
+        function resizeCanvas() {
+            const container = document.getElementById('canvasContainer');
+            const size = container.getBoundingClientRect().width;
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = size * dpr;
+            canvas.height = size * dpr;
+            ctx.scale(dpr, dpr);
+            origin = { x: size/2, y: size/2 };
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            scale = (size/2) / (tableR * 1.05);
+            render();
+        }
+        function saveState() {
+            if(historyStack.length>10) historyStack.shift();
+            historyStack.push(JSON.stringify(rawPoints));
+        }
+        function undo() {
+            if(historyStack.length===0) return;
+            rawPoints = JSON.parse(historyStack.pop());
+            resetStatus();
+            render();
+        }
+        function clearCanvas() {
             saveState();
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const img = new Image();
-                img.onload = function() {
-                    const tCan = document.createElement('canvas');
-                    const MAX = 1000;
-                    let tw = img.width, th = img.height;
-                    if(tw>th && tw>MAX){ th*=MAX/tw; tw=MAX; } 
-                    else if(th>MAX){ tw*=MAX/th; th=MAX; }
-                    tCan.width = tw; tCan.height = th;
-                    const tCtx = tCan.getContext('2d');
-                    tCtx.fillStyle = "white"; tCtx.fillRect(0,0,tw,th);
-                    tCtx.filter = "grayscale(100%) contrast(150%)";
-                    tCtx.drawImage(img, 0, 0, tw, th);
-                    ImageTracer.imageToSVG(tCan.toDataURL(), function(svgStr){
-                        processTrace(svgStr, tw, th);
-                    }, { ltres:0.5, qtres:0.5, pathomit:2, colorsampling:2, numberofcolors:2 });
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
+            rawPoints = [];
+            resetStatus();
+            render();
+        }
+        function setTool(t) {
+            currentTool = t;
+            document.getElementById('btnDraw').className = t==='draw'?'active':'secondary';
+            document.getElementById('btnErase').className = t==='erase'?'active':'secondary';
+            document.getElementById('btnFill').className = t==='fill'?'active':'secondary';
+        }
+        function updateUI() {
+            document.getElementById('symVal').textContent = document.getElementById('symSlider').value + 'x';
+            render();
+        }
+        function showToast(msg, type) {
+            const t = document.getElementById('status-toast');
+            t.textContent = msg; t.className = type; t.style.opacity = 1;
+            setTimeout(()=>t.style.opacity=0, 3000);
+        }
+        function openNav() { document.getElementById("mySidebar").style.width = "250px"; }
+        function closeNav() { document.getElementById("mySidebar").style.width = "0"; }
+        function toggleTheme() {
+            const b = document.body;
+            b.setAttribute('data-theme', b.getAttribute('data-theme')==='dark'?'light':'dark');
+            render();
         }
 
-        function processTrace(svgStr, imgW, imgH) {
-            // FIX: Append SVG to hidden div to calculate path lengths correctly
-            const container = document.getElementById('hidden-trace-container');
-            container.innerHTML = svgStr;
-            const paths = container.getElementsByTagName("path");
-            
-            let strokes = [];
-            const res = 2.0; 
+        // --- ACTIONS ---
+        async function sendToTable() { 
+            if(!generatedGCode) return showToast("Click Prepare first", "error"); 
+            let code = generatedGCode; 
+            if(document.getElementById('autoClearMode').checked) { 
+                try {
+                    let r = await fetch('./designs/clear.txt'); 
+                    if(r.ok) code = (await r.text()) + "\n" + code;
+                } catch(e) {} 
+            } 
+            fetch(BASE_URL+'/send_gcode_block', {
+                method:'POST', 
+                headers:{'Content-Type':'application/json'}, 
+                body:JSON.stringify({gcode:code})
+            })
+            .then(r => r.json())
+            .then(d => showToast(d.success ? "Sent!" : "Error", d.success ? "success" : "error")); 
+        }
 
-            for(let i=0; i<paths.length; i++) {
-                const p = paths[i];
-                const len = p.getTotalLength();
-                if(len < 5) continue; 
-                let pts = [];
-                for(let d=0; d<=len; d+=res) {
-                    const pt = p.getPointAtLength(d);
-                    pts.push({x: pt.x, y: pt.y});
-                }
-                // Check if stroke fits on canvas (very rough check)
-                // In real usage, rely on normalization below
-                strokes.push(pts);
+        async function saveToServer() { 
+            if(!generatedGCode) return showToast("Prepare Path first!", "error");
+            let n = prompt("Enter filename (will be saved as .txt):"); 
+            if(n) {
+                if(!n.toLowerCase().endsWith('.txt')) n += ".txt";
+                showToast("Saving...", "info");
+                fetch(BASE_URL+'/save_design', {
+                    method:'POST', 
+                    headers:{'Content-Type':'application/json'}, 
+                    body:JSON.stringify({filename:n, gcode:generatedGCode})
+                })
+                .then(r => r.json())
+                .then(d => {
+                    if(d.success) showToast("Saved to Pi!", "success");
+                    else showToast("Save Failed: " + (d.error || "Unknown"), "error");
+                })
+                .catch(e => showToast("Network Error", "error"));
             }
-            
-            // Clean up DOM
-            container.innerHTML = '';
+        }
 
-            if(strokes.length === 0) return showToast("No shapes found", "error");
+        function isPointInPolygon(p, polygon) {
+            let inside = false;
+            for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+                let xi = polygon[i].x, yi = polygon[i].y;
+                let xj = polygon[j].x, yj = polygon[j].y;
+                let intersect = ((yi > p.y) !== (yj > p.y)) && (p.x < (xj - xi) * (p.y - yi) / (yj - yi) + xi);
+                if (intersect) inside = !inside;
+            }
+            return inside;
+        }
 
+        function getBounds(shape) {
             let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
-            strokes.flat().forEach(p => {
+            shape.forEach(p => {
                 if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
                 if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
             });
-            const contentW = maxX - minX;
-            const contentH = maxY - minY;
+            return { minX, maxX, minY, maxY, area: (maxX-minX)*(maxY-minY) };
+        }
+
+        function resetStatus() {
+            generatedGCode = null;
+            processedPoints = [];
+            document.getElementById('statusTxt').innerText = "Drawing Mode";
+            document.getElementById('statusTxt').style.color = "orange";
+            document.getElementById('progressSlider').value = 100;
+        }
+
+        function render() {
+            const w = canvas.width / window.devicePixelRatio;
+            const h = canvas.height / window.devicePixelRatio;
+            ctx.clearRect(0, 0, w, h);
+            
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
-            const scaleFac = (tableR * 2 * 0.9) / Math.max(contentW, contentH);
-            const cx = (minX + maxX)/2;
-            const cy = (minY + maxY)/2;
+            const sym = parseInt(document.getElementById('symSlider').value);
+            const dark = document.body.getAttribute('data-theme') === 'dark';
+            const prog = parseInt(document.getElementById('progressSlider').value);
+            document.getElementById('progVal').textContent = prog + '%';
 
-            let normalizedStrokes = strokes.map(s => {
-                return s.map(p => ({
-                    x: (p.x - cx) * scaleFac,
-                    y: -(p.y - cy) * scaleFac 
-                })).filter(p => Math.hypot(p.x, p.y) < tableR);
-            });
+            ctx.save();
+            ctx.translate(origin.x, origin.y);
 
-            rawPoints = [];
-            normalizedStrokes.forEach(s => {
-                rawPoints.push({type:'break'});
-                s.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
-            });
-            rawPoints.push({type:'break'});
+            // Table Circle
+            ctx.beginPath(); ctx.arc(0, 0, tableR*scale, 0, Math.PI*2);
+            ctx.strokeStyle = dark ? '#444' : '#ddd'; ctx.lineWidth = 2; ctx.stroke();
 
-            resetStatus();
-            showToast("Trace Loaded (Click Prepare)", "info");
-            render();
+            const showingFinal = (processedPoints.length > 0);
+            const dataToShow = showingFinal ? processedPoints : rawPoints;
+            const limit = Math.floor(dataToShow.length * (prog/100));
+            const color = showingFinal ? '#ff0000' : (dark ? 'cyan' : '#007bff');
+
+            ctx.lineWidth = 1.5;
+            const loopCount = showingFinal ? 1 : sym;
+
+            for(let s=0; s<loopCount; s++) {
+                const ang = s * (Math.PI*2/sym);
+                ctx.save(); 
+                if(!showingFinal) ctx.rotate(ang); 
+                
+                ctx.beginPath();
+                ctx.strokeStyle = color;
+                
+                let isMove = true;
+                for(let i=0; i<limit; i++) {
+                    const p = dataToShow[i];
+                    if(p.type === 'break' || p.type === 'cmd') { isMove = true; continue; }
+                    const px = p.x * scale; const py = -p.y * scale;
+                    if(isMove) { ctx.moveTo(px, py); isMove = false; } else ctx.lineTo(px, py);
+                }
+                ctx.stroke();
+                
+                if(limit > 0 && limit < dataToShow.length) {
+                    const tip = dataToShow[limit];
+                    if(tip.type !== 'break' && tip.type !== 'cmd') {
+                        ctx.beginPath(); ctx.arc(tip.x*scale, -tip.y*scale, 4, 0, Math.PI*2);
+                        ctx.fillStyle = color; ctx.fill();
+                    }
+                }
+                ctx.restore();
+            }
+            ctx.restore();
         }
 
         init();
