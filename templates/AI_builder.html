@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sand Controller Pro (Spiral Fix)</title>
+    <title>Sand Controller Pro (Dune Flow)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -160,7 +160,7 @@
             </div>
 
             <div class="btn-group">
-                <button id="btnFill" onclick="setTool('fill')" class="secondary">▧ Spiral Fill</button>
+                <button id="btnFill" onclick="setTool('fill')" class="secondary">🌊 Dune Fill</button>
             </div>
 
             <div class="btn-group">
@@ -233,6 +233,40 @@
         const canvas = document.getElementById('drawCanvas');
         const ctx = canvas.getContext('2d');
         const BASE_URL = window.location.origin;
+
+        // Simple Noise Generator for Organic Textures
+        const Noise = {
+            p: [151,160,137,91,90,15,131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,142,8,99,37,240,21,10,23,
+                190,6,148,247,120,234,75,0,26,197,62,94,252,219,203,117,35,11,32,57,177,33,88,237,149,56,87,174,20,
+                125,136,171,168,68,175,74,165,71,134,139,48,27,166,77,146,158,231,83,111,229,122,60,211,133,230,220,
+                105,92,41,55,46,245,40,244,102,143,54,65,25,63,161,1,216,80,73,209,76,132,187,208,89,18,169,200,196,
+                135,130,116,188,159,86,164,100,109,198,173,186,3,64,52,217,226,250,124,123,5,202,38,147,118,126,255,
+                82,85,212,207,206,59,227,47,16,58,17,182,189,28,42,223,183,170,213,119,248,152,2,44,154,163,70,221,
+                153,101,155,167,43,172,9,129,22,39,253,19,98,108,110,79,113,224,232,178,185,112,104,218,246,97,228,
+                251,34,242,193,238,210,144,12,191,179,162,241,81,51,145,235,249,14,239,107,49,192,214,31,181,199,106,
+                157,184,84,204,176,115,121,50,45,127,4,150,254,138,236,205,93,222,114,67,29,24,72,243,141,128,195,
+                78,66,215,61,156,180],
+            perm: new Array(512),
+            grad3: [[1,1,0],[-1,1,0],[1,-1,0],[-1,-1,0],[1,0,1],[-1,0,1],[1,0,-1],[-1,0,-1],[0,1,1],[0,-1,1],[0,1,-1],[0,-1,-1]],
+            init: function() {
+                for(let i=0; i<256; i++) this.perm[i] = this.perm[i+256] = this.p[i];
+            },
+            dot: function(g, x, y) { return g[0]*x + g[1]*y; },
+            mix: function(a, b, t) { return (1-t)*a + t*b; },
+            fade: function(t) { return t*t*t*(t*(t*6-15)+10); },
+            eval: function(x, y) {
+                if(!this.perm[0]) this.init();
+                var X = Math.floor(x), Y = Math.floor(y);
+                x -= X; y -= Y;
+                X = X & 255; Y = Y & 255;
+                var n00 = this.dot(this.grad3[this.perm[X+this.perm[Y]] % 12], x, y);
+                var n01 = this.dot(this.grad3[this.perm[X+this.perm[Y+1]] % 12], x, y-1);
+                var n10 = this.dot(this.grad3[this.perm[X+1+this.perm[Y]] % 12], x-1, y);
+                var n11 = this.dot(this.grad3[this.perm[X+1+this.perm[Y+1]] % 12], x-1, y-1);
+                var u = this.fade(x), v = this.fade(y);
+                return this.mix(this.mix(n00, n10, u), this.mix(n01, n11, u), v);
+            }
+        };
 
         function init() {
             resizeCanvas();
@@ -322,17 +356,21 @@
                 ctx.fillStyle = "black";
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
-                ctx.fillText("▧", px, py);
+                ctx.fillText("🌊", px, py);
             }
         }
 
-        // --- ADVANCED MANUAL FILL (SPIRAL + HOLES + TRAVEL GAP FIX) ---
+        // --- "DUNE" FILL (ORGANIC NOISE + SERPENTINE) ---
         function handleFillClick(e) {
             const clickPos = getPos(e);
-            const FILL_SPACING = 3.5; 
-            const MAX_TRAVEL_JUMP = 40.0; // Any connection longer than this is treated as a break/gap
+            
+            // CONFIGURATION:
+            const DENSITY = 3.5; // Gap between waves
+            const NOISE_SCALE = 0.05; // How "zoomed in" the noise is
+            const WAVE_AMP = 3.0; // Height of the waves
+            const MAX_JUMP = 30.0; // Gap detection
 
-            // 1. Convert rawPoints into distinct shapes with GAP DETECTION
+            // 1. Convert rawPoints into distinct shapes (with gap detection)
             let shapes = [];
             let currentShape = [];
             
@@ -341,12 +379,10 @@
                     if(currentShape.length > 2) shapes.push(currentShape); 
                     currentShape = [];
                 } else {
-                    // Check for invisible travel lines (jumps)
                     if(currentShape.length > 0) {
                         let last = currentShape[currentShape.length-1];
                         let dist = Math.hypot(p.x - last.x, p.y - last.y);
-                        if(dist > MAX_TRAVEL_JUMP) {
-                             // This is a jump! Close current shape and start new one
+                        if(dist > MAX_JUMP) {
                              if(currentShape.length > 2) shapes.push(currentShape);
                              currentShape = [];
                         }
@@ -356,7 +392,7 @@
             });
             if(currentShape.length > 2) shapes.push(currentShape);
 
-            // 2. Identify the Target Shape (The smallest shape containing the click)
+            // 2. Identify Target
             let candidates = [];
             for(let i=0; i<shapes.length; i++) {
                 if(isPointInPolygon(clickPos, shapes[i])) {
@@ -370,16 +406,13 @@
                 return;
             }
 
-            // Sort: Smallest area first (Handles nested shapes/donuts)
             candidates.sort((a,b) => a.area - b.area);
             const target = candidates[0]; 
             
-            // 3. Identify Holes (Shapes completely inside the target)
+            // 3. Identify Holes
             let holes = [];
             shapes.forEach((s, idx) => {
-                if(idx === target.id) return; // Don't check self
-                
-                // If the first point of shape 's' is inside target, assume entire shape is inside
+                if(idx === target.id) return; 
                 if(isPointInPolygon(s[0], target.shape)) {
                      let sBounds = getBounds(s);
                      if(sBounds.area < target.area) {
@@ -388,63 +421,107 @@
                 }
             });
 
-            showToast(`Filling... (${holes.length} holes excluded)`, "info");
+            showToast("Generating Dunes...", "info");
             saveState();
 
-            // 4. Generate Spiral Texture
-            const cx = (target.bounds.minX + target.bounds.maxX) / 2;
-            const cy = (target.bounds.minY + target.bounds.maxY) / 2;
+            // 4. Generate Organic Dunes (Serpentine Scanline)
+            const b = target.bounds;
+            let y = b.minY + DENSITY;
+            let direction = 1; // 1 = Left to Right, -1 = Right to Left
             
-            // Calculate max radius needed to cover the box
-            const maxR = Math.hypot(target.bounds.maxX - cx, target.bounds.maxY - cy) + 10;
-            
-            let currentR = 0;
-            let angle = 0;
-            let isDrawingSpiral = false;
-
             rawPoints.push({type: 'break'});
 
-            // Archimedean Spiral Loop
-            while(currentR < maxR) {
-                // Polar to Cartesian
-                let px = cx + currentR * Math.cos(angle);
-                let py = cy + currentR * Math.sin(angle);
+            while(y < b.maxY) {
+                // Find intersections for this scanline Y
+                let intersections = [];
+                // We use a slightly noisy Y for intersection to match the wave? 
+                // No, better to scan geometric Y and then modulate the drawn line.
+                
+                // Get Scanline Intersections
+                for(let i=0; i<target.shape.length; i++) {
+                    let p1 = target.shape[i];
+                    let p2 = target.shape[(i+1)%target.shape.length];
+                    if((p1.y <= y && p2.y > y) || (p1.y > y && p2.y <= y)) {
+                        let x = p1.x + (y - p1.y) * (p2.x - p1.x) / (p2.y - p1.y);
+                        intersections.push(x);
+                    }
+                }
+                intersections.sort((a,b) => a-b);
 
-                // Hit Test: Inside Target AND NOT Inside Any Hole
-                let valid = isPointInPolygon({x:px, y:py}, target.shape);
-                if(valid) {
-                    for(let h of holes) {
-                        if(isPointInPolygon({x:px, y:py}, h)) {
-                            valid = false;
-                            break;
+                // Draw segments
+                for(let k=0; k<intersections.length; k+=2) {
+                    if(k+1 >= intersections.length) break;
+                    let xStart = intersections[k];
+                    let xEnd = intersections[k+1];
+                    
+                    // Generate Points along this segment
+                    let segPoints = [];
+                    // Step size for organic detail
+                    const step = 2.0; 
+                    
+                    if(direction === 1) {
+                        for(let x=xStart; x<=xEnd; x+=step) segPoints.push(x);
+                        if(segPoints[segPoints.length-1] !== xEnd) segPoints.push(xEnd);
+                    } else {
+                        for(let x=xEnd; x>=xStart; x-=step) segPoints.push(x);
+                        if(segPoints[segPoints.length-1] !== xStart) segPoints.push(xStart);
+                    }
+
+                    let validSegment = [];
+                    let wasInside = false;
+
+                    for(let px of segPoints) {
+                        // Apply NOISE to Y
+                        let noiseVal = Noise.eval(px * NOISE_SCALE, y * NOISE_SCALE);
+                        let py = y + (noiseVal * WAVE_AMP);
+
+                        // Hole Check
+                        let insideHole = false;
+                        for(let h of holes) {
+                            if(isPointInPolygon({x:px, y:py}, h)) {
+                                insideHole = true;
+                                break;
+                            }
+                        }
+
+                        if(!insideHole) {
+                            if(!wasInside) {
+                                // Just entered valid space
+                                if(validSegment.length > 0) {
+                                     // Should not happen in linear scan, but logic safety
+                                     validSegment.forEach(p=>rawPoints.push(p));
+                                     rawPoints.push({type:'break'});
+                                     validSegment = [];
+                                }
+                                wasInside = true;
+                            }
+                            validSegment.push({x:px, y:py, type:'point'});
+                        } else {
+                            if(wasInside) {
+                                // Hit a hole, end this stroke
+                                validSegment.forEach(p=>rawPoints.push(p));
+                                rawPoints.push({type:'break'});
+                                validSegment = [];
+                                wasInside = false;
+                            }
                         }
                     }
-                }
-
-                if(valid) {
-                    if(!isDrawingSpiral) {
-                        // Jump to new section
-                        rawPoints.push({type: 'break'});
-                        isDrawingSpiral = true;
+                    // Flush
+                    if(validSegment.length > 0) {
+                        validSegment.forEach(p=>rawPoints.push(p));
+                        // Do NOT break here immediately if we are snake-connecting
+                        // But since we might jump over a hole or to the next island,
+                        // we need to see if the NEXT start point is close.
                     }
-                    rawPoints.push({x: px, y: py, type: 'point'});
-                } else {
-                    isDrawingSpiral = false;
                 }
-
-                // Increment Angle 
-                const resolution = 2.0; 
-                const dTheta = resolution / (currentR + 1); 
-                angle += dTheta;
                 
-                // Radius growth
-                currentR = (angle / (2 * Math.PI)) * FILL_SPACING;
+                direction *= -1;
+                y += DENSITY;
             }
             
             rawPoints.push({type: 'break'});
-
             render();
-            showToast("Spiral Fill Complete!", "success");
+            showToast("Dune Fill Complete!", "success");
         }
 
         // Helper: Ray Casting Algorithm
@@ -545,7 +622,7 @@
             ctx.restore();
         }
 
-        // --- AI TRACER (Original Client-Side) ---
+        // --- AI TRACER ---
         function handleImageUpload(input) {
             const file = input.files[0];
             if(!file) return;
