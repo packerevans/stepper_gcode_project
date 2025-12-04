@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sand Controller Pro (Strict Topology)</title>
+    <title>Sand Controller Pro (Master Edition)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -234,7 +234,7 @@
         const ctx = canvas.getContext('2d');
         const BASE_URL = window.location.origin;
 
-        // Simple Noise Generator for Organic Textures
+        // Simple Noise Generator
         const Noise = {
             p: [151,160,137,91,90,15,131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,142,8,99,37,240,21,10,23,
                 190,6,148,247,120,234,75,0,26,197,62,94,252,219,203,117,35,11,32,57,177,33,88,237,149,56,87,174,20,
@@ -358,14 +358,14 @@
             }
         }
 
-        // --- DUNE FILL (STRICT TOPOLOGY FIX) ---
+        // --- MASTER DUNE FILL (ROTATION + MULTI-POLYGON TRACE) ---
         function handleFillClick(e) {
             const clickPos = getPos(e);
             
             // CONFIGURATION:
-            const DENSITY = 3.0; // Gap between waves
-            const NOISE_SCALE = 0.05; // Ripple frequency
-            const WAVE_AMP = 3.0; // Ripple Height
+            const DENSITY = 3.0;
+            const NOISE_SCALE = 0.05;
+            const WAVE_AMP = 3.0; 
             const MAX_JUMP = 30.0; 
 
             // 1. Convert rawPoints into distinct shapes
@@ -419,19 +419,20 @@
                 }
             });
 
-            showToast("Calculated Strict Paths...", "info");
+            showToast("Generating Smart Trace...", "info");
             saveState();
 
             // 4. RANDOM ROTATION SETUP
-            const fillAngle = Math.random() * Math.PI; // 0 to 180 degrees
+            const fillAngle = Math.random() * Math.PI; // 0 to 180
             
             const rotatePt = (x, y, rad) => ({
                 x: x * Math.cos(rad) - y * Math.sin(rad),
                 y: x * Math.sin(rad) + y * Math.cos(rad)
             });
 
-            // Rotate Target Shape
+            // Rotate Target AND HOLES
             const rotTarget = target.shape.map(p => rotatePt(p.x, p.y, -fillAngle));
+            const rotHoles = holes.map(h => h.map(p => rotatePt(p.x, p.y, -fillAngle)));
             const rotBounds = getBounds(rotTarget);
             
             // 5. Generate Scanline on Rotated Plane
@@ -440,123 +441,140 @@
             
             rawPoints.push({type: 'break'});
 
-            let lastFilledEdgeIdx = -1;
             let lastFilledPointRot = null;
 
             while(y < rotBounds.maxY) {
-                let intersections = [];
-                
-                // Get Intersections on Rotated Shape AND TRACK EDGE INDEX
-                for(let i=0; i<rotTarget.length; i++) {
-                    let p1 = rotTarget[i];
-                    let p2 = rotTarget[(i+1)%rotTarget.length];
-                    if((p1.y <= y && p2.y > y) || (p1.y > y && p2.y <= y)) {
-                        let x = p1.x + (y - p1.y) * (p2.x - p1.x) / (p2.y - p1.y);
-                        // Store Edge Index
-                        intersections.push({x: x, edgeIndex: i});
+                // COLLECT INTERSECTIONS FOR TARGET AND ALL HOLES
+                let cutPoints = [];
+
+                // Helper to add intersections for a polygon
+                const addIntersections = (poly, polyId) => {
+                    for(let i=0; i<poly.length; i++) {
+                        let p1 = poly[i];
+                        let p2 = poly[(i+1)%poly.length];
+                        if((p1.y <= y && p2.y > y) || (p1.y > y && p2.y <= y)) {
+                            let x = p1.x + (y - p1.y) * (p2.x - p1.x) / (p2.y - p1.y);
+                            cutPoints.push({x:x, polyIndex: polyId}); // polyIndex 0=Target, 1+=Holes
+                        }
                     }
-                }
-                intersections.sort((a,b) => a.x - b.x);
+                };
 
-                // Draw segments
-                for(let k=0; k<intersections.length; k+=2) {
-                    if(k+1 >= intersections.length) break;
-                    
-                    let startNode, endNode;
-                    
-                    if(direction === 1) {
-                        startNode = intersections[k];
-                        endNode = intersections[k+1];
-                    } else {
-                        startNode = intersections[k+1];
-                        endNode = intersections[k];
-                    }
-                    
-                    let xStart = startNode.x;
-                    let xEnd = endNode.x;
-                    
-                    let segPoints = [];
-                    const step = 2.0; 
-                    
-                    if(direction === 1) {
-                        for(let x=xStart; x<=xEnd; x+=step) segPoints.push(x);
-                        if(segPoints[segPoints.length-1] !== xEnd) segPoints.push(xEnd);
-                    } else {
-                        for(let x=xEnd; x>=xStart; x-=step) segPoints.push(x);
-                        if(segPoints[segPoints.length-1] !== xStart) segPoints.push(xStart);
-                    }
+                addIntersections(rotTarget, -1); // -1 = Main Target
+                rotHoles.forEach((h, idx) => addIntersections(h, idx));
 
-                    // Process Points
-                    let validSegment = [];
-                    let wasInside = false;
-                    let segmentStartRot = null;
+                cutPoints.sort((a,b) => a.x - b.x);
 
-                    // --- STRICT PERIMETER TRAVEL LOGIC ---
-                    // Before drawing the segment, connect from previous end point
-                    if(lastFilledPointRot) {
-                         // We are at lastFilledPointRot on edge lastFilledEdgeIdx
-                         // We need to go to startNode (startNode.x, y) on edge startNode.edgeIndex
-                         let targetStartPt = {x: startNode.x, y: y};
-                         
-                         let trace = getStrictPerimeterPath(lastFilledPointRot, lastFilledEdgeIdx, targetStartPt, startNode.edgeIndex, rotTarget);
-                         
-                         // Add trace
-                         trace.forEach(tp => {
-                             let rp = rotatePt(tp.x, tp.y, fillAngle);
-                             rawPoints.push({x:rp.x, y:rp.y, type:'point'});
-                         });
-                    }
+                // ITERATE CUTS TO FIND VALID SEGMENTS
+                for(let k=0; k<cutPoints.length; k++) {
+                     if(k+1 >= cutPoints.length) break;
+                     let startCut = cutPoints[k];
+                     let endCut = cutPoints[k+1];
+                     
+                     // Check midpoint to see if we are in "Ink"
+                     let midX = (startCut.x + endCut.x) / 2;
+                     
+                     // Must be INSIDE target and OUTSIDE all holes
+                     // We check this in rotated space. 
+                     // Since we just calculated intersections, we can do a quick check:
+                     // Is midX inside rotTarget?
+                     // Is midX inside any rotHole?
+                     
+                     let pMid = {x: midX, y: y};
+                     let isInsideTarget = isPointInPolygon(pMid, rotTarget);
+                     let isInsideHole = false;
+                     for(let rh of rotHoles) {
+                         if(isPointInPolygon(pMid, rh)) { isInsideHole = true; break; }
+                     }
 
-                    for(let px of segPoints) {
-                        let noiseVal = Noise.eval(px * NOISE_SCALE, y * NOISE_SCALE);
-                        let py = y + (noiseVal * WAVE_AMP);
-
-                        // Rotate back to verify mask
-                        let realPt = rotatePt(px, py, fillAngle);
-                        let isInsideOrig = isPointInPolygon(realPt, target.shape);
+                     if(isInsideTarget && !isInsideHole) {
+                        // VALID SEGMENT
+                        let segPoints = [];
+                        const step = 2.0; 
                         
-                        let insideHole = false;
-                        if(isInsideOrig) {
-                            for(let h of holes) {
-                                if(isPointInPolygon(realPt, h)) {
-                                    insideHole = true;
-                                    break;
+                        let xStart = startCut.x;
+                        let xEnd = endCut.x;
+
+                        if(direction === 1) {
+                            for(let x=xStart; x<=xEnd; x+=step) segPoints.push(x);
+                            if(segPoints[segPoints.length-1] !== xEnd) segPoints.push(xEnd);
+                        } else {
+                            for(let x=xEnd; x>=xStart; x-=step) segPoints.push(x);
+                            if(segPoints[segPoints.length-1] !== xStart) segPoints.push(xStart);
+                        }
+
+                        let segmentStartPointRot = {x: segPoints[0], y:y};
+
+                        // --- INTELLIGENT TRAVEL ---
+                        if(lastFilledPointRot) {
+                            // Find which polygon we are sitting on
+                            // lastFilledPointRot is on SOME polygon edge.
+                            // segmentStartPointRot is on SOME polygon edge.
+                            
+                            let startPoly = findClosestPoly(lastFilledPointRot, rotTarget, rotHoles);
+                            let endPoly = findClosestPoly(segmentStartPointRot, rotTarget, rotHoles);
+
+                            if(startPoly && endPoly && startPoly === endPoly) {
+                                // We are travelling along the SAME wall (either outer wall or same hole)
+                                // Trace it!
+                                let trace = getPerimeterPath(lastFilledPointRot, segmentStartPointRot, startPoly);
+                                trace.forEach(tp => {
+                                    let rp = rotatePt(tp.x, tp.y, fillAngle);
+                                    rawPoints.push({x:rp.x, y:rp.y, type:'point'});
+                                });
+                            } else {
+                                // Jumping between islands or jumping from wall to hole
+                                // Just break.
+                                if(rawPoints.length>0 && rawPoints[rawPoints.length-1].type!=='break') {
+                                    rawPoints.push({type:'break'});
                                 }
+                            }
+                        } else {
+                             // First point
+                             rawPoints.push({type:'break'});
+                        }
+
+                        // DRAW THE WAVE
+                        for(let px of segPoints) {
+                            let noiseVal = Noise.eval(px * NOISE_SCALE, y * NOISE_SCALE);
+                            let py = y + (noiseVal * WAVE_AMP);
+                            
+                            // Re-verify mask just in case noise pushed us into a hole
+                            let realPt = rotatePt(px, py, fillAngle);
+                            let safe = isPointInPolygon(realPt, target.shape);
+                            if(safe) {
+                                for(let h of holes) { if(isPointInPolygon(realPt, h)) { safe=false; break; } }
+                            }
+
+                            if(safe) {
+                                rawPoints.push({x:realPt.x, y:realPt.y, type:'point'});
                             }
                         }
 
-                        if(isInsideOrig && !insideHole) {
-                            rawPoints.push({x:realPt.x, y:realPt.y, type:'point'});
-                        } 
-                    }
-                    
-                    // Update state for next jump
-                    // Ideally, we end exactly at endNode on the perimeter
-                    lastFilledPointRot = {x: endNode.x, y: y};
-                    lastFilledEdgeIdx = endNode.edgeIndex;
+                        // Save end of this segment for next travel
+                        lastFilledPointRot = {x: segPoints[segPoints.length-1], y:y};
+                     }
                 }
                 
                 direction *= -1;
                 y += DENSITY;
             }
             
-            // --- 6. CLEAN UP EDGES (Outline) ---
+            // --- CLEANUP OUTLINES ---
+            // Draw Target Outline
             if(lastFilledPointRot) {
-                 // Rotate start of shape to rot space
                  let startP = target.shape[0];
                  let startPRot = rotatePt(startP.x, startP.y, -fillAngle);
-                 let trace = getStrictPerimeterPath(lastFilledPointRot, lastFilledEdgeIdx, startPRot, 0, rotTarget);
+                 let trace = getPerimeterPath(lastFilledPointRot, startPRot, rotTarget);
                  trace.forEach(tp => {
                     let rp = rotatePt(tp.x, tp.y, fillAngle);
                     rawPoints.push({x:rp.x, y:rp.y, type:'point'});
                  });
-            } else {
-                rawPoints.push({type: 'break'});
-            }
+            } else { rawPoints.push({type: 'break'}); }
 
             target.shape.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
             rawPoints.push({x:target.shape[0].x, y:target.shape[0].y, type:'point'});
             
+            // Draw Hole Outlines
             holes.forEach(h => {
                 rawPoints.push({type: 'break'});
                 h.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
@@ -565,64 +583,70 @@
 
             rawPoints.push({type: 'break'});
             render();
-            showToast("Strict Perimeter Fill Complete!", "success");
+            showToast("Master Fill Complete!", "success");
         }
 
-        // --- STRICT TOPOLOGY WALKER ---
-        // Walks the polygon edges from (p1 on edge1) to (p2 on edge2)
-        function getStrictPerimeterPath(p1, edge1, p2, edge2, poly) {
-            if(edge1 === -1 || edge2 === -1) return []; // Safety
-            
-            const len = poly.length;
+        function findClosestPoly(pt, target, holes) {
+            // Returns the polygon array that 'pt' is closest to the edge of
+            let bestPoly = null;
+            let minD = 5.0; // Threshold
 
-            // Option 1: Clockwise (Forward)
-            // p1 -> poly[edge1+1] -> ... -> poly[edge2] -> p2
-            let pathCW = [];
-            let distCW = 0;
-            let curr = (edge1 + 1) % len;
+            // Check Target
+            if(distToPoly(pt, target) < minD) return target;
             
-            let lastP = p1;
-            
-            // Special Case: Same Edge
-            if(edge1 === edge2) {
-                // Just direct line
-                return [p2]; 
+            // Check Holes
+            for(let h of holes) {
+                if(distToPoly(pt, h) < minD) return h;
+            }
+            return null;
+        }
+
+        function distToPoly(pt, poly) {
+            let minD = Infinity;
+            for(let i=0; i<poly.length; i++) {
+                let d = Math.hypot(poly[i].x - pt.x, poly[i].y - pt.y);
+                if(d < minD) minD = d;
+            }
+            return minD;
+        }
+
+        // --- PERIMETER TRACING HELPER ---
+        function getPerimeterPath(p1, p2, poly) {
+            let idx1 = -1, minD1 = Infinity;
+            let idx2 = -1, minD2 = Infinity;
+
+            for(let i=0; i<poly.length; i++) {
+                let d1 = Math.hypot(poly[i].x - p1.x, poly[i].y - p1.y);
+                if(d1 < minD1) { minD1 = d1; idx1 = i; }
+                let d2 = Math.hypot(poly[i].x - p2.x, poly[i].y - p2.y);
+                if(d2 < minD2) { minD2 = d2; idx2 = i; }
             }
 
-            while(curr !== (edge2 + 1)%len) {
-                 let v = poly[curr];
-                 pathCW.push(v);
-                 distCW += Math.hypot(v.x - lastP.x, v.y - lastP.y);
-                 lastP = v;
-                 
-                 if(curr === edge2) break; // Reached start of target edge
-                 curr = (curr + 1) % len;
+            if(idx1 === -1 || idx2 === -1 || idx1 === idx2) return [];
+
+            // CW Path
+            let cwPath = [];
+            let curr = idx1;
+            let cwDist = 0;
+            while(curr !== idx2) {
+                let next = (curr + 1) % poly.length;
+                cwDist += Math.hypot(poly[curr].x - poly[next].x, poly[curr].y - poly[next].y);
+                cwPath.push(poly[next]);
+                curr = next;
             }
-            distCW += Math.hypot(p2.x - lastP.x, p2.y - lastP.y);
-            pathCW.push(p2);
 
-            // Option 2: Counter-Clockwise (Backward)
-            // p1 -> poly[edge1] -> ... -> poly[edge2+1] -> p2
-            let pathCCW = [];
-            let distCCW = 0;
-            curr = edge1;
-            lastP = p1;
-
-            while(curr !== edge2) { // Target is end of edge2? No, we walk backwards to edge2+1
-                let v = poly[curr];
-                pathCCW.push(v);
-                distCCW += Math.hypot(v.x - lastP.x, v.y - lastP.y);
-                lastP = v;
-
-                curr = (curr - 1 + len) % len;
+            // CCW Path
+            let ccwPath = [];
+            curr = idx1;
+            let ccwDist = 0;
+            while(curr !== idx2) {
+                let next = (curr - 1 + poly.length) % poly.length;
+                ccwDist += Math.hypot(poly[curr].x - poly[next].x, poly[curr].y - poly[next].y);
+                ccwPath.push(poly[next]);
+                curr = next;
             }
-            // Now we are at vertex (edge2+1). 
-            // The segment for edge2 is poly[edge2] to poly[edge2+1].
-            // We came from poly[edge2+1]. Now we go to p2.
-            distCCW += Math.hypot(p2.x - lastP.x, p2.y - lastP.y);
-            pathCCW.push(p2);
 
-            return (distCW < distCCW) ? pathCW : pathCCW;
+            return (cwDist < ccwDist) ? cwPath : ccwPath;
         }
 
         // Helper: Ray Casting Algorithm
