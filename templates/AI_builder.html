@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sand Controller Pro (Smart Pathing)</title>
+    <title>Sand Controller Pro (Master Edition)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -271,17 +271,25 @@
         function init() {
             resizeCanvas();
             window.addEventListener('resize', resizeCanvas);
+            
             canvas.addEventListener('pointerdown', startDraw);
             canvas.addEventListener('pointermove', moveDraw);
             canvas.addEventListener('pointerup', endDraw);
             canvas.addEventListener('pointerleave', endDraw);
             canvas.style.touchAction = "none";
+            
             updateUI();
         }
 
+        // --- DRAWING LOGIC ---
         function startDraw(e) {
             e.preventDefault();
-            if(currentTool === 'fill') { handleFillClick(e); return; }
+            
+            if(currentTool === 'fill') {
+                handleFillClick(e);
+                return;
+            }
+
             const smart = document.getElementById('smartPenMode').checked;
             if(smart) {
                 if(e.pointerType === 'pen') setTool('draw');
@@ -311,7 +319,10 @@
         }
 
         function getPos(e) {
-            return { x: (e.offsetX - origin.x) / scale, y: -(e.offsetY - origin.y) / scale };
+            return {
+                x: (e.offsetX - origin.x) / scale,
+                y: -(e.offsetY - origin.y) / scale
+            };
         }
 
         function processPointer(e) {
@@ -333,24 +344,37 @@
             const r = 10 * scale;
             const px = origin.x + p.x * scale;
             const py = origin.y - p.y * scale;
+            
             if(currentTool === 'erase') {
                 ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI*2);
                 ctx.strokeStyle = "#999"; ctx.fillStyle = "rgba(200,200,200,0.3)";
                 ctx.stroke(); ctx.fill();
             } else if (currentTool === 'fill') {
-                ctx.font = "20px Arial"; ctx.fillStyle = "black"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+                ctx.font = "20px Arial";
+                ctx.fillStyle = "black";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
                 ctx.fillText("🌊", px, py);
             }
         }
 
-        // --- MASTER DUNE FILL ---
+        // --- MASTER DUNE FILL (ROTATION + MULTI-POLYGON TRACE + AUTO CLOSE) ---
         function handleFillClick(e) {
             const clickPos = getPos(e);
-            const DENSITY = 3.0; const NOISE_SCALE = 0.05; const WAVE_AMP = 3.0; const MAX_JUMP = 30.0; 
+            
+            // CONFIGURATION:
+            const DENSITY = 3.0;
+            const NOISE_SCALE = 0.05;
+            const WAVE_AMP = 3.0; 
+            const MAX_JUMP = 30.0; 
 
-            // 1. Convert rawPoints into distinct shapes
+            // 1. Convert rawPoints into distinct shapes with AUTO-CLOSE
             let shapes = [];
             let currentShape = [];
+            
+            // Helper to calculate distance
+            const dist = (p1, p2) => Math.hypot(p1.x - p2.x, p1.y - p2.y);
+
             rawPoints.forEach(p => {
                 if(p.type === 'break' || p.type === 'cmd') {
                     if(currentShape.length > 2) shapes.push(currentShape); 
@@ -358,16 +382,29 @@
                 } else {
                     if(currentShape.length > 0) {
                         let last = currentShape[currentShape.length-1];
-                        let dist = Math.hypot(p.x - last.x, p.y - last.y);
-                        if(dist > MAX_JUMP) {
-                             if(currentShape.length > 2) shapes.push(currentShape);
-                             currentShape = [];
+                        if(dist(p, last) > MAX_JUMP) {
+                                if(currentShape.length > 2) shapes.push(currentShape);
+                                currentShape = [];
                         }
                     }
                     currentShape.push(p);
                 }
             });
             if(currentShape.length > 2) shapes.push(currentShape);
+
+            // AUTO-CLOSE LOOP
+            shapes.forEach(shape => {
+                let start = shape[0];
+                let end = shape[shape.length-1];
+                if(dist(start, end) < 25.0) {
+                    // Force the last point to equal the first point
+                    shape[shape.length-1].x = start.x;
+                    shape[shape.length-1].y = start.y;
+                } else {
+                    // Explicitly close it by adding the start point
+                    shape.push({x: start.x, y: start.y, type: 'point'});
+                }
+            });
 
             // 2. Identify Target
             let candidates = [];
@@ -378,7 +415,10 @@
                 }
             }
 
-            if(candidates.length === 0) return showToast("Click inside a closed shape", "error");
+            if(candidates.length === 0) {
+                showToast("Click inside a closed shape", "error");
+                return;
+            }
 
             candidates.sort((a,b) => a.area - b.area);
             const target = candidates[0]; 
@@ -389,68 +429,66 @@
                 if(idx === target.id) return; 
                 if(isPointInPolygon(s[0], target.shape)) {
                      let sBounds = getBounds(s);
-                     if(sBounds.area < target.area) holes.push(s);
+                     if(sBounds.area < target.area) {
+                        holes.push(s);
+                     }
                 }
             });
 
-            showToast("Generating Trace & Fill...", "info");
+            showToast("Generating Smart Trace...", "info");
             saveState();
-            
-            // --- FIX: ATOMIC DRAWING ---
-            // We create ONE continuous shape block: Outline -> Dune -> Exit via Perimeter
-            // This prevents the optimizer from inserting lines between the Outline and the Dune
-            
-            // 1. Start new shape block
-            rawPoints.push({type: 'break'});
-            
-            // 2. Draw Outline
-            target.shape.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
-            // Close loop
-            rawPoints.push({x:target.shape[0].x, y:target.shape[0].y, type:'point'});
-            
-            // 3. Draw Holes (cutouts)
-            holes.forEach(h => {
-                // Jump to hole using perimeter trace ideally, but for now a jump inside the "ink" is okay
-                // Actually, let's keep holes separate for simplicity of the fill algorithm
-            });
 
-            // 4. GENERATE DUNE LINES
+            // 4. RANDOM ROTATION SETUP
             const fillAngle = Math.random() * Math.PI; // 0 to 180
+            
             const rotatePt = (x, y, rad) => ({
                 x: x * Math.cos(rad) - y * Math.sin(rad),
                 y: x * Math.sin(rad) + y * Math.cos(rad)
             });
 
+            // Rotate Target AND HOLES
             const rotTarget = target.shape.map(p => rotatePt(p.x, p.y, -fillAngle));
             const rotHoles = holes.map(h => h.map(p => rotatePt(p.x, p.y, -fillAngle)));
             const rotBounds = getBounds(rotTarget);
             
+            // 5. Generate Scanline on Rotated Plane
             let y = rotBounds.minY + DENSITY;
             let direction = 1;
+            
+            rawPoints.push({type: 'break'});
+
             let lastFilledPointRot = null;
 
             while(y < rotBounds.maxY) {
+                // COLLECT INTERSECTIONS FOR TARGET AND ALL HOLES
                 let cutPoints = [];
+
+                // Helper to add intersections for a polygon
                 const addIntersections = (poly, polyId) => {
                     for(let i=0; i<poly.length; i++) {
                         let p1 = poly[i];
                         let p2 = poly[(i+1)%poly.length];
                         if((p1.y <= y && p2.y > y) || (p1.y > y && p2.y <= y)) {
                             let x = p1.x + (y - p1.y) * (p2.x - p1.x) / (p2.y - p1.y);
-                            cutPoints.push({x:x, polyIndex: polyId}); 
+                            cutPoints.push({x:x, polyIndex: polyId}); // polyIndex 0=Target, 1+=Holes
                         }
                     }
                 };
 
-                addIntersections(rotTarget, -1); 
+                addIntersections(rotTarget, -1); // -1 = Main Target
                 rotHoles.forEach((h, idx) => addIntersections(h, idx));
+
                 cutPoints.sort((a,b) => a.x - b.x);
 
+                // ITERATE CUTS TO FIND VALID SEGMENTS
                 for(let k=0; k<cutPoints.length; k++) {
                      if(k+1 >= cutPoints.length) break;
                      let startCut = cutPoints[k];
                      let endCut = cutPoints[k+1];
+                     
+                     // Check midpoint to see if we are in "Ink"
                      let midX = (startCut.x + endCut.x) / 2;
+                     
                      let pMid = {x: midX, y: y};
                      let isInsideTarget = isPointInPolygon(pMid, rotTarget);
                      let isInsideHole = false;
@@ -459,9 +497,12 @@
                      }
 
                      if(isInsideTarget && !isInsideHole) {
+                        // VALID SEGMENT
                         let segPoints = [];
                         const step = 2.0; 
-                        let xStart = startCut.x, xEnd = endCut.x;
+                        
+                        let xStart = startCut.x;
+                        let xEnd = endCut.x;
 
                         if(direction === 1) {
                             for(let x=xStart; x<=xEnd; x+=step) segPoints.push(x);
@@ -473,68 +514,73 @@
 
                         let segmentStartPointRot = {x: segPoints[0], y:y};
 
+                        // --- INTELLIGENT TRAVEL ---
                         if(lastFilledPointRot) {
-                            // ATOMIC MOVE: Connect previous wave to this wave using PERIMETER
-                            // We do NOT use 'break'. We add points to connect.
                             let startPoly = findClosestPoly(lastFilledPointRot, rotTarget, rotHoles);
                             let endPoly = findClosestPoly(segmentStartPointRot, rotTarget, rotHoles);
 
                             if(startPoly && endPoly && startPoly === endPoly) {
+                                // We are travelling along the SAME wall (either outer wall or same hole)
+                                // Trace it!
                                 let trace = getPerimeterPath(lastFilledPointRot, segmentStartPointRot, startPoly);
                                 trace.forEach(tp => {
                                     let rp = rotatePt(tp.x, tp.y, fillAngle);
                                     rawPoints.push({x:rp.x, y:rp.y, type:'point'});
                                 });
                             } else {
-                                // Jump across void (shouldn't happen inside single shape usually)
-                                // If it does, we allow a straight line inside the shape, or break if huge gap
-                                if(distToPoly(segmentStartPointRot, rotTarget) < 50) {
-                                     // Just draw straight line connector inside
+                                // Jumping between islands or jumping from wall to hole
+                                // Just break.
+                                if(rawPoints.length>0 && rawPoints[rawPoints.length-1].type!=='break') {
+                                    rawPoints.push({type:'break'});
                                 }
                             }
                         } else {
-                             // Connection from Outline End to First Wave
-                             // Assume rawPoints last was outline.
-                             // Need to connect outline end to first wave start via perimeter
-                             // (Skipped for simplicity, straight line from Outline End to first Wave usually fine inside shape)
+                             // First point
+                             rawPoints.push({type:'break'});
                         }
 
+                        // DRAW THE WAVE
                         for(let px of segPoints) {
                             let noiseVal = Noise.eval(px * NOISE_SCALE, y * NOISE_SCALE);
                             let py = y + (noiseVal * WAVE_AMP);
                             
+                            // Re-verify mask just in case noise pushed us into a hole
                             let realPt = rotatePt(px, py, fillAngle);
-                            // Relaxed mask check for visual continuity
-                            rawPoints.push({x:realPt.x, y:realPt.y, type:'point'});
+                            let safe = isPointInPolygon(realPt, target.shape);
+                            if(safe) {
+                                for(let h of holes) { if(isPointInPolygon(realPt, h)) { safe=false; break; } }
+                            }
+
+                            if(safe) {
+                                rawPoints.push({x:realPt.x, y:realPt.y, type:'point'});
+                            }
                         }
+
+                        // Save end of this segment for next travel
                         lastFilledPointRot = {x: segPoints[segPoints.length-1], y:y};
                      }
                 }
+                
                 direction *= -1;
                 y += DENSITY;
             }
             
-            // --- FIX 2: SAFE EXIT ---
-            // We are at `lastFilledPointRot` (inside the shape).
-            // We must walk to the perimeter to prepare for a safe exit.
+            // --- CLEANUP OUTLINES ---
+            // Draw Target Outline
             if(lastFilledPointRot) {
-                 // Find closest point on outer perimeter
-                 let closestIdx = -1, minD = Infinity;
-                 for(let i=0; i<rotTarget.length; i++) {
-                     let d = Math.hypot(rotTarget[i].x - lastFilledPointRot.x, rotTarget[i].y - lastFilledPointRot.y);
-                     if(d < minD) { minD = d; closestIdx = i; }
-                 }
-                 if(closestIdx !== -1) {
-                     // Walk to rim
-                     let rimPt = rotTarget[closestIdx];
-                     let realRim = rotatePt(rimPt.x, rimPt.y, fillAngle);
-                     rawPoints.push({x:realRim.x, y:realRim.y, type:'point'});
-                 }
-            }
+                 let startP = target.shape[0];
+                 let startPRot = rotatePt(startP.x, startP.y, -fillAngle);
+                 let trace = getPerimeterPath(lastFilledPointRot, startPRot, rotTarget);
+                 trace.forEach(tp => {
+                    let rp = rotatePt(tp.x, tp.y, fillAngle);
+                    rawPoints.push({x:rp.x, y:rp.y, type:'point'});
+                 });
+            } else { rawPoints.push({type: 'break'}); }
 
-            rawPoints.push({type: 'break'});
+            target.shape.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
+            rawPoints.push({x:target.shape[0].x, y:target.shape[0].y, type:'point'});
             
-            // Draw Hole Outlines separately (safe to do after)
+            // Draw Hole Outlines
             holes.forEach(h => {
                 rawPoints.push({type: 'break'});
                 h.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
@@ -543,12 +589,18 @@
 
             rawPoints.push({type: 'break'});
             render();
-            showToast("Smart Fill Complete!", "success");
+            showToast("Master Fill Complete!", "success");
         }
 
         function findClosestPoly(pt, target, holes) {
-            let minD = 5.0; 
+            // Returns the polygon array that 'pt' is closest to the edge of
+            let bestPoly = null;
+            let minD = 5.0; // Threshold
+
+            // Check Target
             if(distToPoly(pt, target) < minD) return target;
+            
+            // Check Holes
             for(let h of holes) {
                 if(distToPoly(pt, h) < minD) return h;
             }
@@ -564,7 +616,239 @@
             return minD;
         }
 
-        // --- G-CODE PREPARATION (Smart Obstacle Avoidance) ---
+        // --- PERIMETER TRACING HELPER ---
+        function getPerimeterPath(p1, p2, poly) {
+            let idx1 = -1, minD1 = Infinity;
+            let idx2 = -1, minD2 = Infinity;
+
+            for(let i=0; i<poly.length; i++) {
+                let d1 = Math.hypot(poly[i].x - p1.x, poly[i].y - p1.y);
+                if(d1 < minD1) { minD1 = d1; idx1 = i; }
+                let d2 = Math.hypot(poly[i].x - p2.x, poly[i].y - p2.y);
+                if(d2 < minD2) { minD2 = d2; idx2 = i; }
+            }
+
+            if(idx1 === -1 || idx2 === -1 || idx1 === idx2) return [];
+
+            // CW Path
+            let cwPath = [];
+            let curr = idx1;
+            let cwDist = 0;
+            while(curr !== idx2) {
+                let next = (curr + 1) % poly.length;
+                cwDist += Math.hypot(poly[curr].x - poly[next].x, poly[curr].y - poly[next].y);
+                cwPath.push(poly[next]);
+                curr = next;
+            }
+
+            // CCW Path
+            let ccwPath = [];
+            curr = idx1;
+            let ccwDist = 0;
+            while(curr !== idx2) {
+                let next = (curr - 1 + poly.length) % poly.length;
+                ccwDist += Math.hypot(poly[curr].x - poly[next].x, poly[curr].y - poly[next].y);
+                ccwPath.push(poly[next]);
+                curr = next;
+            }
+
+            return (cwDist < ccwDist) ? cwPath : ccwPath;
+        }
+
+        // Helper: Ray Casting Algorithm
+        function isPointInPolygon(p, polygon) {
+            let inside = false;
+            for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+                let xi = polygon[i].x, yi = polygon[i].y;
+                let xj = polygon[j].x, yj = polygon[j].y;
+                let intersect = ((yi > p.y) !== (yj > p.y)) && (p.x < (xj - xi) * (p.y - yi) / (yj - yi) + xi);
+                if (intersect) inside = !inside;
+            }
+            return inside;
+        }
+
+        // Helper: Get Bounds
+        function getBounds(shape) {
+            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+            shape.forEach(p => {
+                if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
+                if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
+            });
+            return { minX, maxX, minY, maxY, area: (maxX-minX)*(maxY-minY) };
+        }
+
+        function resetStatus() {
+            generatedGCode = null;
+            processedPoints = [];
+            document.getElementById('statusTxt').innerText = "Drawing Mode";
+            document.getElementById('statusTxt').style.color = "orange";
+            document.getElementById('progressSlider').value = 100;
+        }
+
+        // --- RENDERER ---
+        function render() {
+            const w = canvas.width / window.devicePixelRatio;
+            const h = canvas.height / window.devicePixelRatio;
+            ctx.clearRect(0, 0, w, h);
+            
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            const sym = parseInt(document.getElementById('symSlider').value);
+            const dark = document.body.getAttribute('data-theme') === 'dark';
+            const prog = parseInt(document.getElementById('progressSlider').value);
+            document.getElementById('progVal').textContent = prog + '%';
+
+            ctx.save();
+            ctx.translate(origin.x, origin.y);
+
+            // Table Circle
+            ctx.beginPath(); ctx.arc(0, 0, tableR*scale, 0, Math.PI*2);
+            ctx.strokeStyle = dark ? '#444' : '#ddd'; ctx.lineWidth = 2; ctx.stroke();
+
+            const showingFinal = (processedPoints.length > 0);
+            const dataToShow = showingFinal ? processedPoints : rawPoints;
+            const limit = Math.floor(dataToShow.length * (prog/100));
+            const color = showingFinal ? '#ff0000' : (dark ? 'cyan' : '#007bff');
+
+            ctx.lineWidth = 1.5;
+            
+            const loopCount = showingFinal ? 1 : sym;
+
+            for(let s=0; s<loopCount; s++) {
+                const ang = s * (Math.PI*2/sym);
+                ctx.save(); 
+                if(!showingFinal) ctx.rotate(ang); 
+                
+                ctx.beginPath();
+                ctx.strokeStyle = color;
+                
+                let isMove = true;
+                for(let i=0; i<limit; i++) {
+                    const p = dataToShow[i];
+                    
+                    // Handle Breaks and M0
+                    if(p.type === 'break' || p.type === 'cmd') { 
+                        isMove = true; 
+                        continue; 
+                    }
+                    
+                    const px = p.x * scale;
+                    const py = -p.y * scale;
+                    
+                    if(isMove) { ctx.moveTo(px, py); isMove = false; }
+                    else ctx.lineTo(px, py);
+                }
+                ctx.stroke();
+                
+                // Draw endpoint if we aren't done
+                if(limit > 0 && limit < dataToShow.length) {
+                    const tip = dataToShow[limit];
+                    if(tip.type !== 'break' && tip.type !== 'cmd') {
+                        ctx.beginPath(); 
+                        ctx.arc(tip.x*scale, -tip.y*scale, 4, 0, Math.PI*2);
+                        ctx.fillStyle = color; ctx.fill();
+                    }
+                }
+                ctx.restore();
+            }
+            ctx.restore();
+        }
+
+        // --- AI TRACER ---
+        function handleImageUpload(input) {
+            const file = input.files[0];
+            if(!file) return;
+            showToast("Scanning...", "info");
+            saveState();
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const tCan = document.createElement('canvas');
+                    const MAX = 1000;
+                    let tw = img.width, th = img.height;
+                    if(tw>th && tw>MAX){ th*=MAX/tw; tw=MAX; } 
+                    else if(th>MAX){ tw*=MAX/th; th=MAX; }
+                    
+                    tCan.width = tw; tCan.height = th;
+                    const tCtx = tCan.getContext('2d');
+                    tCtx.fillStyle = "white"; tCtx.fillRect(0,0,tw,th);
+                    tCtx.filter = "grayscale(100%) contrast(150%)";
+                    tCtx.drawImage(img, 0, 0, tw, th);
+                    
+                    // Original settings
+                    ImageTracer.imageToSVG(tCan.toDataURL(), function(svgStr){
+                        processTrace(svgStr, tw, th);
+                    }, { ltres:0.5, qtres:0.5, pathomit:2, colorsampling:2, numberofcolors:2 });
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function processTrace(svgStr, imgW, imgH) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(svgStr, "image/svg+xml");
+            const paths = doc.getElementsByTagName("path");
+            let strokes = [];
+            const res = 2.0; 
+
+            for(let i=0; i<paths.length; i++) {
+                const p = paths[i];
+                const len = p.getTotalLength();
+                if(len < 5) continue; 
+                
+                let pts = [];
+                let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+
+                for(let d=0; d<=len; d+=res) {
+                    const pt = p.getPointAtLength(d);
+                    pts.push({x: pt.x, y: pt.y});
+                    if(pt.x<minX) minX=pt.x; if(pt.x>maxX) maxX=pt.x;
+                    if(pt.y<minY) minY=pt.y; if(pt.y>maxY) maxY=pt.y;
+                }
+                
+                const w = maxX - minX;
+                const h = maxY - minY;
+                if (w > imgW * 0.98 || h > imgH * 0.98) continue; 
+                strokes.push(pts);
+            }
+
+            if(strokes.length === 0) return showToast("No shapes found", "error");
+
+            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+            strokes.flat().forEach(p => {
+                if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
+                if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
+            });
+            
+            const contentW = maxX - minX;
+            const contentH = maxY - minY;
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            const scaleFac = (tableR * 2 * 0.9) / Math.max(contentW, contentH);
+            const cx = (minX + maxX)/2;
+            const cy = (minY + maxY)/2;
+
+            let normalizedStrokes = strokes.map(s => {
+                return s.map(p => ({
+                    x: (p.x - cx) * scaleFac,
+                    y: -(p.y - cy) * scaleFac 
+                })).filter(p => Math.hypot(p.x, p.y) < tableR);
+            });
+
+            rawPoints = [];
+            normalizedStrokes.forEach(s => {
+                rawPoints.push({type:'break'});
+                s.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
+            });
+            rawPoints.push({type:'break'});
+
+            resetStatus();
+            showToast("Trace Loaded (Click Prepare)", "info");
+            render();
+        }
+
+        // --- OPTIMIZER (WITH PERIMETER SURFING & AUTO-CLOSE) ---
         function prepareGCode() {
             if(rawPoints.length === 0) return showToast("Draw something first!", "error");
             showToast("Optimizing Path...", "info");
@@ -572,6 +856,7 @@
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
             const sym = parseInt(document.getElementById('symSlider').value);
             
+            // 1. Separate raw points into distinct shapes
             let shapes = [];
             let curShape = [];
             rawPoints.forEach(p => {
@@ -584,6 +869,7 @@
             });
             if(curShape.length > 0) shapes.push(curShape);
 
+            // 2. Generate Symmetry Copies
             let pool = [];
             for(let s=0; s<sym; s++) {
                 const ang = s * (Math.PI*2/sym);
@@ -598,6 +884,7 @@
                 });
             }
 
+            // 3. Greedy Nearest Neighbor Sort
             let bestShapeIdx = -1, bestPointIdx = -1, maxDist = -1;
             for (let i=0; i<pool.length; i++) {
                 for (let j=0; j<pool[i].length; j++) {
@@ -623,13 +910,6 @@
 
             let sortedShapes = [startShape];
             let curPos = startShape[startShape.length-1];
-
-            // FIX: Obstacle Awareness should include ALL closed shapes
-            let obstacleShapes = pool.filter(s => {
-                let d = Math.hypot(s[0].x - s[s.length-1].x, s[0].y - s[s.length-1].y);
-                return d < 5.0 && s.length > 5;
-            });
-            if(dClose < 5.0 && startShape.length>5) obstacleShapes.push(startShape);
 
             while(pool.length > 0) {
                 let bestIdx = -1;
@@ -662,7 +942,6 @@
                     let p2 = winner.slice(0, bestStartIdx);
                     winner = p1.concat(p2);
                     winner.push(winner[0]);
-                    obstacleShapes.push(winner);
                 } else {
                     if(bestIsReverse) winner.reverse();
                 }
@@ -672,9 +951,12 @@
                 pool.splice(bestIdx, 1);
             }
 
+            // 4. Flatten shapes into processedPoints with PERIMETER SURFING
             processedPoints = [];
+            const res = 1.0;
             
             if(sortedShapes.length > 0) {
+                // Enter from edge for first shape
                 let first = sortedShapes[0];
                 let fPt = first[0];
                 let fAng = Math.atan2(fPt.y, fPt.x);
@@ -683,45 +965,77 @@
 
             for(let i=0; i<sortedShapes.length; i++) {
                 let s = sortedShapes[i];
+                
+                // HANDLE JUMP FROM PREVIOUS SHAPE
                 if(i > 0) {
                     let prev = sortedShapes[i-1];
                     let currStart = s[0];
-                    let bestExitIdx = -1;
-                    let minDist = Infinity;
-                    
-                    for(let k=0; k<prev.length; k++) {
-                        let d = Math.hypot(prev[k].x - currStart.x, prev[k].y - currStart.y);
-                        if(d < minDist) { minDist = d; bestExitIdx = k; }
-                    }
+                    let prevEnd = prev[prev.length-1];
 
-                    let isPrevClosed = Math.hypot(prev[0].x - prev[prev.length-1].x, prev[0].y - prev[prev.length-1].y) < 5.0;
-                    let retracePath = [];
-                    if(isPrevClosed) {
-                        let distFwd = bestExitIdx; 
-                        let distBk = (prev.length-1) - bestExitIdx;
-                        if(distFwd < distBk) {
-                            for(let m=0; m<=bestExitIdx; m++) retracePath.push(prev[m]);
-                        } else {
-                            for(let m=prev.length-1; m>=bestExitIdx; m--) retracePath.push(prev[m]);
+                    // Distance to jump
+                    let jumpDist = Math.hypot(currStart.x - prevEnd.x, currStart.y - prevEnd.y);
+
+                    // IF JUMP IS SMALL (< 20mm), JUST DRAW IT (It's likely part of the same detail)
+                    if(jumpDist < 20.0) {
+                        let steps = Math.ceil(jumpDist/res);
+                        for(let k=1; k<=steps; k++) {
+                            let t = k/steps;
+                            processedPoints.push({
+                                x: prevEnd.x + (currStart.x-prevEnd.x)*t,
+                                y: prevEnd.y + (currStart.y-prevEnd.y)*t,
+                                type: 'point'
+                            });
                         }
-                    } else {
-                        for(let m=prev.length-1; m>=bestExitIdx; m--) retracePath.push(prev[m]);
-                    }
+                    } 
+                    // IF JUMP IS LARGE, USE RIM TRAVEL (Hide the travel line)
+                    else {
+                        // 1. Exit to Rim from Previous End
+                        let exitAng = Math.atan2(prevEnd.y, prevEnd.x);
+                        processedPoints.push({
+                            x: tableR * Math.cos(exitAng),
+                            y: tableR * Math.sin(exitAng),
+                            type: 'point' 
+                        });
 
-                    retracePath.forEach(p => processedPoints.push(p));
-                    
-                    let startJump = prev[bestExitIdx];
-                    let safePath = getSafePath(startJump, currStart, obstacleShapes);
-                    safePath.forEach(p => processedPoints.push({x:p.x, y:p.y, type:'point'}));
+                        // 2. Travel ARC along Rim to New Start Angle
+                        let enterAng = Math.atan2(currStart.y, currStart.x);
+                        
+                        // Calculate shortest direction around rim
+                        let diff = enterAng - exitAng;
+                        if (diff > Math.PI) diff -= 2*Math.PI;
+                        if (diff < -Math.PI) diff += 2*Math.PI;
+
+                        let rimSteps = Math.ceil(Math.abs(diff * tableR) / 2.0); // 2mm resolution on rim
+                        for(let r=1; r<=rimSteps; r++) {
+                            let t = r/rimSteps;
+                            let curAng = exitAng + (diff * t);
+                            processedPoints.push({
+                                x: tableR * Math.cos(curAng),
+                                y: tableR * Math.sin(curAng),
+                                type: 'point'
+                            });
+                        }
+                    }
                 }
+                
+                // Add the actual shape points
                 s.forEach(p => processedPoints.push(p));
             }
 
+            // 5. ADD EXIT LOGIC (M0 + Escape)
             if(processedPoints.length > 0) {
                 let lastPt = processedPoints[processedPoints.length-1];
+                
+                // Add M0 Command Marker
                 processedPoints.push({type: 'cmd', val: 'M0'});
+
+                // Add Escape Move (Straight to nearest Rim)
                 let exitAng = Math.atan2(lastPt.y, lastPt.x);
-                processedPoints.push({x: tableR * Math.cos(exitAng), y: tableR * Math.sin(exitAng), type: 'point'});
+                processedPoints.push({
+                    x: tableR * Math.cos(exitAng),
+                    y: tableR * Math.sin(exitAng),
+                    type: 'point'
+                });
             }
 
             generatedGCode = generateGCodeStringFromProcessed();
@@ -733,186 +1047,6 @@
             showToast("Path Ready!", "success");
         }
 
-        function getSafePath(p1, p2, obstacles) {
-            let closestInt = null;
-            let bestDist = Infinity;
-            let hitShape = null;
-
-            for(let s of obstacles) {
-                let ints = getIntersections(p1, p2, s);
-                if(ints.length > 0) {
-                    for(let hit of ints) {
-                        let d = Math.hypot(hit.x - p1.x, hit.y - p1.y);
-                        if(d < bestDist && d > 1.0) { 
-                            bestDist = d; closestInt = hit; hitShape = s;
-                        }
-                    }
-                }
-            }
-
-            if(!closestInt) return [p2]; 
-
-            let exitIdx = -1, minExitDist = Infinity;
-            for(let i=0; i<hitShape.length; i++) {
-                let d = Math.hypot(hitShape[i].x - p2.x, hitShape[i].y - p2.y);
-                if(d < minExitDist) { minExitDist = d; exitIdx = i; }
-            }
-            let exitPt = hitShape[exitIdx];
-
-            let entryIdx = -1, minEntryDist = Infinity;
-            for(let i=0; i<hitShape.length; i++) {
-                let d = Math.hypot(hitShape[i].x - closestInt.x, hitShape[i].y - closestInt.y);
-                if(d < minEntryDist) { minEntryDist = d; entryIdx = i; }
-            }
-            let entryPt = hitShape[entryIdx];
-
-            let trace = getPerimeterPath(entryPt, exitPt, hitShape);
-            let result = [];
-            result.push(entryPt); 
-            trace.forEach(p => result.push(p));
-            
-            let tail = getSafePath(exitPt, p2, obstacles);
-            tail.forEach(p => result.push(p));
-
-            return result;
-        }
-
-        function getIntersections(p1, p2, poly) {
-            let ints = [];
-            for(let i=0; i<poly.length; i++) {
-                let a = poly[i];
-                let b = poly[(i+1)%poly.length];
-                let hit = getLineIntersection(p1, p2, a, b);
-                if(hit) ints.push(hit);
-            }
-            return ints;
-        }
-
-        function getLineIntersection(p0, p1, p2, p3) {
-            let s1_x = p1.x - p0.x; let s1_y = p1.y - p0.y;
-            let s2_x = p3.x - p2.x; let s2_y = p3.y - p2.y;
-            let s = (-s1_y * (p0.x - p2.x) + s1_x * (p0.y - p2.y)) / (-s2_x * s1_y + s1_x * s2_y);
-            let t = ( s2_x * (p0.y - p2.y) - s2_y * (p0.x - p2.x)) / (-s2_x * s1_y + s1_x * s2_y);
-            if (s >= 0 && s <= 1 && t >= 0 && t <= 1) return {x: p0.x + (t * s1_x), y: p0.y + (t * s1_y)};
-            return null;
-        }
-
-        function getPerimeterPath(p1, p2, poly) {
-            let idx1 = -1, minD1 = Infinity;
-            let idx2 = -1, minD2 = Infinity;
-            for(let i=0; i<poly.length; i++) {
-                let d1 = Math.hypot(poly[i].x - p1.x, poly[i].y - p1.y);
-                if(d1 < minD1) { minD1 = d1; idx1 = i; }
-                let d2 = Math.hypot(poly[i].x - p2.x, poly[i].y - p2.y);
-                if(d2 < minD2) { minD2 = d2; idx2 = i; }
-            }
-            if(idx1 === -1 || idx2 === -1 || idx1 === idx2) return [];
-            let cwPath = []; let curr = idx1; let cwDist = 0;
-            while(curr !== idx2) {
-                let next = (curr + 1) % poly.length;
-                cwDist += Math.hypot(poly[curr].x - poly[next].x, poly[curr].y - poly[next].y);
-                cwPath.push(poly[next]); curr = next;
-            }
-            let ccwPath = []; curr = idx1; let ccwDist = 0;
-            while(curr !== idx2) {
-                let next = (curr - 1 + poly.length) % poly.length;
-                ccwDist += Math.hypot(poly[curr].x - poly[next].x, poly[curr].y - poly[next].y);
-                ccwPath.push(poly[next]); curr = next;
-            }
-            return (cwDist < ccwDist) ? cwPath : ccwPath;
-        }
-
-        // --- FIXED TRACER FUNCTION ---
-        function handleImageUpload(input) {
-            const file = input.files[0];
-            if(!file) return;
-            showToast("Scanning...", "info");
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const img = new Image();
-                img.onload = function() {
-                    const tCan = document.createElement('canvas');
-                    const MAX = 1000;
-                    let tw = img.width, th = img.height;
-                    if(tw>th && tw>MAX){ th*=MAX/tw; tw=MAX; } 
-                    else if(th>MAX){ tw*=MAX/th; th=MAX; }
-                    tCan.width = tw; tCan.height = th;
-                    const tCtx = tCan.getContext('2d');
-                    // Draw white background then image
-                    tCtx.fillStyle = "white"; tCtx.fillRect(0,0,tw,th);
-                    // High Contrast Filter
-                    tCtx.filter = "grayscale(100%) contrast(200%) brightness(100%)";
-                    tCtx.drawImage(img, 0, 0, tw, th);
-                    
-                    // Robust Trace Settings
-                    ImageTracer.imageToSVG(tCan.toDataURL(), function(svgStr){
-                        processTrace(svgStr, tw, th);
-                    }, { ltres:1, qtres:1, pathomit:8, colorsampling:0, numberofcolors:2, mincolorratio:0.02, colorquantcycles:3, scale:1 });
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        }
-
-        function processTrace(svgStr, imgW, imgH) {
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(svgStr, "image/svg+xml");
-            const paths = doc.getElementsByTagName("path");
-            let strokes = [];
-            const res = 3.0; 
-
-            for(let i=0; i<paths.length; i++) {
-                const p = paths[i];
-                const len = p.getTotalLength();
-                if(len < 10) continue; 
-                let pts = [];
-                let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
-                for(let d=0; d<=len; d+=res) {
-                    const pt = p.getPointAtLength(d);
-                    pts.push({x: pt.x, y: pt.y});
-                    if(pt.x<minX) minX=pt.x; if(pt.x>maxX) maxX=pt.x;
-                    if(pt.y<minY) minY=pt.y; if(pt.y>maxY) maxY=pt.y;
-                }
-                const w = maxX - minX;
-                const h = maxY - minY;
-                if (w > imgW * 0.99 && h > imgH * 0.99) continue; // Ignore box around image
-                strokes.push(pts);
-            }
-
-            if(strokes.length === 0) return showToast("No shapes found (try higher contrast)", "error");
-
-            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
-            strokes.flat().forEach(p => {
-                if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
-                if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
-            });
-            
-            const contentW = maxX - minX;
-            const contentH = maxY - minY;
-            const tableR = parseFloat(document.getElementById('cfgRadius').value);
-            const scaleFac = (tableR * 2 * 0.9) / Math.max(contentW, contentH);
-            const cx = (minX + maxX)/2;
-            const cy = (minY + maxY)/2;
-
-            let normalizedStrokes = strokes.map(s => {
-                return s.map(p => ({
-                    x: (p.x - cx) * scaleFac,
-                    y: -(p.y - cy) * scaleFac 
-                })).filter(p => Math.hypot(p.x, p.y) < tableR);
-            });
-
-            rawPoints = [];
-            normalizedStrokes.forEach(s => {
-                rawPoints.push({type:'break'});
-                s.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
-            });
-            rawPoints.push({type:'break'});
-
-            resetStatus();
-            showToast(`Trace Loaded (${strokes.length} curves)`, "success");
-            render();
-        }
-
         // --- G-CODE GENERATION ---
         function generateGCodeStringFromProcessed() {
             const L1 = parseFloat(document.getElementById('cfgL1').value);
@@ -921,6 +1055,7 @@
             const tableRadius = parseFloat(document.getElementById('cfgRadius').value);
             const stepsPerDeg = parseFloat(document.getElementById('cfgStepsPerDeg').value);
             const stepsPerRad = stepsPerDeg * (180 / Math.PI);
+            
             const centerDelay = parseFloat(document.getElementById('cfgCenterDelay').value);
             const perimDelay = parseFloat(document.getElementById('cfgPerimDelay').value);
 
@@ -929,6 +1064,7 @@
             let prevElbow = 0;
 
             let firstPt = processedPoints[0];
+            // If first point is M0? Unlikely, but handle
             if(firstPt.type === 'cmd') return "";
 
             let startIK = calculateIK(firstPt.x, firstPt.y, 0, 0, L1, L2, gearRatio, stepsPerRad);
@@ -939,11 +1075,22 @@
                 let p1 = processedPoints[i];
                 let p2 = processedPoints[i+1];
 
-                if (p1.type === 'cmd' && p1.val === 'M0') cmds.push("M0");
-                if (p2.type === 'cmd' && p2.val === 'M0') continue;
+                // Check if P1 is a command (M0)
+                if (p1.type === 'cmd' && p1.val === 'M0') {
+                    cmds.push("M0");
+                    // We need to look AHEAD or find current pos to continue
+                    // The loop below handles 'start from valid coord'
+                }
                 
+                // If P2 is M0, skip interpolation, next loop will handle it
+                if (p2.type === 'cmd' && p2.val === 'M0') {
+                    continue;
+                }
+                
+                // FIXED: If P1 was M0, we need start coords from point BEFORE M0
                 let startX, startY;
                 if(p1.type === 'cmd') {
+                   // Search backwards for the last valid geometry point
                    let back = i-1;
                    while(back >= 0 && processedPoints[back].type === 'cmd') back--;
                    if(back < 0) { startX=0; startY=0; }
@@ -966,56 +1113,24 @@
 
                     if(dBase !== 0 || dElbow !== 0) {
                         let r = Math.hypot(x, y);
+
+                        // Scanner Filter (3200 step jump fix)
                         if (r < 5.0 && (Math.abs(dBase) > 2000 || Math.abs(dElbow) > 2000)) {
-                            prevBase += dBase; prevElbow += dElbow; continue; 
+                            prevBase += dBase; 
+                            prevElbow += dElbow;
+                            continue; 
                         }
+
                         let rFactor = r / tableRadius;
                         if(rFactor > 1) rFactor = 1;
                         let delay = Math.round(centerDelay + ((perimDelay - centerDelay) * rFactor));
+                        
                         cmds.push(`G1 ${dElbow} ${dBase} ${delay}`);
                         prevBase += dBase; prevElbow += dElbow;
                     }
                 }
             }
             return cmds.join('\n');
-        }
-
-        // --- KINEMATICS ---
-        function getShortestRotation(raw, last) {
-            let diff = (raw - last) / (2 * Math.PI);
-            let offset = Math.round(diff);
-            return raw - (offset * 2 * Math.PI);
-        }
-        function calculateIK(x, y, lastBaseSteps, lastElbowSteps, L1, L2, gearRatio, stepsPerRad) {
-            let dist = Math.hypot(x, y);
-            if (dist < 2.0) { 
-                const targetBaseSteps = lastBaseSteps; 
-                const currentBaseAngle = -lastBaseSteps / stepsPerRad;
-                const targetElbowSteps = -(Math.PI + gearRatio * currentBaseAngle) * stepsPerRad;
-                return { base_steps: targetBaseSteps, elbow_steps: targetElbowSteps };
-            }
-            const maxReach = L1 + L2;
-            if (dist > maxReach) { x = (x / dist) * maxReach; y = (y / dist) * maxReach; dist = maxReach; }
-            const lastT1 = -lastBaseSteps / stepsPerRad; 
-            let cosBend = (dist*dist - L1*L1 - L2*L2) / (2 * L1 * L2);
-            cosBend = Math.max(-1, Math.min(1, cosBend));
-            const bend1 = Math.acos(cosBend);
-            const bend2 = -Math.acos(cosBend);
-            const k1_1 = L1 + L2 * Math.cos(bend1);
-            const k2_1 = L2 * Math.sin(bend1);
-            let t1_1 = Math.atan2(y, x) - Math.atan2(k2_1, k1_1);
-            t1_1 = getShortestRotation(t1_1, lastT1);
-            const k1_2 = L1 + L2 * Math.cos(bend2);
-            const k2_2 = L2 * Math.sin(bend2);
-            let t1_2 = Math.atan2(y, x) - Math.atan2(k2_2, k1_2);
-            t1_2 = getShortestRotation(t1_2, lastT1);
-            const b1_steps = -t1_1 * stepsPerRad;
-            const e1_steps = -(bend1 + gearRatio * t1_1) * stepsPerRad;
-            const b2_steps = -t1_2 * stepsPerRad;
-            const e2_steps = -(bend2 + gearRatio * t1_2) * stepsPerRad;
-            const cost1 = Math.abs(b1_steps - lastBaseSteps) + Math.abs(e1_steps - lastElbowSteps);
-            const cost2 = Math.abs(b2_steps - lastBaseSteps) + Math.abs(e2_steps - lastElbowSteps);
-            return (cost1 <= cost2) ? { base_steps: b1_steps, elbow_steps: e1_steps } : { base_steps: b2_steps, elbow_steps: e2_steps };
         }
 
         // --- UTILS (Save/Load/Undo) ---
@@ -1109,87 +1224,42 @@
             }
         }
 
-        function isPointInPolygon(p, polygon) {
-            let inside = false;
-            for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-                let xi = polygon[i].x, yi = polygon[i].y;
-                let xj = polygon[j].x, yj = polygon[j].y;
-                let intersect = ((yi > p.y) !== (yj > p.y)) && (p.x < (xj - xi) * (p.y - yi) / (yj - yi) + xi);
-                if (intersect) inside = !inside;
+        // FIXED KINEMATICS
+        function getShortestRotation(raw, last) {
+            let diff = (raw - last) / (2 * Math.PI);
+            let offset = Math.round(diff);
+            return raw - (offset * 2 * Math.PI);
+        }
+        function calculateIK(x, y, lastBaseSteps, lastElbowSteps, L1, L2, gearRatio, stepsPerRad) {
+            let dist = Math.hypot(x, y);
+            if (dist < 2.0) { 
+                const targetBaseSteps = lastBaseSteps; 
+                const currentBaseAngle = -lastBaseSteps / stepsPerRad;
+                const targetElbowSteps = -(Math.PI + gearRatio * currentBaseAngle) * stepsPerRad;
+                return { base_steps: targetBaseSteps, elbow_steps: targetElbowSteps };
             }
-            return inside;
-        }
-
-        function getBounds(shape) {
-            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
-            shape.forEach(p => {
-                if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
-                if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
-            });
-            return { minX, maxX, minY, maxY, area: (maxX-minX)*(maxY-minY) };
-        }
-
-        function resetStatus() {
-            generatedGCode = null;
-            processedPoints = [];
-            document.getElementById('statusTxt').innerText = "Drawing Mode";
-            document.getElementById('statusTxt').style.color = "orange";
-            document.getElementById('progressSlider').value = 100;
-        }
-
-        function render() {
-            const w = canvas.width / window.devicePixelRatio;
-            const h = canvas.height / window.devicePixelRatio;
-            ctx.clearRect(0, 0, w, h);
-            
-            const tableR = parseFloat(document.getElementById('cfgRadius').value);
-            const sym = parseInt(document.getElementById('symSlider').value);
-            const dark = document.body.getAttribute('data-theme') === 'dark';
-            const prog = parseInt(document.getElementById('progressSlider').value);
-            document.getElementById('progVal').textContent = prog + '%';
-
-            ctx.save();
-            ctx.translate(origin.x, origin.y);
-
-            // Table Circle
-            ctx.beginPath(); ctx.arc(0, 0, tableR*scale, 0, Math.PI*2);
-            ctx.strokeStyle = dark ? '#444' : '#ddd'; ctx.lineWidth = 2; ctx.stroke();
-
-            const showingFinal = (processedPoints.length > 0);
-            const dataToShow = showingFinal ? processedPoints : rawPoints;
-            const limit = Math.floor(dataToShow.length * (prog/100));
-            const color = showingFinal ? '#ff0000' : (dark ? 'cyan' : '#007bff');
-
-            ctx.lineWidth = 1.5;
-            const loopCount = showingFinal ? 1 : sym;
-
-            for(let s=0; s<loopCount; s++) {
-                const ang = s * (Math.PI*2/sym);
-                ctx.save(); 
-                if(!showingFinal) ctx.rotate(ang); 
-                
-                ctx.beginPath();
-                ctx.strokeStyle = color;
-                
-                let isMove = true;
-                for(let i=0; i<limit; i++) {
-                    const p = dataToShow[i];
-                    if(p.type === 'break' || p.type === 'cmd') { isMove = true; continue; }
-                    const px = p.x * scale; const py = -p.y * scale;
-                    if(isMove) { ctx.moveTo(px, py); isMove = false; } else ctx.lineTo(px, py);
-                }
-                ctx.stroke();
-                
-                if(limit > 0 && limit < dataToShow.length) {
-                    const tip = dataToShow[limit];
-                    if(tip.type !== 'break' && tip.type !== 'cmd') {
-                        ctx.beginPath(); ctx.arc(tip.x*scale, -tip.y*scale, 4, 0, Math.PI*2);
-                        ctx.fillStyle = color; ctx.fill();
-                    }
-                }
-                ctx.restore();
-            }
-            ctx.restore();
+            const maxReach = L1 + L2;
+            if (dist > maxReach) { x = (x / dist) * maxReach; y = (y / dist) * maxReach; dist = maxReach; }
+            const lastT1 = -lastBaseSteps / stepsPerRad; 
+            let cosBend = (dist*dist - L1*L1 - L2*L2) / (2 * L1 * L2);
+            cosBend = Math.max(-1, Math.min(1, cosBend));
+            const bend1 = Math.acos(cosBend);
+            const bend2 = -Math.acos(cosBend);
+            const k1_1 = L1 + L2 * Math.cos(bend1);
+            const k2_1 = L2 * Math.sin(bend1);
+            let t1_1 = Math.atan2(y, x) - Math.atan2(k2_1, k1_1);
+            t1_1 = getShortestRotation(t1_1, lastT1);
+            const k1_2 = L1 + L2 * Math.cos(bend2);
+            const k2_2 = L2 * Math.sin(bend2);
+            let t1_2 = Math.atan2(y, x) - Math.atan2(k2_2, k1_2);
+            t1_2 = getShortestRotation(t1_2, lastT1);
+            const b1_steps = -t1_1 * stepsPerRad;
+            const e1_steps = -(bend1 + gearRatio * t1_1) * stepsPerRad;
+            const b2_steps = -t1_2 * stepsPerRad;
+            const e2_steps = -(bend2 + gearRatio * t1_2) * stepsPerRad;
+            const cost1 = Math.abs(b1_steps - lastBaseSteps) + Math.abs(e1_steps - lastElbowSteps);
+            const cost2 = Math.abs(b2_steps - lastBaseSteps) + Math.abs(e2_steps - lastElbowSteps);
+            return (cost1 <= cost2) ? { base_steps: b1_steps, elbow_steps: e1_steps } : { base_steps: b2_steps, elbow_steps: e2_steps };
         }
 
         init();
