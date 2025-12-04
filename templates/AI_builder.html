@@ -704,18 +704,17 @@
             render();
         }
 
-        // --- MASTER OBSTACLE AVOIDANCE OPTIMIZER ---
+        // --- SMART "ISLAND HOPPING" OPTIMIZER ---
         function prepareGCode() {
             if(rawPoints.length === 0) return showToast("Draw something first!", "error");
-            showToast("Calculating Smart Paths...", "info");
-            setTimeout(() => { executeSmartPath(); }, 100);
+            showToast("Calculating Routes...", "info");
+            setTimeout(() => { executeSmartPath(); }, 50);
         }
 
         function executeSmartPath() {
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
             const sym = parseInt(document.getElementById('symSlider').value);
             
-            // 1. Separate Shapes
             let shapes = []; let curShape = [];
             rawPoints.forEach(p => {
                 if(p.type === 'break' || p.type === 'cmd') {
@@ -725,27 +724,23 @@
             });
             if(curShape.length > 0) shapes.push(curShape);
 
-            // 2. Generate Symmetry (ALL POTENTIAL OBSTACLES)
-            let pool = [];
+            let allShapesInDesign = [];
             for(let s=0; s<sym; s++) {
                 const ang = s * (Math.PI*2/sym);
                 const c = Math.cos(ang), si = Math.sin(ang);
                 shapes.forEach(sh => {
                     let newSh = sh.map(p => ({ x: p.x*c - p.y*si, y: p.x*si + p.y*c, type: 'point' }));
-                    newSh.bounds = getPolyBounds(newSh); // Pre-calc bounds
-                    pool.push(newSh);
+                    allShapesInDesign.push(newSh);
                 });
             }
 
-            // CRITICAL: Keep a permanent reference to ALL obstacles
-            const allObstacles = pool.slice();
-
-            // 3. Sort
             let sortedShapes = [];
+            let pool = allShapesInDesign.slice();
+
             if(pool.length > 0) {
                 let bestIdx = 0, minD = Infinity;
                 pool.forEach((s, i) => {
-                    let d = Math.abs(Math.hypot(s[0].x, s[0].y) - tableR); // Start near rim
+                    let d = Math.abs(Math.hypot(s[0].x, s[0].y) - tableR); 
                     if(d < minD) { minD=d; bestIdx=i; }
                 });
                 sortedShapes.push(pool[bestIdx]);
@@ -779,13 +774,11 @@
                 } else {
                     if(bestIsReverse) winner.reverse();
                 }
-                winner.bounds = pool[bestIdx].bounds; // Preserve bounds
                 sortedShapes.push(winner);
                 curPos = winner[winner.length-1];
                 pool.splice(bestIdx, 1);
             }
 
-            // 4. Flatten with OBSTACLE AVOIDANCE
             processedPoints = [];
             if(sortedShapes.length > 0) {
                 let first = sortedShapes[0];
@@ -797,10 +790,11 @@
             for(let i=0; i<sortedShapes.length; i++) {
                 let s = sortedShapes[i];
                 if(i > 0) {
-                    let startPt = sortedShapes[i-1][sortedShapes[i-1].length-1];
+                    let prevShape = sortedShapes[i-1];
+                    let startPt = prevShape[prevShape.length-1];
                     let endPt = s[0];
-                    // Check against ALL obstacles
-                    let travelPath = getSmartTravelPath(startPt, endPt, allObstacles);
+                    let potentialBridges = allShapesInDesign.filter(obs => obs !== prevShape && obs !== s);
+                    let travelPath = getSmartTravelPath(startPt, endPt, potentialBridges);
                     travelPath.forEach(tp => { processedPoints.push({x:tp.x, y:tp.y, type:'point'}); });
                 }
                 s.forEach(p => processedPoints.push(p));
@@ -820,17 +814,10 @@
             render(); showToast("Path Optimized!", "success");
         }
 
-        function getSmartTravelPath(p1, p2, obstacles) {
-            // Optimizations
-            const lineBounds = {
-                minX: Math.min(p1.x, p2.x) - 1, maxX: Math.max(p1.x, p2.x) + 1,
-                minY: Math.min(p1.y, p2.y) - 1, maxY: Math.max(p1.y, p2.y) + 1
-            };
-            const totalDist = Math.hypot(p2.x-p1.x, p2.y-p1.y);
-
+        function getSmartTravelPath(p1, p2, bridges) {
             let hits = [];
-            obstacles.forEach((poly, polyIdx) => {
-                if(!boundsOverlap(lineBounds, poly.bounds)) return; // Fast Fail
+            const totalDist = Math.hypot(p2.x-p1.x, p2.y-p1.y);
+            bridges.forEach((poly, polyIdx) => {
                 for(let i=0; i<poly.length-1; i++) {
                     let a = poly[i]; let b = poly[i+1];
                     let inter = getLineIntersection(p1, p2, a, b);
@@ -844,29 +831,16 @@
             });
             if(hits.length === 0) return interpolateLine(p1, p2);
             hits.sort((a,b) => a.dist - b.dist);
-            
             let entry = hits[0];
             let exit = null; let maxDist = -1;
             hits.forEach(h => {
-                if(h.polyIdx === entry.polyIdx) { if(h.dist > maxDist) { maxDist = h.dist; exit = h; } }
+                if(h.poly === entry.poly) { if(h.dist > maxDist) { maxDist = h.dist; exit = h; } }
             });
-            if(!exit || Math.abs(entry.dist - exit.dist) < 1.0) return interpolateLine(p1, p2);
-            
-            let surfPath = getPerimeterSurf(entry.pt, exit.pt, entry.poly);
-            let remainder = getSmartTravelPath(exit.pt, p2, obstacles);
-            return [...surfPath, ...remainder];
-        }
-
-        function getPolyBounds(poly) {
-            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
-            for(let p of poly) {
-                if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
-                if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
-            }
-            return {minX, maxX, minY, maxY};
-        }
-        function boundsOverlap(b1, b2) {
-            return !(b2.minX > b1.maxX || b2.maxX < b1.minX || b2.minY > b1.maxY || b2.maxY < b1.minY);
+            if(!exit || Math.abs(entry.dist - exit.dist) < 0.5) return interpolateLine(p1, p2);
+            let pathPart1 = interpolateLine(p1, entry.pt);
+            let pathPart2 = getPerimeterSurf(entry.pt, exit.pt, entry.poly);
+            let pathPart3 = getSmartTravelPath(exit.pt, p2, bridges);
+            return [...pathPart1, ...pathPart2, ...pathPart3];
         }
 
         function interpolateLine(p1, p2) {
