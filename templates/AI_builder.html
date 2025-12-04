@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sand Controller Pro (Original)</title>
+    <title>Sand Controller Pro (Texture Fill)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -116,6 +116,9 @@
         input:checked + .slider-tog { background-color: var(--secondary); }
         input:checked + .slider-tog:before { transform: translateX(18px); }
 
+        .control-sub {
+            font-size: 11px; margin-left: 10px; color: #666;
+        }
     </style>
 </head>
 <body data-theme="light">
@@ -164,6 +167,23 @@
                 <button class="secondary" onclick="document.getElementById('imgUpload').click()">✨ Trace Image</button>
             </div>
 
+            <div class="toggle-row" style="background:rgba(0,0,0,0.03); padding:8px; border-radius:8px; margin-top:5px;">
+                <div>
+                    <span style="font-weight:600; font-size:13px;">🏴 Fill Shapes</span>
+                    <div class="control-sub" id="fillDesc">Fills inside with texture</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="fillMode" onchange="toggleFillSettings()">
+                    <span class="slider-tog"></span>
+                </label>
+            </div>
+            <div id="fillSettings" style="display:none; padding:10px; background:rgba(0,0,0,0.03); margin-bottom:10px; border-radius:0 0 8px 8px;">
+                <div class="slider-header"><span>DENSITY (Spacing)</span> <span id="densVal">5mm</span></div>
+                <input type="range" id="fillDensity" min="2" max="15" value="5" step="0.5" oninput="document.getElementById('densVal').innerText=this.value+'mm'">
+                
+                <div class="slider-header" style="margin-top:8px;"><span>ANGLE</span> <span id="angVal">45°</span></div>
+                <input type="range" id="fillAngle" min="0" max="180" value="45" step="5" oninput="document.getElementById('angVal').innerText=this.value+'°'">
+            </div>
             <div class="btn-group">
                 <button onclick="undo()" class="secondary">↶ Undo</button>
                 <button onclick="clearCanvas()" class="secondary" style="color:var(--danger); border-color:var(--danger);">✖ Clear</button>
@@ -225,6 +245,7 @@
         let origin = {x:0, y:0};
         let scale = 1;
         let generatedGCode = null;
+        let cachedTrace = null; // Store trace data to re-apply fill without re-uploading
 
         const canvas = document.getElementById('drawCanvas');
         const ctx = canvas.getContext('2d');
@@ -241,6 +262,13 @@
             canvas.style.touchAction = "none";
             
             updateUI();
+        }
+
+        function toggleFillSettings() {
+            const on = document.getElementById('fillMode').checked;
+            document.getElementById('fillSettings').style.display = on ? 'block' : 'none';
+            // If we have a trace loaded, re-process it immediately
+            if(cachedTrace) processTrace(cachedTrace.svgStr, cachedTrace.w, cachedTrace.h);
         }
 
         // --- DRAWING LOGIC ---
@@ -382,7 +410,7 @@
             ctx.restore();
         }
 
-        // --- AI TRACER (Original Client-Side) ---
+        // --- AI TRACER + FILL LOGIC ---
         function handleImageUpload(input) {
             const file = input.files[0];
             if(!file) return;
@@ -405,8 +433,8 @@
                     tCtx.filter = "grayscale(100%) contrast(150%)";
                     tCtx.drawImage(img, 0, 0, tw, th);
                     
-                    // Original settings
                     ImageTracer.imageToSVG(tCan.toDataURL(), function(svgStr){
+                        cachedTrace = { svgStr: svgStr, w: tw, h: th }; // Cache for fill toggling
                         processTrace(svgStr, tw, th);
                     }, { ltres:0.5, qtres:0.5, pathomit:2, colorsampling:2, numberofcolors:2 });
                 };
@@ -437,6 +465,11 @@
                     if(pt.y<minY) minY=pt.y; if(pt.y>maxY) maxY=pt.y;
                 }
                 
+                // Force Close if filling is on? 
+                // ImageTracer usually gives loops, but let's check distance
+                const dClose = Math.hypot(pts[0].x - pts[pts.length-1].x, pts[0].y - pts[pts.length-1].y);
+                if(dClose < 10) pts.push({x: pts[0].x, y: pts[0].y}); // Close it up
+
                 const w = maxX - minX;
                 const h = maxY - minY;
                 if (w > imgW * 0.98 || h > imgH * 0.98) continue; 
@@ -445,8 +478,45 @@
 
             if(strokes.length === 0) return showToast("No shapes found", "error");
 
+            // --- FILL LOGIC START ---
+            const fillMode = document.getElementById('fillMode').checked;
+            let finalStrokes = [];
+
+            if(fillMode) {
+                const density = parseFloat(document.getElementById('fillDensity').value);
+                const angle = parseFloat(document.getElementById('fillAngle').value);
+                
+                strokes.forEach(poly => {
+                    // Try to generate hatch lines inside this polygon
+                    const hatchLines = generateHatchFill(poly, density, angle);
+                    if(hatchLines.length > 0) {
+                        // Connect the lines into a zig zag
+                        let zigzag = [];
+                        for(let k=0; k<hatchLines.length; k++) {
+                            let line = hatchLines[k];
+                            // If even index, go Start->End, if odd go End->Start
+                            if(k % 2 === 0) {
+                                zigzag.push(line.p1); zigzag.push(line.p2);
+                            } else {
+                                zigzag.push(line.p2); zigzag.push(line.p1);
+                            }
+                        }
+                        // Optionally add the perimeter too? 
+                        // Let's just do fill for now to keep it clean, maybe add perimeter at end
+                        finalStrokes.push(zigzag);
+                    } else {
+                        // If fill failed (too small?), keep outline
+                        finalStrokes.push(poly);
+                    }
+                });
+            } else {
+                finalStrokes = strokes;
+            }
+            // --- FILL LOGIC END ---
+
+            // Normalize
             let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
-            strokes.flat().forEach(p => {
+            finalStrokes.flat().forEach(p => {
                 if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
                 if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
             });
@@ -458,7 +528,7 @@
             const cx = (minX + maxX)/2;
             const cy = (minY + maxY)/2;
 
-            let normalizedStrokes = strokes.map(s => {
+            let normalizedStrokes = finalStrokes.map(s => {
                 return s.map(p => ({
                     x: (p.x - cx) * scaleFac,
                     y: -(p.y - cy) * scaleFac 
@@ -473,9 +543,66 @@
             rawPoints.push({type:'break'});
 
             resetStatus();
-            showToast("Trace Loaded (Click Prepare)", "info");
+            showToast(fillMode ? "Trace Loaded (Filled)" : "Trace Loaded (Outline)", "info");
             render();
         }
+
+        // --- SCANLINE HATCH ALGORITHM ---
+        function generateHatchFill(poly, density, angleDeg) {
+            // 1. Rotate polygon so scanlines are horizontal
+            const rad = angleDeg * Math.PI / 180;
+            const c = Math.cos(-rad), s = Math.sin(-rad); // Negative for reverse rotation
+            
+            let rotPoly = poly.map(p => ({
+                x: p.x * c - p.y * s,
+                y: p.x * s + p.y * c
+            }));
+
+            // 2. Find Bounds
+            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+            rotPoly.forEach(p => {
+                if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
+                if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
+            });
+
+            // 3. Scanline Intersections
+            let lines = [];
+            for(let y = minY + density; y < maxY; y += density) {
+                let intersections = [];
+                for(let i=0; i<rotPoly.length; i++) {
+                    let p1 = rotPoly[i];
+                    let p2 = rotPoly[(i+1)%rotPoly.length];
+                    
+                    if ((p1.y <= y && p2.y > y) || (p2.y <= y && p1.y > y)) {
+                        let t = (y - p1.y) / (p2.y - p1.y);
+                        let x = p1.x + t * (p2.x - p1.x);
+                        intersections.push(x);
+                    }
+                }
+                intersections.sort((a,b) => a-b);
+                
+                // Pair up intersections
+                for(let i=0; i<intersections.length; i+=2) {
+                    if(i+1 < intersections.length) {
+                        lines.push({
+                            p1: {x: intersections[i], y: y},
+                            p2: {x: intersections[i+1], y: y}
+                        });
+                    }
+                }
+            }
+
+            // 4. Rotate Back
+            const rc = Math.cos(rad), rs = Math.sin(rad);
+            lines.forEach(l => {
+                let p1 = l.p1, p2 = l.p2;
+                l.p1 = { x: p1.x * rc - p1.y * rs, y: p1.x * rs + p1.y * rc };
+                l.p2 = { x: p2.x * rc - p2.y * rs, y: p2.x * rs + p2.y * rc };
+            });
+
+            return lines;
+        }
+
 
         // --- OPTIMIZER (Original Greedy + M0) ---
         function prepareGCode() {
@@ -692,7 +819,8 @@
                 // Check if P1 is a command (M0)
                 if (p1.type === 'cmd' && p1.val === 'M0') {
                     cmds.push("M0");
-                    continue; 
+                    // We need to look AHEAD or find current pos to continue
+                    // The loop below handles 'start from valid coord'
                 }
                 
                 // If P2 is M0, skip interpolation, next loop will handle it
@@ -700,9 +828,10 @@
                     continue;
                 }
                 
-                // If P1 was M0, we need start coords from point BEFORE M0
+                // FIXED: If P1 was M0, we need start coords from point BEFORE M0
                 let startX, startY;
                 if(p1.type === 'cmd') {
+                   // Search backwards for the last valid geometry point
                    let back = i-1;
                    while(back >= 0 && processedPoints[back].type === 'cmd') back--;
                    if(back < 0) { startX=0; startY=0; }
