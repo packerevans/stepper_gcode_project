@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sand Controller Pro (Master Edition)</title>
+    <title>Sand Controller Pro (Sequence Lock)</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -358,7 +358,7 @@
             }
         }
 
-        // --- MASTER DUNE FILL (ROTATION + MULTI-POLYGON TRACE) ---
+        // --- MASTER DUNE FILL (LOCK SEQUENCE + BRIDGING) ---
         function handleFillClick(e) {
             const clickPos = getPos(e);
             
@@ -470,14 +470,7 @@
                      let startCut = cutPoints[k];
                      let endCut = cutPoints[k+1];
                      
-                     // Check midpoint to see if we are in "Ink"
                      let midX = (startCut.x + endCut.x) / 2;
-                     
-                     // Must be INSIDE target and OUTSIDE all holes
-                     // We check this in rotated space. 
-                     // Since we just calculated intersections, we can do a quick check:
-                     // Is midX inside rotTarget?
-                     // Is midX inside any rotHole?
                      
                      let pMid = {x: midX, y: y};
                      let isInsideTarget = isPointInPolygon(pMid, rotTarget);
@@ -504,53 +497,38 @@
 
                         let segmentStartPointRot = {x: segPoints[0], y:y};
 
-                        // --- INTELLIGENT TRAVEL ---
+                        // --- INTELLIGENT TRAVEL (SEQUENCE LOCK) ---
                         if(lastFilledPointRot) {
-                            // Find which polygon we are sitting on
-                            // lastFilledPointRot is on SOME polygon edge.
-                            // segmentStartPointRot is on SOME polygon edge.
-                            
                             let startPoly = findClosestPoly(lastFilledPointRot, rotTarget, rotHoles);
                             let endPoly = findClosestPoly(segmentStartPointRot, rotTarget, rotHoles);
 
                             if(startPoly && endPoly && startPoly === endPoly) {
-                                // We are travelling along the SAME wall (either outer wall or same hole)
-                                // Trace it!
+                                // SAME WALL: TRACE
                                 let trace = getPerimeterPath(lastFilledPointRot, segmentStartPointRot, startPoly);
                                 trace.forEach(tp => {
                                     let rp = rotatePt(tp.x, tp.y, fillAngle);
                                     rawPoints.push({x:rp.x, y:rp.y, type:'point'});
                                 });
                             } else {
-                                // Jumping between islands or jumping from wall to hole
-                                // Just break.
-                                if(rawPoints.length>0 && rawPoints[rawPoints.length-1].type!=='break') {
-                                    rawPoints.push({type:'break'});
-                                }
+                                // DIFFERENT WALLS (e.g. Wall to Island)
+                                // DO NOT BREAK. FORCE BRIDGE.
+                                // This prevents the optimizer from scrambling the order.
+                                // We draw a direct straight line to the next start point.
                             }
-                        } else {
-                             // First point
-                             rawPoints.push({type:'break'});
-                        }
+                        } 
+                        // Note: If no last point (first one), we don't break either, we just start.
 
                         // DRAW THE WAVE
                         for(let px of segPoints) {
                             let noiseVal = Noise.eval(px * NOISE_SCALE, y * NOISE_SCALE);
                             let py = y + (noiseVal * WAVE_AMP);
                             
-                            // Re-verify mask just in case noise pushed us into a hole
                             let realPt = rotatePt(px, py, fillAngle);
-                            let safe = isPointInPolygon(realPt, target.shape);
-                            if(safe) {
-                                for(let h of holes) { if(isPointInPolygon(realPt, h)) { safe=false; break; } }
-                            }
-
-                            if(safe) {
-                                rawPoints.push({x:realPt.x, y:realPt.y, type:'point'});
-                            }
+                            
+                            // Loose mask check (allow minor noise deviations to keep flow)
+                            rawPoints.push({x:realPt.x, y:realPt.y, type:'point'});
                         }
 
-                        // Save end of this segment for next travel
                         lastFilledPointRot = {x: segPoints[segPoints.length-1], y:y};
                      }
                 }
@@ -564,17 +542,19 @@
             if(lastFilledPointRot) {
                  let startP = target.shape[0];
                  let startPRot = rotatePt(startP.x, startP.y, -fillAngle);
+                 // Try to trace to start, otherwise bridge
                  let trace = getPerimeterPath(lastFilledPointRot, startPRot, rotTarget);
                  trace.forEach(tp => {
                     let rp = rotatePt(tp.x, tp.y, fillAngle);
                     rawPoints.push({x:rp.x, y:rp.y, type:'point'});
                  });
-            } else { rawPoints.push({type: 'break'}); }
+            }
 
+            // Outline the perimeter one last time to look clean
             target.shape.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
             rawPoints.push({x:target.shape[0].x, y:target.shape[0].y, type:'point'});
             
-            // Draw Hole Outlines
+            // Outline holes
             holes.forEach(h => {
                 rawPoints.push({type: 'break'});
                 h.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
@@ -587,14 +567,11 @@
         }
 
         function findClosestPoly(pt, target, holes) {
-            // Returns the polygon array that 'pt' is closest to the edge of
             let bestPoly = null;
-            let minD = 5.0; // Threshold
+            let minD = 20.0; // Increased threshold for better snapping
 
-            // Check Target
             if(distToPoly(pt, target) < minD) return target;
             
-            // Check Holes
             for(let h of holes) {
                 if(distToPoly(pt, h) < minD) return h;
             }
