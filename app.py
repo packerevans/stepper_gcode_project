@@ -4,6 +4,8 @@ import os
 import re
 import asyncio
 import socket
+import cv2                # Machine Vision
+import numpy as np        # Math/Arrays
 from collections import deque
 # Assuming these modules exist in your project folder
 import wifi_tools 
@@ -122,18 +124,91 @@ class GCodeRunner(threading.Thread):
         if self.on_complete:
             self.on_complete()
 
+# === AI IMAGE PROCESSOR (The New Logic) ===
+class SandTableGenerator:
+    def __init__(self, table_radius_mm=202.6):
+        self.R = table_radius_mm
+
+    def process(self, file_stream, density=1.0):
+        # 1. Decode Image from Memory
+        file_bytes = np.asarray(bytearray(file_stream.read()), dtype=np.uint8)
+        img = cv2.imdecode(file_bytes, cv2.IMREAD_GRAYSCALE)
+        
+        if img is None:
+            raise ValueError("Could not decode image")
+
+        # 2. Resize & Edge Detect
+        h, w = img.shape
+        new_size = (int(w * density), int(h * density))
+        img = cv2.resize(img, new_size)
+        
+        # Blur slightly to remove noise before edge detection
+        img_blur = cv2.GaussianBlur(img, (5, 5), 0)
+        edges = cv2.Canny(img_blur, 50, 150)
+        
+        # Find Contours
+        contours, _ = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+
+        # 3. Map to Table Coordinates (mm)
+        scale = (self.R * 1.8) / max(new_size) 
+        cx, cy = new_size[0] / 2, new_size[1] / 2
+        mapped_paths = []
+        
+        for cnt in contours:
+            epsilon = 0.005 * cv2.arcLength(cnt, False)
+            approx = cv2.approxPolyDP(cnt, epsilon, False)
+            
+            if len(approx) > 2:
+                path = []
+                for point in approx:
+                    x = (point[0][0] - cx) * scale
+                    y = (cy - point[0][1]) * scale 
+                    path.append([x, y])
+                mapped_paths.append(np.array(path))
+
+        # 4. Greedy Optimization (Sandify Logic)
+        if not mapped_paths:
+            return []
+            
+        current_pos = np.array([self.R, 0.0]) 
+        ordered_points = [{'x': float(self.R), 'y': 0.0, 'type': 'point'}]
+        pool = mapped_paths.copy()
+
+        while pool:
+            best_idx = -1
+            best_dist = float('inf')
+            reverse_contour = False
+
+            for i, contour in enumerate(pool):
+                d_start = np.linalg.norm(contour[0] - current_pos)
+                d_end = np.linalg.norm(contour[-1] - current_pos)
+
+                if d_start < best_dist:
+                    best_dist = d_start
+                    best_idx = i
+                    reverse_contour = False
+                if d_end < best_dist:
+                    best_dist = d_end
+                    best_idx = i
+                    reverse_contour = True
+
+            chosen = pool.pop(best_idx)
+            if reverse_contour:
+                chosen = chosen[::-1]
+
+            for p in chosen:
+                ordered_points.append({'x': float(p[0]), 'y': float(p[1]), 'type': 'point'})
+            
+            current_pos = chosen[-1]
+
+        ordered_points.append({'x': float(self.R), 'y': 0.0, 'type': 'point'})
+        return ordered_points
+
 # === JOB MANAGER ===
 def on_job_finished():
-    """Called specifically when a job ends naturally. Triggers the wait."""
     process_queue(wait_enabled=True)
 
 def process_queue(wait_enabled=True):
-    """
-    Decides what runs next.
-    wait_enabled: If True, we do the 60s pause before starting the next job.
-                  (Used between loop items or queued items).
-                  If False, we start immediately (Used for initial manual starts).
-    """
     global current_job_name, is_looping
 
     if current_gcode_runner and current_gcode_runner.is_alive():
@@ -149,27 +224,22 @@ def process_queue(wait_enabled=True):
     elif is_looping and len(loop_playlist) > 0:
         next_file = loop_playlist.pop(0)
         loop_playlist.append(next_file) # Rotate to end
-        
         try:
             path = os.path.join(DESIGNS_FOLDER, next_file)
             with open(path, 'r') as f: gcode = f.read()
             next_job = {'gcode': gcode, 'filename': next_file}
         except Exception as e:
             log_message(f"Loop Load Error: {e}")
-            process_queue(wait_enabled=False) # Skip and try next immediately
+            process_queue(wait_enabled=False) 
             return
 
     if next_job:
-        # --- THE 60 SECOND WAIT FEATURE ---
-        # Only happens if wait_enabled is True (between jobs)
         if wait_enabled:
             log_message("Design complete. Pausing motors for 60s...")
             if arduino_connected:
                 with lock: arduino.write(b"PAUSE\n")
             
-            # Sleep in chunks to allow interruption if needed
             for _ in range(60): 
-                # If user cleared queue/loop while waiting, break
                 if not is_looping and len(job_queue) == 0:
                     break
                 time.sleep(1)
@@ -188,7 +258,6 @@ def start_job(job_data):
     with lock:
         arduino.write(b"RESUME\n") 
     
-    # Pass 'on_job_finished' which enforces the wait for the NEXT item
     runner = GCodeRunner(job_data['gcode'], job_data['filename'], on_complete=on_job_finished)
     runner.start()
 
@@ -229,6 +298,25 @@ def index():
         return redirect(url_for('wifi_setup_page'))
     return render_template("designs.html")
 
+# --- AI TRACER ROUTES (NEW) ---
+@app.route("/ai_tracer")
+def ai_tracer_page():
+    # Serves the new HTML file you created
+    return render_template("AI2.html") 
+
+@app.route('/process_image', methods=['POST'])
+def process_image_route():
+    file = request.files.get('image')
+    if not file:
+        return jsonify({'success': False, 'error': 'No file uploaded'}), 400
+    try:
+        gen = SandTableGenerator(table_radius_mm=202.6)
+        points = gen.process(file, density=0.5) 
+        return jsonify({'success': True, 'points': points})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+# --- STATUS & CONTROLS ---
 @app.route("/status_full", methods=["GET"])
 def status_full():
     next_text = "None"
@@ -255,7 +343,6 @@ def set_loop():
     is_looping = True
     log_message(f"Loop started with {len(files)} designs.")
     
-    # If idle, start the first loop item IMMEDIATELY (no wait)
     if current_gcode_runner is None or not current_gcode_runner.is_alive():
         process_queue(wait_enabled=False)
         
@@ -278,12 +365,9 @@ def send_gcode_block_route():
     if not gcode: return jsonify(success=False, error="No G-code"), 400
     if not arduino_connected: return jsonify(success=False, error="No Arduino"), 500
 
-    # IF IDLE: Start IMMEDIATELY (Bypass Queue, Bypass Wait)
     if current_gcode_runner is None or not current_gcode_runner.is_alive():
         start_job({'gcode': gcode, 'filename': filename})
         return jsonify(success=True, message=f"Started {filename}")
-    
-    # IF BUSY: Add to Queue (Wait will happen when current job ends)
     else:
         job_queue.append({'gcode': gcode, 'filename': filename})
         return jsonify(success=True, message=f"Added to Queue")
@@ -305,6 +389,7 @@ def delete_design():
             return jsonify(success=True)
         else: return jsonify(success=False, error="File not found")
     except Exception as e: return jsonify(success=False, error=str(e))
+
 @app.route("/save_design", methods=["POST"])
 def save_design():
     data = request.json
@@ -314,7 +399,6 @@ def save_design():
     if not filename or not gcode:
         return jsonify(success=False, error="Missing filename or gcode")
 
-    # Security: Ensure clean filename
     filename = os.path.basename(filename)
     if not filename.lower().endswith(".txt"):
         filename += ".txt"
@@ -361,7 +445,7 @@ def send_command():
         return jsonify(success=True)
     return jsonify(success=False, error="Not connected")
 
-# === ORIGINAL ROUTES ===
+# === WIFI & SYSTEM ROUTES ===
 @app.route("/wifi_setup")
 def wifi_setup_page():
     return render_template("wifi_setup.html", networks=wifi_tools.get_wifi_networks(), saved_networks=wifi_tools.get_saved_networks(), ip_address=get_current_ip(), hostname=socket.gethostname())
@@ -409,6 +493,7 @@ def update_firmware():
     except: pass
     return jsonify(success=True)
 
+# === FRONTEND PAGES ===
 @app.route("/controls")
 def controls(): return render_template("index.html")
 @app.route("/terminal")
