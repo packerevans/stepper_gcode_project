@@ -634,33 +634,50 @@
         ctx.restore();
     }
 
-    // --- AI TRACER ---
-    function handleImageUpload(input) {
-        const file = input.files[0];
-        if(!file) return;
-        showToast("Scanning...", "info");
-        saveState();
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const img = new Image();
-            img.onload = function() {
-                const tCan = document.createElement('canvas');
-                const MAX = 1000;
-                let tw = img.width, th = img.height;
-                if(tw>th && tw>MAX){ th*=MAX/tw; tw=MAX; } else if(th>MAX){ tw*=MAX/th; th=MAX; }
-                tCan.width = tw; tCan.height = th;
-                const tCtx = tCan.getContext('2d');
-                tCtx.fillStyle = "white"; tCtx.fillRect(0,0,tw,th);
-                tCtx.filter = "grayscale(100%) contrast(150%)";
-                tCtx.drawImage(img, 0, 0, tw, th);
-                ImageTracer.imageToSVG(tCan.toDataURL(), function(svgStr){
-                    processTrace(svgStr, tw, th);
-                }, { ltres:0.5, qtres:0.5, pathomit:2, colorsampling:2, numberofcolors:2 });
-            };
-            img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
-    }
+// --- REPLACEMENT FUNCTION: Trace.py Connection ---
+        async function handleImageUpload(input) {
+            const file = input.files[0];
+            if(!file) return;
+
+            // User Feedback
+            showToast("Sending to trace.py engine...", "info");
+            saveState(); 
+
+            const formData = new FormData();
+            formData.append('image', file);
+
+            try {
+                // Post to the Python Flask server
+                const response = await fetch('/process_image', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Load the optimized path from Python
+                    rawPoints = data.points;
+                    
+                    // Add breaks to ensure the rendering engine treats it as a new path
+                    rawPoints.unshift({type: 'break'});
+                    rawPoints.push({type: 'break'});
+
+                    resetStatus();
+                    showToast("Trace Complete!", "success");
+                    render(); // Refresh the canvas
+                } else {
+                    showToast("Error: " + data.error, "error");
+                }
+
+            } catch (error) {
+                console.error(error);
+                showToast("Connection Failed. Is trace.py running?", "error");
+            }
+            
+            // Reset input so you can upload the same file again if needed
+            input.value = ''; 
+        }
 
     function processTrace(svgStr, imgW, imgH) {
         const parser = new DOMParser();
