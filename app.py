@@ -5,7 +5,6 @@ import re
 import asyncio
 import socket
 from collections import deque
-# Assuming these modules exist in your project folder
 import wifi_tools 
 import ble_controller 
 
@@ -26,14 +25,14 @@ def apply_ngrok_header(response: Response):
     return response
 
 # === STATE MANAGEMENT ===
-job_queue = deque()      # High Priority (Manual adds)
-loop_playlist = []       # Low Priority (Looping files)
-is_looping = False       # Flag
-is_paused = False        # Track Pause State
-is_waiting = False       # Track Cooldown State
+job_queue = deque()      
+loop_playlist = []       
+is_looping = False       
+is_paused = False        
+is_waiting = False       
 
-current_job_name = None  # What is currently running
-next_job_name = None     # What is coming up next
+current_job_name = None  
+next_job_name = None     
 
 serial_log = []
 lock = threading.Lock()
@@ -73,16 +72,20 @@ class GCodeRunner(threading.Thread):
         self.is_running = True
         self.on_complete = on_complete
         
-        self.ARDUINO_BUFFER_SIZE = 40  
+        # --- SAFETY FIX: LOWER BUFFER SIZE ---
+        # Arduino Limit is 50. We use 25 to be ultra-safe against Overflows.
+        self.ARDUINO_BUFFER_SIZE = 25  
         self.credits = self.ARDUINO_BUFFER_SIZE 
         self.lines_sent = 0
         self.slot_available_event = threading.Event()
 
     def process_incoming_serial(self, line):
         line = line.strip().upper()
+        # Only increment if we see "DONE"
         if line == "DONE":
             with lock:
-                self.credits += 1
+                if self.credits < self.ARDUINO_BUFFER_SIZE:
+                    self.credits += 1
                 self.slot_available_event.set() 
 
     def send_line(self, line):
@@ -101,13 +104,13 @@ class GCodeRunner(threading.Thread):
         global current_gcode_runner, current_job_name, is_paused
         current_gcode_runner = self
         current_job_name = self.filename
-        # Reset pause state on new job start
         is_paused = False 
         
         log_message(f"Job Started: {self.filename}")
 
         # 1. SEND COMMANDS
         while self.is_running and self.lines_sent < self.total_lines:
+            # Wait if out of credits
             if self.credits <= 0:
                 self.slot_available_event.clear()
                 got_slot = self.slot_available_event.wait(timeout=10.0) 
@@ -115,18 +118,18 @@ class GCodeRunner(threading.Thread):
                     log_message("TIMEOUT: Arduino stopped responding.")
                     break
             
+            # Send next line
             if self.is_running:
                 next_line = self.lines[self.lines_sent]
                 if not self.send_line(next_line): break
                 time.sleep(0.002) 
 
-        # 2. WAIT FOR COMPLETION (Race Condition Fix)
-        # We must wait for the Arduino to actually finish moving.
-        # We know it's done when credits return to full (40).
+        # 2. SAFETY WAIT (Prevents "Skipping")
+        # We wait for the buffer to empty (Credits return to Max)
+        # This ensures the machine physically finishes before we say "Done"
         if self.is_running:
             while self.credits < self.ARDUINO_BUFFER_SIZE:
-                time.sleep(0.1)
-                # Allow user to kill it even while waiting
+                time.sleep(0.2)
                 if not self.is_running: break
 
         # 3. FINISH
@@ -139,14 +142,9 @@ class GCodeRunner(threading.Thread):
 
 # === JOB MANAGER ===
 def on_job_finished():
-    """Called specifically when a job ends naturally. Triggers the wait."""
     process_queue(wait_enabled=True)
 
 def process_queue(wait_enabled=True):
-    """
-    Decides what runs next.
-    wait_enabled: If True, we do the 30s pause before starting the next job.
-    """
     global current_job_name, is_looping, is_waiting, is_paused
 
     if current_gcode_runner and current_gcode_runner.is_alive():
@@ -154,62 +152,47 @@ def process_queue(wait_enabled=True):
 
     next_job = None
     
-    # 1. Check High Priority Queue
     if len(job_queue) > 0:
         next_job = job_queue.popleft()
-    
-    # 2. Check Loop (if Queue empty)
     elif is_looping and len(loop_playlist) > 0:
         next_file = loop_playlist.pop(0)
-        loop_playlist.append(next_file) # Rotate to end
-        
+        loop_playlist.append(next_file) 
         try:
             path = os.path.join(DESIGNS_FOLDER, next_file)
             with open(path, 'r') as f: gcode = f.read()
             next_job = {'gcode': gcode, 'filename': next_file}
         except Exception as e:
             log_message(f"Loop Load Error: {e}")
-            process_queue(wait_enabled=False) # Skip and try next immediately
+            process_queue(wait_enabled=False)
             return
 
     if next_job:
-        # --- THE 30 SECOND WAIT FEATURE ---
-        # Only happens if wait_enabled is True (between jobs)
         if wait_enabled:
             is_waiting = True
             log_message("Design complete. Pausing motors for 30s...")
-            # EXPLICITLY PAUSE ARDUINO MOTORS
             if arduino_connected:
                 with lock: arduino.write(b"PAUSE\n")
             
-            # Sleep in chunks to allow interruption if needed
             for _ in range(30): 
-                # If user cleared queue/loop while waiting, break
                 if not is_looping and len(job_queue) == 0:
                     break
                 time.sleep(1)
             
             is_waiting = False
-            # RESUME happens inside start_job
             
         start_job(next_job)
     else:
-        # --- QUEUE EMPTY: FORCE PAUSE ---
         log_message("Queue empty. Pausing motors.")
         current_job_name = None
         if arduino_connected:
             with lock: arduino.write(b"PAUSE\n")
-        # We do NOT set is_paused=True here because that flag implies 
-        # "Paused mid-print". This is "Idle/Finished".
 
 def start_job(job_data):
     if not arduino_connected: return
     
-    # Ensure motors are ON before starting
     with lock:
         arduino.write(b"RESUME\n") 
     
-    # Pass 'on_job_finished' which enforces the wait for the NEXT item
     runner = GCodeRunner(job_data['gcode'], job_data['filename'], on_complete=on_job_finished)
     runner.start()
 
@@ -221,7 +204,9 @@ def read_from_serial():
             if arduino.in_waiting > 0:
                 line = arduino.readline().decode(errors="ignore").strip()
                 if line:
-                    log_message(f"Ard: {line}") 
+                    # Filter out purely debug messages if needed, but log useful ones
+                    if "ERROR" in line: log_message(f"Ard: {line}")
+                    
                     if current_gcode_runner:
                         current_gcode_runner.process_incoming_serial(line)
             else:
@@ -263,8 +248,8 @@ def status_full():
         "queue_count": len(job_queue),
         "next_up": next_text,
         "is_looping": is_looping,
-        "is_paused": is_paused,   # Send Pause State
-        "is_waiting": is_waiting  # Send Wait State
+        "is_paused": is_paused,   
+        "is_waiting": is_waiting  
     })
 
 @app.route("/set_loop", methods=["POST"])
@@ -278,7 +263,6 @@ def set_loop():
     is_looping = True
     log_message(f"Loop started with {len(files)} designs.")
     
-    # If idle, start the first loop item IMMEDIATELY (no wait)
     if current_gcode_runner is None or not current_gcode_runner.is_alive():
         process_queue(wait_enabled=False)
         
@@ -289,7 +273,6 @@ def cancel_loop():
     global is_looping, loop_playlist, is_waiting
     is_looping = False
     loop_playlist = []
-    # If we are waiting, the wait loop checks 'is_looping', so it will exit naturally.
     log_message("Loop cancelled.")
     return jsonify(success=True)
 
@@ -302,12 +285,9 @@ def send_gcode_block_route():
     if not gcode: return jsonify(success=False, error="No G-code"), 400
     if not arduino_connected: return jsonify(success=False, error="No Arduino"), 500
 
-    # IF IDLE: Start IMMEDIATELY (Bypass Queue, Bypass Wait)
     if current_gcode_runner is None or not current_gcode_runner.is_alive():
         start_job({'gcode': gcode, 'filename': filename})
         return jsonify(success=True, message=f"Started {filename}")
-    
-    # IF BUSY: Add to Queue (Wait will happen when current job ends)
     else:
         job_queue.append({'gcode': gcode, 'filename': filename})
         return jsonify(success=True, message=f"Added to Queue")
@@ -339,7 +319,6 @@ def save_design():
     if not filename or not gcode:
         return jsonify(success=False, error="Missing filename or gcode")
 
-    # Security: Ensure clean filename
     filename = os.path.basename(filename)
     if not filename.lower().endswith(".txt"):
         filename += ".txt"
@@ -372,7 +351,6 @@ def send_command():
             with lock: arduino.write(b"CLEAR\n")
         return jsonify(success=True)
 
-    # Track Pause State
     if cmd == "PAUSE":
         is_paused = True
     elif cmd == "RESUME":
@@ -392,7 +370,6 @@ def send_command():
         return jsonify(success=True)
     return jsonify(success=False, error="Not connected")
 
-# === ORIGINAL ROUTES ===
 @app.route("/wifi_setup")
 def wifi_setup_page():
     return render_template("wifi_setup.html", networks=wifi_tools.get_wifi_networks(), saved_networks=wifi_tools.get_saved_networks(), ip_address=get_current_ip(), hostname=socket.gethostname())
