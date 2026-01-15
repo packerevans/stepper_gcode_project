@@ -151,6 +151,41 @@
             box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
         }
 
+        /* --- LOADING SCREEN STYLES --- */
+        #loadingOverlay {
+            display: none; /* Hidden by default */
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.6); /* Gray out browser */
+            z-index: 9999; /* Sit on top of everything */
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            backdrop-filter: blur(2px);
+        }
+        
+        .loader-spinner {
+            border: 6px solid #f3f3f3;
+            border-top: 6px solid var(--color-primary);
+            border-radius: 50%;
+            width: 50px; height: 50px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+        
+        .loader-text {
+            color: #ffffff;
+            font-size: 1.5em;
+            font-weight: 500;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
         @media (max-width: 600px) {
             .status-row { flex-direction: column; gap: 15px; }
             button { width: 100%; }
@@ -158,6 +193,12 @@
     </style>
 </head>
 <body data-theme="light">
+    
+    <div id="loadingOverlay">
+        <div class="loader-spinner"></div>
+        <div class="loader-text">Connecting...</div>
+    </div>
+
     <div id="mySidebar" class="sidebar">
         <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
         <a href="/">Designs</a> 
@@ -217,12 +258,10 @@
         const DEFAULT_FAVS = ["#ffffff", "#f0f0f0", "#e0e0e0"]; 
         
         // --- COLOR CALIBRATION ---
-        // Adjust these values if your white is still too blue or too green.
-        // Lower numbers mean LESS of that color.
         const CALIBRATION = {
-            r: 1.0,  // Red (100%)
-            g: 0.9,  // Green (90% - reduced slightly)
-            b: 0.75  // Blue (75% - reduced heavily to fix blue tint)
+            r: 1.0, 
+            g: 0.9, 
+            b: 0.75 
         };
 
         function hexToRgb(hex) {
@@ -238,6 +277,10 @@
         }
 
         async function sendCurrentState() {
+            // Show Loading Screen
+            const overlay = document.getElementById('loadingOverlay');
+            overlay.style.display = 'flex';
+
             const hex = document.getElementById('colorPicker').value;
             const rawRgb = hexToRgb(hex);
             
@@ -246,8 +289,13 @@
             const g = Math.floor(rawRgb.g * CALIBRATION.g);
             const b = Math.floor(rawRgb.b * CALIBRATION.b);
 
-            // Send corrected values to the strip
-            await sendCommand(`LED:${r},${g},${b},16`, false); 
+            try {
+                // Send corrected values to the strip
+                await sendCommand(`LED:${r},${g},${b},16`, false); 
+            } finally {
+                // Hide Loading Screen regardless of success or failure
+                overlay.style.display = 'none';
+            }
         }
 
         async function applyFavorite(hex) {
