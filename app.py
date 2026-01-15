@@ -13,9 +13,7 @@ app = Flask(__name__)
 app.secret_key = 'your_super_secret_key' 
 
 # === CONFIGURATION ===
-REST_INTERVAL_SECONDS = 30  # Updated from 60 to 30 seconds
 DESIGNS_FOLDER = os.path.join(app.root_path, 'templates', 'designs')
-
 if not os.path.exists(DESIGNS_FOLDER):
     try:
         os.makedirs(DESIGNS_FOLDER)
@@ -31,6 +29,8 @@ def apply_ngrok_header(response: Response):
 job_queue = deque()      # High Priority (Manual adds)
 loop_playlist = []       # Low Priority (Looping files)
 is_looping = False       # Flag
+is_paused = False        # Track Pause State
+is_waiting = False       # Track Cooldown State
 
 current_job_name = None  # What is currently running
 next_job_name = None     # What is coming up next
@@ -98,9 +98,11 @@ class GCodeRunner(threading.Thread):
             return False
 
     def run(self):
-        global current_gcode_runner, current_job_name
+        global current_gcode_runner, current_job_name, is_paused
         current_gcode_runner = self
         current_job_name = self.filename
+        # Reset pause state on new job start
+        is_paused = False 
         
         log_message(f"Job Started: {self.filename}")
 
@@ -133,10 +135,8 @@ def process_queue(wait_enabled=True):
     """
     Decides what runs next.
     wait_enabled: If True, we do the 30s pause before starting the next job.
-                  (Used between loop items or queued items).
-                  If False, we start immediately (Used for initial manual starts).
     """
-    global current_job_name, is_looping
+    global current_job_name, is_looping, is_waiting, is_paused
 
     if current_gcode_runner and current_gcode_runner.is_alive():
         return
@@ -162,38 +162,39 @@ def process_queue(wait_enabled=True):
             return
 
     if next_job:
-        # --- THE WAIT FEATURE ---
+        # --- THE 30 SECOND WAIT FEATURE ---
         # Only happens if wait_enabled is True (between jobs)
         if wait_enabled:
-            log_message(f"Design complete. Pausing motors for {REST_INTERVAL_SECONDS}s...")
-            
-            # Send PAUSE to deactivate motors while waiting
+            is_waiting = True
+            log_message("Design complete. Pausing motors for 30s...")
+            # EXPLICITLY PAUSE ARDUINO MOTORS
             if arduino_connected:
                 with lock: arduino.write(b"PAUSE\n")
             
             # Sleep in chunks to allow interruption if needed
-            for _ in range(REST_INTERVAL_SECONDS): 
+            for _ in range(30): 
                 # If user cleared queue/loop while waiting, break
                 if not is_looping and len(job_queue) == 0:
                     break
                 time.sleep(1)
             
-            # Note: We do NOT send RESUME here anymore. 
-            # It is sent inside start_job() below to ensure motors 
-            # engage exactly when the new design starts.
+            is_waiting = False
+            # RESUME happens inside start_job
             
         start_job(next_job)
     else:
-        log_message("Queue empty. Standing by.")
+        # --- QUEUE EMPTY: FORCE PAUSE ---
+        log_message("Queue empty. Pausing motors.")
         current_job_name = None
-        # Ensure motors are off if the queue is empty
         if arduino_connected:
-             with lock: arduino.write(b"PAUSE\n")
+            with lock: arduino.write(b"PAUSE\n")
+        # We don't set is_paused=True here because that flag implies 
+        # "Paused mid-print". This is "Idle/Finished".
 
 def start_job(job_data):
     if not arduino_connected: return
     
-    # Send RESUME to reactivate motors immediately before drawing
+    # Ensure motors are ON before starting
     with lock:
         arduino.write(b"RESUME\n") 
     
@@ -250,7 +251,9 @@ def status_full():
         "playing": current_job_name.replace('.txt', '') if current_job_name else None,
         "queue_count": len(job_queue),
         "next_up": next_text,
-        "is_looping": is_looping
+        "is_looping": is_looping,
+        "is_paused": is_paused,   # Send Pause State
+        "is_waiting": is_waiting  # Send Wait State
     })
 
 @app.route("/set_loop", methods=["POST"])
@@ -272,9 +275,10 @@ def set_loop():
 
 @app.route("/cancel_loop", methods=["POST"])
 def cancel_loop():
-    global is_looping, loop_playlist
+    global is_looping, loop_playlist, is_waiting
     is_looping = False
     loop_playlist = []
+    # If we are waiting, the wait loop checks 'is_looping', so it will exit naturally.
     log_message("Loop cancelled.")
     return jsonify(success=True)
 
@@ -342,11 +346,11 @@ def save_design():
 
 @app.route("/send", methods=["POST"])
 def send_command():
+    global is_paused, current_gcode_runner, is_looping, loop_playlist, is_waiting
     data = request.json
     cmd = data.get("command")
     
     if cmd == "CLEAR":
-        global current_gcode_runner, is_looping, loop_playlist
         if current_gcode_runner and current_gcode_runner.is_alive():
             current_gcode_runner.is_running = False 
             current_gcode_runner.slot_available_event.set()
@@ -356,6 +360,12 @@ def send_command():
         if arduino_connected:
             with lock: arduino.write(b"CLEAR\n")
         return jsonify(success=True)
+
+    # Track Pause State
+    if cmd == "PAUSE":
+        is_paused = True
+    elif cmd == "RESUME":
+        is_paused = False
 
     if cmd.startswith("LED:") or cmd in ["CONNECT", "DISCONNECT", "POWER:ON", "POWER:OFF"]:
         if cmd.startswith("LED:"):
