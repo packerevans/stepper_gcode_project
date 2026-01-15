@@ -106,6 +106,7 @@ class GCodeRunner(threading.Thread):
         
         log_message(f"Job Started: {self.filename}")
 
+        # 1. SEND COMMANDS
         while self.is_running and self.lines_sent < self.total_lines:
             if self.credits <= 0:
                 self.slot_available_event.clear()
@@ -119,6 +120,16 @@ class GCodeRunner(threading.Thread):
                 if not self.send_line(next_line): break
                 time.sleep(0.002) 
 
+        # 2. WAIT FOR COMPLETION (Race Condition Fix)
+        # We must wait for the Arduino to actually finish moving.
+        # We know it's done when credits return to full (40).
+        if self.is_running:
+            while self.credits < self.ARDUINO_BUFFER_SIZE:
+                time.sleep(0.1)
+                # Allow user to kill it even while waiting
+                if not self.is_running: break
+
+        # 3. FINISH
         current_job_name = None
         current_gcode_runner = None
         log_message("Design Completed.")
@@ -188,7 +199,7 @@ def process_queue(wait_enabled=True):
         current_job_name = None
         if arduino_connected:
             with lock: arduino.write(b"PAUSE\n")
-        # We don't set is_paused=True here because that flag implies 
+        # We do NOT set is_paused=True here because that flag implies 
         # "Paused mid-print". This is "Idle/Finished".
 
 def start_job(job_data):
