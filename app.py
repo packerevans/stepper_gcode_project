@@ -13,7 +13,9 @@ app = Flask(__name__)
 app.secret_key = 'your_super_secret_key' 
 
 # === CONFIGURATION ===
+REST_INTERVAL_SECONDS = 30  # Updated from 60 to 30 seconds
 DESIGNS_FOLDER = os.path.join(app.root_path, 'templates', 'designs')
+
 if not os.path.exists(DESIGNS_FOLDER):
     try:
         os.makedirs(DESIGNS_FOLDER)
@@ -130,7 +132,7 @@ def on_job_finished():
 def process_queue(wait_enabled=True):
     """
     Decides what runs next.
-    wait_enabled: If True, we do the 60s pause before starting the next job.
+    wait_enabled: If True, we do the 30s pause before starting the next job.
                   (Used between loop items or queued items).
                   If False, we start immediately (Used for initial manual starts).
     """
@@ -160,31 +162,38 @@ def process_queue(wait_enabled=True):
             return
 
     if next_job:
-        # --- THE 60 SECOND WAIT FEATURE ---
+        # --- THE WAIT FEATURE ---
         # Only happens if wait_enabled is True (between jobs)
         if wait_enabled:
-            log_message("Design complete. Pausing motors for 60s...")
+            log_message(f"Design complete. Pausing motors for {REST_INTERVAL_SECONDS}s...")
+            
+            # Send PAUSE to deactivate motors while waiting
             if arduino_connected:
                 with lock: arduino.write(b"PAUSE\n")
             
             # Sleep in chunks to allow interruption if needed
-            for _ in range(60): 
+            for _ in range(REST_INTERVAL_SECONDS): 
                 # If user cleared queue/loop while waiting, break
                 if not is_looping and len(job_queue) == 0:
                     break
                 time.sleep(1)
             
-            if arduino_connected:
-                with lock: arduino.write(b"RESUME\n")
+            # Note: We do NOT send RESUME here anymore. 
+            # It is sent inside start_job() below to ensure motors 
+            # engage exactly when the new design starts.
             
         start_job(next_job)
     else:
         log_message("Queue empty. Standing by.")
         current_job_name = None
+        # Ensure motors are off if the queue is empty
+        if arduino_connected:
+             with lock: arduino.write(b"PAUSE\n")
 
 def start_job(job_data):
     if not arduino_connected: return
     
+    # Send RESUME to reactivate motors immediately before drawing
     with lock:
         arduino.write(b"RESUME\n") 
     
@@ -305,6 +314,7 @@ def delete_design():
             return jsonify(success=True)
         else: return jsonify(success=False, error="File not found")
     except Exception as e: return jsonify(success=False, error=str(e))
+
 @app.route("/save_design", methods=["POST"])
 def save_design():
     data = request.json
