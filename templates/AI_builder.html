@@ -116,6 +116,19 @@
         input:checked + .slider-tog { background-color: var(--secondary); }
         input:checked + .slider-tog:before { transform: translateX(18px); }
 
+        /* Dynamic Tool Settings Container */
+        #toolSettingsArea {
+            background: rgba(0,0,0,0.03);
+            border: 1px dashed var(--secondary);
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 12px;
+            display: none; /* Hidden by default */
+        }
+        .tool-setting-group { display: none; } /* Specific groups hidden by default */
+        .tool-setting-group.active { display: block; }
+        .tool-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--secondary); margin-bottom: 5px; display:block;}
+
     </style>
 </head>
 <body data-theme="light">
@@ -154,12 +167,47 @@
                 </label>
             </div>
 
+            <div id="toolSettingsArea">
+                <div id="set-pen" class="tool-setting-group">
+                    <div class="toggle-row" style="margin:0;">
+                        <span style="font-size:13px;">〰️ Smooth Strokes</span>
+                        <label class="switch">
+                            <input type="checkbox" id="smoothDrawMode">
+                            <span class="slider-tog"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="set-erase" class="tool-setting-group">
+                    <span class="tool-label">Eraser Size: <span id="eraseSizeVal">10px</span></span>
+                    <input type="range" min="2" max="50" value="10" oninput="updateToolSettings()" id="eraserSizeSlider">
+                </div>
+
+                <div id="set-fill" class="tool-setting-group">
+                    <span class="tool-label">Line Spacing: <span id="fillGapVal">5.0</span></span>
+                    <input type="range" min="1.0" max="15.0" step="0.5" value="5.0" oninput="updateToolSettings()" id="fillGapSlider">
+                </div>
+
+                 <div id="set-select" class="tool-setting-group">
+                    <span class="tool-label">Resize All</span>
+                    <div style="display:flex; gap:5px; margin-bottom:8px;">
+                        <button class="secondary" style="padding:4px;" onclick="applyTransform('scale', 0.95)">➖</button>
+                        <button class="secondary" style="padding:4px;" onclick="applyTransform('scale', 1.05)">➕</button>
+                    </div>
+                    <span class="tool-label">Rotate All</span>
+                    <input type="range" min="-180" max="180" value="0" step="5" onchange="applyTransform('rotate', this.value)" oninput="this.nextElementSibling.innerText=this.value+'°'" id="rotSlider">
+                    <span style="font-size:10px; float:right;">0°</span>
+                    <div style="clear:both; padding-top:5px; font-size:11px; color:#666;"><i>Drag canvas to Move</i></div>
+                </div>
+            </div>
+
             <div class="btn-group">
                 <button id="btnDraw" onclick="setTool('draw')" class="active">✏️ Draw</button>
                 <button id="btnErase" onclick="setTool('erase')" class="secondary">🧼 Erase</button>
             </div>
 
             <div class="btn-group">
+                <button id="btnSelect" onclick="setTool('select')" class="secondary">✋ Move/Edit</button>
                 <button id="btnFill" onclick="setTool('fill')" class="secondary">🌊 Dune Fill</button>
             </div>
 
@@ -230,12 +278,16 @@
         let scale = 1;
         let generatedGCode = null;
 
+        // Tool Settings State
+        let eraserRadius = 10;
+        let fillGap = 5.0;
+
         const canvas = document.getElementById('drawCanvas');
         const ctx = canvas.getContext('2d');
         const BASE_URL = window.location.origin;
 
         // =====================================================
-        // === 1. CORE MATH & GEOMETRY HELPERS (MOVED TO TOP) ===
+        // === 1. CORE MATH & GEOMETRY HELPERS ===
         // =====================================================
 
         function distSq(p1, p2) { return (p1.x-p2.x)**2 + (p1.y-p2.y)**2; }
@@ -259,7 +311,7 @@
                 if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
                 if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
             });
-            return { minX, maxX, minY, maxY, area: (maxX-minX)*(maxY-minY) };
+            return { minX, maxX, minY, maxY, area: (maxX-minX)*(maxY-minY), w: maxX-minX, h: maxY-minY, cx: (minX+maxX)/2, cy: (minY+maxY)/2 };
         }
 
         // Strict segment intersection check
@@ -268,7 +320,6 @@
             if (det === 0) return null; 
             const lambda = ((D.y - C.y) * (D.x - A.x) + (C.x - D.x) * (D.y - A.y)) / det;
             const gamma = ((A.y - B.y) * (D.x - A.x) + (B.x - A.x) * (D.y - A.y)) / det;
-            // Strict inequality (0 < x < 1) avoids matching shared vertices
             if (lambda > 0.001 && lambda < 0.999 && gamma > 0.001 && gamma < 0.999) {
                 return { x: A.x + lambda * (B.x - A.x), y: A.y + lambda * (B.y - A.y) };
             }
@@ -303,7 +354,6 @@
             return null;
         }
 
-        // Get perimeter path between two indices on a poly
         function getPerimeterPath(idx1, idx2, poly) {
             if(idx1 === -1 || idx2 === -1) return [];
             if(idx1 === idx2) return [poly[idx1]];
@@ -354,7 +404,7 @@
             return path;
         }
 
-        // --- TRACE CHECKER (Recursive Route Finder) ---
+        // --- TRACE CHECKER ---
         function routeConnect(start, end, shapes, depth=0) {
             if (depth > 5) return [end]; 
 
@@ -407,7 +457,6 @@
         // === APP LOGIC ===
         // ==============================================
 
-        // Simple Noise Generator
         const Noise = {
             p: [151,160,137,91,90,15,131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,142,8,99,37,240,21,10,23,
                 190,6,148,247,120,234,75,0,26,197,62,94,252,219,203,117,35,11,32,57,177,33,88,237,149,56,87,174,20,
@@ -452,7 +501,10 @@
             canvas.style.touchAction = "none";
             
             updateUI();
+            updateToolSettings();
         }
+
+        let dragStart = null;
 
         // --- DRAWING LOGIC ---
         function startDraw(e) {
@@ -464,10 +516,18 @@
             }
 
             const smart = document.getElementById('smartPenMode').checked;
-            if(smart) {
+            if(smart && currentTool !== 'select') {
                 if(e.pointerType === 'pen') setTool('draw');
                 else if(e.pointerType === 'touch') setTool('erase');
             }
+
+            if(currentTool === 'select') {
+                isDrawing = true;
+                dragStart = getPos(e);
+                canvas.setPointerCapture(e.pointerId);
+                return;
+            }
+
             saveState();
             isDrawing = true;
             canvas.setPointerCapture(e.pointerId);
@@ -479,16 +539,91 @@
             e.preventDefault();
             const pos = getPos(e);
             document.getElementById('coordDisplay').textContent = `X:${pos.x.toFixed(0)} Y:${pos.y.toFixed(0)}`;
+            
             if(!isDrawing) { render(); drawCursor(pos); return; }
+
+            if(currentTool === 'select' && dragStart) {
+                const dx = pos.x - dragStart.x;
+                const dy = pos.y - dragStart.y;
+                // Move all points
+                rawPoints.forEach(p => {
+                    if(p.type === 'point') {
+                        p.x += dx;
+                        p.y += dy;
+                    }
+                });
+                dragStart = pos; // Reset drag start to current to avoid compounding
+                render();
+                return;
+            }
+
             processPointer(e);
         }
 
         function endDraw(e) {
             if(!isDrawing) return;
             isDrawing = false;
-            if(currentTool === 'draw') rawPoints.push({type:'break'});
             canvas.releasePointerCapture(e.pointerId);
+            
+            if(currentTool === 'select') {
+                dragStart = null;
+                saveState(); // Save state after move
+                return;
+            }
+
+            if(currentTool === 'draw') {
+                // Apply smoothing if enabled
+                if(document.getElementById('smoothDrawMode').checked) {
+                    smoothLastStroke();
+                }
+                rawPoints.push({type:'break'});
+            }
             render();
+        }
+
+        function smoothLastStroke() {
+            // Find the last stroke
+            let lastBreak = -1;
+            for(let i=rawPoints.length-1; i>=0; i--) {
+                if(rawPoints[i].type === 'break' || rawPoints[i].type === 'cmd') {
+                    lastBreak = i;
+                    break;
+                }
+            }
+            
+            // Extract points
+            let stroke = [];
+            let startIndex = lastBreak + 1;
+            for(let i=startIndex; i<rawPoints.length; i++) stroke.push(rawPoints[i]);
+
+            if(stroke.length < 3) return;
+
+            // Chaikin's Algorithm (Corner Cutting) - 2 Passes
+            for(let pass=0; pass<2; pass++) {
+                let smooth = [];
+                smooth.push(stroke[0]);
+                for(let i=0; i<stroke.length-1; i++) {
+                    let p0 = stroke[i];
+                    let p1 = stroke[i+1];
+                    
+                    // 25% and 75% points
+                    smooth.push({
+                        x: 0.75 * p0.x + 0.25 * p1.x,
+                        y: 0.75 * p0.y + 0.25 * p1.y,
+                        type: 'point'
+                    });
+                    smooth.push({
+                        x: 0.25 * p0.x + 0.75 * p1.x,
+                        y: 0.25 * p0.y + 0.75 * p1.y,
+                        type: 'point'
+                    });
+                }
+                smooth.push(stroke[stroke.length-1]);
+                stroke = smooth;
+            }
+
+            // Replace in rawPoints
+            rawPoints.splice(startIndex, rawPoints.length - startIndex, ...stroke);
         }
 
         function getPos(e) {
@@ -502,8 +637,8 @@
             const p = getPos(e);
             if(currentTool === 'draw') {
                 rawPoints.push({x: p.x, y: p.y, type: 'point'});
-            } else {
-                const r = 10;
+            } else if (currentTool === 'erase') {
+                const r = eraserRadius; // Use dynamic radius
                 rawPoints = rawPoints.filter(pt => {
                     if(pt.type === 'break') return true;
                     return Math.hypot(pt.x - p.x, pt.y - p.y) > r;
@@ -514,7 +649,7 @@
         }
 
         function drawCursor(p) {
-            const r = 10 * scale;
+            const r = (currentTool === 'erase' ? eraserRadius : 10) * scale;
             const px = origin.x + p.x * scale;
             const py = origin.y - p.y * scale;
             
@@ -528,15 +663,92 @@
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
                 ctx.fillText("🌊", px, py);
+            } else if (currentTool === 'select') {
+                ctx.font = "20px Arial";
+                ctx.fillStyle = "black";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText("✋", px, py);
             }
         }
 
-        // --- MASTER DUNE FILL (ROTATION + MULTI-POLYGON TRACE) ---
+        // --- TRANSFORM HELPERS ---
+        function applyTransform(type, val) {
+            if(rawPoints.length === 0) return;
+            saveState();
+
+            // Calculate Center
+            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+            let hasPoints = false;
+            rawPoints.forEach(p => {
+                if(p.type === 'point') {
+                    if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
+                    if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
+                    hasPoints = true;
+                }
+            });
+            
+            if(!hasPoints) return;
+            const cx = (minX + maxX)/2;
+            const cy = (minY + maxY)/2;
+
+            if(type === 'rotate') {
+                // Rotation is absolute from the slider (val is degrees)
+                // Actually, making it incremental is better for UI flow, 
+                // but standard slider returns absolute. 
+                // Let's assume the user dragged the slider.
+                // NOTE: Since the slider resets to 0, let's treat it as a delta?
+                // No, standard absolute rotation is tricky without storing initial state.
+                // Let's do simple delta rotation based on difference from prev value?
+                // Simpler: Just rotate by the val (assuming val is small delta) OR
+                // Re-implementation: Slider sets specific angle? No.
+                // Let's just do: Slider value is treated as "Rotate X degrees" then snaps back?
+                // Alternative: The slider in UI triggers `onchange`.
+                
+                // Let's implement the slider as an absolute Rotator? No, that requires storing initial rotation.
+                // Let's implement as "Relative Rotate".
+                // Since `onchange` fires on release, or `oninput`.
+                // We will use the value as a strict rotation relative to center.
+                // But since we don't track object orientation, let's use the slider 
+                // as a "Rotate this much" tool.
+                
+                const rad = (parseFloat(val) * Math.PI) / 180;
+                const cos = Math.cos(rad);
+                const sin = Math.sin(rad);
+
+                rawPoints.forEach(p => {
+                    if(p.type === 'point') {
+                        let tx = p.x - cx;
+                        let ty = p.y - cy;
+                        p.x = cx + (tx * cos - ty * sin);
+                        p.y = cy + (tx * sin + ty * cos);
+                    }
+                });
+                
+                // Reset slider visual only (hacky but effective for continuous use)
+                document.getElementById('rotSlider').value = 0;
+                document.getElementById('rotSlider').nextElementSibling.innerText = "0°";
+            }
+            
+            if(type === 'scale') {
+                const s = parseFloat(val);
+                rawPoints.forEach(p => {
+                    if(p.type === 'point') {
+                        p.x = cx + (p.x - cx) * s;
+                        p.y = cy + (p.y - cy) * s;
+                    }
+                });
+            }
+            render();
+        }
+
+
+        // --- MASTER DUNE FILL ---
         function handleFillClick(e) {
             const clickPos = getPos(e);
             
             // CONFIGURATION:
-            const DENSITY = 3.0;
+            const DENSITY = fillGap; // Use user selected gap
             const NOISE_SCALE = 0.05;
             const WAVE_AMP = 3.0; 
             const MAX_JUMP = 30.0; 
@@ -646,12 +858,6 @@
                      // Check midpoint to see if we are in "Ink"
                      let midX = (startCut.x + endCut.x) / 2;
                      
-                     // Must be INSIDE target and OUTSIDE all holes
-                     // We check this in rotated space. 
-                     // Since we just calculated intersections, we can do a quick check:
-                     // Is midX inside rotTarget?
-                     // Is midX inside any rotHole?
-                     
                      let pMid = {x: midX, y: y};
                      let isInsideTarget = isPointInPolygon(pMid, rotTarget);
                      let isInsideHole = false;
@@ -679,9 +885,6 @@
 
                         // --- INTELLIGENT TRAVEL ---
                         if(lastFilledPointRot) {
-                            // Find which polygon we are sitting on
-                            // lastFilledPointRot is on SOME polygon edge.
-                            // segmentStartPointRot is on SOME polygon edge.
                             
                             let startPoly = findClosestPoly(lastFilledPointRot, rotTarget, rotHoles);
                             let endPoly = findClosestPoly(segmentStartPointRot, rotTarget, rotHoles);
@@ -697,14 +900,11 @@
                                     rawPoints.push({x:rp.x, y:rp.y, type:'point'});
                                 });
                             } else {
-                                // Jumping between islands or jumping from wall to hole
-                                // Just break.
                                 if(rawPoints.length>0 && rawPoints[rawPoints.length-1].type!=='break') {
                                     rawPoints.push({type:'break'});
                                 }
                             }
                         } else {
-                             // First point
                              rawPoints.push({type:'break'});
                         }
 
@@ -713,7 +913,6 @@
                             let noiseVal = Noise.eval(px * NOISE_SCALE, y * NOISE_SCALE);
                             let py = y + (noiseVal * WAVE_AMP);
                             
-                            // Re-verify mask just in case noise pushed us into a hole
                             let realPt = rotatePt(px, py, fillAngle);
                             let safe = isPointInPolygon(realPt, target.shape);
                             if(safe) {
@@ -735,7 +934,6 @@
             }
             
             // --- CLEANUP OUTLINES ---
-            // Draw Target Outline
             if(lastFilledPointRot) {
                  let startP = target.shape[0];
                  let startPRot = rotatePt(startP.x, startP.y, -fillAngle);
@@ -752,7 +950,6 @@
             target.shape.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
             rawPoints.push({x:target.shape[0].x, y:target.shape[0].y, type:'point'});
             
-            // Draw Hole Outlines
             holes.forEach(h => {
                 rawPoints.push({type: 'break'});
                 h.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
@@ -858,7 +1055,7 @@
             render();
         }
 
-        // --- OPTIMIZER (Original Greedy + Trace Check) ---
+        // --- OPTIMIZER ---
         function prepareGCode() {
             if(rawPoints.length === 0) return showToast("Draw something first!", "error");
             showToast("Optimizing Path... (Checking Collisions)", "info");
@@ -963,7 +1160,7 @@
                     pool.splice(bestIdx, 1);
                 }
 
-                // 4. Flatten shapes into processedPoints (With Stats)
+                // 4. Flatten shapes into processedPoints
                 processedPoints = [];
                 const res = 1.0;
                 
@@ -972,7 +1169,6 @@
                 let stats_segments = [];
 
                 if(sortedShapes.length > 0) {
-                    // Enter from edge for first shape
                     let fPt = sortedShapes[0][0];
                     let fAng = Math.atan2(fPt.y, fPt.x);
                     processedPoints.push({x: tableR*Math.cos(fAng), y: tableR*Math.sin(fAng), type:'point'});
@@ -992,7 +1188,6 @@
                             if(d < minDist) { minDist = d; bestExitIdx = k; }
                         }
 
-                        // Handle closed loops on previous shape
                         let isPrevClosed = Math.hypot(prev[0].x - prev[prev.length-1].x, prev[0].y - prev[prev.length-1].y) < 5.0;
                         let retracePath = [];
                         if(isPrevClosed) {
@@ -1011,16 +1206,10 @@
                         
                         let startJump = prev[bestExitIdx];
                         
-                        // --- TRACE CHECK LOGIC ---
-                        // Calculate safe path
                         let safePath = routeConnect(startJump, currStart, sortedShapes);
                         
-                        // Stats
                         if(safePath.length > 1) {
                             stats_rerouted++;
-                            console.log(`Connection ${i}: Rerouted around obstacle (${safePath.length} segments)`);
-                        } else {
-                            console.log(`Connection ${i}: Direct path`);
                         }
                         stats_segments.push(safePath.length);
 
@@ -1029,7 +1218,6 @@
                     s.forEach(p => processedPoints.push(p));
                 }
 
-                // 5. ADD EXIT LOGIC
                 if(processedPoints.length > 0) {
                     let lastPt = processedPoints[processedPoints.length-1];
                     processedPoints.push({type: 'cmd', val: 'M0'});
@@ -1049,7 +1237,7 @@
                 document.getElementById('progressSlider').value = 0;
                 render(); 
                 showToast(summary, "success");
-            }, 50); // Tiny delay to allow UI render
+            }, 50);
         }
 
         // --- G-CODE GENERATION ---
@@ -1069,7 +1257,6 @@
             let prevElbow = 0;
 
             let firstPt = processedPoints[0];
-            // If first point is M0? Unlikely, but handle
             if(firstPt.type === 'cmd') return "";
 
             let startIK = calculateIK(firstPt.x, firstPt.y, 0, 0, L1, L2, gearRatio, stepsPerRad);
@@ -1080,22 +1267,16 @@
                 let p1 = processedPoints[i];
                 let p2 = processedPoints[i+1];
 
-                // Check if P1 is a command (M0)
                 if (p1.type === 'cmd' && p1.val === 'M0') {
                     cmds.push("M0");
-                    // We need to look AHEAD or find current pos to continue
-                    // The loop below handles 'start from valid coord'
                 }
                 
-                // If P2 is M0, skip interpolation, next loop will handle it
                 if (p2.type === 'cmd' && p2.val === 'M0') {
                     continue;
                 }
                 
-                // FIXED: If P1 was M0, we need start coords from point BEFORE M0
                 let startX, startY;
                 if(p1.type === 'cmd') {
-                   // Search backwards for the last valid geometry point
                    let back = i-1;
                    while(back >= 0 && processedPoints[back].type === 'cmd') back--;
                    if(back < 0) { startX=0; startY=0; }
@@ -1119,7 +1300,6 @@
                     if(dBase !== 0 || dElbow !== 0) {
                         let r = Math.hypot(x, y);
 
-                        // Scanner Filter (3200 step jump fix)
                         if (r < 5.0 && (Math.abs(dBase) > 2000 || Math.abs(dElbow) > 2000)) {
                             prevBase += dBase; 
                             prevElbow += dElbow;
@@ -1138,7 +1318,7 @@
             return cmds.join('\n');
         }
 
-        // --- UTILS (Save/Load/Undo) ---
+        // --- UTILS ---
         function resizeCanvas() {
             const container = document.getElementById('canvasContainer');
             const size = container.getBoundingClientRect().width;
@@ -1172,7 +1352,38 @@
             document.getElementById('btnDraw').className = t==='draw'?'active':'secondary';
             document.getElementById('btnErase').className = t==='erase'?'active':'secondary';
             document.getElementById('btnFill').className = t==='fill'?'active':'secondary';
+            document.getElementById('btnSelect').className = t==='select'?'active':'secondary';
+            
+            updateToolSettings();
         }
+        
+        function updateToolSettings() {
+            // Manage UI settings visibility
+            const area = document.getElementById('toolSettingsArea');
+            const grps = document.querySelectorAll('.tool-setting-group');
+            grps.forEach(g => g.style.display = 'none');
+            
+            let activeGrp = null;
+            if(currentTool === 'draw') activeGrp = document.getElementById('set-pen');
+            if(currentTool === 'erase') activeGrp = document.getElementById('set-erase');
+            if(currentTool === 'fill') activeGrp = document.getElementById('set-fill');
+            if(currentTool === 'select') activeGrp = document.getElementById('set-select');
+            
+            if(activeGrp) {
+                area.style.display = 'block';
+                activeGrp.style.display = 'block';
+            } else {
+                area.style.display = 'none';
+            }
+
+            // Update variables
+            eraserRadius = parseInt(document.getElementById('eraserSizeSlider').value);
+            document.getElementById('eraseSizeVal').innerText = eraserRadius + 'px';
+            
+            fillGap = parseFloat(document.getElementById('fillGapSlider').value);
+            document.getElementById('fillGapVal').innerText = fillGap.toFixed(1);
+        }
+
         function updateUI() {
             document.getElementById('symVal').textContent = document.getElementById('symSlider').value + 'x';
             render();
@@ -1251,7 +1462,6 @@
                 }
                 ctx.stroke();
                 
-                // Draw endpoint
                 if(limit > 0 && limit < dataToShow.length) {
                     const tip = dataToShow[limit];
                     if(tip.type !== 'break' && tip.type !== 'cmd') {
@@ -1262,6 +1472,27 @@
                 }
                 ctx.restore();
             }
+
+            // Draw Transform Bounding Box
+            if(currentTool === 'select' && rawPoints.length > 0) {
+                 // Calculate simplified bounds
+                 let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+                 rawPoints.forEach(p => {
+                    if(p.type === 'point') {
+                        if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
+                        if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
+                    }
+                });
+                if(minX !== Infinity) {
+                    ctx.beginPath();
+                    ctx.rect(minX*scale, -maxY*scale, (maxX-minX)*scale, (maxY-minY)*scale);
+                    ctx.strokeStyle = dark ? "white" : "black";
+                    ctx.setLineDash([5, 5]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+            }
+
             ctx.restore();
         }
 
@@ -1304,7 +1535,6 @@
             }
         }
 
-        // FIXED KINEMATICS
         function getShortestRotation(raw, last) {
             let diff = (raw - last) / (2 * Math.PI);
             let offset = Math.round(diff);
