@@ -348,11 +348,24 @@
         function resumeDesign() { sendCmd('RESUME'); }
         function clearQueue() { sendCmd('CLEAR'); updateQ(); }
 
+        // --- UPDATED STATUS LOGIC ---
         async function updateQ() {
             try {
-                let r=await fetch(`${BASE_URL}/status_full`);
-                let d=await r.json();
-                document.getElementById('playing-display').textContent = d.playing ? `Playing: ${d.playing}` : "Select a design";
+                let r = await fetch(`${BASE_URL}/status_full`);
+                let d = await r.json();
+                
+                let playText = "Select a design";
+                
+                if (d.playing) {
+                    // Check if actually paused
+                    playText = d.is_paused ? `Paused: ${d.playing}` : `Playing: ${d.playing}`;
+                } 
+                else if (d.is_waiting) {
+                    // Show cooldown message
+                    playText = `Cooling down (Next: ${d.next_up})`;
+                }
+                
+                document.getElementById('playing-display').textContent = playText;
                 
                 let qText = "Queue empty";
                 if(d.queue_count > 0) qText = `Next: ${d.next_up} (+${d.queue_count-1})`;
