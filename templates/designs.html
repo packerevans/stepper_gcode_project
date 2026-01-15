@@ -92,12 +92,10 @@
 
         .card-img-wrap { position: relative; aspect-ratio: 1/1; background: #fff; width: 100%; }
         
-        /* UPDATED: Added transform scaleX(-1) to mirror the rendering */
+        /* Mirror Canvas to fix backward text */
         .card canvas { 
-            width: 100%; 
-            height: 100%; 
-            display: block; 
-            transform: scaleX(-1); 
+            width: 100%; height: 100%; display: block; 
+            transform: scaleX(-1);
         }
         
         /* Select Dot */
@@ -295,12 +293,10 @@
             selectedFiles.clear(); renderSel(); loadLib();
         }
 
-        // --- IMPROVED COPY FUNCTION (Secure & Fallback) ---
         async function copySelected() {
             let txt = "";
             showStatus("Fetching code...");
             
-            // 1. Fetch text
             try {
                 for(let f of selectedFiles) {
                     let r = await fetch(`${BASE_URL}/designs/${f}`);
@@ -308,7 +304,6 @@
                 }
             } catch(e) { showStatus("Error fetching files"); return; }
 
-            // 2. Try Modern API (HTTPS/Localhost)
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 try {
                     await navigator.clipboard.writeText(txt);
@@ -318,7 +313,6 @@
                 } catch (err) { console.log("Clipboard API failed, trying fallback..."); }
             }
 
-            // 3. Fallback (HTTP/Mobile)
             const ta = document.createElement("textarea");
             ta.value = txt;
             ta.style.position = "fixed"; ta.style.left = "-9999px";
@@ -395,8 +389,28 @@
             img.onerror=()=>{
                 fetch(`${BASE_URL}/designs/${f}`).then(r=>r.text()).then(t=>{
                     drawTrace(cvs,t);
-                    let tm=0; t.split('\n').forEach(l=>{if(l.startsWith('G1')){let p=l.substring(2).split(/\s+/); tm+=Math.max(Math.abs(p[0]),Math.abs(p[1]))*(p[2]||1000)}});
-                    document.getElementById(`t-${clean}`).textContent=Math.ceil(tm/6e7)+" min";
+                    let tm=0;
+                    t.split('\n').forEach(l=>{
+                        let line = l.trim();
+                        if(line.toUpperCase().startsWith('G1')){
+                            let p = line.substring(2).trim().split(/\s+/);
+                            // Time = Max(Steps) * Delay(us)
+                            let steps = Math.max(Math.abs(parseInt(p[0])||0), Math.abs(parseInt(p[1])||0));
+                            let delay = parseInt(p[2]) || 1000;
+                            tm += steps * delay;
+                        }
+                    });
+                    
+                    // Convert microseconds to seconds
+                    let seconds = Math.round(tm / 1000000);
+                    let timeStr;
+                    if (seconds < 60) {
+                        timeStr = seconds + "s";
+                    } else {
+                        timeStr = Math.ceil(seconds / 60) + "m";
+                    }
+                    
+                    document.getElementById(`t-${clean}`).textContent = timeStr;
                 });
             }
         }
