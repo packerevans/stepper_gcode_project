@@ -47,10 +47,6 @@
 
         .header-center { text-align: center; overflow: hidden; }
         .playing-text { font-weight: 700; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
-        
-        /* Added a subtle color for the time duration in the header */
-        .time-tag { font-weight: 400; opacity: 0.8; font-size: 0.9em; margin-left: 6px; }
-        
         .queue-text { font-size: 0.8rem; opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
         
         .icon-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--color-text); }
@@ -147,9 +143,7 @@
     <header>
         <button class="icon-btn" onclick="openNav()">☰</button>
         <div class="header-center">
-            <div id="playing-display" class="playing-text">
-                Select a design <span id="header-time" class="time-tag"></span>
-            </div>
+            <div id="playing-display" class="playing-text">Select a design</div>
             <div id="queue-display" class="queue-text">Queue empty</div>
         </div>
         <button class="icon-btn" onclick="toggleTheme()">◑</button>
@@ -171,7 +165,7 @@
     <div class="controls-wrapper">
         <div id="status-pill" class="status-pill">Ready</div>
         <div class="main-actions">
-            <select id="speedSelect">
+            <select id="speedSelect" onchange="updateAllTimes()">
                 <option value="0.5">Speed: Fast</option>
                 <option value="1.0" selected>Speed: Normal</option>
                 <option value="2.0">Speed: Slow</option>
@@ -200,7 +194,6 @@
         const BASE_URL = `${window.location.protocol}//${window.location.host}`;
         let selectedFiles = new Set();
         let allFiles = [];
-        let fileDurations = {}; // Cache for duration strings
 
         // --- MATH & LAZY LOADING ---
         const observer = new IntersectionObserver((e,o)=>{e.forEach(x=>{if(x.isIntersecting){loadPreview(x.target,x.target.dataset.f);o.unobserve(x.target)}})},{rootMargin:"100px"});
@@ -355,52 +348,11 @@
         function resumeDesign() { sendCmd('RESUME'); }
         function clearQueue() { sendCmd('CLEAR'); updateQ(); }
 
-        // --- Helper to calculate time from text ---
-        function calculateDuration(gcodeText) {
-            let tm = 0;
-            gcodeText.split('\n').forEach(l => {
-                let line = l.trim();
-                if(line.toUpperCase().startsWith('G1')){
-                    let p = line.substring(2).trim().split(/\s+/);
-                    let steps = Math.max(Math.abs(parseInt(p[0])||0), Math.abs(parseInt(p[1])||0));
-                    let delay = parseInt(p[2]) || 1000;
-                    tm += steps * delay;
-                }
-            });
-            let seconds = Math.round(tm / 1000000);
-            return seconds < 60 ? `(${seconds}s)` : `(${Math.ceil(seconds/60)}m)`;
-        }
-
         async function updateQ() {
             try {
                 let r=await fetch(`${BASE_URL}/status_full`);
                 let d=await r.json();
-                
-                let playText = "Select a design";
-                let timeTag = "";
-
-                if (d.playing) {
-                    playText = `Playing: ${d.playing}`;
-                    // Check if we have the time cached
-                    if (fileDurations[d.playing]) {
-                        timeTag = fileDurations[d.playing];
-                    } else {
-                        // If we are playing something that wasn't loaded in the grid yet, fetch its time now
-                        fetch(`${BASE_URL}/designs/${d.playing}`).then(r=>r.text()).then(t=>{
-                            fileDurations[d.playing] = calculateDuration(t);
-                        });
-                    }
-                }
-
-                // Update Header
-                let playEl = document.getElementById('playing-display');
-                if (!playEl.innerHTML.includes(playText)) {
-                    playEl.innerHTML = `${playText} <span class="time-tag">${timeTag}</span>`;
-                } else {
-                    // Just update time tag if text is same
-                    let tagEl = playEl.querySelector('.time-tag');
-                    if(tagEl) tagEl.textContent = timeTag;
-                }
+                document.getElementById('playing-display').textContent = d.playing ? `Playing: ${d.playing}` : "Select a design";
                 
                 let qText = "Queue empty";
                 if(d.queue_count > 0) qText = `Next: ${d.next_up} (+${d.queue_count-1})`;
@@ -424,27 +376,74 @@
             fs.forEach(f=>{
                 let d=document.createElement('div'), clean=f.replace('.txt','');
                 d.className='card'; d.dataset.name=f; d.dataset.hasPng="false";
+                // Added data-base-time attribute to store the raw calculation later
+                d.dataset.baseTime="0"; 
                 d.onclick=(e)=>{if(e.target.className!=='select-dot')runDesign(f)};
                 d.innerHTML=`<div class="card-img-wrap"><canvas data-f="${f}" width="300" height="300"></canvas><div class="select-dot" onclick="toggleSelect('${f}', event)"></div></div><div class="card-body"><h3 class="card-title">${clean}</h3><div class="card-meta">Est: <span id="t-${clean}">...</span></div></div>`;
                 g.appendChild(d); observer.observe(d.querySelector('canvas'));
             }); renderSel();
         }
 
+        // --- NEW FUNCTION: Formats microseconds into 45s or 5m ---
+        function formatTimeFromMicroseconds(us) {
+            if(!us) return "...";
+            let seconds = Math.round(us / 1000000);
+            if (seconds < 60) return seconds + "s";
+            return Math.ceil(seconds / 60) + "m";
+        }
+
+        // --- NEW FUNCTION: Updates all visible cards when dropdown changes ---
+        function updateAllTimes() {
+            let speed = parseFloat(document.getElementById('speedSelect').value) || 1.0;
+            document.querySelectorAll('.card').forEach(card => {
+                let base = parseFloat(card.dataset.baseTime);
+                if(base > 0) {
+                    let finalTime = base * speed;
+                    let clean = card.dataset.name.replace('.txt','');
+                    let span = document.getElementById(`t-${clean}`);
+                    if(span) span.textContent = formatTimeFromMicroseconds(finalTime);
+                }
+            });
+        }
+
         function loadPreview(cvs, f) {
             let clean = f.replace('.txt','');
             let card = cvs.closest('.card');
             
-            // ALWAYS fetch text to calculate time (and cache it)
             fetch(`${BASE_URL}/designs/${f}`).then(r => r.text()).then(t => {
-                let timeStr = calculateDuration(t);
-                fileDurations[f] = timeStr; // Save to global cache
-                document.getElementById(`t-${clean}`).textContent = timeStr.replace('(','').replace(')',''); // Remove parens for card view
+                
+                // --- TIME CALCULATION (Base Speed) ---
+                let tm = 0;
+                t.split('\n').forEach(l => {
+                    let line = l.trim();
+                    if(line.toUpperCase().startsWith('G1')){
+                        let p = line.substring(2).trim().split(/\s+/);
+                        // Time = Max(Steps) * Delay(us)
+                        let steps = Math.max(Math.abs(parseInt(p[0])||0), Math.abs(parseInt(p[1])||0));
+                        let delay = parseInt(p[2]) || 1000;
+                        tm += steps * delay;
+                    }
+                });
+
+                // Store the "Normal" (Base) time on the card
+                card.dataset.baseTime = tm;
+
+                // Calculate display based on CURRENT selected speed
+                let currentSpeed = parseFloat(document.getElementById('speedSelect').value) || 1.0;
+                document.getElementById(`t-${clean}`).textContent = formatTimeFromMicroseconds(tm * currentSpeed);
 
                 // --- IMAGE HANDLING ---
                 let img = new Image();
                 img.src = `${BASE_URL}/designs/${clean}.png`;
-                img.onload = () => { cvs.getContext('2d').drawImage(img,0,0,300,300); card.dataset.hasPng="true"; };
-                img.onerror = () => { drawTrace(cvs, t); };
+                
+                img.onload = () => {
+                    cvs.getContext('2d').drawImage(img,0,0,300,300);
+                    card.dataset.hasPng="true";
+                };
+                
+                img.onerror = () => {
+                    drawTrace(cvs, t);
+                };
             });
         }
 
