@@ -305,7 +305,6 @@
         function distSq(p1, p2) { return (p1.x-p2.x)**2 + (p1.y-p2.y)**2; }
         function dist(p1, p2) { return Math.sqrt(distSq(p1, p2)); }
 
-        // Ray-Casting algorithm for point-in-polygon check
         function isPointInPolygon(p, polygon) {
             let inside = false;
             for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
@@ -326,7 +325,6 @@
             return { minX, maxX, minY, maxY, area: (maxX-minX)*(maxY-minY), w: maxX-minX, h: maxY-minY, cx: (minX+maxX)/2, cy: (minY+maxY)/2 };
         }
 
-        // Strict segment intersection check
         function getIntersection(A, B, C, D) {
             const det = (B.x - A.x) * (D.y - C.y) - (D.x - C.x) * (B.y - A.y);
             if (det === 0) return null; 
@@ -522,8 +520,6 @@
         function startDraw(e) {
             e.preventDefault();
             
-            // Disable drawing if we are in Production Mode (Processed points exist and tools are hidden)
-            // Or simple check: if generatedGCode exists, don't allow drawing unless we reset.
             if(generatedGCode) return;
 
             if(currentTool === 'fill') {
@@ -561,7 +557,6 @@
             if(currentTool === 'select' && dragStart) {
                 const dx = pos.x - dragStart.x;
                 const dy = pos.y - dragStart.y;
-                // Move all points
                 rawPoints.forEach(p => {
                     if(p.type === 'point') {
                         p.x += dx;
@@ -658,7 +653,6 @@
         }
 
         function drawCursor(p) {
-            // Don't draw cursor if locked
             if(generatedGCode) return;
 
             const r = (currentTool === 'erase' ? eraserRadius : 10) * scale;
@@ -1035,7 +1029,6 @@
                 const tableR = parseFloat(document.getElementById('cfgRadius').value);
                 const sym = parseInt(document.getElementById('symSlider').value);
                 
-                // 1. Separate raw points into distinct shapes
                 let shapes = [];
                 let curShape = [];
                 rawPoints.forEach(p => {
@@ -1048,7 +1041,6 @@
                 });
                 if(curShape.length > 0) shapes.push(curShape);
 
-                // 2. Generate Symmetry Copies
                 let pool = [];
                 for(let s=0; s<sym; s++) {
                     const ang = s * (Math.PI*2/sym);
@@ -1063,7 +1055,6 @@
                     });
                 }
 
-                // 3. Greedy Nearest Neighbor Sort
                 let bestShapeIdx = -1, bestPointIdx = -1, maxDist = -1;
                 for (let i=0; i<pool.length; i++) {
                     for (let j=0; j<pool[i].length; j++) {
@@ -1074,7 +1065,7 @@
 
                 let startShape = pool[bestShapeIdx];
                 pool.splice(bestShapeIdx, 1);
-                // Check direction
+                
                 let dClose = Math.hypot(startShape[0].x - startShape[startShape.length-1].x, startShape[0].y - startShape[startShape.length-1].y);
                 
                 if(dClose < 5.0) { 
@@ -1131,7 +1122,6 @@
                     pool.splice(bestIdx, 1);
                 }
 
-                // 4. Flatten shapes into processedPoints
                 processedPoints = [];
                 const res = 1.0;
                 
@@ -1217,7 +1207,7 @@
             }, 50);
         }
 
-        // --- NEW: Return to Editing Mode ---
+        // --- Return to Editing Mode ---
         function returnToEditing() {
             generatedGCode = null;
             processedPoints = [];
@@ -1227,7 +1217,6 @@
             document.getElementById('designPhaseControls').classList.add('fade-in');
             
             resetStatus();
-            // Reset symmetry to current value to update drawing logic
             updateUI();
         }
 
@@ -1250,7 +1239,8 @@
             let firstPt = processedPoints[0];
             if(firstPt.type === 'cmd') return "";
 
-            let startIK = calculateIK(firstPt.x, firstPt.y, 0, 0, L1, L2, gearRatio, stepsPerRad);
+            // MIRROR FIX: Negate X coordinate for initial IK calculation
+            let startIK = calculateIK(-firstPt.x, firstPt.y, 0, 0, L1, L2, gearRatio, stepsPerRad);
             prevBase = startIK.base_steps;
             prevElbow = startIK.elbow_steps;
 
@@ -1284,7 +1274,9 @@
                     let x = startX + (p2.x - startX)*t;
                     let y = startY + (p2.y - startY)*t;
 
-                    let ik = calculateIK(x, y, prevBase, prevElbow, L1, L2, gearRatio, stepsPerRad);
+                    // MIRROR FIX: Negate X coordinate during interpolation
+                    // This mirrors the G-Code output horizontally relative to the screen
+                    let ik = calculateIK(-x, y, prevBase, prevElbow, L1, L2, gearRatio, stepsPerRad);
                     let dBase = Math.round(ik.base_steps - prevBase);
                     let dElbow = Math.round(ik.elbow_steps - prevElbow);
 
@@ -1349,7 +1341,6 @@
         }
         
         function updateToolSettings() {
-            // Manage UI settings visibility
             const area = document.getElementById('toolSettingsArea');
             const grps = document.querySelectorAll('.tool-setting-group');
             grps.forEach(g => g.style.display = 'none');
@@ -1367,7 +1358,6 @@
                 area.style.display = 'none';
             }
 
-            // Update variables
             eraserRadius = parseInt(document.getElementById('eraserSizeSlider').value);
             document.getElementById('eraseSizeVal').innerText = eraserRadius + 'px';
             
@@ -1466,7 +1456,6 @@
 
             // Draw Transform Bounding Box
             if(currentTool === 'select' && rawPoints.length > 0 && !generatedGCode) {
-                 // Calculate simplified bounds
                  let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
                  rawPoints.forEach(p => {
                     if(p.type === 'point') {
