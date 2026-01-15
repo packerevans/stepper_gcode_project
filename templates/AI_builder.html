@@ -123,11 +123,15 @@
             border-radius: 8px;
             padding: 10px;
             margin-bottom: 12px;
-            display: none; /* Hidden by default */
+            display: none;
         }
-        .tool-setting-group { display: none; } /* Specific groups hidden by default */
+        .tool-setting-group { display: none; }
         .tool-setting-group.active { display: block; }
         .tool-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--secondary); margin-bottom: 5px; display:block;}
+
+        /* Animation for swapping controls */
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
     </style>
 </head>
@@ -157,83 +161,91 @@
         </div>
 
         <div class="controls-panel">
-            <h2>Tools</h2>
             
-            <div class="toggle-row">
-                <span style="font-weight:600; font-size:13px;">🖋️ Smart Pen Mode</span>
-                <label class="switch">
-                    <input type="checkbox" id="smartPenMode" checked>
-                    <span class="slider-tog"></span>
-                </label>
-            </div>
+            <div id="designPhaseControls">
+                <h2>Tools</h2>
+                
+                <div class="toggle-row">
+                    <span style="font-weight:600; font-size:13px;">🖋️ Smart Pen Mode</span>
+                    <label class="switch">
+                        <input type="checkbox" id="smartPenMode" checked>
+                        <span class="slider-tog"></span>
+                    </label>
+                </div>
 
-            <div id="toolSettingsArea">
-                <div id="set-pen" class="tool-setting-group">
-                    <div class="toggle-row" style="margin:0;">
-                        <span style="font-size:13px;">〰️ Smooth Strokes</span>
-                        <label class="switch">
-                            <input type="checkbox" id="smoothDrawMode">
-                            <span class="slider-tog"></span>
-                        </label>
+                <div id="toolSettingsArea">
+                    <div id="set-pen" class="tool-setting-group">
+                        <div class="toggle-row" style="margin:0;">
+                            <span style="font-size:13px;">〰️ Smooth Strokes</span>
+                            <label class="switch">
+                                <input type="checkbox" id="smoothDrawMode">
+                                <span class="slider-tog"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="set-erase" class="tool-setting-group">
+                        <span class="tool-label">Eraser Size: <span id="eraseSizeVal">10px</span></span>
+                        <input type="range" min="2" max="50" value="10" oninput="updateToolSettings()" id="eraserSizeSlider">
+                    </div>
+
+                    <div id="set-fill" class="tool-setting-group">
+                        <span class="tool-label">Line Spacing: <span id="fillGapVal">5.0</span></span>
+                        <input type="range" min="1.0" max="15.0" step="0.5" value="5.0" oninput="updateToolSettings()" id="fillGapSlider">
+                    </div>
+
+                    <div id="set-select" class="tool-setting-group">
+                        <span class="tool-label">Resize All</span>
+                        <div style="display:flex; gap:5px; margin-bottom:8px;">
+                            <button class="secondary" style="padding:4px;" onclick="applyTransform('scale', 0.95)">➖</button>
+                            <button class="secondary" style="padding:4px;" onclick="applyTransform('scale', 1.05)">➕</button>
+                        </div>
+                        <span class="tool-label">Rotate All</span>
+                        <input type="range" min="-180" max="180" value="0" step="5" onchange="applyTransform('rotate', this.value)" oninput="this.nextElementSibling.innerText=this.value+'°'" id="rotSlider">
+                        <span style="font-size:10px; float:right;">0°</span>
+                        <div style="clear:both; padding-top:5px; font-size:11px; color:#666;"><i>Drag canvas to Move</i></div>
                     </div>
                 </div>
 
-                <div id="set-erase" class="tool-setting-group">
-                    <span class="tool-label">Eraser Size: <span id="eraseSizeVal">10px</span></span>
-                    <input type="range" min="2" max="50" value="10" oninput="updateToolSettings()" id="eraserSizeSlider">
+                <div class="btn-group">
+                    <button id="btnDraw" onclick="setTool('draw')" class="active">✏️ Draw</button>
+                    <button id="btnErase" onclick="setTool('erase')" class="secondary">🧼 Erase</button>
                 </div>
 
-                <div id="set-fill" class="tool-setting-group">
-                    <span class="tool-label">Line Spacing: <span id="fillGapVal">5.0</span></span>
-                    <input type="range" min="1.0" max="15.0" step="0.5" value="5.0" oninput="updateToolSettings()" id="fillGapSlider">
+                <div class="btn-group">
+                    <button id="btnSelect" onclick="setTool('select')" class="secondary">✋ Move/Edit</button>
+                    <button id="btnFill" onclick="setTool('fill')" class="secondary">🌊 Dune Fill</button>
                 </div>
 
-                 <div id="set-select" class="tool-setting-group">
-                    <span class="tool-label">Resize All</span>
-                    <div style="display:flex; gap:5px; margin-bottom:8px;">
-                        <button class="secondary" style="padding:4px;" onclick="applyTransform('scale', 0.95)">➖</button>
-                        <button class="secondary" style="padding:4px;" onclick="applyTransform('scale', 1.05)">➕</button>
-                    </div>
-                    <span class="tool-label">Rotate All</span>
-                    <input type="range" min="-180" max="180" value="0" step="5" onchange="applyTransform('rotate', this.value)" oninput="this.nextElementSibling.innerText=this.value+'°'" id="rotSlider">
-                    <span style="font-size:10px; float:right;">0°</span>
-                    <div style="clear:both; padding-top:5px; font-size:11px; color:#666;"><i>Drag canvas to Move</i></div>
+                <div class="btn-group">
+                    <input type="file" id="imgUpload" accept="image/*" style="display:none" onchange="handleImageUpload(this)">
+                    <button class="secondary" onclick="document.getElementById('imgUpload').click()">✨ Trace Image</button>
                 </div>
-            </div>
 
-            <div class="btn-group">
-                <button id="btnDraw" onclick="setTool('draw')" class="active">✏️ Draw</button>
-                <button id="btnErase" onclick="setTool('erase')" class="secondary">🧼 Erase</button>
-            </div>
+                <div class="btn-group">
+                    <button onclick="undo()" class="secondary">↶ Undo</button>
+                    <button onclick="clearCanvas()" class="secondary" style="color:var(--danger); border-color:var(--danger);">✖ Clear</button>
+                </div>
 
-            <div class="btn-group">
-                <button id="btnSelect" onclick="setTool('select')" class="secondary">✋ Move/Edit</button>
-                <button id="btnFill" onclick="setTool('fill')" class="secondary">🌊 Dune Fill</button>
-            </div>
+                <hr style="border:0; border-top:1px solid #ddd; margin: 15px 0;">
+                
+                <div class="slider-row">
+                    <div class="slider-header"><span>SYMMETRY</span> <span id="symVal">1x</span></div>
+                    <input type="range" id="symSlider" min="1" max="12" value="1" step="1" oninput="updateUI()">
+                </div>
 
-            <div class="btn-group">
-                <input type="file" id="imgUpload" accept="image/*" style="display:none" onchange="handleImageUpload(this)">
-                <button class="secondary" onclick="document.getElementById('imgUpload').click()">✨ Trace Image</button>
+                <button class="action" onclick="prepareGCode()" style="margin-bottom:15px; font-size:1.1em;">⚙️ Prepare Path</button>
             </div>
-
-            <div class="btn-group">
-                <button onclick="undo()" class="secondary">↶ Undo</button>
-                <button onclick="clearCanvas()" class="secondary" style="color:var(--danger); border-color:var(--danger);">✖ Clear</button>
-            </div>
-
-            <hr style="border:0; border-top:1px solid #ddd; margin: 15px 0;">
-            
-             <div class="slider-row">
-                <div class="slider-header"><span>SYMMETRY</span> <span id="symVal">1x</span></div>
-                <input type="range" id="symSlider" min="1" max="12" value="1" step="1" oninput="updateUI()">
+            <div id="productionPhaseControls" style="display:none; margin-bottom:15px;">
+                <button class="secondary" onclick="returnToEditing()" style="width:100%; border:2px dashed #999; color:#444; background: rgba(0,0,0,0.05);">
+                    ✏️ Back to Edit
+                </button>
             </div>
 
             <div class="slider-row">
                 <div class="slider-header"><span>SIMULATION (Start ⮕ Finish)</span> <span id="progVal">100%</span></div>
                 <input type="range" id="progressSlider" min="0" max="100" value="100" oninput="render()">
             </div>
-
-            <button class="action" onclick="prepareGCode()" style="margin-bottom:15px; font-size:1.1em;">⚙️ Prepare Path</button>
 
             <div style="text-align:center; font-size:12px; margin-bottom:10px; color:#666;">
                 Status: <span id="statusTxt" style="font-weight:bold; color:var(--primary);">Drawing Mode</span>
@@ -510,6 +522,10 @@
         function startDraw(e) {
             e.preventDefault();
             
+            // Disable drawing if we are in Production Mode (Processed points exist and tools are hidden)
+            // Or simple check: if generatedGCode exists, don't allow drawing unless we reset.
+            if(generatedGCode) return;
+
             if(currentTool === 'fill') {
                 handleFillClick(e);
                 return;
@@ -552,7 +568,7 @@
                         p.y += dy;
                     }
                 });
-                dragStart = pos; // Reset drag start to current to avoid compounding
+                dragStart = pos; 
                 render();
                 return;
             }
@@ -567,12 +583,11 @@
             
             if(currentTool === 'select') {
                 dragStart = null;
-                saveState(); // Save state after move
+                saveState(); 
                 return;
             }
 
             if(currentTool === 'draw') {
-                // Apply smoothing if enabled
                 if(document.getElementById('smoothDrawMode').checked) {
                     smoothLastStroke();
                 }
@@ -582,7 +597,6 @@
         }
 
         function smoothLastStroke() {
-            // Find the last stroke
             let lastBreak = -1;
             for(let i=rawPoints.length-1; i>=0; i--) {
                 if(rawPoints[i].type === 'break' || rawPoints[i].type === 'cmd') {
@@ -591,22 +605,18 @@
                 }
             }
             
-            // Extract points
             let stroke = [];
             let startIndex = lastBreak + 1;
             for(let i=startIndex; i<rawPoints.length; i++) stroke.push(rawPoints[i]);
 
             if(stroke.length < 3) return;
 
-            // Chaikin's Algorithm (Corner Cutting) - 2 Passes
             for(let pass=0; pass<2; pass++) {
                 let smooth = [];
                 smooth.push(stroke[0]);
                 for(let i=0; i<stroke.length-1; i++) {
                     let p0 = stroke[i];
                     let p1 = stroke[i+1];
-                    
-                    // 25% and 75% points
                     smooth.push({
                         x: 0.75 * p0.x + 0.25 * p1.x,
                         y: 0.75 * p0.y + 0.25 * p1.y,
@@ -622,7 +632,6 @@
                 stroke = smooth;
             }
 
-            // Replace in rawPoints
             rawPoints.splice(startIndex, rawPoints.length - startIndex, ...stroke);
         }
 
@@ -638,7 +647,7 @@
             if(currentTool === 'draw') {
                 rawPoints.push({x: p.x, y: p.y, type: 'point'});
             } else if (currentTool === 'erase') {
-                const r = eraserRadius; // Use dynamic radius
+                const r = eraserRadius; 
                 rawPoints = rawPoints.filter(pt => {
                     if(pt.type === 'break') return true;
                     return Math.hypot(pt.x - p.x, pt.y - p.y) > r;
@@ -649,6 +658,9 @@
         }
 
         function drawCursor(p) {
+            // Don't draw cursor if locked
+            if(generatedGCode) return;
+
             const r = (currentTool === 'erase' ? eraserRadius : 10) * scale;
             const px = origin.x + p.x * scale;
             const py = origin.y - p.y * scale;
@@ -677,7 +689,6 @@
             if(rawPoints.length === 0) return;
             saveState();
 
-            // Calculate Center
             let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
             let hasPoints = false;
             rawPoints.forEach(p => {
@@ -693,25 +704,6 @@
             const cy = (minY + maxY)/2;
 
             if(type === 'rotate') {
-                // Rotation is absolute from the slider (val is degrees)
-                // Actually, making it incremental is better for UI flow, 
-                // but standard slider returns absolute. 
-                // Let's assume the user dragged the slider.
-                // NOTE: Since the slider resets to 0, let's treat it as a delta?
-                // No, standard absolute rotation is tricky without storing initial state.
-                // Let's do simple delta rotation based on difference from prev value?
-                // Simpler: Just rotate by the val (assuming val is small delta) OR
-                // Re-implementation: Slider sets specific angle? No.
-                // Let's just do: Slider value is treated as "Rotate X degrees" then snaps back?
-                // Alternative: The slider in UI triggers `onchange`.
-                
-                // Let's implement the slider as an absolute Rotator? No, that requires storing initial rotation.
-                // Let's implement as "Relative Rotate".
-                // Since `onchange` fires on release, or `oninput`.
-                // We will use the value as a strict rotation relative to center.
-                // But since we don't track object orientation, let's use the slider 
-                // as a "Rotate this much" tool.
-                
                 const rad = (parseFloat(val) * Math.PI) / 180;
                 const cos = Math.cos(rad);
                 const sin = Math.sin(rad);
@@ -725,7 +717,6 @@
                     }
                 });
                 
-                // Reset slider visual only (hacky but effective for continuous use)
                 document.getElementById('rotSlider').value = 0;
                 document.getElementById('rotSlider').nextElementSibling.innerText = "0°";
             }
@@ -742,18 +733,14 @@
             render();
         }
 
-
         // --- MASTER DUNE FILL ---
         function handleFillClick(e) {
             const clickPos = getPos(e);
-            
-            // CONFIGURATION:
-            const DENSITY = fillGap; // Use user selected gap
+            const DENSITY = fillGap; 
             const NOISE_SCALE = 0.05;
             const WAVE_AMP = 3.0; 
             const MAX_JUMP = 30.0; 
 
-            // 1. Convert rawPoints into distinct shapes
             let shapes = [];
             let currentShape = [];
             
@@ -775,7 +762,6 @@
             });
             if(currentShape.length > 2) shapes.push(currentShape);
 
-            // 2. Identify Target
             let candidates = [];
             for(let i=0; i<shapes.length; i++) {
                 if(isPointInPolygon(clickPos, shapes[i])) {
@@ -792,7 +778,6 @@
             candidates.sort((a,b) => a.area - b.area);
             const target = candidates[0]; 
             
-            // 3. Identify Holes
             let holes = [];
             shapes.forEach((s, idx) => {
                 if(idx === target.id) return; 
@@ -807,20 +792,17 @@
             showToast("Generating Smart Trace...", "info");
             saveState();
 
-            // 4. RANDOM ROTATION SETUP
-            const fillAngle = Math.random() * Math.PI; // 0 to 180
+            const fillAngle = Math.random() * Math.PI; 
             
             const rotatePt = (x, y, rad) => ({
                 x: x * Math.cos(rad) - y * Math.sin(rad),
                 y: x * Math.sin(rad) + y * Math.cos(rad)
             });
 
-            // Rotate Target AND HOLES
             const rotTarget = target.shape.map(p => rotatePt(p.x, p.y, -fillAngle));
             const rotHoles = holes.map(h => h.map(p => rotatePt(p.x, p.y, -fillAngle)));
             const rotBounds = getBounds(rotTarget);
             
-            // 5. Generate Scanline on Rotated Plane
             let y = rotBounds.minY + DENSITY;
             let direction = 1;
             
@@ -829,33 +811,29 @@
             let lastFilledPointRot = null;
 
             while(y < rotBounds.maxY) {
-                // COLLECT INTERSECTIONS FOR TARGET AND ALL HOLES
                 let cutPoints = [];
 
-                // Helper to add intersections for a polygon
                 const addIntersections = (poly, polyId) => {
                     for(let i=0; i<poly.length; i++) {
                         let p1 = poly[i];
                         let p2 = poly[(i+1)%poly.length];
                         if((p1.y <= y && p2.y > y) || (p1.y > y && p2.y <= y)) {
                             let x = p1.x + (y - p1.y) * (p2.x - p1.x) / (p2.y - p1.y);
-                            cutPoints.push({x:x, polyIndex: polyId}); // polyIndex 0=Target, 1+=Holes
+                            cutPoints.push({x:x, polyIndex: polyId}); 
                         }
                     }
                 };
 
-                addIntersections(rotTarget, -1); // -1 = Main Target
+                addIntersections(rotTarget, -1); 
                 rotHoles.forEach((h, idx) => addIntersections(h, idx));
 
                 cutPoints.sort((a,b) => a.x - b.x);
 
-                // ITERATE CUTS TO FIND VALID SEGMENTS
                 for(let k=0; k<cutPoints.length; k++) {
                      if(k+1 >= cutPoints.length) break;
                      let startCut = cutPoints[k];
                      let endCut = cutPoints[k+1];
                      
-                     // Check midpoint to see if we are in "Ink"
                      let midX = (startCut.x + endCut.x) / 2;
                      
                      let pMid = {x: midX, y: y};
@@ -866,7 +844,6 @@
                      }
 
                      if(isInsideTarget && !isInsideHole) {
-                        // VALID SEGMENT
                         let segPoints = [];
                         const step = 2.0; 
                         
@@ -883,15 +860,12 @@
 
                         let segmentStartPointRot = {x: segPoints[0], y:y};
 
-                        // --- INTELLIGENT TRAVEL ---
                         if(lastFilledPointRot) {
                             
                             let startPoly = findClosestPoly(lastFilledPointRot, rotTarget, rotHoles);
                             let endPoly = findClosestPoly(segmentStartPointRot, rotTarget, rotHoles);
 
                             if(startPoly && endPoly && startPoly === endPoly) {
-                                // We are travelling along the SAME wall (either outer wall or same hole)
-                                // Trace it!
                                 let idx1 = findClosestIndex(lastFilledPointRot, startPoly);
                                 let idx2 = findClosestIndex(segmentStartPointRot, startPoly);
                                 let trace = getPerimeterPath(idx1, idx2, startPoly);
@@ -908,7 +882,6 @@
                              rawPoints.push({type:'break'});
                         }
 
-                        // DRAW THE WAVE
                         for(let px of segPoints) {
                             let noiseVal = Noise.eval(px * NOISE_SCALE, y * NOISE_SCALE);
                             let py = y + (noiseVal * WAVE_AMP);
@@ -924,7 +897,6 @@
                             }
                         }
 
-                        // Save end of this segment for next travel
                         lastFilledPointRot = {x: segPoints[segPoints.length-1], y:y};
                      }
                 }
@@ -933,7 +905,6 @@
                 y += DENSITY;
             }
             
-            // --- CLEANUP OUTLINES ---
             if(lastFilledPointRot) {
                  let startP = target.shape[0];
                  let startPRot = rotatePt(startP.x, startP.y, -fillAngle);
@@ -1060,7 +1031,7 @@
             if(rawPoints.length === 0) return showToast("Draw something first!", "error");
             showToast("Optimizing Path... (Checking Collisions)", "info");
 
-            setTimeout(() => { // Allow UI to update before heavy lifting
+            setTimeout(() => { 
                 const tableR = parseFloat(document.getElementById('cfgRadius').value);
                 const sym = parseInt(document.getElementById('symSlider').value);
                 
@@ -1235,9 +1206,29 @@
                 document.getElementById('statusTxt').innerText = summary;
                 document.getElementById('statusTxt').style.color = "green";
                 document.getElementById('progressSlider').value = 0;
+                
+                // --- TOGGLE INTERFACE ---
+                document.getElementById('designPhaseControls').style.display = 'none';
+                document.getElementById('productionPhaseControls').style.display = 'block';
+                document.getElementById('productionPhaseControls').classList.add('fade-in');
+
                 render(); 
                 showToast(summary, "success");
             }, 50);
+        }
+
+        // --- NEW: Return to Editing Mode ---
+        function returnToEditing() {
+            generatedGCode = null;
+            processedPoints = [];
+            
+            document.getElementById('designPhaseControls').style.display = 'block';
+            document.getElementById('productionPhaseControls').style.display = 'none';
+            document.getElementById('designPhaseControls').classList.add('fade-in');
+            
+            resetStatus();
+            // Reset symmetry to current value to update drawing logic
+            updateUI();
         }
 
         // --- G-CODE GENERATION ---
@@ -1474,7 +1465,7 @@
             }
 
             // Draw Transform Bounding Box
-            if(currentTool === 'select' && rawPoints.length > 0) {
+            if(currentTool === 'select' && rawPoints.length > 0 && !generatedGCode) {
                  // Calculate simplified bounds
                  let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
                  rawPoints.forEach(p => {
