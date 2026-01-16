@@ -135,7 +135,6 @@
         .stamp-btn { font-size: 18px; padding: 5px; background: rgba(0,0,0,0.05); border-radius: 4px; border: 1px solid rgba(0,0,0,0.1); }
         .stamp-btn:hover { background: var(--secondary); color: white; }
 
-        /* Modal Styles */
         #imgOptionsModal {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.8); z-index: 5000;
@@ -199,11 +198,6 @@
 
                 <div id="toolSettingsArea">
                     <div id="set-pen" class="tool-setting-group">
-                        <div class="slider-row" style="margin-bottom: 10px;">
-                            <div class="slider-header"><span>SYMMETRY</span> <span id="symVal">1x</span></div>
-                            <input type="range" id="symSlider" min="1" max="12" value="1" step="1" oninput="updateUI()">
-                        </div>
-
                         <div class="toggle-row" style="margin:0;">
                             <span style="font-size:13px;">🔗 Shape Connector</span>
                             <label class="switch">
@@ -224,6 +218,11 @@
                                 <button class="stamp-btn" onclick="addShape('diamond')">💎</button>
                                 <button class="stamp-btn" onclick="addShape('spiral')">🌀</button>
                             </div>
+                        </div>
+                        
+                        <div class="slider-row" style="margin-top: 15px; margin-bottom: 0;">
+                            <div class="slider-header"><span>SYMMETRY</span> <span id="symVal">1x</span></div>
+                            <input type="range" id="symSlider" min="1" max="12" value="1" step="1" oninput="updateUI()">
                         </div>
                     </div>
 
@@ -254,14 +253,11 @@
                         <input type="range" min="-4.0" max="10.0" step="0.1" value="2.0" 
                                oninput="document.getElementById('sandStartVal').innerText=this.value+'x'; applySandify();" id="sandScaleInput">
                         <div style="text-align:right; font-size:10px; margin-bottom:5px;" id="sandStartVal">2.0x</div>
-                        
                         <span class="tool-label">Zoom Interval</span>
                         <input type="range" min="0.01" max="0.2" step="0.01" value="0.05" oninput="applySandify()" id="sandZoomInput">
-                        
                         <span class="tool-label">Rotation Interval</span>
                         <input type="range" min="0" max="45" step="1" value="5" oninput="applySandify()" id="sandRotInput">
-
-                        <span class="tool-label">Shift Interval (Left/Right)</span>
+                        <span class="tool-label">Shift Interval</span>
                         <input type="range" min="-50" max="50" step="1" value="0" oninput="applySandify()" id="sandShiftInput">
                     </div>
                 </div>
@@ -288,7 +284,6 @@
                 </div>
 
                 <hr style="border:0; border-top:1px solid #ddd; margin: 15px 0;">
-                
                 <button class="action" onclick="prepareGCode()" style="margin-bottom:15px; font-size:1.1em;">⚙️ Prepare Path</button>
             </div>
             
@@ -345,29 +340,18 @@
         let origin = {x:0, y:0};
         let scale = 1;
         let generatedGCode = null;
-
-        // Tool Settings State
         let eraserRadius = 10;
         let fillGap = 5.0;
-
-        // Sandify Base State
         let sandBasePoints = null;
-
-        // Live Transform State
         let lastRotVal = 0;
         let lastScaleVal = 100;
-
-        // Image Upload Temp Storage
         let tempImgData = null;
 
         const canvas = document.getElementById('drawCanvas');
         const ctx = canvas.getContext('2d');
         const BASE_URL = window.location.origin;
 
-        // =====================================================
-        // === 1. CORE MATH & GEOMETRY HELPERS ===
-        // =====================================================
-
+        // ... [Geometry Helpers match previous] ...
         function distSq(p1, p2) { return (p1.x-p2.x)**2 + (p1.y-p2.y)**2; }
         function dist(p1, p2) { return Math.sqrt(distSq(p1, p2)); }
         function isPointInPolygon(p, polygon) {
@@ -549,9 +533,7 @@
             updateToolSettings();
         }
 
-        let dragStart = null;
-
-        // --- DRAWING LOGIC ---
+        // --- DRAWING & INPUT HANDLERS ---
         function startDraw(e) {
             e.preventDefault();
             if(generatedGCode) return;
@@ -632,17 +614,13 @@
             for(let i=startIndex; i<rawPoints.length; i++) stroke.push(rawPoints[i]);
             if(stroke.length < 3) return;
 
-            // Auto-Connect Logic
             let startP = stroke[0];
             let endP = stroke[stroke.length-1];
             let d = Math.hypot(startP.x - endP.x, startP.y - endP.y);
-            
-            // Snap to close loop if close
             if(d < 30.0) {
                 stroke.push({x: startP.x, y: startP.y, type:'point'});
             }
 
-            // Smoothing: 2 Passes (Chaikin)
             for(let pass=0; pass<2; pass++) {
                 let smooth = [];
                 smooth.push(stroke[0]);
@@ -666,7 +644,6 @@
             rawPoints.splice(startIndex, rawPoints.length - startIndex, ...stroke);
         }
 
-        // --- SHAPE STAMPS ---
         function addShape(type) {
             saveState();
             const r = 50; 
@@ -721,6 +698,194 @@
             showToast("Added " + type, "success");
         }
 
+        // --- IMAGE HANDLING & PROCESSING ---
+        function handleImageUpload(input) {
+            const file = input.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                tempImgData = e.target.result;
+                document.getElementById('imgOptionsModal').style.display = 'flex';
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function closeImgModal() {
+            document.getElementById('imgOptionsModal').style.display = 'none';
+            tempImgData = null;
+            document.getElementById('imgUpload').value = ''; 
+        }
+
+        function confirmTrace() {
+            if(!tempImgData) return;
+            closeImgModal();
+            showToast("Scanning (Trace)...", "info");
+            saveState();
+            
+            const img = new Image();
+            img.onload = function() {
+                const tCan = document.createElement('canvas');
+                // Limit resolution to speed up tracing
+                const MAX = 800; 
+                let tw = img.width, th = img.height;
+                if(tw>th && tw>MAX){ th*=MAX/tw; tw=MAX; } 
+                else if(th>MAX){ tw*=MAX/th; th=MAX; }
+                tCan.width = tw; tCan.height = th;
+                
+                const tCtx = tCan.getContext('2d');
+                tCtx.fillStyle = "white"; tCtx.fillRect(0,0,tw,th);
+                tCtx.drawImage(img, 0, 0, tw, th);
+                
+                // SVG Trace Config
+                ImageTracer.imageToSVG(tCan.toDataURL(), function(svgStr){ 
+                    processTrace(svgStr, tw, th); 
+                }, { ltres:0.5, qtres:0.5, pathomit:2, colorsampling:2, numberofcolors:2 });
+            };
+            img.src = tempImgData;
+        }
+
+        function confirmSketch() {
+            if(!tempImgData) return;
+            closeImgModal();
+            showToast("Processing Sketch...", "info");
+            saveState();
+            
+            const img = new Image();
+            img.onload = function() {
+                processSketch(img);
+            };
+            img.src = tempImgData;
+        }
+
+        function processTrace(svgStr, imgW, imgH) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(svgStr, "image/svg+xml");
+            const paths = doc.getElementsByTagName("path");
+            let strokes = [];
+            const res = 2.0; 
+
+            for(let i=0; i<paths.length; i++) {
+                const p = paths[i];
+                const len = p.getTotalLength();
+                if(len < 5) continue; 
+                let pts = [];
+                for(let d=0; d<=len; d+=res) {
+                    const pt = p.getPointAtLength(d);
+                    pts.push({x: pt.x, y: pt.y});
+                }
+                strokes.push(pts);
+            }
+
+            if(strokes.length === 0) return showToast("No shapes found", "error");
+            finalizeImport(strokes);
+        }
+
+        // IMPROVED SKETCH ALGORITHM (5 Shades)
+        function processSketch(img) {
+            const size = 500;
+            const can = document.createElement('canvas');
+            can.width = size; can.height = size;
+            const c = can.getContext('2d');
+            
+            // Fit image
+            let scale = Math.min(size/img.width, size/img.height);
+            let w = img.width * scale;
+            let h = img.height * scale;
+            let ox = (size-w)/2;
+            let oy = (size-h)/2;
+            
+            c.fillStyle = "white"; c.fillRect(0,0,size,size);
+            c.drawImage(img, ox, oy, w, h);
+            
+            const idata = c.getImageData(0,0,size,size);
+            const data = idata.data;
+            let strokes = [];
+            
+            // Variable density hatching
+            // Thresholds: 
+            // <50: Pitch Black (Step 2)
+            // <100: Dark (Step 3)
+            // <150: Mid (Step 6)
+            // <200: Light (Step 12)
+            // >200: White (Skip)
+
+            for(let y=0; y<size; y++) {
+                let currentStroke = [];
+                
+                for(let x=0; x<size; x++) {
+                    let idx = (y*size + x)*4;
+                    let gray = 0.299*data[idx] + 0.587*data[idx+1] + 0.114*data[idx+2];
+                    
+                    // Circular mask
+                    let dx = x - size/2, dy = y - size/2;
+                    if(Math.sqrt(dx*dx + dy*dy) > size/2 - 2) gray = 255; 
+
+                    let active = false;
+                    
+                    if(gray < 50) {
+                        if(y % 2 === 0) active = true;
+                    } else if(gray < 100) {
+                        if(y % 3 === 0) active = true;
+                    } else if(gray < 150) {
+                        if(y % 6 === 0) active = true;
+                    } else if(gray < 200) {
+                        if(y % 12 === 0) active = true;
+                    }
+
+                    if(active) {
+                        currentStroke.push({x:x, y:y});
+                    } else {
+                        if(currentStroke.length > 3) {
+                            strokes.push(currentStroke);
+                        }
+                        currentStroke = [];
+                    }
+                }
+                if(currentStroke.length > 3) strokes.push(currentStroke);
+            }
+            
+            finalizeImport(strokes);
+        }
+
+        function finalizeImport(strokes) {
+            // 1. Calculate Bounds
+            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+            strokes.flat().forEach(p => {
+                if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
+                if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
+            });
+            
+            // 2. Scaling Factors
+            const contentW = maxX - minX;
+            const contentH = maxY - minY;
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            // 90% coverage
+            const scaleFac = (tableR * 2 * 0.9) / Math.max(contentW, contentH);
+            const cx = (minX + maxX)/2;
+            const cy = (minY + maxY)/2;
+
+            // 3. Normalize & Apply to rawPoints
+            rawPoints = [];
+            strokes.forEach(s => {
+                let normS = s.map(p => ({
+                    x: (p.x - cx) * scaleFac,
+                    y: -(p.y - cy) * scaleFac // Flip Y for table coords
+                })).filter(p => Math.hypot(p.x, p.y) < tableR); // Clip to circle
+
+                if(normS.length > 1) {
+                    rawPoints.push({type:'break'});
+                    normS.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
+                }
+            });
+            rawPoints.push({type:'break'});
+
+            resetStatus();
+            render();
+            showToast("Import Successful", "success");
+        }
+
+        // [Helper functions like getPos, processPointer, drawCursor, applyTransform, liveRotate/Scale, applySandify, handleFillClick remain unchanged from previous stable versions]
+        
         function getPos(e) {
             return {
                 x: (e.offsetX - origin.x) / scale,
@@ -921,7 +1086,6 @@
             }
         }
 
-
         // --- MASTER DUNE FILL ---
         function handleFillClick(e) {
             const clickPos = getPos(e);
@@ -1087,178 +1251,9 @@
             showToast("Master Fill Complete!", "success");
         }
 
-        // --- IMAGE IMPORT MODAL ---
-        function handleImageUpload(input) {
-            const file = input.files[0];
-            if(!file) return;
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                tempImgData = e.target.result;
-                document.getElementById('imgOptionsModal').style.display = 'flex';
-            };
-            reader.readAsDataURL(file);
-        }
-
-        function closeImgModal() {
-            document.getElementById('imgOptionsModal').style.display = 'none';
-            tempImgData = null;
-            document.getElementById('imgUpload').value = ''; 
-        }
-
-        function confirmTrace() {
-            if(!tempImgData) return;
-            closeImgModal();
-            showToast("Scanning (Trace)...", "info");
-            saveState();
-            const img = new Image();
-            img.onload = function() {
-                const tCan = document.createElement('canvas');
-                const MAX = 1000;
-                let tw = img.width, th = img.height;
-                if(tw>th && tw>MAX){ th*=MAX/tw; tw=MAX; } 
-                else if(th>MAX){ tw*=MAX/th; th=MAX; }
-                tCan.width = tw; tCan.height = th;
-                const tCtx = tCan.getContext('2d');
-                tCtx.fillStyle = "white"; tCtx.fillRect(0,0,tw,th);
-                tCtx.filter = "grayscale(100%) contrast(150%)";
-                tCtx.drawImage(img, 0, 0, tw, th);
-                ImageTracer.imageToSVG(tCan.toDataURL(), function(svgStr){ processTrace(svgStr, tw, th); }, { ltres:0.5, qtres:0.5, pathomit:2, colorsampling:2, numberofcolors:2 });
-            };
-            img.src = tempImgData;
-        }
-
-        function confirmSketch() {
-            if(!tempImgData) return;
-            closeImgModal();
-            showToast("Processing Sketch Mode...", "info");
-            saveState();
-            const img = new Image();
-            img.onload = function() {
-                processSketch(img);
-            };
-            img.src = tempImgData;
-        }
-
-        function processTrace(svgStr, imgW, imgH) {
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(svgStr, "image/svg+xml");
-            const paths = doc.getElementsByTagName("path");
-            let strokes = [];
-            const res = 2.0; 
-            for(let i=0; i<paths.length; i++) {
-                const p = paths[i];
-                const len = p.getTotalLength();
-                if(len < 5) continue; 
-                let pts = [];
-                let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
-                for(let d=0; d<=len; d+=res) {
-                    const pt = p.getPointAtLength(d);
-                    pts.push({x: pt.x, y: pt.y});
-                    if(pt.x<minX) minX=pt.x; if(pt.x>maxX) maxX=pt.x;
-                    if(pt.y<minY) minY=pt.y; if(pt.y>maxY) maxY=pt.y;
-                }
-                const w = maxX - minX;
-                const h = maxY - minY;
-                if (w > imgW * 0.98 || h > imgH * 0.98) continue; 
-                strokes.push(pts);
-            }
-            if(strokes.length === 0) return showToast("No shapes found", "error");
-            finalizeImport(strokes);
-        }
-
-        // --- SKETCH MODE LOGIC ---
-        function processSketch(img) {
-            // Resize for processing speed
-            const size = 500;
-            const can = document.createElement('canvas');
-            can.width = size; can.height = size;
-            const c = can.getContext('2d');
-            
-            // Maintain aspect ratio fit
-            let scale = Math.min(size/img.width, size/img.height);
-            let w = img.width * scale;
-            let h = img.height * scale;
-            let ox = (size-w)/2;
-            let oy = (size-h)/2;
-            
-            c.fillStyle = "white"; c.fillRect(0,0,size,size);
-            c.drawImage(img, ox, oy, w, h);
-            
-            const idata = c.getImageData(0,0,size,size);
-            const data = idata.data;
-            let strokes = [];
-            
-            // Hatching Algorithm
-            // Layers: 
-            // 1. Darkest (Val < 80) -> Density 2px
-            // 2. Mid (Val < 150) -> Density 4px
-            // 3. Light (Val < 220) -> Density 8px
-            
-            let yStep = 2; // base step
-            
-            for(let y=0; y<size; y+=yStep) {
-                let currentStroke = [];
-                let threshold = 0;
-                
-                // Variable Density by checking Y modulo
-                if(y % 8 === 0) threshold = 220; // Light line row
-                else if(y % 4 === 0) threshold = 150; // Mid line row
-                else threshold = 80; // Dark line row
-                
-                for(let x=0; x<size; x++) {
-                    let idx = (y*size + x)*4;
-                    // Grayscale
-                    let gray = 0.299*data[idx] + 0.587*data[idx+1] + 0.114*data[idx+2];
-                    
-                    // Simple mask (Circle)
-                    let dx = x - size/2; let dy = y - size/2;
-                    if(Math.sqrt(dx*dx + dy*dy) > size/2 - 5) gray = 255; // force white outside circle
-                    
-                    if(gray < threshold) {
-                        currentStroke.push({x: x, y: y});
-                    } else {
-                        if(currentStroke.length > 5) { // Minimum line length
-                            strokes.push(currentStroke);
-                        }
-                        currentStroke = [];
-                    }
-                }
-                if(currentStroke.length > 5) strokes.push(currentStroke);
-            }
-            
-            finalizeImport(strokes);
-        }
-
-        function finalizeImport(strokes) {
-            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
-            strokes.flat().forEach(p => {
-                if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
-                if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
-            });
-            const contentW = maxX - minX;
-            const contentH = maxY - minY;
-            const tableR = parseFloat(document.getElementById('cfgRadius').value);
-            const scaleFac = (tableR * 2 * 0.9) / Math.max(contentW, contentH);
-            const cx = (minX + maxX)/2;
-            const cy = (minY + maxY)/2;
-            let normalizedStrokes = strokes.map(s => {
-                return s.map(p => ({
-                    x: (p.x - cx) * scaleFac,
-                    y: -(p.y - cy) * scaleFac 
-                })).filter(p => Math.hypot(p.x, p.y) < tableR);
-            });
-            rawPoints = [];
-            normalizedStrokes.forEach(s => {
-                rawPoints.push({type:'break'});
-                s.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
-            });
-            rawPoints.push({type:'break'});
-            resetStatus();
-            showToast("Import Complete (Click Prepare)", "info");
-            render();
-        }
-
-        // --- OPTIMIZER ---
+        // ... [Optimizer, G-Code Generation, and Utils remain unchanged] ...
+        // [Assuming they are included as in previous turns]
+        
         function prepareGCode() {
             if(rawPoints.length === 0) return showToast("Draw something first!", "error");
             showToast("Optimizing Path...", "info");
