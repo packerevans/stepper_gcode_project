@@ -135,6 +135,18 @@
         .stamp-btn { font-size: 18px; padding: 5px; background: rgba(0,0,0,0.05); border-radius: 4px; border: 1px solid rgba(0,0,0,0.1); }
         .stamp-btn:hover { background: var(--secondary); color: white; }
 
+        /* Modal Styles */
+        #imgOptionsModal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); z-index: 5000;
+            display: none; align-items: center; justify-content: center;
+        }
+        .modal-content {
+            background: var(--panel); color: var(--text);
+            padding: 20px; border-radius: 12px; width: 90%; max-width: 400px;
+            text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        .modal-btn-row { display: flex; gap: 10px; margin-top: 20px; }
     </style>
 </head>
 <body data-theme="light">
@@ -145,6 +157,18 @@
         <a href="/ai_builder">AI Builder</a>
         <a href="/led_controls">LED Controls</a>
         <a href="/terminal">Terminal</a>
+    </div>
+
+    <div id="imgOptionsModal">
+        <div class="modal-content">
+            <h3>Import Image</h3>
+            <p>How would you like to process this image?</p>
+            <div class="modal-btn-row">
+                <button class="secondary" onclick="confirmTrace()">Standard Trace<br><span style="font-size:10px">(Outlines)</span></button>
+                <button class="active" onclick="confirmSketch()">Sketch Mode<br><span style="font-size:10px">(Shading/Hatch)</span></button>
+            </div>
+            <button style="margin-top:10px; background:none; border:none; color:var(--text); text-decoration:underline;" onclick="closeImgModal()">Cancel</button>
+        </div>
     </div>
 
     <div class="nav-bar">
@@ -166,19 +190,24 @@
                 <h2>Tools</h2>
                 
                 <div class="toggle-row">
-                    <span style="font-weight:600; font-size:13px;">🖋️ Smart Pen Mode</span>
+                    <span style="font-weight:600; font-size:13px;">🖋️ Stylus Mode</span>
                     <label class="switch">
-                        <input type="checkbox" id="smartPenMode" checked>
+                        <input type="checkbox" id="stylusMode">
                         <span class="slider-tog"></span>
                     </label>
                 </div>
 
                 <div id="toolSettingsArea">
                     <div id="set-pen" class="tool-setting-group">
+                        <div class="slider-row" style="margin-bottom: 10px;">
+                            <div class="slider-header"><span>SYMMETRY</span> <span id="symVal">1x</span></div>
+                            <input type="range" id="symSlider" min="1" max="12" value="1" step="1" oninput="updateUI()">
+                        </div>
+
                         <div class="toggle-row" style="margin:0;">
-                            <span style="font-size:13px;">〰️ Strong Smoothing</span>
+                            <span style="font-size:13px;">🔗 Shape Connector</span>
                             <label class="switch">
-                                <input type="checkbox" id="smoothDrawMode" checked>
+                                <input type="checkbox" id="shapeConnectMode" checked>
                                 <span class="slider-tog"></span>
                             </label>
                         </div>
@@ -188,7 +217,11 @@
                                 <button class="stamp-btn" onclick="addShape('circle')">⭕</button>
                                 <button class="stamp-btn" onclick="addShape('square')">⬜</button>
                                 <button class="stamp-btn" onclick="addShape('triangle')">🔺</button>
+                                <button class="stamp-btn" onclick="addShape('hexagon')">⬡</button>
+                                <button class="stamp-btn" onclick="addShape('pentagon')">⬠</button>
                                 <button class="stamp-btn" onclick="addShape('star')">⭐</button>
+                                <button class="stamp-btn" onclick="addShape('heart')">❤️</button>
+                                <button class="stamp-btn" onclick="addShape('diamond')">💎</button>
                                 <button class="stamp-btn" onclick="addShape('spiral')">🌀</button>
                             </div>
                         </div>
@@ -214,15 +247,11 @@
                         <input type="range" min="10" max="200" value="100" step="1" id="liveScaleSlider" 
                                oninput="liveScale(this.value)" onchange="endLiveTransform(this)">
                         <div style="text-align:right; font-size:10px; color:#666;" id="liveScaleVal">100%</div>
-                        
-                        <div style="clear:both; padding-top:5px; font-size:11px; color:#666; font-style:italic;">
-                            Sliders apply instantly and reset on release.
-                        </div>
                     </div>
 
                     <div id="set-sandify" class="tool-setting-group">
                         <span class="tool-label">Start Size (Enlarged)</span>
-                        <input type="range" min="1.1" max="4.0" step="0.1" value="2.0" 
+                        <input type="range" min="-4.0" max="10.0" step="0.1" value="2.0" 
                                oninput="document.getElementById('sandStartVal').innerText=this.value+'x'; applySandify();" id="sandScaleInput">
                         <div style="text-align:right; font-size:10px; margin-bottom:5px;" id="sandStartVal">2.0x</div>
                         
@@ -234,8 +263,6 @@
 
                         <span class="tool-label">Shift Interval (Left/Right)</span>
                         <input type="range" min="-50" max="50" step="1" value="0" oninput="applySandify()" id="sandShiftInput">
-                        
-                        <div style="font-size:11px; color:#666; margin-top:5px;"><i>Adjust sliders to update pattern live.</i></div>
                     </div>
                 </div>
 
@@ -246,7 +273,7 @@
 
                 <div class="btn-group">
                     <button id="btnSelect" onclick="setTool('select')" class="secondary">✋ Move</button>
-                    <button id="btnSandify" onclick="setTool('sandify')" class="secondary">🌀 Sandify</button>
+                    <button id="btnSandify" onclick="toggleSandify()" class="secondary">🌀 Sandify</button>
                 </div>
 
                 <div class="btn-group">
@@ -262,11 +289,6 @@
 
                 <hr style="border:0; border-top:1px solid #ddd; margin: 15px 0;">
                 
-                <div class="slider-row">
-                    <div class="slider-header"><span>SYMMETRY</span> <span id="symVal">1x</span></div>
-                    <input type="range" id="symSlider" min="1" max="12" value="1" step="1" oninput="updateUI()">
-                </div>
-
                 <button class="action" onclick="prepareGCode()" style="margin-bottom:15px; font-size:1.1em;">⚙️ Prepare Path</button>
             </div>
             
@@ -328,12 +350,15 @@
         let eraserRadius = 10;
         let fillGap = 5.0;
 
-        // Sandify Base State (to prevent degradation on live updates)
+        // Sandify Base State
         let sandBasePoints = null;
 
         // Live Transform State
         let lastRotVal = 0;
         let lastScaleVal = 100;
+
+        // Image Upload Temp Storage
+        let tempImgData = null;
 
         const canvas = document.getElementById('drawCanvas');
         const ctx = canvas.getContext('2d');
@@ -532,7 +557,7 @@
             if(generatedGCode) return;
             if(currentTool === 'fill') { handleFillClick(e); return; }
 
-            const smart = document.getElementById('smartPenMode').checked;
+            const smart = document.getElementById('stylusMode').checked;
             if(smart && currentTool !== 'select' && currentTool !== 'sandify') {
                 if(e.pointerType === 'pen') setTool('draw');
                 else if(e.pointerType === 'touch') setTool('erase');
@@ -586,15 +611,15 @@
                 return;
             }
             if(currentTool === 'draw') {
-                if(document.getElementById('smoothDrawMode').checked) {
-                    smoothLastStroke();
+                if(document.getElementById('shapeConnectMode').checked) {
+                    autoConnectAndSmooth();
                 }
                 rawPoints.push({type:'break'});
             }
             render();
         }
 
-        function smoothLastStroke() {
+        function autoConnectAndSmooth() {
             let lastBreak = -1;
             for(let i=rawPoints.length-1; i>=0; i--) {
                 if(rawPoints[i].type === 'break' || rawPoints[i].type === 'cmd') {
@@ -607,8 +632,18 @@
             for(let i=startIndex; i<rawPoints.length; i++) stroke.push(rawPoints[i]);
             if(stroke.length < 3) return;
 
-            // STRONGER SMOOTHING: 4 Passes
-            for(let pass=0; pass<4; pass++) {
+            // Auto-Connect Logic
+            let startP = stroke[0];
+            let endP = stroke[stroke.length-1];
+            let d = Math.hypot(startP.x - endP.x, startP.y - endP.y);
+            
+            // Snap to close loop if close
+            if(d < 30.0) {
+                stroke.push({x: startP.x, y: startP.y, type:'point'});
+            }
+
+            // Smoothing: 2 Passes (Chaikin)
+            for(let pass=0; pass<2; pass++) {
                 let smooth = [];
                 smooth.push(stroke[0]);
                 for(let i=0; i<stroke.length-1; i++) {
@@ -646,12 +681,31 @@
                 pts = [{x:-r,y:-r}, {x:r,y:-r}, {x:r,y:r}, {x:-r,y:r}, {x:-r,y:-r}];
             } else if(type==='triangle') {
                 pts = [{x:0,y:r}, {x:r*0.86,y:-r/2}, {x:-r*0.86,y:-r/2}, {x:0,y:r}];
+            } else if(type==='hexagon') {
+                for(let i=0; i<=6; i++) {
+                    const a = (i/6)*Math.PI*2;
+                    pts.push({x: Math.cos(a)*r, y: Math.sin(a)*r});
+                }
+            } else if(type==='pentagon') {
+                for(let i=0; i<=5; i++) {
+                    const a = (i/5)*Math.PI*2 - Math.PI/2; 
+                    pts.push({x: Math.cos(a)*r, y: Math.sin(a)*r});
+                }
             } else if(type==='star') {
                  for(let i=0; i<=10; i++) {
                     const a = (i/10)*Math.PI*2 + Math.PI/2;
                     const rad = (i%2===0) ? r : r*0.4;
                     pts.push({x: Math.cos(a)*rad, y: Math.sin(a)*rad});
                 }
+            } else if(type==='heart') {
+                for(let i=0; i<60; i++) {
+                    let t = (i/60) * Math.PI * 2;
+                    let x = 16 * Math.pow(Math.sin(t), 3);
+                    let y = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
+                    pts.push({x: x * (r/16), y: y * (r/16)});
+                }
+            } else if(type==='diamond') {
+                pts = [{x:0, y:r}, {x:r*0.7, y:0}, {x:0, y:-r}, {x:-r*0.7, y:0}, {x:0, y:r}];
             } else if(type==='spiral') {
                 for(let i=0; i<100; i++) {
                     const a = i * 0.3;
@@ -713,7 +767,6 @@
             const diff = val - lastRotVal;
             if(diff === 0) return;
             
-            // Apply delta rotation
             const rad = (diff * Math.PI) / 180;
             const cos = Math.cos(rad);
             const sin = Math.sin(rad);
@@ -776,8 +829,7 @@
         }
 
         function endLiveTransform(slider) {
-            saveState(); // Commit the change
-            // Reset logic to avoid range limits
+            saveState(); 
             if(slider.id === 'liveRotSlider') {
                 slider.value = 0;
                 lastRotVal = 0;
@@ -794,7 +846,6 @@
         function applySandify() {
             if(!sandBasePoints || sandBasePoints.length === 0) return;
             
-            // Read from slider
             const startScale = parseFloat(document.getElementById('sandScaleInput').value);
             const zoomStep = parseFloat(document.getElementById('sandZoomInput').value);
             const rotStep = parseFloat(document.getElementById('sandRotInput').value);
@@ -803,7 +854,6 @@
             let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
             let pointsFound = false;
             
-            // Use base points for calculation source
             let baseShape = JSON.parse(JSON.stringify(sandBasePoints));
             
             baseShape.forEach(p => {
@@ -852,10 +902,23 @@
                 currentShift += shiftStep;
             }
 
-            // Update global rawPoints for display/Gcode
             rawPoints = newPattern;
             resetStatus();
             render();
+        }
+
+        function toggleSandify() {
+            if(currentTool === 'sandify') {
+                if(sandBasePoints) {
+                    rawPoints = JSON.parse(JSON.stringify(sandBasePoints));
+                    sandBasePoints = null;
+                }
+                setTool('select'); 
+                showToast("Sandify Cancelled", "info");
+                render();
+            } else {
+                setTool('sandify');
+            }
         }
 
 
@@ -1024,31 +1087,56 @@
             showToast("Master Fill Complete!", "success");
         }
 
-        // --- IMAGE UPLOAD HANDLING ---
+        // --- IMAGE IMPORT MODAL ---
         function handleImageUpload(input) {
             const file = input.files[0];
             if(!file) return;
-            showToast("Scanning...", "info");
-            saveState();
             const reader = new FileReader();
             reader.onload = function(e) {
-                const img = new Image();
-                img.onload = function() {
-                    const tCan = document.createElement('canvas');
-                    const MAX = 1000;
-                    let tw = img.width, th = img.height;
-                    if(tw>th && tw>MAX){ th*=MAX/tw; tw=MAX; } 
-                    else if(th>MAX){ tw*=MAX/th; th=MAX; }
-                    tCan.width = tw; tCan.height = th;
-                    const tCtx = tCan.getContext('2d');
-                    tCtx.fillStyle = "white"; tCtx.fillRect(0,0,tw,th);
-                    tCtx.filter = "grayscale(100%) contrast(150%)";
-                    tCtx.drawImage(img, 0, 0, tw, th);
-                    ImageTracer.imageToSVG(tCan.toDataURL(), function(svgStr){ processTrace(svgStr, tw, th); }, { ltres:0.5, qtres:0.5, pathomit:2, colorsampling:2, numberofcolors:2 });
-                };
-                img.src = e.target.result;
+                tempImgData = e.target.result;
+                document.getElementById('imgOptionsModal').style.display = 'flex';
             };
             reader.readAsDataURL(file);
+        }
+
+        function closeImgModal() {
+            document.getElementById('imgOptionsModal').style.display = 'none';
+            tempImgData = null;
+            document.getElementById('imgUpload').value = ''; 
+        }
+
+        function confirmTrace() {
+            if(!tempImgData) return;
+            closeImgModal();
+            showToast("Scanning (Trace)...", "info");
+            saveState();
+            const img = new Image();
+            img.onload = function() {
+                const tCan = document.createElement('canvas');
+                const MAX = 1000;
+                let tw = img.width, th = img.height;
+                if(tw>th && tw>MAX){ th*=MAX/tw; tw=MAX; } 
+                else if(th>MAX){ tw*=MAX/th; th=MAX; }
+                tCan.width = tw; tCan.height = th;
+                const tCtx = tCan.getContext('2d');
+                tCtx.fillStyle = "white"; tCtx.fillRect(0,0,tw,th);
+                tCtx.filter = "grayscale(100%) contrast(150%)";
+                tCtx.drawImage(img, 0, 0, tw, th);
+                ImageTracer.imageToSVG(tCan.toDataURL(), function(svgStr){ processTrace(svgStr, tw, th); }, { ltres:0.5, qtres:0.5, pathomit:2, colorsampling:2, numberofcolors:2 });
+            };
+            img.src = tempImgData;
+        }
+
+        function confirmSketch() {
+            if(!tempImgData) return;
+            closeImgModal();
+            showToast("Processing Sketch Mode...", "info");
+            saveState();
+            const img = new Image();
+            img.onload = function() {
+                processSketch(img);
+            };
+            img.src = tempImgData;
         }
 
         function processTrace(svgStr, imgW, imgH) {
@@ -1075,6 +1163,73 @@
                 strokes.push(pts);
             }
             if(strokes.length === 0) return showToast("No shapes found", "error");
+            finalizeImport(strokes);
+        }
+
+        // --- SKETCH MODE LOGIC ---
+        function processSketch(img) {
+            // Resize for processing speed
+            const size = 500;
+            const can = document.createElement('canvas');
+            can.width = size; can.height = size;
+            const c = can.getContext('2d');
+            
+            // Maintain aspect ratio fit
+            let scale = Math.min(size/img.width, size/img.height);
+            let w = img.width * scale;
+            let h = img.height * scale;
+            let ox = (size-w)/2;
+            let oy = (size-h)/2;
+            
+            c.fillStyle = "white"; c.fillRect(0,0,size,size);
+            c.drawImage(img, ox, oy, w, h);
+            
+            const idata = c.getImageData(0,0,size,size);
+            const data = idata.data;
+            let strokes = [];
+            
+            // Hatching Algorithm
+            // Layers: 
+            // 1. Darkest (Val < 80) -> Density 2px
+            // 2. Mid (Val < 150) -> Density 4px
+            // 3. Light (Val < 220) -> Density 8px
+            
+            let yStep = 2; // base step
+            
+            for(let y=0; y<size; y+=yStep) {
+                let currentStroke = [];
+                let threshold = 0;
+                
+                // Variable Density by checking Y modulo
+                if(y % 8 === 0) threshold = 220; // Light line row
+                else if(y % 4 === 0) threshold = 150; // Mid line row
+                else threshold = 80; // Dark line row
+                
+                for(let x=0; x<size; x++) {
+                    let idx = (y*size + x)*4;
+                    // Grayscale
+                    let gray = 0.299*data[idx] + 0.587*data[idx+1] + 0.114*data[idx+2];
+                    
+                    // Simple mask (Circle)
+                    let dx = x - size/2; let dy = y - size/2;
+                    if(Math.sqrt(dx*dx + dy*dy) > size/2 - 5) gray = 255; // force white outside circle
+                    
+                    if(gray < threshold) {
+                        currentStroke.push({x: x, y: y});
+                    } else {
+                        if(currentStroke.length > 5) { // Minimum line length
+                            strokes.push(currentStroke);
+                        }
+                        currentStroke = [];
+                    }
+                }
+                if(currentStroke.length > 5) strokes.push(currentStroke);
+            }
+            
+            finalizeImport(strokes);
+        }
+
+        function finalizeImport(strokes) {
             let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
             strokes.flat().forEach(p => {
                 if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
@@ -1099,7 +1254,7 @@
             });
             rawPoints.push({type:'break'});
             resetStatus();
-            showToast("Trace Loaded (Click Prepare)", "info");
+            showToast("Import Complete (Click Prepare)", "info");
             render();
         }
 
