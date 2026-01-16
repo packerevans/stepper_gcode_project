@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sand Controller Pro (Trace Check)</title>
+    <title>Sand Controller Pro</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -116,7 +116,6 @@
         input:checked + .slider-tog { background-color: var(--secondary); }
         input:checked + .slider-tog:before { transform: translateX(18px); }
 
-        /* Dynamic Tool Settings Container */
         #toolSettingsArea {
             background: rgba(0,0,0,0.03);
             border: 1px dashed var(--secondary);
@@ -129,9 +128,12 @@
         .tool-setting-group.active { display: block; }
         .tool-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--secondary); margin-bottom: 5px; display:block;}
 
-        /* Animation for swapping controls */
         .fade-in { animation: fadeIn 0.3s ease-in; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .stamp-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin-top: 8px; }
+        .stamp-btn { font-size: 18px; padding: 5px; background: rgba(0,0,0,0.05); border-radius: 4px; border: 1px solid rgba(0,0,0,0.1); }
+        .stamp-btn:hover { background: var(--secondary); color: white; }
 
     </style>
 </head>
@@ -152,7 +154,6 @@
     </div>
 
     <div class="app-container">
-        
         <div class="drawing-panel">
             <div class="canvas-wrapper" id="canvasContainer">
                 <canvas id="drawCanvas"></canvas>
@@ -161,7 +162,6 @@
         </div>
 
         <div class="controls-panel">
-            
             <div id="designPhaseControls">
                 <h2>Tools</h2>
                 
@@ -176,11 +176,21 @@
                 <div id="toolSettingsArea">
                     <div id="set-pen" class="tool-setting-group">
                         <div class="toggle-row" style="margin:0;">
-                            <span style="font-size:13px;">〰️ Smooth Strokes</span>
+                            <span style="font-size:13px;">〰️ Strong Smoothing</span>
                             <label class="switch">
-                                <input type="checkbox" id="smoothDrawMode">
+                                <input type="checkbox" id="smoothDrawMode" checked>
                                 <span class="slider-tog"></span>
                             </label>
+                        </div>
+                        <div style="margin-top:10px;">
+                            <span class="tool-label">Add Stamps</span>
+                            <div class="stamp-grid">
+                                <button class="stamp-btn" onclick="addShape('circle')">⭕</button>
+                                <button class="stamp-btn" onclick="addShape('square')">⬜</button>
+                                <button class="stamp-btn" onclick="addShape('triangle')">🔺</button>
+                                <button class="stamp-btn" onclick="addShape('star')">⭐</button>
+                                <button class="stamp-btn" onclick="addShape('spiral')">🌀</button>
+                            </div>
                         </div>
                     </div>
 
@@ -195,32 +205,37 @@
                     </div>
 
                     <div id="set-select" class="tool-setting-group">
-                        <span class="tool-label">Resize All</span>
-                        <div style="display:flex; gap:5px; margin-bottom:8px;">
-                            <button class="secondary" style="padding:4px;" onclick="applyTransform('scale', 0.95)">➖</button>
-                            <button class="secondary" style="padding:4px;" onclick="applyTransform('scale', 1.05)">➕</button>
+                        <span class="tool-label">Rotate Live</span>
+                        <input type="range" min="-180" max="180" value="0" step="1" id="liveRotSlider" 
+                               oninput="liveRotate(this.value)" onchange="endLiveTransform(this)">
+                        <div style="text-align:right; font-size:10px; color:#666;" id="liveRotVal">0°</div>
+                        
+                        <span class="tool-label" style="margin-top:10px;">Resize Live</span>
+                        <input type="range" min="10" max="200" value="100" step="1" id="liveScaleSlider" 
+                               oninput="liveScale(this.value)" onchange="endLiveTransform(this)">
+                        <div style="text-align:right; font-size:10px; color:#666;" id="liveScaleVal">100%</div>
+                        
+                        <div style="clear:both; padding-top:5px; font-size:11px; color:#666; font-style:italic;">
+                            Sliders apply instantly and reset on release.
                         </div>
-                        <span class="tool-label">Rotate All</span>
-                        <input type="range" min="-180" max="180" value="0" step="5" onchange="applyTransform('rotate', this.value)" oninput="this.nextElementSibling.innerText=this.value+'°'" id="rotSlider">
-                        <span style="font-size:10px; float:right;">0°</span>
-                        <div style="clear:both; padding-top:5px; font-size:11px; color:#666;"><i>Drag canvas to Move</i></div>
                     </div>
 
                     <div id="set-sandify" class="tool-setting-group">
                         <span class="tool-label">Start Size (Enlarged)</span>
-                        <input type="range" min="1.1" max="4.0" step="0.1" value="2.0" oninput="document.getElementById('sandStartVal').innerText=this.value+'x'" id="sandScaleInput">
+                        <input type="range" min="1.1" max="4.0" step="0.1" value="2.0" 
+                               oninput="document.getElementById('sandStartVal').innerText=this.value+'x'; applySandify();" id="sandScaleInput">
                         <div style="text-align:right; font-size:10px; margin-bottom:5px;" id="sandStartVal">2.0x</div>
                         
                         <span class="tool-label">Zoom Interval</span>
-                        <input type="range" min="0.01" max="0.2" step="0.01" value="0.05" id="sandZoomInput">
+                        <input type="range" min="0.01" max="0.2" step="0.01" value="0.05" oninput="applySandify()" id="sandZoomInput">
                         
                         <span class="tool-label">Rotation Interval</span>
-                        <input type="range" min="0" max="45" step="1" value="5" id="sandRotInput">
+                        <input type="range" min="0" max="45" step="1" value="5" oninput="applySandify()" id="sandRotInput">
 
-                        <span class="tool-label">Shift Interval (Drift)</span>
-                        <input type="range" min="0" max="5" step="0.5" value="0" id="sandShiftInput">
-
-                        <button onclick="applySandify()" class="action" style="margin-top:10px; width:100%; padding:8px; font-size:12px;">✨ Generate Pattern</button>
+                        <span class="tool-label">Shift Interval (Left/Right)</span>
+                        <input type="range" min="-50" max="50" step="1" value="0" oninput="applySandify()" id="sandShiftInput">
+                        
+                        <div style="font-size:11px; color:#666; margin-top:5px;"><i>Adjust sliders to update pattern live.</i></div>
                     </div>
                 </div>
 
@@ -254,6 +269,7 @@
 
                 <button class="action" onclick="prepareGCode()" style="margin-bottom:15px; font-size:1.1em;">⚙️ Prepare Path</button>
             </div>
+            
             <div id="productionPhaseControls" style="display:none; margin-bottom:15px;">
                 <button class="secondary" onclick="returnToEditing()" style="width:100%; border:2px dashed #999; color:#444; background: rgba(0,0,0,0.05);">
                     ✏️ Back to Edit
@@ -261,7 +277,7 @@
             </div>
 
             <div class="slider-row">
-                <div class="slider-header"><span>SIMULATION (Start ⮕ Finish)</span> <span id="progVal">100%</span></div>
+                <div class="slider-header"><span>SIMULATION</span> <span id="progVal">100%</span></div>
                 <input type="range" id="progressSlider" min="0" max="100" value="100" oninput="render()">
             </div>
 
@@ -312,6 +328,13 @@
         let eraserRadius = 10;
         let fillGap = 5.0;
 
+        // Sandify Base State (to prevent degradation on live updates)
+        let sandBasePoints = null;
+
+        // Live Transform State
+        let lastRotVal = 0;
+        let lastScaleVal = 100;
+
         const canvas = document.getElementById('drawCanvas');
         const ctx = canvas.getContext('2d');
         const BASE_URL = window.location.origin;
@@ -322,7 +345,6 @@
 
         function distSq(p1, p2) { return (p1.x-p2.x)**2 + (p1.y-p2.y)**2; }
         function dist(p1, p2) { return Math.sqrt(distSq(p1, p2)); }
-
         function isPointInPolygon(p, polygon) {
             let inside = false;
             for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
@@ -333,7 +355,6 @@
             }
             return inside;
         }
-
         function getBounds(shape) {
             let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
             shape.forEach(p => {
@@ -342,7 +363,6 @@
             });
             return { minX, maxX, minY, maxY, area: (maxX-minX)*(maxY-minY), w: maxX-minX, h: maxY-minY, cx: (minX+maxX)/2, cy: (minY+maxY)/2 };
         }
-
         function getIntersection(A, B, C, D) {
             const det = (B.x - A.x) * (D.y - C.y) - (D.x - C.x) * (B.y - A.y);
             if (det === 0) return null; 
@@ -353,7 +373,6 @@
             }
             return null;
         }
-
         function distToPoly(pt, poly) {
             let minD = Infinity;
             for(let i=0; i<poly.length; i++) {
@@ -362,7 +381,6 @@
             }
             return minD;
         }
-
         function findClosestIndex(pt, poly) {
             let minD = Infinity, idx = -1;
             for(let i=0; i<poly.length; i++) {
@@ -371,7 +389,6 @@
             }
             return idx;
         }
-
         function findClosestPoly(pt, target, holes) {
             let bestPoly = null;
             let minD = 5.0; 
@@ -381,13 +398,10 @@
             }
             return null;
         }
-
         function getPerimeterPath(idx1, idx2, poly) {
             if(idx1 === -1 || idx2 === -1) return [];
             if(idx1 === idx2) return [poly[idx1]];
-            
             let isClosed = dist(poly[0], poly[poly.length-1]) < 2.0;
-
             if (!isClosed) {
                 let path = [];
                 let step = (idx1 < idx2) ? 1 : -1;
@@ -395,7 +409,6 @@
                 path.push(poly[idx2]);
                 return path;
             }
-
             let len = poly.length;
             let cwDist = 0, ccwDist = 0;
             let curr = idx1;
@@ -404,14 +417,12 @@
                 cwDist += dist(poly[curr], poly[next]);
                 curr = next;
             }
-            
             curr = idx1;
             while(curr !== idx2) {
                 let next = (curr - 1 + len) % len;
                 ccwDist += dist(poly[curr], poly[next]);
                 curr = next;
             }
-            
             let path = [];
             if(cwDist < ccwDist) {
                 curr = idx1;
@@ -431,25 +442,18 @@
             path.push(poly[idx2]);
             return path;
         }
-
-        // --- TRACE CHECKER ---
         function routeConnect(start, end, shapes, depth=0) {
             if (depth > 5) return [end]; 
-
             let collision = null;
             let minD = Infinity;
-
             for (let sIdx = 0; sIdx < shapes.length; sIdx++) {
                 let poly = shapes[sIdx];
                 let isClosed = dist(poly[0], poly[poly.length-1]) < 2.0;
                 let limit = isClosed ? poly.length : poly.length - 1;
-
                 for (let i = 0; i < limit; i++) {
                     let p1 = poly[i];
                     let p2 = poly[(i+1)%poly.length];
-                    
                     if (dist(start, p1) < 0.1 || dist(start, p2) < 0.1) continue;
-
                     let hit = getIntersection(start, end, p1, p2);
                     if (hit) {
                         let d = dist(start, hit);
@@ -457,33 +461,23 @@
                     }
                 }
             }
-
             if (!collision) return [end];
-
             let obstacle = collision.poly;
-            
             let exitIdx = -1, minExitD = Infinity;
             for(let i=0; i<obstacle.length; i++) {
                 let d = dist(obstacle[i], end);
                 if(d < minExitD) { minExitD = d; exitIdx = i; }
             }
-
             let entryIdx = -1, minEntryD = Infinity;
             for(let i=0; i<obstacle.length; i++) {
                 let d = dist(obstacle[i], collision.pt);
                 if(d < minEntryD) { minEntryD = d; entryIdx = i; }
             }
-
             let surfPath = getPerimeterPath(entryIdx, exitIdx, obstacle);
             let exitPoint = obstacle[exitIdx];
             let remainingPath = routeConnect(exitPoint, end, shapes, depth+1);
-
             return surfPath.concat(remainingPath);
         }
-
-        // ==============================================
-        // === APP LOGIC ===
-        // ==============================================
 
         const Noise = {
             p: [151,160,137,91,90,15,131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,142,8,99,37,240,21,10,23,
@@ -521,13 +515,11 @@
         function init() {
             resizeCanvas();
             window.addEventListener('resize', resizeCanvas);
-            
             canvas.addEventListener('pointerdown', startDraw);
             canvas.addEventListener('pointermove', moveDraw);
             canvas.addEventListener('pointerup', endDraw);
             canvas.addEventListener('pointerleave', endDraw);
             canvas.style.touchAction = "none";
-            
             updateUI();
             updateToolSettings();
         }
@@ -537,13 +529,8 @@
         // --- DRAWING LOGIC ---
         function startDraw(e) {
             e.preventDefault();
-            
             if(generatedGCode) return;
-
-            if(currentTool === 'fill') {
-                handleFillClick(e);
-                return;
-            }
+            if(currentTool === 'fill') { handleFillClick(e); return; }
 
             const smart = document.getElementById('smartPenMode').checked;
             if(smart && currentTool !== 'select' && currentTool !== 'sandify') {
@@ -557,8 +544,6 @@
                 canvas.setPointerCapture(e.pointerId);
                 return;
             }
-            
-            // Disable drawing when Sandify is active (it's a generator tool)
             if(currentTool === 'sandify') return;
 
             saveState();
@@ -588,7 +573,6 @@
                 render();
                 return;
             }
-
             processPointer(e);
         }
 
@@ -596,13 +580,11 @@
             if(!isDrawing) return;
             isDrawing = false;
             canvas.releasePointerCapture(e.pointerId);
-            
             if(currentTool === 'select') {
                 dragStart = null;
                 saveState(); 
                 return;
             }
-
             if(currentTool === 'draw') {
                 if(document.getElementById('smoothDrawMode').checked) {
                     smoothLastStroke();
@@ -620,14 +602,13 @@
                     break;
                 }
             }
-            
             let stroke = [];
             let startIndex = lastBreak + 1;
             for(let i=startIndex; i<rawPoints.length; i++) stroke.push(rawPoints[i]);
-
             if(stroke.length < 3) return;
 
-            for(let pass=0; pass<2; pass++) {
+            // STRONGER SMOOTHING: 4 Passes
+            for(let pass=0; pass<4; pass++) {
                 let smooth = [];
                 smooth.push(stroke[0]);
                 for(let i=0; i<stroke.length-1; i++) {
@@ -647,8 +628,43 @@
                 smooth.push(stroke[stroke.length-1]);
                 stroke = smooth;
             }
-
             rawPoints.splice(startIndex, rawPoints.length - startIndex, ...stroke);
+        }
+
+        // --- SHAPE STAMPS ---
+        function addShape(type) {
+            saveState();
+            const r = 50; 
+            let pts = [];
+            
+            if(type==='circle') {
+                for(let i=0; i<=36; i++) {
+                    const a = (i/36)*Math.PI*2;
+                    pts.push({x: Math.cos(a)*r, y: Math.sin(a)*r});
+                }
+            } else if(type==='square') {
+                pts = [{x:-r,y:-r}, {x:r,y:-r}, {x:r,y:r}, {x:-r,y:r}, {x:-r,y:-r}];
+            } else if(type==='triangle') {
+                pts = [{x:0,y:r}, {x:r*0.86,y:-r/2}, {x:-r*0.86,y:-r/2}, {x:0,y:r}];
+            } else if(type==='star') {
+                 for(let i=0; i<=10; i++) {
+                    const a = (i/10)*Math.PI*2 + Math.PI/2;
+                    const rad = (i%2===0) ? r : r*0.4;
+                    pts.push({x: Math.cos(a)*rad, y: Math.sin(a)*rad});
+                }
+            } else if(type==='spiral') {
+                for(let i=0; i<100; i++) {
+                    const a = i * 0.3;
+                    const rad = (i/100)*r;
+                    pts.push({x: Math.cos(a)*rad, y: Math.sin(a)*rad});
+                }
+            }
+
+            if(rawPoints.length > 0 && rawPoints[rawPoints.length-1].type !== 'break') rawPoints.push({type:'break'});
+            pts.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
+            rawPoints.push({type:'break'});
+            render();
+            showToast("Added " + type, "success");
         }
 
         function getPos(e) {
@@ -675,40 +691,32 @@
 
         function drawCursor(p) {
             if(generatedGCode) return;
-
             const r = (currentTool === 'erase' ? eraserRadius : 10) * scale;
             const px = origin.x + p.x * scale;
             const py = origin.y - p.y * scale;
-            
             if(currentTool === 'erase') {
                 ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI*2);
                 ctx.strokeStyle = "#999"; ctx.fillStyle = "rgba(200,200,200,0.3)";
                 ctx.stroke(); ctx.fill();
             } else if (currentTool === 'fill') {
-                ctx.font = "20px Arial";
-                ctx.fillStyle = "black";
-                ctx.textAlign = "center";
-                ctx.textBaseline = "middle";
-                ctx.fillText("🌊", px, py);
+                ctx.font = "20px Arial"; ctx.fillStyle = "black"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("🌊", px, py);
             } else if (currentTool === 'select') {
-                ctx.font = "20px Arial";
-                ctx.fillStyle = "black";
-                ctx.textAlign = "center";
-                ctx.textBaseline = "middle";
-                ctx.fillText("✋", px, py);
+                ctx.font = "20px Arial"; ctx.fillStyle = "black"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("✋", px, py);
             } else if (currentTool === 'sandify') {
-                 ctx.font = "20px Arial";
-                ctx.fillStyle = "black";
-                ctx.textAlign = "center";
-                ctx.textBaseline = "middle";
-                ctx.fillText("🌀", px, py);
+                ctx.font = "20px Arial"; ctx.fillStyle = "black"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("🌀", px, py);
             }
         }
 
-        // --- TRANSFORM HELPERS ---
-        function applyTransform(type, val) {
+        // --- LIVE TRANSFORM HELPERS ---
+        function liveRotate(val) {
             if(rawPoints.length === 0) return;
-            saveState();
+            const diff = val - lastRotVal;
+            if(diff === 0) return;
+            
+            // Apply delta rotation
+            const rad = (diff * Math.PI) / 180;
+            const cos = Math.cos(rad);
+            const sin = Math.sin(rad);
 
             let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
             let hasPoints = false;
@@ -719,57 +727,84 @@
                     hasPoints = true;
                 }
             });
-            
             if(!hasPoints) return;
             const cx = (minX + maxX)/2;
             const cy = (minY + maxY)/2;
 
-            if(type === 'rotate') {
-                const rad = (parseFloat(val) * Math.PI) / 180;
-                const cos = Math.cos(rad);
-                const sin = Math.sin(rad);
+            rawPoints.forEach(p => {
+                if(p.type === 'point') {
+                    let tx = p.x - cx;
+                    let ty = p.y - cy;
+                    p.x = cx + (tx * cos - ty * sin);
+                    p.y = cy + (tx * sin + ty * cos);
+                }
+            });
 
-                rawPoints.forEach(p => {
-                    if(p.type === 'point') {
-                        let tx = p.x - cx;
-                        let ty = p.y - cy;
-                        p.x = cx + (tx * cos - ty * sin);
-                        p.y = cy + (tx * sin + ty * cos);
-                    }
-                });
-                
-                document.getElementById('rotSlider').value = 0;
-                document.getElementById('rotSlider').nextElementSibling.innerText = "0°";
-            }
-            
-            if(type === 'scale') {
-                const s = parseFloat(val);
-                rawPoints.forEach(p => {
-                    if(p.type === 'point') {
-                        p.x = cx + (p.x - cx) * s;
-                        p.y = cy + (p.y - cy) * s;
-                    }
-                });
-            }
+            lastRotVal = val;
+            document.getElementById('liveRotVal').innerText = val + "°";
             render();
         }
 
-        // --- SANDIFY LOGIC (NEW) ---
-        function applySandify() {
-            if(rawPoints.length === 0) return showToast("Draw a shape first!", "error");
-            saveState();
+        function liveScale(val) {
+             if(rawPoints.length === 0) return;
+             const factor = val / lastScaleVal;
+             if(factor === 1) return;
 
+             let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+             let hasPoints = false;
+             rawPoints.forEach(p => {
+                if(p.type === 'point') {
+                    if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
+                    if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
+                    hasPoints = true;
+                }
+            });
+            if(!hasPoints) return;
+            const cx = (minX + maxX)/2;
+            const cy = (minY + maxY)/2;
+
+            rawPoints.forEach(p => {
+                if(p.type === 'point') {
+                    p.x = cx + (p.x - cx) * factor;
+                    p.y = cy + (p.y - cy) * factor;
+                }
+            });
+
+            lastScaleVal = val;
+            document.getElementById('liveScaleVal').innerText = val + "%";
+            render();
+        }
+
+        function endLiveTransform(slider) {
+            saveState(); // Commit the change
+            // Reset logic to avoid range limits
+            if(slider.id === 'liveRotSlider') {
+                slider.value = 0;
+                lastRotVal = 0;
+                document.getElementById('liveRotVal').innerText = "0°";
+            }
+            if(slider.id === 'liveScaleSlider') {
+                slider.value = 100;
+                lastScaleVal = 100;
+                document.getElementById('liveScaleVal').innerText = "100%";
+            }
+        }
+
+        // --- SANDIFY LOGIC ---
+        function applySandify() {
+            if(!sandBasePoints || sandBasePoints.length === 0) return;
+            
+            // Read from slider
             const startScale = parseFloat(document.getElementById('sandScaleInput').value);
             const zoomStep = parseFloat(document.getElementById('sandZoomInput').value);
             const rotStep = parseFloat(document.getElementById('sandRotInput').value);
             const shiftStep = parseFloat(document.getElementById('sandShiftInput').value);
             
-            // Calculate center of current drawing to scale around
             let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
             let pointsFound = false;
             
-            // Create a deep copy of the original pattern to clone
-            let baseShape = JSON.parse(JSON.stringify(rawPoints));
+            // Use base points for calculation source
+            let baseShape = JSON.parse(JSON.stringify(sandBasePoints));
             
             baseShape.forEach(p => {
                 if(p.type === 'point') {
@@ -780,60 +815,34 @@
             });
 
             if(!pointsFound) return;
-            
             const cx = (minX + maxX)/2;
             const cy = (minY + maxY)/2;
 
             let newPattern = [];
-            
-            // Loop from Start Scale down to 1.0
             let currentScale = startScale;
             let currentRot = 0;
             let currentShift = 0;
-            
-            // We want the rotation to accumulate.
-            // If we start at scale X and go to 1, we usually want the largest one rotated MOST or LEAST?
-            // "Spinning it inwards" usually means the outer ones are rotated relative to inner.
-            // Let's just accumulate rotation per step.
             
             while(currentScale >= 1.0) {
                 const rad = (currentRot * Math.PI) / 180;
                 const cos = Math.cos(rad);
                 const sin = Math.sin(rad);
                 
-                // Clone base shape
                 baseShape.forEach(p => {
                     if(p.type === 'point') {
-                        // 1. Center logic
                         let tx = p.x - cx;
                         let ty = p.y - cy;
-                        
-                        // 2. Scale
                         tx *= currentScale;
                         ty *= currentScale;
-                        
-                        // 3. Rotate
                         let rx = tx * cos - ty * sin;
                         let ry = tx * sin + ty * cos;
-                        
-                        // 4. Shift (Drift outwards or inwards? Let's just add drift)
-                        // If we want it to drift as it gets smaller, we multiply shift by iteration index?
-                        // Let's just apply constant shift accumulator
-                        // shift is a bit ambiguous without direction, let's just shift X for spiral effect
                         rx += currentShift; 
-
-                        // 5. Translate back
-                        newPattern.push({
-                            x: cx + rx,
-                            y: cy + ry,
-                            type: 'point'
-                        });
+                        newPattern.push({ x: cx + rx, y: cy + ry, type: 'point' });
                     } else {
                         newPattern.push({type: p.type});
                     }
                 });
                 
-                // Add break between copies if not already there
                 if(newPattern.length > 0 && newPattern[newPattern.length-1].type !== 'break') {
                     newPattern.push({type: 'break'});
                 }
@@ -843,11 +852,12 @@
                 currentShift += shiftStep;
             }
 
+            // Update global rawPoints for display/Gcode
             rawPoints = newPattern;
             resetStatus();
             render();
-            showToast("Sandify Complete!", "success");
         }
+
 
         // --- MASTER DUNE FILL ---
         function handleFillClick(e) {
@@ -909,11 +919,7 @@
             saveState();
 
             const fillAngle = Math.random() * Math.PI; 
-            
-            const rotatePt = (x, y, rad) => ({
-                x: x * Math.cos(rad) - y * Math.sin(rad),
-                y: x * Math.sin(rad) + y * Math.cos(rad)
-            });
+            const rotatePt = (x, y, rad) => ({ x: x * Math.cos(rad) - y * Math.sin(rad), y: x * Math.sin(rad) + y * Math.cos(rad) });
 
             const rotTarget = target.shape.map(p => rotatePt(p.x, p.y, -fillAngle));
             const rotHoles = holes.map(h => h.map(p => rotatePt(p.x, p.y, -fillAngle)));
@@ -928,7 +934,6 @@
 
             while(y < rotBounds.maxY) {
                 let cutPoints = [];
-
                 const addIntersections = (poly, polyId) => {
                     for(let i=0; i<poly.length; i++) {
                         let p1 = poly[i];
@@ -939,33 +944,25 @@
                         }
                     }
                 };
-
                 addIntersections(rotTarget, -1); 
                 rotHoles.forEach((h, idx) => addIntersections(h, idx));
-
                 cutPoints.sort((a,b) => a.x - b.x);
 
                 for(let k=0; k<cutPoints.length; k++) {
                      if(k+1 >= cutPoints.length) break;
                      let startCut = cutPoints[k];
                      let endCut = cutPoints[k+1];
-                     
                      let midX = (startCut.x + endCut.x) / 2;
-                     
                      let pMid = {x: midX, y: y};
                      let isInsideTarget = isPointInPolygon(pMid, rotTarget);
                      let isInsideHole = false;
-                     for(let rh of rotHoles) {
-                         if(isPointInPolygon(pMid, rh)) { isInsideHole = true; break; }
-                     }
+                     for(let rh of rotHoles) { if(isPointInPolygon(pMid, rh)) { isInsideHole = true; break; } }
 
                      if(isInsideTarget && !isInsideHole) {
                         let segPoints = [];
                         const step = 2.0; 
-                        
                         let xStart = startCut.x;
                         let xEnd = endCut.x;
-
                         if(direction === 1) {
                             for(let x=xStart; x<=xEnd; x+=step) segPoints.push(x);
                             if(segPoints[segPoints.length-1] !== xEnd) segPoints.push(xEnd);
@@ -973,14 +970,10 @@
                             for(let x=xEnd; x>=xStart; x-=step) segPoints.push(x);
                             if(segPoints[segPoints.length-1] !== xStart) segPoints.push(xStart);
                         }
-
                         let segmentStartPointRot = {x: segPoints[0], y:y};
-
                         if(lastFilledPointRot) {
-                            
                             let startPoly = findClosestPoly(lastFilledPointRot, rotTarget, rotHoles);
                             let endPoly = findClosestPoly(segmentStartPointRot, rotTarget, rotHoles);
-
                             if(startPoly && endPoly && startPoly === endPoly) {
                                 let idx1 = findClosestIndex(lastFilledPointRot, startPoly);
                                 let idx2 = findClosestIndex(segmentStartPointRot, startPoly);
@@ -994,55 +987,38 @@
                                     rawPoints.push({type:'break'});
                                 }
                             }
-                        } else {
-                             rawPoints.push({type:'break'});
-                        }
+                        } else { rawPoints.push({type:'break'}); }
 
                         for(let px of segPoints) {
                             let noiseVal = Noise.eval(px * NOISE_SCALE, y * NOISE_SCALE);
                             let py = y + (noiseVal * WAVE_AMP);
-                            
                             let realPt = rotatePt(px, py, fillAngle);
                             let safe = isPointInPolygon(realPt, target.shape);
-                            if(safe) {
-                                for(let h of holes) { if(isPointInPolygon(realPt, h)) { safe=false; break; } }
-                            }
-
-                            if(safe) {
-                                rawPoints.push({x:realPt.x, y:realPt.y, type:'point'});
-                            }
+                            if(safe) { for(let h of holes) { if(isPointInPolygon(realPt, h)) { safe=false; break; } } }
+                            if(safe) { rawPoints.push({x:realPt.x, y:realPt.y, type:'point'}); }
                         }
-
                         lastFilledPointRot = {x: segPoints[segPoints.length-1], y:y};
                      }
                 }
-                
                 direction *= -1;
                 y += DENSITY;
             }
-            
             if(lastFilledPointRot) {
                  let startP = target.shape[0];
                  let startPRot = rotatePt(startP.x, startP.y, -fillAngle);
-                 
                  let idx1 = findClosestIndex(lastFilledPointRot, rotTarget);
                  let idx2 = findClosestIndex(startPRot, rotTarget);
                  let trace = getPerimeterPath(idx1, idx2, rotTarget);
-                 trace.forEach(tp => {
-                    let rp = rotatePt(tp.x, tp.y, fillAngle);
-                    rawPoints.push({x:rp.x, y:rp.y, type:'point'});
-                 });
+                 trace.forEach(tp => { let rp = rotatePt(tp.x, tp.y, fillAngle); rawPoints.push({x:rp.x, y:rp.y, type:'point'}); });
             } else { rawPoints.push({type: 'break'}); }
 
             target.shape.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
             rawPoints.push({x:target.shape[0].x, y:target.shape[0].y, type:'point'});
-            
             holes.forEach(h => {
                 rawPoints.push({type: 'break'});
                 h.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
                 rawPoints.push({x:h[0].x, y:h[0].y, type:'point'});
             });
-
             rawPoints.push({type: 'break'});
             render();
             showToast("Master Fill Complete!", "success");
@@ -1054,7 +1030,6 @@
             if(!file) return;
             showToast("Scanning...", "info");
             saveState();
-
             const reader = new FileReader();
             reader.onload = function(e) {
                 const img = new Image();
@@ -1064,16 +1039,12 @@
                     let tw = img.width, th = img.height;
                     if(tw>th && tw>MAX){ th*=MAX/tw; tw=MAX; } 
                     else if(th>MAX){ tw*=MAX/th; th=MAX; }
-                    
                     tCan.width = tw; tCan.height = th;
                     const tCtx = tCan.getContext('2d');
                     tCtx.fillStyle = "white"; tCtx.fillRect(0,0,tw,th);
                     tCtx.filter = "grayscale(100%) contrast(150%)";
                     tCtx.drawImage(img, 0, 0, tw, th);
-                    
-                    ImageTracer.imageToSVG(tCan.toDataURL(), function(svgStr){
-                        processTrace(svgStr, tw, th);
-                    }, { ltres:0.5, qtres:0.5, pathomit:2, colorsampling:2, numberofcolors:2 });
+                    ImageTracer.imageToSVG(tCan.toDataURL(), function(svgStr){ processTrace(svgStr, tw, th); }, { ltres:0.5, qtres:0.5, pathomit:2, colorsampling:2, numberofcolors:2 });
                 };
                 img.src = e.target.result;
             };
@@ -1086,57 +1057,47 @@
             const paths = doc.getElementsByTagName("path");
             let strokes = [];
             const res = 2.0; 
-
             for(let i=0; i<paths.length; i++) {
                 const p = paths[i];
                 const len = p.getTotalLength();
                 if(len < 5) continue; 
-                
                 let pts = [];
                 let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
-
                 for(let d=0; d<=len; d+=res) {
                     const pt = p.getPointAtLength(d);
                     pts.push({x: pt.x, y: pt.y});
                     if(pt.x<minX) minX=pt.x; if(pt.x>maxX) maxX=pt.x;
                     if(pt.y<minY) minY=pt.y; if(pt.y>maxY) maxY=pt.y;
                 }
-                
                 const w = maxX - minX;
                 const h = maxY - minY;
                 if (w > imgW * 0.98 || h > imgH * 0.98) continue; 
                 strokes.push(pts);
             }
-
             if(strokes.length === 0) return showToast("No shapes found", "error");
-
             let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
             strokes.flat().forEach(p => {
                 if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
                 if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
             });
-            
             const contentW = maxX - minX;
             const contentH = maxY - minY;
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
             const scaleFac = (tableR * 2 * 0.9) / Math.max(contentW, contentH);
             const cx = (minX + maxX)/2;
             const cy = (minY + maxY)/2;
-
             let normalizedStrokes = strokes.map(s => {
                 return s.map(p => ({
                     x: (p.x - cx) * scaleFac,
                     y: -(p.y - cy) * scaleFac 
                 })).filter(p => Math.hypot(p.x, p.y) < tableR);
             });
-
             rawPoints = [];
             normalizedStrokes.forEach(s => {
                 rawPoints.push({type:'break'});
                 s.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
             });
             rawPoints.push({type:'break'});
-
             resetStatus();
             showToast("Trace Loaded (Click Prepare)", "info");
             render();
@@ -1145,38 +1106,28 @@
         // --- OPTIMIZER ---
         function prepareGCode() {
             if(rawPoints.length === 0) return showToast("Draw something first!", "error");
-            showToast("Optimizing Path... (Checking Collisions)", "info");
-
+            showToast("Optimizing Path...", "info");
             setTimeout(() => { 
                 const tableR = parseFloat(document.getElementById('cfgRadius').value);
                 const sym = parseInt(document.getElementById('symSlider').value);
-                
                 let shapes = [];
                 let curShape = [];
                 rawPoints.forEach(p => {
                     if(p.type === 'break' || p.type === 'cmd') {
                         if(curShape.length > 0) shapes.push(curShape);
                         curShape = [];
-                    } else {
-                        curShape.push(p);
-                    }
+                    } else { curShape.push(p); }
                 });
                 if(curShape.length > 0) shapes.push(curShape);
-
                 let pool = [];
                 for(let s=0; s<sym; s++) {
                     const ang = s * (Math.PI*2/sym);
                     const c = Math.cos(ang), si = Math.sin(ang);
                     shapes.forEach(sh => {
-                        let newSh = sh.map(p => ({
-                            x: p.x*c - p.y*si,
-                            y: p.x*si + p.y*c,
-                            type: 'point'
-                        }));
+                        let newSh = sh.map(p => ({ x: p.x*c - p.y*si, y: p.x*si + p.y*c, type: 'point' }));
                         pool.push(newSh);
                     });
                 }
-
                 let bestShapeIdx = -1, bestPointIdx = -1, maxDist = -1;
                 for (let i=0; i<pool.length; i++) {
                     for (let j=0; j<pool[i].length; j++) {
@@ -1184,12 +1135,9 @@
                         if (d > maxDist) { maxDist = d; bestShapeIdx = i; bestPointIdx = j; }
                     }
                 }
-
                 let startShape = pool[bestShapeIdx];
                 pool.splice(bestShapeIdx, 1);
-                
                 let dClose = Math.hypot(startShape[0].x - startShape[startShape.length-1].x, startShape[0].y - startShape[startShape.length-1].y);
-                
                 if(dClose < 5.0) { 
                     let p1 = startShape.slice(bestPointIdx);
                     let p2 = startShape.slice(0, bestPointIdx);
@@ -1200,20 +1148,13 @@
                     let dEnd = Math.hypot(startShape[startShape.length-1].x, startShape[startShape.length-1].y);
                     if(dEnd > dStart) startShape.reverse();
                 }
-
                 let sortedShapes = [startShape];
                 let curPos = startShape[startShape.length-1];
-
                 while(pool.length > 0) {
-                    let bestIdx = -1;
-                    let bestDist = Infinity;
-                    let bestStartIdx = 0;
-                    let bestIsReverse = false;
-
+                    let bestIdx = -1, bestDist = Infinity, bestStartIdx = 0, bestIsReverse = false;
                     for(let i=0; i<pool.length; i++) {
                         let s = pool[i];
                         let isClosed = Math.hypot(s[0].x - s[s.length-1].x, s[0].y - s[s.length-1].y) < 5.0;
-
                         if(isClosed) {
                             for(let k=0; k<s.length; k++) {
                                 let d = Math.hypot(curPos.x - s[k].x, curPos.y - s[k].y);
@@ -1226,10 +1167,8 @@
                             if(dEnd < bestDist) { bestDist=dEnd; bestIdx=i; bestStartIdx=0; bestIsReverse=true; }
                         }
                     }
-
                     let winner = pool[bestIdx];
                     let isWinnerClosed = Math.hypot(winner[0].x - winner[winner.length-1].x, winner[0].y - winner[winner.length-1].y) < 5.0;
-
                     if(isWinnerClosed) {
                         let p1 = winner.slice(bestStartIdx);
                         let p2 = winner.slice(0, bestStartIdx);
@@ -1238,25 +1177,18 @@
                     } else {
                         if(bestIsReverse) winner.reverse();
                     }
-
                     sortedShapes.push(winner);
                     curPos = winner[winner.length-1];
                     pool.splice(bestIdx, 1);
                 }
-
                 processedPoints = [];
-                const res = 1.0;
-                
                 let stats_connections = 0;
                 let stats_rerouted = 0;
-                let stats_segments = [];
-
                 if(sortedShapes.length > 0) {
                     let fPt = sortedShapes[0][0];
                     let fAng = Math.atan2(fPt.y, fPt.x);
                     processedPoints.push({x: tableR*Math.cos(fAng), y: tableR*Math.sin(fAng), type:'point'});
                 }
-
                 for(let i=0; i<sortedShapes.length; i++) {
                     let s = sortedShapes[i];
                     if(i > 0) {
@@ -1265,84 +1197,55 @@
                         let currStart = s[0];
                         let bestExitIdx = -1;
                         let minDist = Infinity;
-                        
                         for(let k=0; k<prev.length; k++) {
                             let d = Math.hypot(prev[k].x - currStart.x, prev[k].y - currStart.y);
                             if(d < minDist) { minDist = d; bestExitIdx = k; }
                         }
-
                         let isPrevClosed = Math.hypot(prev[0].x - prev[prev.length-1].x, prev[0].y - prev[prev.length-1].y) < 5.0;
                         let retracePath = [];
                         if(isPrevClosed) {
                             let distFwd = bestExitIdx; 
                             let distBk = (prev.length-1) - bestExitIdx;
-                            if(distFwd < distBk) {
-                                for(let m=0; m<=bestExitIdx; m++) retracePath.push(prev[m]);
-                            } else {
-                                for(let m=prev.length-1; m>=bestExitIdx; m--) retracePath.push(prev[m]);
-                            }
-                        } else {
-                            for(let m=prev.length-1; m>=bestExitIdx; m--) retracePath.push(prev[m]);
-                        }
-
+                            if(distFwd < distBk) { for(let m=0; m<=bestExitIdx; m++) retracePath.push(prev[m]); } 
+                            else { for(let m=prev.length-1; m>=bestExitIdx; m--) retracePath.push(prev[m]); }
+                        } else { for(let m=prev.length-1; m>=bestExitIdx; m--) retracePath.push(prev[m]); }
                         retracePath.forEach(p => processedPoints.push(p));
-                        
                         let startJump = prev[bestExitIdx];
-                        
                         let safePath = routeConnect(startJump, currStart, sortedShapes);
-                        
-                        if(safePath.length > 1) {
-                            stats_rerouted++;
-                        }
-                        stats_segments.push(safePath.length);
-
+                        if(safePath.length > 1) { stats_rerouted++; }
                         safePath.forEach(p => processedPoints.push({x:p.x, y:p.y, type:'point'}));
                     }
                     s.forEach(p => processedPoints.push(p));
                 }
-
                 if(processedPoints.length > 0) {
                     let lastPt = processedPoints[processedPoints.length-1];
                     processedPoints.push({type: 'cmd', val: 'M0'});
                     let exitAng = Math.atan2(lastPt.y, lastPt.x);
-                    processedPoints.push({
-                        x: tableR * Math.cos(exitAng),
-                        y: tableR * Math.sin(exitAng),
-                        type: 'point'
-                    });
+                    processedPoints.push({ x: tableR * Math.cos(exitAng), y: tableR * Math.sin(exitAng), type: 'point' });
                 }
-
                 generatedGCode = generateGCodeStringFromProcessed();
-                
                 let summary = `Path Ready! ${sortedShapes.length} shapes. ${stats_rerouted}/${stats_connections} jumps rerouted.`;
                 document.getElementById('statusTxt').innerText = summary;
                 document.getElementById('statusTxt').style.color = "green";
                 document.getElementById('progressSlider').value = 0;
-                
-                // --- TOGGLE INTERFACE ---
                 document.getElementById('designPhaseControls').style.display = 'none';
                 document.getElementById('productionPhaseControls').style.display = 'block';
                 document.getElementById('productionPhaseControls').classList.add('fade-in');
-
                 render(); 
                 showToast(summary, "success");
             }, 50);
         }
 
-        // --- Return to Editing Mode ---
         function returnToEditing() {
             generatedGCode = null;
             processedPoints = [];
-            
             document.getElementById('designPhaseControls').style.display = 'block';
             document.getElementById('productionPhaseControls').style.display = 'none';
             document.getElementById('designPhaseControls').classList.add('fade-in');
-            
             resetStatus();
             updateUI();
         }
 
-        // --- G-CODE GENERATION ---
         function generateGCodeStringFromProcessed() {
             const L1 = parseFloat(document.getElementById('cfgL1').value);
             const L2 = parseFloat(document.getElementById('cfgL2').value);
@@ -1350,71 +1253,43 @@
             const tableRadius = parseFloat(document.getElementById('cfgRadius').value);
             const stepsPerDeg = parseFloat(document.getElementById('cfgStepsPerDeg').value);
             const stepsPerRad = stepsPerDeg * (180 / Math.PI);
-            
             const centerDelay = parseFloat(document.getElementById('cfgCenterDelay').value);
             const perimDelay = parseFloat(document.getElementById('cfgPerimDelay').value);
-
             let cmds = [];
             let prevBase = 0;
             let prevElbow = 0;
-
             let firstPt = processedPoints[0];
             if(firstPt.type === 'cmd') return "";
-
-            // MIRROR FIX: Negate X coordinate for initial IK calculation
             let startIK = calculateIK(-firstPt.x, firstPt.y, 0, 0, L1, L2, gearRatio, stepsPerRad);
             prevBase = startIK.base_steps;
             prevElbow = startIK.elbow_steps;
-
             for(let i=0; i<processedPoints.length-1; i++) {
                 let p1 = processedPoints[i];
                 let p2 = processedPoints[i+1];
-
-                if (p1.type === 'cmd' && p1.val === 'M0') {
-                    cmds.push("M0");
-                }
-                
-                if (p2.type === 'cmd' && p2.val === 'M0') {
-                    continue;
-                }
-                
+                if (p1.type === 'cmd' && p1.val === 'M0') { cmds.push("M0"); }
+                if (p2.type === 'cmd' && p2.val === 'M0') { continue; }
                 let startX, startY;
                 if(p1.type === 'cmd') {
                    let back = i-1;
                    while(back >= 0 && processedPoints[back].type === 'cmd') back--;
                    if(back < 0) { startX=0; startY=0; }
                    else { startX = processedPoints[back].x; startY = processedPoints[back].y; }
-                } else {
-                    startX = p1.x; startY = p1.y;
-                }
-
+                } else { startX = p1.x; startY = p1.y; }
                 let dist = Math.hypot(p2.x-startX, p2.y-startY);
                 let steps = Math.max(1, Math.ceil(dist / 1.0)); 
-
                 for(let j=1; j<=steps; j++) {
                     let t = j/steps;
                     let x = startX + (p2.x - startX)*t;
                     let y = startY + (p2.y - startY)*t;
-
-                    // MIRROR FIX: Negate X coordinate during interpolation
-                    // This mirrors the G-Code output horizontally relative to the screen
                     let ik = calculateIK(-x, y, prevBase, prevElbow, L1, L2, gearRatio, stepsPerRad);
                     let dBase = Math.round(ik.base_steps - prevBase);
                     let dElbow = Math.round(ik.elbow_steps - prevElbow);
-
                     if(dBase !== 0 || dElbow !== 0) {
                         let r = Math.hypot(x, y);
-
-                        if (r < 5.0 && (Math.abs(dBase) > 2000 || Math.abs(dElbow) > 2000)) {
-                            prevBase += dBase; 
-                            prevElbow += dElbow;
-                            continue; 
-                        }
-
+                        if (r < 5.0 && (Math.abs(dBase) > 2000 || Math.abs(dElbow) > 2000)) { prevBase += dBase; prevElbow += dElbow; continue; }
                         let rFactor = r / tableRadius;
                         if(rFactor > 1) rFactor = 1;
                         let delay = Math.round(centerDelay + ((perimDelay - centerDelay) * rFactor));
-                        
                         cmds.push(`G1 ${dElbow} ${dBase} ${delay}`);
                         prevBase += dBase; prevElbow += dElbow;
                     }
@@ -1423,7 +1298,6 @@
             return cmds.join('\n');
         }
 
-        // --- UTILS ---
         function resizeCanvas() {
             const container = document.getElementById('canvasContainer');
             const size = container.getBoundingClientRect().width;
@@ -1453,6 +1327,11 @@
             render();
         }
         function setTool(t) {
+            // Save base points if leaving another tool
+            if(currentTool === 'sandify' && t !== 'sandify') {
+                 sandBasePoints = null; // Clear base cache
+            }
+
             currentTool = t;
             document.getElementById('btnDraw').className = t==='draw'?'active':'secondary';
             document.getElementById('btnErase').className = t==='erase'?'active':'secondary';
@@ -1461,6 +1340,16 @@
             document.getElementById('btnSandify').className = t==='sandify'?'active':'secondary';
             
             updateToolSettings();
+
+            // Sandify Logic: Auto-Capture state and generate
+            if(t === 'sandify') {
+                if(rawPoints.length > 0) {
+                     sandBasePoints = JSON.parse(JSON.stringify(rawPoints));
+                     applySandify();
+                } else {
+                    showToast("Draw something first!", "error");
+                }
+            }
         }
         
         function updateToolSettings() {
@@ -1481,10 +1370,8 @@
             } else {
                 area.style.display = 'none';
             }
-
             eraserRadius = parseInt(document.getElementById('eraserSizeSlider').value);
             document.getElementById('eraseSizeVal').innerText = eraserRadius + 'px';
-            
             fillGap = parseFloat(document.getElementById('fillGapSlider').value);
             document.getElementById('fillGapVal').innerText = fillGap.toFixed(1);
         }
@@ -1505,7 +1392,6 @@
             b.setAttribute('data-theme', b.getAttribute('data-theme')==='dark'?'light':'dark');
             render();
         }
-
         function resetStatus() {
             generatedGCode = null;
             processedPoints = [];
@@ -1514,109 +1400,70 @@
             document.getElementById('progressSlider').value = 100;
             render();
         }
-
         function render() {
             const w = canvas.width / window.devicePixelRatio;
             const h = canvas.height / window.devicePixelRatio;
             ctx.clearRect(0, 0, w, h);
-            
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
             const sym = parseInt(document.getElementById('symSlider').value);
             const dark = document.body.getAttribute('data-theme') === 'dark';
             const prog = parseInt(document.getElementById('progressSlider').value);
             document.getElementById('progVal').textContent = prog + '%';
-
             ctx.save();
             ctx.translate(origin.x, origin.y);
-
-            // Table Circle
             ctx.beginPath(); ctx.arc(0, 0, tableR*scale, 0, Math.PI*2);
             ctx.strokeStyle = dark ? '#444' : '#ddd'; ctx.lineWidth = 2; ctx.stroke();
-
             const showingFinal = (processedPoints.length > 0);
             const dataToShow = showingFinal ? processedPoints : rawPoints;
             const limit = Math.floor(dataToShow.length * (prog/100));
             const color = showingFinal ? '#ff0000' : (dark ? 'cyan' : '#007bff');
-
             ctx.lineWidth = 1.5;
-            
             const loopCount = showingFinal ? 1 : sym;
-
             for(let s=0; s<loopCount; s++) {
                 const ang = s * (Math.PI*2/sym);
                 ctx.save(); 
                 if(!showingFinal) ctx.rotate(ang); 
-                
                 ctx.beginPath();
                 ctx.strokeStyle = color;
-                
                 let isMove = true;
                 for(let i=0; i<limit; i++) {
                     const p = dataToShow[i];
-                    
-                    if(p.type === 'break' || p.type === 'cmd') { 
-                        isMove = true; 
-                        continue; 
-                    }
-                    
+                    if(p.type === 'break' || p.type === 'cmd') { isMove = true; continue; }
                     const px = p.x * scale;
                     const py = -p.y * scale;
-                    
                     if(isMove) { ctx.moveTo(px, py); isMove = false; }
                     else ctx.lineTo(px, py);
                 }
                 ctx.stroke();
-                
                 if(limit > 0 && limit < dataToShow.length) {
                     const tip = dataToShow[limit];
                     if(tip.type !== 'break' && tip.type !== 'cmd') {
-                        ctx.beginPath(); 
-                        ctx.arc(tip.x*scale, -tip.y*scale, 4, 0, Math.PI*2);
-                        ctx.fillStyle = color; ctx.fill();
+                        ctx.beginPath(); ctx.arc(tip.x*scale, -tip.y*scale, 4, 0, Math.PI*2); ctx.fillStyle = color; ctx.fill();
                     }
                 }
                 ctx.restore();
             }
-
-            // Draw Transform Bounding Box
             if(currentTool === 'select' && rawPoints.length > 0 && !generatedGCode) {
                  let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
                  rawPoints.forEach(p => {
-                    if(p.type === 'point') {
-                        if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
-                        if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
-                    }
+                    if(p.type === 'point') { if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x; if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y; }
                 });
                 if(minX !== Infinity) {
-                    ctx.beginPath();
-                    ctx.rect(minX*scale, -maxY*scale, (maxX-minX)*scale, (maxY-minY)*scale);
-                    ctx.strokeStyle = dark ? "white" : "black";
-                    ctx.setLineDash([5, 5]);
-                    ctx.stroke();
-                    ctx.setLineDash([]);
+                    ctx.beginPath(); ctx.rect(minX*scale, -maxY*scale, (maxX-minX)*scale, (maxY-minY)*scale);
+                    ctx.strokeStyle = dark ? "white" : "black"; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
                 }
             }
-
             ctx.restore();
         }
 
-        // --- ACTIONS ---
         async function sendToTable() { 
             if(!generatedGCode) return showToast("Click Prepare first", "error"); 
             let code = generatedGCode; 
             if(document.getElementById('autoClearMode').checked) { 
-                try {
-                    let r = await fetch('./designs/clear.txt'); 
-                    if(r.ok) code = (await r.text()) + "\n" + code;
-                } catch(e) {} 
+                try { let r = await fetch('./designs/clear.txt'); if(r.ok) code = (await r.text()) + "\n" + code; } catch(e) {} 
             } 
-            fetch(BASE_URL+'/send_gcode_block', {
-                method:'POST', 
-                headers:{'Content-Type':'application/json'}, 
-                body:JSON.stringify({gcode:code})
-            })
-            .then(r => r.json())
-            .then(d => showToast(d.success ? "Sent!" : "Error", d.success ? "success" : "error")); 
+            fetch(BASE_URL+'/send_gcode_block', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({gcode:code}) })
+            .then(r => r.json()).then(d => showToast(d.success ? "Sent!" : "Error", d.success ? "success" : "error")); 
         }
 
         async function saveToServer() { 
@@ -1625,20 +1472,11 @@
             if(n) {
                 if(!n.toLowerCase().endsWith('.txt')) n += ".txt";
                 showToast("Saving...", "info");
-                fetch(BASE_URL+'/save_design', {
-                    method:'POST', 
-                    headers:{'Content-Type':'application/json'}, 
-                    body:JSON.stringify({filename:n, gcode:generatedGCode})
-                })
-                .then(r => r.json())
-                .then(d => {
-                    if(d.success) showToast("Saved to Pi!", "success");
-                    else showToast("Save Failed: " + (d.error || "Unknown"), "error");
-                })
+                fetch(BASE_URL+'/save_design', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({filename:n, gcode:generatedGCode}) })
+                .then(r => r.json()).then(d => { if(d.success) showToast("Saved to Pi!", "success"); else showToast("Save Failed: " + (d.error || "Unknown"), "error"); })
                 .catch(e => showToast("Network Error", "error"));
             }
         }
-
         function getShortestRotation(raw, last) {
             let diff = (raw - last) / (2 * Math.PI);
             let offset = Math.round(diff);
@@ -1675,7 +1513,6 @@
             const cost2 = Math.abs(b2_steps - lastBaseSteps) + Math.abs(e2_steps - lastElbowSteps);
             return (cost1 <= cost2) ? { base_steps: b1_steps, elbow_steps: e1_steps } : { base_steps: b2_steps, elbow_steps: e2_steps };
         }
-
         init();
     </script>
 </body>
