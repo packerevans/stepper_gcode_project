@@ -135,18 +135,6 @@
         .stamp-btn { font-size: 18px; padding: 5px; background: rgba(0,0,0,0.05); border-radius: 4px; border: 1px solid rgba(0,0,0,0.1); }
         .stamp-btn:hover { background: var(--secondary); color: white; }
 
-        /* Modal Styles */
-        #imgOptionsModal {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8); z-index: 5000;
-            display: none; align-items: center; justify-content: center;
-        }
-        .modal-content {
-            background: var(--panel); color: var(--text);
-            padding: 20px; border-radius: 12px; width: 90%; max-width: 400px;
-            text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-        }
-        .modal-btn-row { display: flex; gap: 10px; margin-top: 20px; }
     </style>
 </head>
 <body data-theme="light">
@@ -157,18 +145,6 @@
         <a href="/ai_builder">AI Builder</a>
         <a href="/led_controls">LED Controls</a>
         <a href="/terminal">Terminal</a>
-    </div>
-
-    <div id="imgOptionsModal">
-        <div class="modal-content">
-            <h3>Import Image</h3>
-            <p>Select processing method:</p>
-            <div class="modal-btn-row">
-                <button class="secondary" onclick="confirmTrace()">Trace (Outline)</button>
-                <button class="active" onclick="confirmSketch()">Sketch (Shaded)</button>
-            </div>
-            <button style="margin-top:15px; background:none; border:none; color:var(--text); text-decoration:underline; cursor:pointer;" onclick="closeImgModal()">Cancel</button>
-        </div>
     </div>
 
     <div class="nav-bar">
@@ -215,15 +191,8 @@
                                 <button class="stamp-btn" onclick="addShape('hexagon')">⬡</button>
                                 <button class="stamp-btn" onclick="addShape('pentagon')">⬠</button>
                                 <button class="stamp-btn" onclick="addShape('star')">⭐</button>
-                                <button class="stamp-btn" onclick="addShape('heart')">❤️</button>
-                                <button class="stamp-btn" onclick="addShape('diamond')">💎</button>
                                 <button class="stamp-btn" onclick="addShape('spiral')">🌀</button>
                             </div>
-                        </div>
-                        
-                        <div class="slider-row" style="margin-top: 15px; margin-bottom: 0;">
-                            <div class="slider-header"><span>SYMMETRY</span> <span id="symVal">1x</span></div>
-                            <input type="range" id="symSlider" min="1" max="12" value="1" step="1" oninput="updateUI()">
                         </div>
                     </div>
 
@@ -289,6 +258,11 @@
 
                 <hr style="border:0; border-top:1px solid #ddd; margin: 15px 0;">
                 
+                <div class="slider-row">
+                    <div class="slider-header"><span>SYMMETRY</span> <span id="symVal">1x</span></div>
+                    <input type="range" id="symSlider" min="1" max="12" value="1" step="1" oninput="updateUI()">
+                </div>
+
                 <button class="action" onclick="prepareGCode()" style="margin-bottom:15px; font-size:1.1em;">⚙️ Prepare Path</button>
             </div>
             
@@ -350,15 +324,12 @@
         let eraserRadius = 10;
         let fillGap = 5.0;
 
-        // Sandify Base State
+        // Sandify Base State (to prevent degradation on live updates)
         let sandBasePoints = null;
 
         // Live Transform State
         let lastRotVal = 0;
         let lastScaleVal = 100;
-
-        // Image Upload Temp Storage
-        let tempImgData = null;
 
         const canvas = document.getElementById('drawCanvas');
         const ctx = canvas.getContext('2d');
@@ -637,7 +608,7 @@
             let endP = stroke[stroke.length-1];
             let d = Math.hypot(startP.x - endP.x, startP.y - endP.y);
             
-            // Snap to close loop if close
+            // If endpoints are close, close the loop
             if(d < 30.0) {
                 stroke.push({x: startP.x, y: startP.y, type:'point'});
             }
@@ -688,7 +659,7 @@
                 }
             } else if(type==='pentagon') {
                 for(let i=0; i<=5; i++) {
-                    const a = (i/5)*Math.PI*2 - Math.PI/2; 
+                    const a = (i/5)*Math.PI*2 - Math.PI/2; // Start at top
                     pts.push({x: Math.cos(a)*r, y: Math.sin(a)*r});
                 }
             } else if(type==='star') {
@@ -697,15 +668,6 @@
                     const rad = (i%2===0) ? r : r*0.4;
                     pts.push({x: Math.cos(a)*rad, y: Math.sin(a)*rad});
                 }
-            } else if(type==='heart') {
-                for(let i=0; i<60; i++) {
-                    let t = (i/60) * Math.PI * 2;
-                    let x = 16 * Math.pow(Math.sin(t), 3);
-                    let y = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
-                    pts.push({x: x * (r/16), y: y * (r/16)});
-                }
-            } else if(type==='diamond') {
-                pts = [{x:0, y:r}, {x:r*0.7, y:0}, {x:0, y:-r}, {x:-r*0.7, y:0}, {x:0, y:r}];
             } else if(type==='spiral') {
                 for(let i=0; i<100; i++) {
                     const a = i * 0.3;
@@ -721,199 +683,6 @@
             showToast("Added " + type, "success");
         }
 
-        // --- IMAGE HANDLING & PROCESSING ---
-        function handleImageUpload(input) {
-            const file = input.files[0];
-            if(!file) return;
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                tempImgData = e.target.result;
-                document.getElementById('imgOptionsModal').style.display = 'flex';
-            };
-            reader.readAsDataURL(file);
-        }
-
-        function closeImgModal() {
-            document.getElementById('imgOptionsModal').style.display = 'none';
-            tempImgData = null;
-            document.getElementById('imgUpload').value = ''; 
-        }
-
-        function confirmTrace() {
-            if(!tempImgData) return;
-            closeImgModal();
-            showToast("Scanning (Trace)...", "info");
-            saveState();
-            
-            const img = new Image();
-            img.onload = function() {
-                const tCan = document.createElement('canvas');
-                // Limit resolution to speed up tracing
-                const MAX = 800; 
-                let tw = img.width, th = img.height;
-                if(tw>th && tw>MAX){ th*=MAX/tw; tw=MAX; } 
-                else if(th>MAX){ tw*=MAX/th; th=MAX; }
-                tCan.width = tw; tCan.height = th;
-                
-                const tCtx = tCan.getContext('2d');
-                tCtx.fillStyle = "white"; tCtx.fillRect(0,0,tw,th);
-                tCtx.drawImage(img, 0, 0, tw, th);
-                
-                // SVG Trace Config
-                ImageTracer.imageToSVG(tCan.toDataURL(), function(svgStr){ 
-                    processTrace(svgStr, tw, th); 
-                }, { ltres:0.5, qtres:0.5, pathomit:2, colorsampling:2, numberofcolors:2 });
-            };
-            img.src = tempImgData;
-        }
-
-        function confirmSketch() {
-            if(!tempImgData) return;
-            closeImgModal();
-            showToast("Processing Sketch Mode...", "info");
-            saveState();
-            
-            const img = new Image();
-            img.onload = function() {
-                processSketch(img);
-            };
-            img.src = tempImgData;
-        }
-
-        // --- RESTORED TRACE PROCESSING ---
-        // This function now contains all the logic internally to ensure it works
-        function processTrace(svgStr, imgW, imgH) {
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(svgStr, "image/svg+xml");
-            const paths = doc.getElementsByTagName("path");
-            let strokes = [];
-            const res = 2.0; 
-
-            // 1. Extract Points
-            for(let i=0; i<paths.length; i++) {
-                const p = paths[i];
-                const len = p.getTotalLength();
-                if(len < 5) continue; 
-                
-                let pts = [];
-                for(let d=0; d<=len; d+=res) {
-                    const pt = p.getPointAtLength(d);
-                    pts.push({x: pt.x, y: pt.y});
-                }
-                strokes.push(pts);
-            }
-
-            if(strokes.length === 0) return showToast("No shapes found", "error");
-
-            // 2. Calculate Bounding Box
-            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
-            strokes.flat().forEach(p => {
-                if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
-                if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
-            });
-            
-            const contentW = maxX - minX;
-            const contentH = maxY - minY;
-            const tableR = parseFloat(document.getElementById('cfgRadius').value);
-            // Scale to 90% of table radius
-            const scaleFac = (tableR * 2 * 0.9) / Math.max(contentW, contentH);
-            const cx = (minX + maxX)/2;
-            const cy = (minY + maxY)/2;
-
-            // 3. Normalize & Apply
-            rawPoints = [];
-            strokes.forEach(s => {
-                let normS = s.map(p => ({
-                    x: (p.x - cx) * scaleFac,
-                    y: -(p.y - cy) * scaleFac // Flip Y
-                })).filter(p => Math.hypot(p.x, p.y) < tableR);
-
-                if(normS.length > 1) {
-                    rawPoints.push({type:'break'});
-                    normS.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
-                }
-            });
-            rawPoints.push({type:'break'});
-
-            resetStatus();
-            showToast("Trace Loaded", "success");
-            render();
-        }
-
-        // --- IMPROVED SKETCH MODE ---
-        function processSketch(img) {
-            const size = 600; // Resolution
-            const can = document.createElement('canvas');
-            can.width = size; can.height = size;
-            const c = can.getContext('2d');
-            
-            let scale = Math.min(size/img.width, size/img.height);
-            let w = img.width * scale;
-            let h = img.height * scale;
-            let ox = (size-w)/2;
-            let oy = (size-h)/2;
-            
-            c.fillStyle = "white"; c.fillRect(0,0,size,size);
-            c.drawImage(img, ox, oy, w, h);
-            
-            const idata = c.getImageData(0,0,size,size);
-            const data = idata.data;
-            let strokes = [];
-            
-            // Multi-shade Hatching
-            for(let y=0; y<size; y+=2) { // Step 2 to allow densest lines
-                let currentStroke = [];
-                
-                for(let x=0; x<size; x++) {
-                    let idx = (y*size + x)*4;
-                    let gray = 0.299*data[idx] + 0.587*data[idx+1] + 0.114*data[idx+2];
-                    
-                    // Mask Circle
-                    let dx = x - size/2, dy = y - size/2;
-                    if(Math.sqrt(dx*dx + dy*dy) > size/2 - 2) gray = 255; 
-
-                    let drawPixel = false;
-                    
-                    // 5 Density Levels
-                    if(gray < 50) { drawPixel = true; } // Every line
-                    else if(gray < 100) { if(y%3===0) drawPixel = true; } 
-                    else if(gray < 150) { if(y%6===0) drawPixel = true; }
-                    else if(gray < 200) { if(y%12===0) drawPixel = true; }
-                    
-                    if(drawPixel) {
-                        currentStroke.push({x:x, y:y});
-                    } else {
-                        if(currentStroke.length > 2) strokes.push(currentStroke);
-                        currentStroke = [];
-                    }
-                }
-                if(currentStroke.length > 2) strokes.push(currentStroke);
-            }
-            
-            // Normalize sketch to table
-            const tableR = parseFloat(document.getElementById('cfgRadius').value);
-            const sketchScale = (tableR * 2 * 0.95) / size;
-            
-            rawPoints = [];
-            strokes.forEach(s => {
-                let normS = s.map(p => ({
-                    x: (p.x - size/2) * sketchScale,
-                    y: -(p.y - size/2) * sketchScale 
-                }));
-                if(normS.length > 1) {
-                    rawPoints.push({type:'break'});
-                    normS.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
-                }
-            });
-            rawPoints.push({type:'break'});
-            
-            resetStatus();
-            showToast("Sketch Generated", "success");
-            render();
-        }
-
-        // [Helper functions like getPos, processPointer, drawCursor, applyTransform, liveRotate/Scale, applySandify, handleFillClick remain unchanged]
-        
         function getPos(e) {
             return {
                 x: (e.offsetX - origin.x) / scale,
@@ -1100,19 +869,23 @@
             render();
         }
 
+        // --- TOGGLE SANDIFY BUTTON ---
         function toggleSandify() {
+            // If already in sandify mode, toggle OFF
             if(currentTool === 'sandify') {
                 if(sandBasePoints) {
+                    // Revert to original
                     rawPoints = JSON.parse(JSON.stringify(sandBasePoints));
                     sandBasePoints = null;
                 }
-                setTool('select'); 
+                setTool('select'); // Switch back to a safe tool
                 showToast("Sandify Cancelled", "info");
                 render();
             } else {
                 setTool('sandify');
             }
         }
+
 
         // --- MASTER DUNE FILL ---
         function handleFillClick(e) {
@@ -1277,6 +1050,85 @@
             rawPoints.push({type: 'break'});
             render();
             showToast("Master Fill Complete!", "success");
+        }
+
+        // --- IMAGE UPLOAD HANDLING ---
+        function handleImageUpload(input) {
+            const file = input.files[0];
+            if(!file) return;
+            showToast("Scanning...", "info");
+            saveState();
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const tCan = document.createElement('canvas');
+                    const MAX = 1000;
+                    let tw = img.width, th = img.height;
+                    if(tw>th && tw>MAX){ th*=MAX/tw; tw=MAX; } 
+                    else if(th>MAX){ tw*=MAX/th; th=MAX; }
+                    tCan.width = tw; tCan.height = th;
+                    const tCtx = tCan.getContext('2d');
+                    tCtx.fillStyle = "white"; tCtx.fillRect(0,0,tw,th);
+                    tCtx.filter = "grayscale(100%) contrast(150%)";
+                    tCtx.drawImage(img, 0, 0, tw, th);
+                    ImageTracer.imageToSVG(tCan.toDataURL(), function(svgStr){ processTrace(svgStr, tw, th); }, { ltres:0.5, qtres:0.5, pathomit:2, colorsampling:2, numberofcolors:2 });
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function processTrace(svgStr, imgW, imgH) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(svgStr, "image/svg+xml");
+            const paths = doc.getElementsByTagName("path");
+            let strokes = [];
+            const res = 2.0; 
+            for(let i=0; i<paths.length; i++) {
+                const p = paths[i];
+                const len = p.getTotalLength();
+                if(len < 5) continue; 
+                let pts = [];
+                let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+                for(let d=0; d<=len; d+=res) {
+                    const pt = p.getPointAtLength(d);
+                    pts.push({x: pt.x, y: pt.y});
+                    if(pt.x<minX) minX=pt.x; if(pt.x>maxX) maxX=pt.x;
+                    if(pt.y<minY) minY=pt.y; if(pt.y>maxY) maxY=pt.y;
+                }
+                const w = maxX - minX;
+                const h = maxY - minY;
+                if (w > imgW * 0.98 || h > imgH * 0.98) continue; 
+                strokes.push(pts);
+            }
+            if(strokes.length === 0) return showToast("No shapes found", "error");
+            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+            strokes.flat().forEach(p => {
+                if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
+                if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
+            });
+            const contentW = maxX - minX;
+            const contentH = maxY - minY;
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            const scaleFac = (tableR * 2 * 0.9) / Math.max(contentW, contentH);
+            const cx = (minX + maxX)/2;
+            const cy = (minY + maxY)/2;
+            let normalizedStrokes = strokes.map(s => {
+                return s.map(p => ({
+                    x: (p.x - cx) * scaleFac,
+                    y: -(p.y - cy) * scaleFac 
+                })).filter(p => Math.hypot(p.x, p.y) < tableR);
+            });
+            rawPoints = [];
+            normalizedStrokes.forEach(s => {
+                rawPoints.push({type:'break'});
+                s.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
+            });
+            rawPoints.push({type:'break'});
+            resetStatus();
+            showToast("Trace Loaded (Click Prepare)", "info");
+            render();
         }
 
         // --- OPTIMIZER ---
