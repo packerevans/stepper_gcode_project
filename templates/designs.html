@@ -76,6 +76,20 @@
         }
         .btn-primary { background: var(--color-accent) !important; color: white !important; border: none !important; }
 
+        /* --- Sent Popup --- */
+        #sent-popup {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9);
+            background: rgba(74, 222, 128, 0.85); /* Transparent Green */
+            backdrop-filter: blur(4px);
+            color: #004d00;
+            padding: 25px 50px; border-radius: 25px;
+            font-size: 2rem; font-weight: 800;
+            opacity: 0; pointer-events: none; z-index: 2000;
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        #sent-popup.active { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
         /* --- Grid --- */
         .grid { display: grid; gap: 16px; padding: 15px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); max-width: 1200px; margin: 0 auto; }
 
@@ -135,6 +149,8 @@
 </head>
 <body data-theme="light">
 
+    <div id="sent-popup">SENT!</div>
+
     <div id="loop-indicator">
         <span>Drawing on Repeat</span>
         <button class="close-loop" onclick="cancelLoop()">✕</button>
@@ -170,6 +186,7 @@
                 <option value="1.0" selected>Speed: Normal</option>
                 <option value="2.0">Speed: Slow</option>
             </select>
+            <button class="action-btn" onclick="shuffleLoop()">Shuffle All</button>
             <button class="action-btn btn-primary" onclick="resumeDesign()">Resume</button>
             <button class="action-btn" onclick="pauseDesign()">Pause</button>
             <button class="action-btn" onclick="clearQueue()">Clear All</button>
@@ -251,6 +268,13 @@
             setTimeout(()=>el.style.opacity='0', 3000);
         }
 
+        // --- POPUP FUNCTION ---
+        function showSentPopup() {
+            let p = document.getElementById('sent-popup');
+            p.classList.add('active');
+            setTimeout(() => { p.classList.remove('active'); }, 800);
+        }
+
         function toggleSelect(f, e) {
             e.stopPropagation();
             if(selectedFiles.has(f)) selectedFiles.delete(f); else selectedFiles.add(f);
@@ -263,6 +287,21 @@
             let bar=document.getElementById('selection-bar');
             if(selectedFiles.size>0){ bar.classList.add('active'); document.getElementById('sel-count').textContent=`${selectedFiles.size} Selected`; }
             else bar.classList.remove('active');
+        }
+
+        // --- SHUFFLE & LOOP FUNCTION ---
+        async function shuffleLoop() {
+            if(allFiles.length === 0) { showStatus("No designs found"); return; }
+            showStatus("Shuffling Library...");
+            
+            // Random Shuffle
+            let shuffled = [...allFiles].sort(() => 0.5 - Math.random());
+            
+            await fetch(`${BASE_URL}/set_loop`, {
+                method:"POST", headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({files:shuffled})
+            });
+            updateQ();
         }
 
         async function loopSelected() {
@@ -296,7 +335,6 @@
         async function copySelected() {
             let txt = "";
             showStatus("Fetching code...");
-            
             try {
                 for(let f of selectedFiles) {
                     let r = await fetch(`${BASE_URL}/designs/${f}`);
@@ -318,20 +356,19 @@
             ta.style.position = "fixed"; ta.style.left = "-9999px";
             document.body.appendChild(ta);
             ta.focus(); ta.select();
-            
             try {
                 document.execCommand('copy');
                 showStatus("Copied!");
                 selectedFiles.clear(); renderSel();
-            } catch (err) {
-                showStatus("Copy Failed");
-            }
+            } catch (err) { showStatus("Copy Failed"); }
             document.body.removeChild(ta);
         }
 
         async function runDesign(f) {
+            // TRIGGER POPUP
+            showSentPopup();
+
             let spd = document.getElementById('speedSelect').value;
-            showStatus("Queueing...");
             let r=await fetch(`${BASE_URL}/designs/${f}`), txt=await r.text();
             let gcode = txt.split('\n').map(l=>{
                 if(l.trim().toUpperCase().startsWith('G1')){
@@ -348,23 +385,18 @@
         function resumeDesign() { sendCmd('RESUME'); }
         function clearQueue() { sendCmd('CLEAR'); updateQ(); }
 
-        // --- UPDATED STATUS LOGIC ---
         async function updateQ() {
             try {
                 let r = await fetch(`${BASE_URL}/status_full`);
                 let d = await r.json();
                 
                 let playText = "Select a design";
-                
                 if (d.playing) {
-                    // Check if actually paused
                     playText = d.is_paused ? `Paused: ${d.playing}` : `Playing: ${d.playing}`;
                 } 
                 else if (d.is_waiting) {
-                    // Show cooldown message
                     playText = `Cooling down (Next: ${d.next_up})`;
                 }
-                
                 document.getElementById('playing-display').textContent = playText;
                 
                 let qText = "Queue empty";
@@ -389,7 +421,6 @@
             fs.forEach(f=>{
                 let d=document.createElement('div'), clean=f.replace('.txt','');
                 d.className='card'; d.dataset.name=f; d.dataset.hasPng="false";
-                // Added data-base-time attribute to store the raw calculation later
                 d.dataset.baseTime="0"; 
                 d.onclick=(e)=>{if(e.target.className!=='select-dot')runDesign(f)};
                 d.innerHTML=`<div class="card-img-wrap"><canvas data-f="${f}" width="300" height="300"></canvas><div class="select-dot" onclick="toggleSelect('${f}', event)"></div></div><div class="card-body"><h3 class="card-title">${clean}</h3><div class="card-meta">Est: <span id="t-${clean}">...</span></div></div>`;
@@ -397,7 +428,6 @@
             }); renderSel();
         }
 
-        // --- NEW FUNCTION: Formats microseconds into 45s or 5m ---
         function formatTimeFromMicroseconds(us) {
             if(!us) return "...";
             let seconds = Math.round(us / 1000000);
@@ -405,7 +435,6 @@
             return Math.ceil(seconds / 60) + "m";
         }
 
-        // --- NEW FUNCTION: Updates all visible cards when dropdown changes ---
         function updateAllTimes() {
             let speed = parseFloat(document.getElementById('speedSelect').value) || 1.0;
             document.querySelectorAll('.card').forEach(card => {
@@ -424,39 +453,24 @@
             let card = cvs.closest('.card');
             
             fetch(`${BASE_URL}/designs/${f}`).then(r => r.text()).then(t => {
-                
-                // --- TIME CALCULATION (Base Speed) ---
                 let tm = 0;
                 t.split('\n').forEach(l => {
                     let line = l.trim();
                     if(line.toUpperCase().startsWith('G1')){
                         let p = line.substring(2).trim().split(/\s+/);
-                        // Time = Max(Steps) * Delay(us)
                         let steps = Math.max(Math.abs(parseInt(p[0])||0), Math.abs(parseInt(p[1])||0));
                         let delay = parseInt(p[2]) || 1000;
                         tm += steps * delay;
                     }
                 });
-
-                // Store the "Normal" (Base) time on the card
                 card.dataset.baseTime = tm;
-
-                // Calculate display based on CURRENT selected speed
                 let currentSpeed = parseFloat(document.getElementById('speedSelect').value) || 1.0;
                 document.getElementById(`t-${clean}`).textContent = formatTimeFromMicroseconds(tm * currentSpeed);
 
-                // --- IMAGE HANDLING ---
                 let img = new Image();
                 img.src = `${BASE_URL}/designs/${clean}.png`;
-                
-                img.onload = () => {
-                    cvs.getContext('2d').drawImage(img,0,0,300,300);
-                    card.dataset.hasPng="true";
-                };
-                
-                img.onerror = () => {
-                    drawTrace(cvs, t);
-                };
+                img.onload = () => { cvs.getContext('2d').drawImage(img,0,0,300,300); card.dataset.hasPng="true"; };
+                img.onerror = () => { drawTrace(cvs, t); };
             });
         }
 
