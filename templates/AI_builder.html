@@ -135,6 +135,7 @@
         .stamp-btn { font-size: 18px; padding: 5px; background: rgba(0,0,0,0.05); border-radius: 4px; border: 1px solid rgba(0,0,0,0.1); }
         .stamp-btn:hover { background: var(--secondary); color: white; }
 
+        /* Modal Styles */
         #imgOptionsModal {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.8); z-index: 5000;
@@ -161,12 +162,12 @@
     <div id="imgOptionsModal">
         <div class="modal-content">
             <h3>Import Image</h3>
-            <p>How would you like to process this image?</p>
+            <p>Select processing method:</p>
             <div class="modal-btn-row">
-                <button class="secondary" onclick="confirmTrace()">Standard Trace<br><span style="font-size:10px">(Outlines)</span></button>
-                <button class="active" onclick="confirmSketch()">Sketch Mode<br><span style="font-size:10px">(Shading/Hatch)</span></button>
+                <button class="secondary" onclick="confirmTrace()">Trace (Outline)</button>
+                <button class="active" onclick="confirmSketch()">Sketch (Shaded)</button>
             </div>
-            <button style="margin-top:10px; background:none; border:none; color:var(--text); text-decoration:underline;" onclick="closeImgModal()">Cancel</button>
+            <button style="margin-top:15px; background:none; border:none; color:var(--text); text-decoration:underline; cursor:pointer;" onclick="closeImgModal()">Cancel</button>
         </div>
     </div>
 
@@ -253,11 +254,14 @@
                         <input type="range" min="-4.0" max="10.0" step="0.1" value="2.0" 
                                oninput="document.getElementById('sandStartVal').innerText=this.value+'x'; applySandify();" id="sandScaleInput">
                         <div style="text-align:right; font-size:10px; margin-bottom:5px;" id="sandStartVal">2.0x</div>
+                        
                         <span class="tool-label">Zoom Interval</span>
                         <input type="range" min="0.01" max="0.2" step="0.01" value="0.05" oninput="applySandify()" id="sandZoomInput">
+                        
                         <span class="tool-label">Rotation Interval</span>
                         <input type="range" min="0" max="45" step="1" value="5" oninput="applySandify()" id="sandRotInput">
-                        <span class="tool-label">Shift Interval</span>
+
+                        <span class="tool-label">Shift Interval (Left/Right)</span>
                         <input type="range" min="-50" max="50" step="1" value="0" oninput="applySandify()" id="sandShiftInput">
                     </div>
                 </div>
@@ -284,6 +288,7 @@
                 </div>
 
                 <hr style="border:0; border-top:1px solid #ddd; margin: 15px 0;">
+                
                 <button class="action" onclick="prepareGCode()" style="margin-bottom:15px; font-size:1.1em;">⚙️ Prepare Path</button>
             </div>
             
@@ -340,18 +345,29 @@
         let origin = {x:0, y:0};
         let scale = 1;
         let generatedGCode = null;
+
+        // Tool Settings State
         let eraserRadius = 10;
         let fillGap = 5.0;
+
+        // Sandify Base State
         let sandBasePoints = null;
+
+        // Live Transform State
         let lastRotVal = 0;
         let lastScaleVal = 100;
+
+        // Image Upload Temp Storage
         let tempImgData = null;
 
         const canvas = document.getElementById('drawCanvas');
         const ctx = canvas.getContext('2d');
         const BASE_URL = window.location.origin;
 
-        // ... [Geometry Helpers match previous] ...
+        // =====================================================
+        // === 1. CORE MATH & GEOMETRY HELPERS ===
+        // =====================================================
+
         function distSq(p1, p2) { return (p1.x-p2.x)**2 + (p1.y-p2.y)**2; }
         function dist(p1, p2) { return Math.sqrt(distSq(p1, p2)); }
         function isPointInPolygon(p, polygon) {
@@ -533,7 +549,9 @@
             updateToolSettings();
         }
 
-        // --- DRAWING & INPUT HANDLERS ---
+        let dragStart = null;
+
+        // --- DRAWING LOGIC ---
         function startDraw(e) {
             e.preventDefault();
             if(generatedGCode) return;
@@ -614,13 +632,17 @@
             for(let i=startIndex; i<rawPoints.length; i++) stroke.push(rawPoints[i]);
             if(stroke.length < 3) return;
 
+            // Auto-Connect Logic
             let startP = stroke[0];
             let endP = stroke[stroke.length-1];
             let d = Math.hypot(startP.x - endP.x, startP.y - endP.y);
+            
+            // Snap to close loop if close
             if(d < 30.0) {
                 stroke.push({x: startP.x, y: startP.y, type:'point'});
             }
 
+            // Smoothing: 2 Passes (Chaikin)
             for(let pass=0; pass<2; pass++) {
                 let smooth = [];
                 smooth.push(stroke[0]);
@@ -644,6 +666,7 @@
             rawPoints.splice(startIndex, rawPoints.length - startIndex, ...stroke);
         }
 
+        // --- SHAPE STAMPS ---
         function addShape(type) {
             saveState();
             const r = 50; 
@@ -747,7 +770,7 @@
         function confirmSketch() {
             if(!tempImgData) return;
             closeImgModal();
-            showToast("Processing Sketch...", "info");
+            showToast("Processing Sketch Mode...", "info");
             saveState();
             
             const img = new Image();
@@ -757,6 +780,8 @@
             img.src = tempImgData;
         }
 
+        // --- RESTORED TRACE PROCESSING ---
+        // This function now contains all the logic internally to ensure it works
         function processTrace(svgStr, imgW, imgH) {
             const parser = new DOMParser();
             const doc = parser.parseFromString(svgStr, "image/svg+xml");
@@ -764,10 +789,12 @@
             let strokes = [];
             const res = 2.0; 
 
+            // 1. Extract Points
             for(let i=0; i<paths.length; i++) {
                 const p = paths[i];
                 const len = p.getTotalLength();
                 if(len < 5) continue; 
+                
                 let pts = [];
                 for(let d=0; d<=len; d+=res) {
                     const pt = p.getPointAtLength(d);
@@ -777,17 +804,49 @@
             }
 
             if(strokes.length === 0) return showToast("No shapes found", "error");
-            finalizeImport(strokes);
+
+            // 2. Calculate Bounding Box
+            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+            strokes.flat().forEach(p => {
+                if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
+                if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
+            });
+            
+            const contentW = maxX - minX;
+            const contentH = maxY - minY;
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            // Scale to 90% of table radius
+            const scaleFac = (tableR * 2 * 0.9) / Math.max(contentW, contentH);
+            const cx = (minX + maxX)/2;
+            const cy = (minY + maxY)/2;
+
+            // 3. Normalize & Apply
+            rawPoints = [];
+            strokes.forEach(s => {
+                let normS = s.map(p => ({
+                    x: (p.x - cx) * scaleFac,
+                    y: -(p.y - cy) * scaleFac // Flip Y
+                })).filter(p => Math.hypot(p.x, p.y) < tableR);
+
+                if(normS.length > 1) {
+                    rawPoints.push({type:'break'});
+                    normS.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
+                }
+            });
+            rawPoints.push({type:'break'});
+
+            resetStatus();
+            showToast("Trace Loaded", "success");
+            render();
         }
 
-        // IMPROVED SKETCH ALGORITHM (5 Shades)
+        // --- IMPROVED SKETCH MODE ---
         function processSketch(img) {
-            const size = 500;
+            const size = 600; // Resolution
             const can = document.createElement('canvas');
             can.width = size; can.height = size;
             const c = can.getContext('2d');
             
-            // Fit image
             let scale = Math.min(size/img.width, size/img.height);
             let w = img.width * scale;
             let h = img.height * scale;
@@ -801,90 +860,59 @@
             const data = idata.data;
             let strokes = [];
             
-            // Variable density hatching
-            // Thresholds: 
-            // <50: Pitch Black (Step 2)
-            // <100: Dark (Step 3)
-            // <150: Mid (Step 6)
-            // <200: Light (Step 12)
-            // >200: White (Skip)
-
-            for(let y=0; y<size; y++) {
+            // Multi-shade Hatching
+            for(let y=0; y<size; y+=2) { // Step 2 to allow densest lines
                 let currentStroke = [];
                 
                 for(let x=0; x<size; x++) {
                     let idx = (y*size + x)*4;
                     let gray = 0.299*data[idx] + 0.587*data[idx+1] + 0.114*data[idx+2];
                     
-                    // Circular mask
+                    // Mask Circle
                     let dx = x - size/2, dy = y - size/2;
                     if(Math.sqrt(dx*dx + dy*dy) > size/2 - 2) gray = 255; 
 
-                    let active = false;
+                    let drawPixel = false;
                     
-                    if(gray < 50) {
-                        if(y % 2 === 0) active = true;
-                    } else if(gray < 100) {
-                        if(y % 3 === 0) active = true;
-                    } else if(gray < 150) {
-                        if(y % 6 === 0) active = true;
-                    } else if(gray < 200) {
-                        if(y % 12 === 0) active = true;
-                    }
-
-                    if(active) {
+                    // 5 Density Levels
+                    if(gray < 50) { drawPixel = true; } // Every line
+                    else if(gray < 100) { if(y%3===0) drawPixel = true; } 
+                    else if(gray < 150) { if(y%6===0) drawPixel = true; }
+                    else if(gray < 200) { if(y%12===0) drawPixel = true; }
+                    
+                    if(drawPixel) {
                         currentStroke.push({x:x, y:y});
                     } else {
-                        if(currentStroke.length > 3) {
-                            strokes.push(currentStroke);
-                        }
+                        if(currentStroke.length > 2) strokes.push(currentStroke);
                         currentStroke = [];
                     }
                 }
-                if(currentStroke.length > 3) strokes.push(currentStroke);
+                if(currentStroke.length > 2) strokes.push(currentStroke);
             }
             
-            finalizeImport(strokes);
-        }
-
-        function finalizeImport(strokes) {
-            // 1. Calculate Bounds
-            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
-            strokes.flat().forEach(p => {
-                if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
-                if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
-            });
-            
-            // 2. Scaling Factors
-            const contentW = maxX - minX;
-            const contentH = maxY - minY;
+            // Normalize sketch to table
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
-            // 90% coverage
-            const scaleFac = (tableR * 2 * 0.9) / Math.max(contentW, contentH);
-            const cx = (minX + maxX)/2;
-            const cy = (minY + maxY)/2;
-
-            // 3. Normalize & Apply to rawPoints
+            const sketchScale = (tableR * 2 * 0.95) / size;
+            
             rawPoints = [];
             strokes.forEach(s => {
                 let normS = s.map(p => ({
-                    x: (p.x - cx) * scaleFac,
-                    y: -(p.y - cy) * scaleFac // Flip Y for table coords
-                })).filter(p => Math.hypot(p.x, p.y) < tableR); // Clip to circle
-
+                    x: (p.x - size/2) * sketchScale,
+                    y: -(p.y - size/2) * sketchScale 
+                }));
                 if(normS.length > 1) {
                     rawPoints.push({type:'break'});
                     normS.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
                 }
             });
             rawPoints.push({type:'break'});
-
+            
             resetStatus();
+            showToast("Sketch Generated", "success");
             render();
-            showToast("Import Successful", "success");
         }
 
-        // [Helper functions like getPos, processPointer, drawCursor, applyTransform, liveRotate/Scale, applySandify, handleFillClick remain unchanged from previous stable versions]
+        // [Helper functions like getPos, processPointer, drawCursor, applyTransform, liveRotate/Scale, applySandify, handleFillClick remain unchanged]
         
         function getPos(e) {
             return {
@@ -1251,9 +1279,7 @@
             showToast("Master Fill Complete!", "success");
         }
 
-        // ... [Optimizer, G-Code Generation, and Utils remain unchanged] ...
-        // [Assuming they are included as in previous turns]
-        
+        // --- OPTIMIZER ---
         function prepareGCode() {
             if(rawPoints.length === 0) return showToast("Draw something first!", "error");
             showToast("Optimizing Path...", "info");
