@@ -1,14 +1,14 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang=\"en\">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta charset=\"UTF-8\">
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\">
     <title>Sand Controller Pro</title>
     
-    <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
-    <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
+    <link rel=\"icon\" type=\"image/png\" sizes=\"192x192\" href=\"/static/icons/icon-192.png\">
+    <link rel=\"apple-touch-icon\" sizes=\"512x512\" href=\"/static/icons/icon-512.png\">
 
-    <script src="https://cdn.jsdelivr.net/npm/imagetracerjs@1.2.6/imagetracer_v1.2.6.min.js"></script>
+    <script src=\"https://cdn.jsdelivr.net/npm/imagetracerjs@1.2.6/imagetracer_v1.2.6.min.js\"></script>
 
     <style>
         :root {
@@ -86,7 +86,7 @@
         
         .slider-row { margin-bottom: 15px; background: rgba(0,0,0,0.05); padding: 8px; border-radius: 8px; }
         .slider-header { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; font-weight: bold; }
-        input[type="range"] { width: 100%; accent-color: var(--secondary); }
+        input[type=\"range\"] { width: 100%; accent-color: var(--secondary); }
         
         #progressSlider {
             -webkit-appearance: none; width: 100%; height: 8px; border-radius: 5px; background: #d3d3d3; outline: none;
@@ -98,7 +98,7 @@
         details { background: rgba(0,0,0,0.05); padding: 10px; border-radius: 8px; margin-top: 10px; }
         summary { cursor: pointer; font-weight: bold; font-size: 13px; }
         .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
-        input[type="number"] { width: 100%; padding: 5px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box; font-family: monospace;}
+        input[type=\"number\"] { width: 100%; padding: 5px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box; font-family: monospace;}
 
         #status-toast {
             position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
@@ -112,7 +112,7 @@
         .switch { position: relative; display: inline-block; width: 40px; height: 22px; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider-tog { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
-        .slider-tog:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        .slider-tog:before { position: absolute; content: \"\"; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
         input:checked + .slider-tog { background-color: var(--secondary); }
         input:checked + .slider-tog:before { transform: translateX(18px); }
 
@@ -137,178 +137,186 @@
 
     </style>
 </head>
-<body data-theme="light">
+<body data-theme=\"light\">
 
-    <div id="mySidebar" class="sidebar">
-        <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
-        <a href="/">Designs</a> 
-        <a href="/ai_builder">AI Builder</a>
-        <a href="/led_controls">LED Controls</a>
-        <a href="/terminal">Terminal</a>
+    <div id=\"mySidebar\" class=\"sidebar\">
+        <a href=\"javascript:void(0)\" onclick=\"closeNav()\">✖ Close</a>
+        <a href=\"/\">Designs</a> 
+        <a href=\"/ai_builder\">AI Builder</a>
+        <a href=\"/led_controls\">LED Controls</a>
+        <a href=\"/terminal\">Terminal</a>
     </div>
 
-    <div class="nav-bar">
-        <button style="flex:0; background:none; font-size:24px; color:var(--text); padding:0;" onclick="openNav()">☰</button>
-        <h1 style="margin:0; font-size:1.2rem;">Sand Controller</h1>
-        <button style="flex:0; background:none; font-size:20px;" onclick="toggleTheme()">☀️</button>
+    <div class=\"nav-bar\">
+        <button style=\"flex:0; background:none; font-size:24px; color:var(--text); padding:0;\" onclick=\"openNav()\">☰</button>
+        <h1 style=\"margin:0; font-size:1.2rem;\">Sand Controller</h1>
+        <button style=\"flex:0; background:none; font-size:20px;\" onclick=\"toggleTheme()\">☀️</button>
     </div>
 
-    <div class="app-container">
-        <div class="drawing-panel">
-            <div class="canvas-wrapper" id="canvasContainer">
-                <canvas id="drawCanvas"></canvas>
+    <div class=\"app-container\">
+        <div class=\"drawing-panel\">
+            <div class=\"canvas-wrapper\" id=\"canvasContainer\">
+                <canvas id=\"drawCanvas\"></canvas>
             </div>
-            <div id="coordDisplay" style="position:absolute; bottom:10px; left:10px; background:rgba(0,0,0,0.5); color:white; padding:4px 8px; border-radius:4px; font-size:11px; pointer-events:none;">X:0 Y:0</div>
+            <div id=\"coordDisplay\" style=\"position:absolute; bottom:10px; left:10px; background:rgba(0,0,0,0.5); color:white; padding:4px 8px; border-radius:4px; font-size:11px; pointer-events:none;\">X:0 Y:0</div>
         </div>
 
-        <div class="controls-panel">
-            <div id="designPhaseControls">
+        <div class=\"controls-panel\">
+            <div id=\"designPhaseControls\">
                 <h2>Tools</h2>
                 
-                <div class="toggle-row">
-                    <span style="font-weight:600; font-size:13px;">🖋️ Stylus Mode</span>
-                    <label class="switch">
-                        <input type="checkbox" id="stylusMode">
-                        <span class="slider-tog"></span>
+                <div class=\"toggle-row\">
+                    <span style=\"font-weight:600; font-size:13px;\">🖋️ Stylus Mode</span>
+                    <label class=\"switch\">
+                        <input type=\"checkbox\" id=\"stylusMode\">
+                        <span class=\"slider-tog\"></span>
                     </label>
                 </div>
 
-                <div id="toolSettingsArea">
-                    <div id="set-pen" class="tool-setting-group">
-                        <div class="toggle-row" style="margin:0;">
-                            <span style="font-size:13px;">🔗 Shape Connector</span>
-                            <label class="switch">
-                                <input type="checkbox" id="shapeConnectMode" checked>
-                                <span class="slider-tog"></span>
+                <div id=\"toolSettingsArea\">
+                    <div id=\"set-pen\" class=\"tool-setting-group\">
+                        <div class=\"toggle-row\" style=\"margin:0;\">
+                            <span style=\"font-size:13px;\">🔗 Shape Connector</span>
+                            <label class=\"switch\">
+                                <input type=\"checkbox\" id=\"shapeConnectMode\" checked>
+                                <span class=\"slider-tog\"></span>
                             </label>
                         </div>
-                        <div style="margin-top:10px;">
-                            <span class="tool-label">Add Stamps</span>
-                            <div class="stamp-grid">
-                                <button class="stamp-btn" onclick="addShape('circle')">⭕</button>
-                                <button class="stamp-btn" onclick="addShape('square')">⬜</button>
-                                <button class="stamp-btn" onclick="addShape('triangle')">🔺</button>
-                                <button class="stamp-btn" onclick="addShape('hexagon')">⬡</button>
-                                <button class="stamp-btn" onclick="addShape('pentagon')">⬠</button>
-                                <button class="stamp-btn" onclick="addShape('star')">⭐</button>
-                                <button class="stamp-btn" onclick="addShape('spiral')">🌀</button>
+                        <div style=\"margin-top:10px;\">
+                            <span class=\"tool-label\">Add Stamps</span>
+                            <div class=\"stamp-grid\">
+                                <button class=\"stamp-btn\" onclick=\"addShape('circle')\">⭕</button>
+                                <button class=\"stamp-btn\" onclick=\"addShape('square')\">⬜</button>
+                                <button class=\"stamp-btn\" onclick=\"addShape('triangle')\">🔺</button>
+                                <button class=\"stamp-btn\" onclick=\"addShape('hexagon')\">⬡</button>
+                                <button class=\"stamp-btn\" onclick=\"addShape('pentagon')\">⬠</button>
+                                <button class=\"stamp-btn\" onclick=\"addShape('star')\">⭐</button>
+                                <button class=\"stamp-btn\" onclick=\"addShape('spiral')\">🌀</button>
                             </div>
                         </div>
                     </div>
 
-                    <div id="set-erase" class="tool-setting-group">
-                        <span class="tool-label">Eraser Size: <span id="eraseSizeVal">10px</span></span>
-                        <input type="range" min="2" max="50" value="10" oninput="updateToolSettings()" id="eraserSizeSlider">
+                    <div id=\"set-erase\" class=\"tool-setting-group\">
+                        <span class=\"tool-label\">Eraser Size: <span id=\"eraseSizeVal\">10px</span></span>
+                        <input type=\"range\" min=\"2\" max=\"50\" value=\"10\" oninput=\"updateToolSettings()\" id=\"eraserSizeSlider\">
                     </div>
 
-                    <div id="set-fill" class="tool-setting-group">
-                        <span class="tool-label">Line Spacing: <span id="fillGapVal">5.0</span></span>
-                        <input type="range" min="1.0" max="15.0" step="0.5" value="5.0" oninput="updateToolSettings()" id="fillGapSlider">
+                    <div id=\"set-fill\" class=\"tool-setting-group\">
+                        <span class=\"tool-label\">Line Spacing: <span id=\"fillGapVal\">5.0</span></span>
+                        <input type=\"range\" min=\"1.0\" max=\"15.0\" step=\"0.5\" value=\"5.0\" oninput=\"updateToolSettings()\" id=\"fillGapSlider\">
+                    </div>
+                    
+                    <div id=\"set-trimmer\" class=\"tool-setting-group\">
+                        <span class=\"tool-label\" style=\"color:var(--danger);\">🚫 NO-GO ZONES</span>
+                        <div style=\"font-size:11px; color:#666; margin-top:5px;\">
+                            Draw closed loops around areas you want connection lines to avoid.
+                        </div>
                     </div>
 
-                    <div id="set-select" class="tool-setting-group">
-                        <span class="tool-label">Rotate Live</span>
-                        <input type="range" min="-180" max="180" value="0" step="1" id="liveRotSlider" 
-                               oninput="liveRotate(this.value)" onchange="endLiveTransform(this)">
-                        <div style="text-align:right; font-size:10px; color:#666;" id="liveRotVal">0°</div>
+                    <div id=\"set-select\" class=\"tool-setting-group\">
+                        <span class=\"tool-label\">Rotate Live</span>
+                        <input type=\"range\" min=\"-180\" max=\"180\" value=\"0\" step=\"1\" id=\"liveRotSlider\" 
+                               oninput=\"liveRotate(this.value)\" onchange=\"endLiveTransform(this)\">
+                        <div style=\"text-align:right; font-size:10px; color:#666;\" id=\"liveRotVal\">0°</div>
                         
-                        <span class="tool-label" style="margin-top:10px;">Resize Live</span>
-                        <input type="range" min="10" max="200" value="100" step="1" id="liveScaleSlider" 
-                               oninput="liveScale(this.value)" onchange="endLiveTransform(this)">
-                        <div style="text-align:right; font-size:10px; color:#666;" id="liveScaleVal">100%</div>
+                        <span class=\"tool-label\" style=\"margin-top:10px;\">Resize Live</span>
+                        <input type=\"range\" min=\"10\" max=\"200\" value=\"100\" step=\"1\" id=\"liveScaleSlider\" 
+                               oninput=\"liveScale(this.value)\" onchange=\"endLiveTransform(this)\">
+                        <div style=\"text-align:right; font-size:10px; color:#666;\" id=\"liveScaleVal\">100%</div>
                     </div>
 
-                    <div id="set-sandify" class="tool-setting-group">
-                        <span class="tool-label">Start Size (Enlarged)</span>
-                        <input type="range" min="-4.0" max="10.0" step="0.1" value="2.0" 
-                               oninput="document.getElementById('sandStartVal').innerText=this.value+'x'; applySandify();" id="sandScaleInput">
-                        <div style="text-align:right; font-size:10px; margin-bottom:5px;" id="sandStartVal">2.0x</div>
+                    <div id=\"set-sandify\" class=\"tool-setting-group\">
+                        <span class=\"tool-label\">Start Size (Enlarged)</span>
+                        <input type=\"range\" min=\"-4.0\" max=\"10.0\" step=\"0.1\" value=\"2.0\" 
+                               oninput=\"document.getElementById('sandStartVal').innerText=this.value+'x'; applySandify();\" id=\"sandScaleInput\">
+                        <div style=\"text-align:right; font-size:10px; margin-bottom:5px;\" id=\"sandStartVal\">2.0x</div>
                         
-                        <span class="tool-label">Zoom Interval</span>
-                        <input type="range" min="0.01" max="0.2" step="0.01" value="0.05" oninput="applySandify()" id="sandZoomInput">
+                        <span class=\"tool-label\">Zoom Interval</span>
+                        <input type=\"range\" min=\"0.01\" max=\"0.2\" step=\"0.01\" value=\"0.05\" oninput=\"applySandify()\" id=\"sandZoomInput\">
                         
-                        <span class="tool-label">Rotation Interval</span>
-                        <input type="range" min="0" max="45" step="1" value="5" oninput="applySandify()" id="sandRotInput">
+                        <span class=\"tool-label\">Rotation Interval</span>
+                        <input type=\"range\" min=\"0\" max=\"45\" step=\"1\" value=\"5\" oninput=\"applySandify()\" id=\"sandRotInput\">
 
-                        <span class="tool-label">Shift Interval (Left/Right)</span>
-                        <input type="range" min="-50" max="50" step="1" value="0" oninput="applySandify()" id="sandShiftInput">
+                        <span class=\"tool-label\">Shift Interval (Left/Right)</span>
+                        <input type=\"range\" min=\"-50\" max=\"50\" step=\"1\" value=\"0\" oninput=\"applySandify()\" id=\"sandShiftInput\">
                     </div>
                 </div>
 
-                <div class="btn-group">
-                    <button id="btnDraw" onclick="setTool('draw')" class="active">✏️ Draw</button>
-                    <button id="btnErase" onclick="setTool('erase')" class="secondary">🧼 Erase</button>
+                <div class=\"btn-group\">
+                    <button id=\"btnDraw\" onclick=\"setTool('draw')\" class=\"active\">✏️ Draw</button>
+                    <button id=\"btnErase\" onclick=\"setTool('erase')\" class=\"secondary\">🧼 Erase</button>
                 </div>
 
-                <div class="btn-group">
-                    <button id="btnSelect" onclick="setTool('select')" class="secondary">✋ Move</button>
-                    <button id="btnSandify" onclick="toggleSandify()" class="secondary">🌀 Sandify</button>
+                <div class=\"btn-group\">
+                    <button id=\"btnSelect\" onclick=\"setTool('select')\" class=\"secondary\">✋ Move</button>
+                    <button id=\"btnSandify\" onclick=\"toggleSandify()\" class=\"secondary\">🌀 Sandify</button>
                 </div>
 
-                <div class="btn-group">
-                    <button id="btnFill" onclick="setTool('fill')" class="secondary">🌊 Dune Fill</button>
-                    <input type="file" id="imgUpload" accept="image/*" style="display:none" onchange="handleImageUpload(this)">
-                    <button class="secondary" onclick="document.getElementById('imgUpload').click()">✨ Trace</button>
+                <div class=\"btn-group\">
+                    <button id=\"btnFill\" onclick=\"setTool('fill')\" class=\"secondary\">🌊 Dune Fill</button>
+                    <input type=\"file\" id=\"imgUpload\" accept=\"image/*\" style=\"display:none\" onchange=\"handleImageUpload(this)\">
+                    <button class=\"secondary\" onclick=\"document.getElementById('imgUpload').click()\">✨ Trace</button>
+                    <button id=\"btnTrimmer\" onclick=\"setTool('trimmer')\" class=\"secondary\" style=\"border: 1px dashed var(--danger); color: var(--danger);\">🚫 No-Go</button>
                 </div>
 
-                <div class="btn-group">
-                    <button onclick="undo()" class="secondary">↶ Undo</button>
-                    <button onclick="clearCanvas()" class="secondary" style="color:var(--danger); border-color:var(--danger);">✖ Clear</button>
+                <div class=\"btn-group\">
+                    <button onclick=\"undo()\" class=\"secondary\">↶ Undo</button>
+                    <button onclick=\"clearCanvas()\" class=\"secondary\" style=\"color:var(--danger); border-color:var(--danger);\">✖ Clear</button>
                 </div>
 
-                <hr style="border:0; border-top:1px solid #ddd; margin: 15px 0;">
+                <hr style=\"border:0; border-top:1px solid #ddd; margin: 15px 0;\">
                 
-                <div class="slider-row">
-                    <div class="slider-header"><span>SYMMETRY</span> <span id="symVal">1x</span></div>
-                    <input type="range" id="symSlider" min="1" max="12" value="1" step="1" oninput="updateUI()">
+                <div class=\"slider-row\">
+                    <div class=\"slider-header\"><span>SYMMETRY</span> <span id=\"symVal\">1x</span></div>
+                    <input type=\"range\" id=\"symSlider\" min=\"1\" max=\"12\" value=\"1\" step=\"1\" oninput=\"updateUI()\">
                 </div>
 
-                <button class="action" onclick="prepareGCode()" style="margin-bottom:15px; font-size:1.1em;">⚙️ Prepare Path</button>
+                <button class=\"action\" onclick=\"prepareGCode()\" style=\"margin-bottom:15px; font-size:1.1em;\">⚙️ Prepare Path</button>
             </div>
             
-            <div id="productionPhaseControls" style="display:none; margin-bottom:15px;">
-                <button class="secondary" onclick="returnToEditing()" style="width:100%; border:2px dashed #999; color:#444; background: rgba(0,0,0,0.05);">
+            <div id=\"productionPhaseControls\" style=\"display:none; margin-bottom:15px;\">
+                <button class=\"secondary\" onclick=\"returnToEditing()\" style=\"width:100%; border:2px dashed #999; color:#444; background: rgba(0,0,0,0.05);\">
                     ✏️ Back to Edit
                 </button>
             </div>
 
-            <div class="slider-row">
-                <div class="slider-header"><span>SIMULATION</span> <span id="progVal">100%</span></div>
-                <input type="range" id="progressSlider" min="0" max="100" value="100" oninput="render()">
+            <div class=\"slider-row\">
+                <div class=\"slider-header\"><span>SIMULATION</span> <span id=\"progVal\">100%</span></div>
+                <input type=\"range\" id=\"progressSlider\" min=\"0\" max=\"100\" value=\"100\" oninput=\"render()\">
             </div>
 
-            <div style="text-align:center; font-size:12px; margin-bottom:10px; color:#666;">
-                Status: <span id="statusTxt" style="font-weight:bold; color:var(--primary);">Drawing Mode</span>
+            <div style=\"text-align:center; font-size:12px; margin-bottom:10px; color:#666;\">
+                Status: <span id=\"statusTxt\" style=\"font-weight:bold; color:var(--primary);\">Drawing Mode</span>
             </div>
 
-            <div class="toggle-row" style="background:rgba(0,0,0,0.03); padding:8px; border-radius:8px; margin-bottom:10px;">
-                <span style="font-weight:600; font-size:13px;">✨ Auto-Clear Before Run</span>
-                <label class="switch">
-                    <input type="checkbox" id="autoClearMode" checked>
-                    <span class="slider-tog"></span>
+            <div class=\"toggle-row\" style=\"background:rgba(0,0,0,0.03); padding:8px; border-radius:8px; margin-bottom:10px;\">
+                <span style=\"font-weight:600; font-size:13px;\">✨ Auto-Clear Before Run</span>
+                <label class=\"switch\">
+                    <input type=\"checkbox\" id=\"autoClearMode\" checked>
+                    <span class=\"slider-tog\"></span>
                 </label>
             </div>
 
-            <div class="btn-group">
-                <button onclick="sendToTable()" class="active">🚀 Run</button>
-                <button onclick="saveToServer()" class="secondary">💾 Save to Pi</button>
+            <div class=\"btn-group\">
+                <button onclick=\"sendToTable()\" class=\"active\">🚀 Run</button>
+                <button onclick=\"saveToServer()\" class=\"secondary\">💾 Save to Pi</button>
             </div>
 
             <details>
                 <summary>⚙️ Machine Settings</summary>
-                <div class="settings-grid">
-                    <div><label>Radius</label><input type="number" id="cfgRadius" value="202.6" onchange="resizeCanvas()"></div>
-                    <div><label>Center Speed</label><input type="number" id="cfgCenterDelay" value="500"></div>
-                    <div><label>Rim Speed</label><input type="number" id="cfgPerimDelay" value="3000"></div>
-                    <div><label>Steps/Deg</label><input type="number" id="cfgStepsPerDeg" value="8.888888"></div>
-                    <div><label>Arm 1</label><input type="number" id="cfgL1" value="101.3"></div>
-                    <div><label>Arm 2</label><input type="number" id="cfgL2" value="101.3"></div>
+                <div class=\"settings-grid\">
+                    <div><label>Radius</label><input type=\"number\" id=\"cfgRadius\" value=\"202.6\" onchange=\"resizeCanvas()\"></div>
+                    <div><label>Center Speed</label><input type=\"number\" id=\"cfgCenterDelay\" value=\"500\"></div>
+                    <div><label>Rim Speed</label><input type=\"number\" id=\"cfgPerimDelay\" value=\"3000\"></div>
+                    <div><label>Steps/Deg</label><input type=\"number\" id=\"cfgStepsPerDeg\" value=\"8.888888\"></div>
+                    <div><label>Arm 1</label><input type=\"number\" id=\"cfgL1\" value=\"101.3\"></div>
+                    <div><label>Arm 2</label><input type=\"number\" id=\"cfgL2\" value=\"101.3\"></div>
                 </div>
             </details>
         </div>
     </div>
 
-    <div id="status-toast"></div>
+    <div id=\"status-toast\"></div>
 
     <script>
         let rawPoints = []; 
@@ -515,7 +523,7 @@
             canvas.addEventListener('pointermove', moveDraw);
             canvas.addEventListener('pointerup', endDraw);
             canvas.addEventListener('pointerleave', endDraw);
-            canvas.style.touchAction = "none";
+            canvas.style.touchAction = \"none\";
             updateUI();
             updateToolSettings();
         }
@@ -529,7 +537,7 @@
             if(currentTool === 'fill') { handleFillClick(e); return; }
 
             const smart = document.getElementById('stylusMode').checked;
-            if(smart && currentTool !== 'select' && currentTool !== 'sandify') {
+            if(smart && currentTool !== 'select' && currentTool !== 'sandify' && currentTool !== 'trimmer') {
                 if(e.pointerType === 'pen') setTool('draw');
                 else if(e.pointerType === 'touch') setTool('erase');
             }
@@ -560,7 +568,7 @@
                 const dx = pos.x - dragStart.x;
                 const dy = pos.y - dragStart.y;
                 rawPoints.forEach(p => {
-                    if(p.type === 'point') {
+                    if(p.type === 'point' || p.type === 'trimmerPoint') {
                         p.x += dx;
                         p.y += dy;
                     }
@@ -584,6 +592,19 @@
             if(currentTool === 'draw') {
                 if(document.getElementById('shapeConnectMode').checked) {
                     autoConnectAndSmooth();
+                }
+                rawPoints.push({type:'break'});
+            }
+            if(currentTool === 'trimmer') {
+                // Close the trimmer loop visually and logically
+                let lastStart = -1;
+                for(let i=rawPoints.length-1; i>=0; i--) {
+                    if(rawPoints[i].type === 'break' || rawPoints[i].type === 'cmd') { lastStart = i+1; break; }
+                }
+                if(lastStart === -1) lastStart = 0;
+                if(rawPoints.length > lastStart) {
+                    let first = rawPoints[lastStart];
+                    rawPoints.push({x:first.x, y:first.y, type:'trimmerPoint'});
                 }
                 rawPoints.push({type:'break'});
             }
@@ -694,10 +715,12 @@
             const p = getPos(e);
             if(currentTool === 'draw') {
                 rawPoints.push({x: p.x, y: p.y, type: 'point'});
+            } else if (currentTool === 'trimmer') {
+                rawPoints.push({x: p.x, y: p.y, type: 'trimmerPoint'});
             } else if (currentTool === 'erase') {
                 const r = eraserRadius; 
                 rawPoints = rawPoints.filter(pt => {
-                    if(pt.type === 'break') return true;
+                    if(pt.type === 'break' || pt.type === 'cmd') return true;
                     return Math.hypot(pt.x - p.x, pt.y - p.y) > r;
                 });
             }
@@ -712,14 +735,16 @@
             const py = origin.y - p.y * scale;
             if(currentTool === 'erase') {
                 ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI*2);
-                ctx.strokeStyle = "#999"; ctx.fillStyle = "rgba(200,200,200,0.3)";
+                ctx.strokeStyle = \"#999\"; ctx.fillStyle = \"rgba(200,200,200,0.3)\";
                 ctx.stroke(); ctx.fill();
             } else if (currentTool === 'fill') {
-                ctx.font = "20px Arial"; ctx.fillStyle = "black"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("🌊", px, py);
+                ctx.font = \"20px Arial\"; ctx.fillStyle = \"black\"; ctx.textAlign=\"center\"; ctx.textBaseline=\"middle\"; ctx.fillText=\"🌊\", px, py);
             } else if (currentTool === 'select') {
-                ctx.font = "20px Arial"; ctx.fillStyle = "black"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("✋", px, py);
+                ctx.font = \"20px Arial\"; ctx.fillStyle = \"black\"; ctx.textAlign=\"center\"; ctx.textBaseline=\"middle\"; ctx.fillText=\"✋\", px, py);
             } else if (currentTool === 'sandify') {
-                ctx.font = "20px Arial"; ctx.fillStyle = "black"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("🌀", px, py);
+                ctx.font = \"20px Arial\"; ctx.fillStyle = \"black\"; ctx.textAlign=\"center\"; ctx.textBaseline=\"middle\"; ctx.fillText=\"🌀\", px, py);
+            } else if (currentTool === 'trimmer') {
+                ctx.font = \"20px Arial\"; ctx.fillStyle = \"black\"; ctx.textAlign=\"center\"; ctx.textBaseline=\"middle\"; ctx.fillText=\"🚫\", px, py);
             }
         }
 
@@ -736,7 +761,7 @@
             let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
             let hasPoints = false;
             rawPoints.forEach(p => {
-                if(p.type === 'point') {
+                if(p.type === 'point' || p.type === 'trimmerPoint') {
                     if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
                     if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
                     hasPoints = true;
@@ -747,7 +772,7 @@
             const cy = (minY + maxY)/2;
 
             rawPoints.forEach(p => {
-                if(p.type === 'point') {
+                if(p.type === 'point' || p.type === 'trimmerPoint') {
                     let tx = p.x - cx;
                     let ty = p.y - cy;
                     p.x = cx + (tx * cos - ty * sin);
@@ -756,7 +781,7 @@
             });
 
             lastRotVal = val;
-            document.getElementById('liveRotVal').innerText = val + "°";
+            document.getElementById('liveRotVal').innerText = val + \"°\";
             render();
         }
 
@@ -768,7 +793,7 @@
              let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
              let hasPoints = false;
              rawPoints.forEach(p => {
-                if(p.type === 'point') {
+                if(p.type === 'point' || p.type === 'trimmerPoint') {
                     if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
                     if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
                     hasPoints = true;
@@ -779,14 +804,14 @@
             const cy = (minY + maxY)/2;
 
             rawPoints.forEach(p => {
-                if(p.type === 'point') {
+                if(p.type === 'point' || p.type === 'trimmerPoint') {
                     p.x = cx + (p.x - cx) * factor;
                     p.y = cy + (p.y - cy) * factor;
                 }
             });
 
             lastScaleVal = val;
-            document.getElementById('liveScaleVal').innerText = val + "%";
+            document.getElementById('liveScaleVal').innerText = val + \"%\";
             render();
         }
 
@@ -795,12 +820,12 @@
             if(slider.id === 'liveRotSlider') {
                 slider.value = 0;
                 lastRotVal = 0;
-                document.getElementById('liveRotVal').innerText = "0°";
+                document.getElementById('liveRotVal').innerText = \"0°\";
             }
             if(slider.id === 'liveScaleSlider') {
                 slider.value = 100;
                 lastScaleVal = 100;
-                document.getElementById('liveScaleVal').innerText = "100%";
+                document.getElementById('liveScaleVal').innerText = \"100%\";
             }
         }
 
@@ -902,7 +927,7 @@
                 if(p.type === 'break' || p.type === 'cmd') {
                     if(currentShape.length > 2) shapes.push(currentShape); 
                     currentShape = [];
-                } else {
+                } else if(p.type === 'point') {
                     if(currentShape.length > 0) {
                         let last = currentShape[currentShape.length-1];
                         let dist = Math.hypot(p.x - last.x, p.y - last.y);
@@ -1069,8 +1094,8 @@
                     else if(th>MAX){ tw*=MAX/th; th=MAX; }
                     tCan.width = tw; tCan.height = th;
                     const tCtx = tCan.getContext('2d');
-                    tCtx.fillStyle = "white"; tCtx.fillRect(0,0,tw,th);
-                    tCtx.filter = "grayscale(100%) contrast(150%)";
+                    tCtx.fillStyle = \"white\"; tCtx.fillRect(0,0,tw,th);
+                    tCtx.filter = \"grayscale(100%) contrast(150%)\";
                     tCtx.drawImage(img, 0, 0, tw, th);
                     ImageTracer.imageToSVG(tCan.toDataURL(), function(svgStr){ processTrace(svgStr, tw, th); }, { ltres:0.5, qtres:0.5, pathomit:2, colorsampling:2, numberofcolors:2 });
                 };
@@ -1081,8 +1106,8 @@
 
         function processTrace(svgStr, imgW, imgH) {
             const parser = new DOMParser();
-            const doc = parser.parseFromString(svgStr, "image/svg+xml");
-            const paths = doc.getElementsByTagName("path");
+            const doc = parser.parseFromString(svgStr, \"image/svg+xml\");
+            const paths = doc.getElementsByTagName(\"path\");
             let strokes = [];
             const res = 2.0; 
             for(let i=0; i<paths.length; i++) {
@@ -1139,14 +1164,24 @@
                 const tableR = parseFloat(document.getElementById('cfgRadius').value);
                 const sym = parseInt(document.getElementById('symSlider').value);
                 let shapes = [];
+                let trimmerShapes = [];
                 let curShape = [];
+                
+                // Separate drawing shapes from trimmer shapes
                 rawPoints.forEach(p => {
                     if(p.type === 'break' || p.type === 'cmd') {
-                        if(curShape.length > 0) shapes.push(curShape);
+                        if(curShape.length > 0) {
+                            if(curShape[0].type === 'trimmerPoint') trimmerShapes.push(curShape);
+                            else shapes.push(curShape);
+                        }
                         curShape = [];
                     } else { curShape.push(p); }
                 });
-                if(curShape.length > 0) shapes.push(curShape);
+                if(curShape.length > 0) {
+                    if(curShape[0].type === 'trimmerPoint') trimmerShapes.push(curShape);
+                    else shapes.push(curShape);
+                }
+
                 let pool = [];
                 for(let s=0; s<sym; s++) {
                     const ang = s * (Math.PI*2/sym);
@@ -1156,6 +1191,12 @@
                         pool.push(newSh);
                     });
                 }
+                
+                // We do NOT replicate trimmer shapes for symmetry usually, as obstacles are often specific. 
+                // But if you want symmetry, you would do it here. For now, assume trimmer is global.
+                // We add trimmerShapes to the routing obstacle list, but NOT the pool of shapes to draw.
+                let obstacleList = shapes.concat(trimmerShapes);
+
                 let bestShapeIdx = -1, bestPointIdx = -1, maxDist = -1;
                 for (let i=0; i<pool.length; i++) {
                     for (let j=0; j<pool[i].length; j++) {
@@ -1163,6 +1204,8 @@
                         if (d > maxDist) { maxDist = d; bestShapeIdx = i; bestPointIdx = j; }
                     }
                 }
+                if(bestShapeIdx === -1) return showToast("No drawing lines found", "error");
+
                 let startShape = pool[bestShapeIdx];
                 pool.splice(bestShapeIdx, 1);
                 let dClose = Math.hypot(startShape[0].x - startShape[startShape.length-1].x, startShape[0].y - startShape[startShape.length-1].y);
@@ -1238,8 +1281,12 @@
                             else { for(let m=prev.length-1; m>=bestExitIdx; m--) retracePath.push(prev[m]); }
                         } else { for(let m=prev.length-1; m>=bestExitIdx; m--) retracePath.push(prev[m]); }
                         retracePath.forEach(p => processedPoints.push(p));
+                        
                         let startJump = prev[bestExitIdx];
-                        let safePath = routeConnect(startJump, currStart, sortedShapes);
+                        // Pass combined obstacles (drawing + trimmer) to router
+                        // We use sortedShapes because they are already sequenced, plus the trimmerShapes
+                        let routingObstacles = sortedShapes.concat(trimmerShapes);
+                        let safePath = routeConnect(startJump, currStart, routingObstacles);
                         if(safePath.length > 1) { stats_rerouted++; }
                         safePath.forEach(p => processedPoints.push({x:p.x, y:p.y, type:'point'}));
                     }
@@ -1252,9 +1299,9 @@
                     processedPoints.push({ x: tableR * Math.cos(exitAng), y: tableR * Math.sin(exitAng), type: 'point' });
                 }
                 generatedGCode = generateGCodeStringFromProcessed();
-                let summary = `Path Ready! ${sortedShapes.length} shapes. ${stats_rerouted}/${stats_connections} jumps rerouted.`;
+                let summary = `Path Ready! ${sortedShapes.length} shapes. ${stats_rerouted}/${stats_connections} jumps rerouted around obstacles.`;
                 document.getElementById('statusTxt').innerText = summary;
-                document.getElementById('statusTxt').style.color = "green";
+                document.getElementById('statusTxt').style.color = \"green\";
                 document.getElementById('progressSlider').value = 0;
                 document.getElementById('designPhaseControls').style.display = 'none';
                 document.getElementById('productionPhaseControls').style.display = 'block';
@@ -1287,14 +1334,14 @@
             let prevBase = 0;
             let prevElbow = 0;
             let firstPt = processedPoints[0];
-            if(firstPt.type === 'cmd') return "";
+            if(firstPt.type === 'cmd') return \"\";
             let startIK = calculateIK(-firstPt.x, firstPt.y, 0, 0, L1, L2, gearRatio, stepsPerRad);
             prevBase = startIK.base_steps;
             prevElbow = startIK.elbow_steps;
             for(let i=0; i<processedPoints.length-1; i++) {
                 let p1 = processedPoints[i];
                 let p2 = processedPoints[i+1];
-                if (p1.type === 'cmd' && p1.val === 'M0') { cmds.push("M0"); }
+                if (p1.type === 'cmd' && p1.val === 'M0') { cmds.push(\"M0\"); }
                 if (p2.type === 'cmd' && p2.val === 'M0') { continue; }
                 let startX, startY;
                 if(p1.type === 'cmd') {
@@ -1323,7 +1370,7 @@
                     }
                 }
             }
-            return cmds.join('\n');
+            return cmds.join('\\n');
         }
 
         function resizeCanvas() {
@@ -1366,6 +1413,7 @@
             document.getElementById('btnFill').className = t==='fill'?'active':'secondary';
             document.getElementById('btnSelect').className = t==='select'?'active':'secondary';
             document.getElementById('btnSandify').className = t==='sandify'?'active':'secondary';
+            document.getElementById('btnTrimmer').className = t==='trimmer'?'active':'secondary';
             
             updateToolSettings();
 
@@ -1391,6 +1439,7 @@
             if(currentTool === 'fill') activeGrp = document.getElementById('set-fill');
             if(currentTool === 'select') activeGrp = document.getElementById('set-select');
             if(currentTool === 'sandify') activeGrp = document.getElementById('set-sandify');
+            if(currentTool === 'trimmer') activeGrp = document.getElementById('set-trimmer');
             
             if(activeGrp) {
                 area.style.display = 'block';
@@ -1413,8 +1462,8 @@
             t.textContent = msg; t.className = type; t.style.opacity = 1;
             setTimeout(()=>t.style.opacity=0, 3000);
         }
-        function openNav() { document.getElementById("mySidebar").style.width = "250px"; }
-        function closeNav() { document.getElementById("mySidebar").style.width = "0"; }
+        function openNav() { document.getElementById(\"mySidebar\").style.width = \"250px\"; }
+        function closeNav() { document.getElementById(\"mySidebar\").style.width = \"0\"; }
         function toggleTheme() {
             const b = document.body;
             b.setAttribute('data-theme', b.getAttribute('data-theme')==='dark'?'light':'dark');
@@ -1423,8 +1472,8 @@
         function resetStatus() {
             generatedGCode = null;
             processedPoints = [];
-            document.getElementById('statusTxt').innerText = "Drawing Mode";
-            document.getElementById('statusTxt').style.color = "var(--primary)";
+            document.getElementById('statusTxt').innerText = \"Drawing Mode\";
+            document.getElementById('statusTxt').style.color = \"var(--primary)\";
             document.getElementById('progressSlider').value = 100;
             render();
         }
@@ -1441,7 +1490,41 @@
             ctx.translate(origin.x, origin.y);
             ctx.beginPath(); ctx.arc(0, 0, tableR*scale, 0, Math.PI*2);
             ctx.strokeStyle = dark ? '#444' : '#ddd'; ctx.lineWidth = 2; ctx.stroke();
+            
             const showingFinal = (processedPoints.length > 0);
+            
+            // Render Trimmer Polygons (Red Zones) First - ALWAYS
+            if(!showingFinal) {
+                let currentTStroke = [];
+                for(let i=0; i<rawPoints.length; i++) {
+                    let p = rawPoints[i];
+                    if(p.type === 'break' || p.type === 'cmd') {
+                         if(currentTStroke.length > 0 && currentTStroke[0].type === 'trimmerPoint') {
+                            ctx.beginPath();
+                            ctx.fillStyle = \"rgba(231, 76, 60, 0.2)\"; // Red faint
+                            ctx.strokeStyle = \"rgba(231, 76, 60, 0.5)\";
+                            currentTStroke.forEach((pt, idx) => {
+                                if(idx===0) ctx.moveTo(pt.x*scale, -pt.y*scale);
+                                else ctx.lineTo(pt.x*scale, -pt.y*scale);
+                            });
+                            ctx.fill(); ctx.stroke();
+                         }
+                         currentTStroke = [];
+                    } else { currentTStroke.push(p); }
+                }
+                // Check last stroke
+                 if(currentTStroke.length > 0 && currentTStroke[0].type === 'trimmerPoint') {
+                    ctx.beginPath();
+                    ctx.fillStyle = \"rgba(231, 76, 60, 0.2)\";
+                    ctx.strokeStyle = \"rgba(231, 76, 60, 0.5)\";
+                    currentTStroke.forEach((pt, idx) => {
+                        if(idx===0) ctx.moveTo(pt.x*scale, -pt.y*scale);
+                        else ctx.lineTo(pt.x*scale, -pt.y*scale);
+                    });
+                    ctx.fill(); ctx.stroke();
+                 }
+            }
+
             const dataToShow = showingFinal ? processedPoints : rawPoints;
             const limit = Math.floor(dataToShow.length * (prog/100));
             const color = showingFinal ? '#ff0000' : (dark ? 'cyan' : '#007bff');
@@ -1456,6 +1539,7 @@
                 let isMove = true;
                 for(let i=0; i<limit; i++) {
                     const p = dataToShow[i];
+                    if(p.type === 'trimmerPoint') { isMove = true; continue; } // Don't draw trimmer as blue line
                     if(p.type === 'break' || p.type === 'cmd') { isMove = true; continue; }
                     const px = p.x * scale;
                     const py = -p.y * scale;
@@ -1465,7 +1549,7 @@
                 ctx.stroke();
                 if(limit > 0 && limit < dataToShow.length) {
                     const tip = dataToShow[limit];
-                    if(tip.type !== 'break' && tip.type !== 'cmd') {
+                    if(tip.type !== 'break' && tip.type !== 'cmd' && tip.type !== 'trimmerPoint') {
                         ctx.beginPath(); ctx.arc(tip.x*scale, -tip.y*scale, 4, 0, Math.PI*2); ctx.fillStyle = color; ctx.fill();
                     }
                 }
@@ -1478,7 +1562,7 @@
                 });
                 if(minX !== Infinity) {
                     ctx.beginPath(); ctx.rect(minX*scale, -maxY*scale, (maxX-minX)*scale, (maxY-minY)*scale);
-                    ctx.strokeStyle = dark ? "white" : "black"; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
+                    ctx.strokeStyle = dark ? \"white\" : \"black\"; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
                 }
             }
             ctx.restore();
@@ -1488,7 +1572,7 @@
             if(!generatedGCode) return showToast("Click Prepare first", "error"); 
             let code = generatedGCode; 
             if(document.getElementById('autoClearMode').checked) { 
-                try { let r = await fetch('./designs/clear.txt'); if(r.ok) code = (await r.text()) + "\n" + code; } catch(e) {} 
+                try { let r = await fetch('./designs/clear.txt'); if(r.ok) code = (await r.text()) + \"\\n\" + code; } catch(e) {} 
             } 
             fetch(BASE_URL+'/send_gcode_block', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({gcode:code}) })
             .then(r => r.json()).then(d => showToast(d.success ? "Sent!" : "Error", d.success ? "success" : "error")); 
@@ -1498,9 +1582,45 @@
             if(!generatedGCode) return showToast("Prepare Path first!", "error");
             let n = prompt("Enter filename (will be saved as .txt):"); 
             if(n) {
-                if(!n.toLowerCase().endsWith('.txt')) n += ".txt";
+                if(!n.toLowerCase().endsWith('.txt')) n += \".txt\";
                 showToast("Saving...", "info");
-                fetch(BASE_URL+'/save_design', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({filename:n, gcode:generatedGCode}) })
+                fetch(BASE_URL+'/save_design', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({file<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sand Controller Pro</title>
+    
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
+
+    <script src="https://cdn.jsdelivr.net/npm/imagetracerjs@1.2.6/imagetracer_v1.2.6.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #d2b48c; 
+            --secondary: #b08d5c; 
+            --bg: #f4f4f4; 
+            --panel: #ffffff; 
+            --text: #333;
+            --accent: #2ecc71;
+            --danger: #e74c3c;
+            --btn-text: #fff;
+        }
+        body[data-theme='dark'] {
+            --bg: #121212; --panel: #1e1e1e; --text: #e0e0e0; --btn-text: #000;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg); color: var(--text);
+            margin: 0; padding: 0; height: 100vh;
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+
+        .nav-bar {
+            display: flex; justify-content: space-between; align-items: center;
+name:n, gcode:generatedGCode}) })
                 .then(r => r.json()).then(d => { if(d.success) showToast("Saved to Pi!", "success"); else showToast("Save Failed: " + (d.error || "Unknown"), "error"); })
                 .catch(e => showToast("Network Error", "error"));
             }
