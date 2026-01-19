@@ -816,14 +816,13 @@
             let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
             let pointsFound = false;
             
-            let baseShape = JSON.parse(JSON.stringify(sandBasePoints));
+            // Filter to only points to ensure continuity (ignore breaks in source)
+            let baseShapePoints = sandBasePoints.filter(p => p.type === 'point');
             
-            baseShape.forEach(p => {
-                if(p.type === 'point') {
-                    if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
-                    if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
-                    pointsFound = true;
-                }
+            baseShapePoints.forEach(p => {
+                if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
+                if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
+                pointsFound = true;
             });
 
             if(!pointsFound) return;
@@ -835,34 +834,32 @@
             let currentRot = 0;
             let currentShift = 0;
             
+            // Create the continuous spiral
             while(currentScale >= 1.0) {
                 const rad = (currentRot * Math.PI) / 180;
                 const cos = Math.cos(rad);
                 const sin = Math.sin(rad);
                 
-                baseShape.forEach(p => {
-                    if(p.type === 'point') {
-                        let tx = p.x - cx;
-                        let ty = p.y - cy;
-                        tx *= currentScale;
-                        ty *= currentScale;
-                        let rx = tx * cos - ty * sin;
-                        let ry = tx * sin + ty * cos;
-                        rx += currentShift; 
-                        newPattern.push({ x: cx + rx, y: cy + ry, type: 'point' });
-                    } else {
-                        newPattern.push({type: p.type});
-                    }
+                baseShapePoints.forEach(p => {
+                    let tx = p.x - cx;
+                    let ty = p.y - cy;
+                    tx *= currentScale;
+                    ty *= currentScale;
+                    let rx = tx * cos - ty * sin;
+                    let ry = tx * sin + ty * cos;
+                    rx += currentShift; 
+                    newPattern.push({ x: cx + rx, y: cy + ry, type: 'point' });
                 });
                 
-                if(newPattern.length > 0 && newPattern[newPattern.length-1].type !== 'break') {
-                    newPattern.push({type: 'break'});
-                }
+                // REMOVED: The break insertion that was here, making it continuous.
 
                 currentScale -= zoomStep;
                 currentRot += rotStep;
                 currentShift += shiftStep;
             }
+
+            // Add final break to close the whole object
+            if(newPattern.length > 0) newPattern.push({type: 'break'});
 
             rawPoints = newPattern;
             resetStatus();
