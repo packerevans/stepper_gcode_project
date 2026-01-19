@@ -192,6 +192,7 @@
                                 <button class="stamp-btn" onclick="addShape('pentagon')">⬠</button>
                                 <button class="stamp-btn" onclick="addShape('star')">⭐</button>
                                 <button class="stamp-btn" onclick="addShape('spiral')">🌀</button>
+                                <button class="stamp-btn" onclick="addShape('random')">🎲</button>
                             </div>
                         </div>
                     </div>
@@ -674,13 +675,43 @@
                     const rad = (i/100)*r;
                     pts.push({x: Math.cos(a)*rad, y: Math.sin(a)*rad});
                 }
+            } else if (type === 'random') {
+                const numPoints = Math.floor(Math.random() * 15) + 1;
+                
+                if(numPoints === 1) {
+                    // Random Oval/Circle
+                    const rx = r * (0.5 + Math.random());
+                    const ry = r * (0.5 + Math.random());
+                    for(let i=0; i<=36; i++) {
+                         const a = (i/36)*Math.PI*2;
+                         pts.push({x: Math.cos(a)*rx, y: Math.sin(a)*ry});
+                    }
+                } else if(numPoints === 2) {
+                    // Random Line
+                    const angle = Math.random() * Math.PI * 2;
+                    const len = r * (0.8 + Math.random() * 0.4);
+                    pts.push({x: Math.cos(angle)*len, y: Math.sin(angle)*len});
+                    pts.push({x: Math.cos(angle + Math.PI)*len, y: Math.sin(angle + Math.PI)*len});
+                } else {
+                    // Random Polygon
+                    let angles = [];
+                    for(let i=0; i<numPoints; i++) angles.push(Math.random() * Math.PI * 2);
+                    angles.sort((a,b) => a-b);
+                    for(let i=0; i<angles.length; i++) {
+                        const rad = r * (0.5 + Math.random() * 0.8);
+                        pts.push({x: Math.cos(angles[i])*rad, y: Math.sin(angles[i])*rad});
+                    }
+                    pts.push(pts[0]); // Close loop
+                }
+                showToast("Added Random Shape (" + numPoints + " edges)", "success");
             }
+
+            if(type !== 'random') showToast("Added " + type, "success");
 
             if(rawPoints.length > 0 && rawPoints[rawPoints.length-1].type !== 'break') rawPoints.push({type:'break'});
             pts.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'}));
             rawPoints.push({type:'break'});
             render();
-            showToast("Added " + type, "success");
         }
 
         function getPos(e) {
