@@ -17,7 +17,7 @@ const int ms3 = 6;
 
 // --- SETTINGS ---
 // MUST match your Python script (usually 9600 for older scripts)
-#define BAUD_RATE 9600 
+#define BAUD_RATE 115200 
 
 // --- STATE VARIABLES ---
 bool paused = true; 
