@@ -52,7 +52,7 @@ arduino_connected = False
 current_gcode_runner = None
 
 try:
-    arduino = serial.Serial('/dev/ttyACM0', 9600, timeout=0.1) 
+    arduino = serial.Serial('/dev/ttyACM0', 115200, timeout=0.1) 
     time.sleep(2) 
     arduino_connected = True
 except Exception as e:
