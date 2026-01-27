@@ -132,13 +132,6 @@
         .tool-setting-group.active { display: block; }
         .tool-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--secondary); margin-bottom: 5px; display:block;}
 
-        .fade-in { animation: fadeIn 0.3s ease-in; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-        .stamp-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin-top: 8px; }
-        .stamp-btn { font-size: 18px; padding: 5px; background: rgba(0,0,0,0.05); border-radius: 4px; border: 1px solid rgba(0,0,0,0.1); }
-        .stamp-btn:hover { background: var(--secondary); color: white; }
-
         #hiddenTraceBuffer, #vortexScanCanvas { display: none; }
         select.full-width { width: 100%; padding: 6px; border-radius: 4px; border: 1px solid #ccc; }
 
@@ -646,7 +639,7 @@
             newPoints.push({type:'break'}); rawPoints = newPoints; render();
         }
 
-        // --- TEXT TOOL LOGIC ---
+        // --- NEW TEXT TOOL LOGIC ---
         function renderTextToTrace() {
             const text = document.getElementById('toolTextInput').value;
             const size = document.getElementById('toolTextSize').value;
@@ -705,19 +698,17 @@
 
         function runHighPrecisionTrace() {
             if(!traceImgData) return;
-            const thresh = 150; 
-            const densityInput = document.getElementById('traceDensityInput');
+            const thresh = 150; const densityInput = document.getElementById('traceDensityInput');
             const density = parseFloat(densityInput.value); 
             const ballSizeMm = parseFloat(document.getElementById('cfgBallSize').value);
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
             
-            // Calibration: Translate ball size to buffer pixel scale
-            const pixelBallSize = (ballSizeMm / (tableR * 2)) * 800;
+            // Calibration factor for Stand-off Lead-in: Ball radius (mm) converted to 800x800 buffer scale
+            const mmToPx = 800 / (tableR * 2);
+            const standOffPx = (ballSizeMm / 2) * mmToPx;
             
             const SIZE = 800; const CENTER = SIZE / 2;
-            let pixelGrid = new Uint8Array(SIZE*SIZE); 
-            for(let i=0; i<SIZE*SIZE; i++) { pixelGrid[i] = traceImgData.data[i*4] < thresh ? 1 : 0; }
-            
+            let pixelGrid = new Uint8Array(SIZE*SIZE); for(let i=0; i<SIZE*SIZE; i++) { pixelGrid[i] = traceImgData.data[i*4] < thresh ? 1 : 0; }
             let contours = []; const traced = new Uint8Array(SIZE*SIZE).fill(0);
             
             const traceBoundary = (sx, sy) => {
@@ -763,32 +754,42 @@
             }
 
             let finalPath = []; 
-            // Shape path safety: Ball size dictates how far away shapes need to be drawn
-            const mergeThreshold = Math.max(spacingPx * 1.5, pixelBallSize);
+            // The shapes should be drawn further away from spiral lines to avoid overlap
+            const distTolerance = Math.max(spacingPx * 1.5, standOffPx * 2);
 
             for(let i=0; i<spiral.length; i++) {
                 const sp = spiral[i]; finalPath.push(sp);
-                
                 contours.forEach(c => { 
                     if(!c.merged) { 
                         const d = Math.hypot(sp.x - c.trigger.x, sp.y - c.trigger.y); 
-                        if (d < mergeThreshold) { 
-                            // BRIDGE LOGIC: INWARD CONNECTION
-                            // Calculate a point further "in" (toward the center) from the spiral circle 
-                            // to provide the lead-in line from the background pattern.
-                            const angleToShape = Math.atan2(c.trigger.y - sp.y, c.trigger.x - sp.x);
-                            const leadInDist = pixelBallSize * 0.5;
-                            const bridgePoint = {
-                                x: sp.x + Math.cos(angleToShape) * leadInDist,
-                                y: sp.y + Math.sin(angleToShape) * leadInDist
-                            };
+                        if (d < distTolerance) { 
+                            // CALCULATE OUTWARD EXTENDING LINE:
+                            // We calculate the unit vector from CENTER to the shape's trigger point
+                            const dx = c.trigger.x - CENTER;
+                            const dy = c.trigger.y - CENTER;
+                            const distFromCenter = Math.hypot(dx, dy);
                             
-                            finalPath.push(bridgePoint); // Move inward from spiral
-                            finalPath.push(c.trigger);   // Reach shape
-                            c.points.forEach(p => finalPath.push(p)); // Trace shape
-                            finalPath.push(c.trigger);   // Return to start of shape
-                            finalPath.push(bridgePoint); // Lead back out
-                            finalPath.push(sp);          // Resume spiral
+                            if (distFromCenter > 0) {
+                                const ux = dx / distFromCenter;
+                                const uy = dy / distFromCenter;
+                                
+                                // Create an extension point extended OUTWARD from the trigger point
+                                // by half the ball size plus 2px safety
+                                const extX = c.trigger.x + ux * (standOffPx + 2);
+                                const extY = c.trigger.y + uy * (standOffPx + 2);
+                                
+                                // Bridge: Spiral -> Outward Extension -> Shape Trigger
+                                finalPath.push({x: extX, y: extY});
+                                finalPath.push(c.trigger);
+                                c.points.forEach(p => finalPath.push(p)); 
+                                // Lead-out: Shape -> Extension -> Back to Spiral
+                                finalPath.push({x: extX, y: extY});
+                                finalPath.push(sp); 
+                            } else {
+                                finalPath.push(c.trigger);
+                                c.points.forEach(p => finalPath.push(p)); 
+                                finalPath.push(sp);
+                            }
                             c.merged = true; 
                         } 
                     } 
