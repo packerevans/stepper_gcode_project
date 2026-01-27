@@ -73,7 +73,6 @@ class GCodeRunner(threading.Thread):
         self.on_complete = on_complete
         
         # --- SAFETY FIX: LOWER BUFFER SIZE ---
-        # Arduino Limit is 50. We use 25 to be ultra-safe against Overflows.
         self.ARDUINO_BUFFER_SIZE = 25  
         self.credits = self.ARDUINO_BUFFER_SIZE 
         self.lines_sent = 0
@@ -81,7 +80,6 @@ class GCodeRunner(threading.Thread):
 
     def process_incoming_serial(self, line):
         line = line.strip().upper()
-        # Only increment if we see "DONE"
         if line == "DONE":
             with lock:
                 if self.credits < self.ARDUINO_BUFFER_SIZE:
@@ -110,7 +108,6 @@ class GCodeRunner(threading.Thread):
 
         # 1. SEND COMMANDS
         while self.is_running and self.lines_sent < self.total_lines:
-            # Wait if out of credits
             if self.credits <= 0:
                 self.slot_available_event.clear()
                 got_slot = self.slot_available_event.wait(timeout=10.0) 
@@ -118,15 +115,12 @@ class GCodeRunner(threading.Thread):
                     log_message("TIMEOUT: Arduino stopped responding.")
                     break
             
-            # Send next line
             if self.is_running:
                 next_line = self.lines[self.lines_sent]
                 if not self.send_line(next_line): break
                 time.sleep(0.002) 
 
-        # 2. SAFETY WAIT (Prevents "Skipping")
-        # We wait for the buffer to empty (Credits return to Max)
-        # This ensures the machine physically finishes before we say "Done"
+        # 2. SAFETY WAIT
         if self.is_running:
             while self.credits < self.ARDUINO_BUFFER_SIZE:
                 time.sleep(0.2)
@@ -204,9 +198,7 @@ def read_from_serial():
             if arduino.in_waiting > 0:
                 line = arduino.readline().decode(errors="ignore").strip()
                 if line:
-                    # Filter out purely debug messages if needed, but log useful ones
                     if "ERROR" in line: log_message(f"Ard: {line}")
-                    
                     if current_gcode_runner:
                         current_gcode_runner.process_incoming_serial(line)
             else:
@@ -237,20 +229,67 @@ def index():
 
 @app.route("/status_full", methods=["GET"])
 def status_full():
-    next_text = "None"
+    # MODIFIED: Returns full list of queued items for the dropdown
+    queue_list = []
+    
     if len(job_queue) > 0:
-        next_text = job_queue[0]['filename'].replace('.txt', '')
-    elif is_looping and len(loop_playlist) > 0:
-        next_text = f"{loop_playlist[0].replace('.txt', '')} (Loop)"
+        # Standard Queue
+        for i, job in enumerate(job_queue):
+            queue_list.append({
+                "index": i,
+                "name": job['filename'].replace('.txt', ''),
+                "type": "queue"
+            })
+    elif is_looping:
+        # Loop Playlist (showing next few items)
+        # We limit to 10 items to keep the dropdown manageable
+        limit = min(len(loop_playlist), 10)
+        for i in range(limit):
+             queue_list.append({
+                "index": i,
+                "name": loop_playlist[i].replace('.txt', ''),
+                "type": "loop"
+            })
+
+    next_text = "None"
+    if queue_list:
+        next_text = queue_list[0]["name"]
         
     return jsonify({
         "playing": current_job_name.replace('.txt', '') if current_job_name else None,
         "queue_count": len(job_queue),
+        "queue_items": queue_list, # NEW: Full list for dropdown
         "next_up": next_text,
         "is_looping": is_looping,
         "is_paused": is_paused,   
         "is_waiting": is_waiting  
     })
+
+@app.route("/remove_from_queue", methods=["POST"])
+def remove_from_queue():
+    # NEW: Endpoint to remove specific item from queue
+    global job_queue, loop_playlist
+    data = request.json
+    index = data.get("index")
+    q_type = data.get("type")
+    
+    try:
+        index = int(index)
+        if q_type == "queue":
+            if 0 <= index < len(job_queue):
+                del job_queue[index]
+                return jsonify(success=True)
+        elif q_type == "loop":
+            if 0 <= index < len(loop_playlist):
+                del loop_playlist[index]
+                # If loop becomes empty, stop looping logic
+                if not loop_playlist:
+                    cancel_loop()
+                return jsonify(success=True)
+    except Exception as e:
+        return jsonify(success=False, error=str(e))
+        
+    return jsonify(success=False, error="Invalid index or type")
 
 @app.route("/set_loop", methods=["POST"])
 def set_loop():
