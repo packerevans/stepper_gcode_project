@@ -1,27 +1,55 @@
-<div><label>Ball Size (mm)</label><input type="number" id="cfgBallSize" value="13" onchange="runHighPrecisionTrace()"></div>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Sand Controller Pro</title>
+    
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
+
     <style>
         :root {
-            --primary: #d2b48c; --secondary: #b08d5c; --bg: #f4f4f4; --panel: #ffffff; 
-            --text: #333; --accent: #2ecc71; --danger: #e74c3c; --btn-text: #fff;
+            --primary: #d2b48c; 
+            --secondary: #b08d5c; 
+            --bg: #f4f4f4; 
+            --panel: #ffffff; 
+            --text: #333;
+            --accent: #2ecc71;
+            --danger: #e74c3c;
+            --btn-text: #fff;
         }
         body[data-theme='dark'] {
             --bg: #121212; --panel: #1e1e1e; --text: #e0e0e0; --btn-text: #000;
         }
+
         body {
-            font-family: 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text);
-            margin: 0; padding: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg); color: var(--text);
+            margin: 0; padding: 0; height: 100vh;
+            display: flex; flex-direction: column; overflow: hidden;
         }
-        .nav-bar { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: var(--panel); box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 100; }
-        .sidebar { height: 100%; width: 0; position: fixed; top: 0; left: 0; background-color: var(--primary); overflow-x: hidden; transition: 0.3s; padding-top: 60px; z-index: 2000; box-shadow: 4px 0 10px rgba(0,0,0,0.3); }
-        .sidebar a { padding: 15px 24px; text-decoration: none; font-size: 18px; color: #fff; display: block; font-weight: 500; }
-        .app-container { display: flex; flex-direction: column; height: 100%; width: 100%; padding: 10px; box-sizing: border-box; gap: 10px; overflow-y: auto; }
+
+        .nav-bar {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 15px; background: var(--panel);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 100;
+        }
+        .sidebar {
+            height: 100%; width: 0; position: fixed; top: 0; left: 0;
+            background-color: var(--primary); overflow-x: hidden;
+            transition: 0.3s; padding-top: 60px; z-index: 2000;
+            box-shadow: 4px 0 10px rgba(0,0,0,0.3);
+        }
+        .sidebar a {
+            padding: 15px 24px; text-decoration: none; font-size: 18px;
+            color: #fff; display: block; font-weight: 500;
+        }
+
+        .app-container {
+            display: flex; flex-direction: column; height: 100%; width: 100%;
+            padding: 10px; box-sizing: border-box; gap: 10px; overflow-y: auto;
+        }
         @media (min-width: 768px) {
             .app-container { flex-direction: row; overflow: hidden; }
             .drawing-panel { flex: 2; border-radius: 16px; background: var(--panel); position: relative; display: flex; align-items: center; justify-content: center; }
@@ -31,28 +59,59 @@
             .drawing-panel { width: 100%; aspect-ratio: 1/1; border-radius: 16px; background: var(--panel); flex-shrink: 0; position: relative;}
             .controls-panel { flex: 1; border-radius: 16px; background: var(--panel); padding: 15px; }
         }
-        .canvas-wrapper { position: relative; width: 95vmin; height: 95vmin; max-width: 95%; max-height: 95%; aspect-ratio: 1 / 1; margin: auto; border-radius: 50%; border: 4px solid var(--primary); background: #fff; touch-action: none; cursor: crosshair; overflow: hidden; }
+
+        .canvas-wrapper {
+            position: relative;
+            width: 95vmin; 
+            height: 95vmin; 
+            max-width: 95%; 
+            max-height: 95%; 
+            aspect-ratio: 1 / 1; 
+            margin: auto;
+            border-radius: 50%;
+            border: 4px solid var(--primary); 
+            background: #fff;
+            touch-action: none; cursor: crosshair; overflow: hidden;
+        }
         body[data-theme='dark'] .canvas-wrapper { background: #222; border-color: var(--secondary); }
         canvas { display: block; width: 100%; height: 100%; border-radius: 50%; }
+
         h2 { margin: 0 0 15px 0; font-size: 1.2rem; color: var(--secondary); text-align: center; }
         .btn-group { display: flex; gap: 8px; margin-bottom: 12px; }
-        button { background: var(--primary); color: var(--btn-text); border: none; padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer; flex: 1; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
+        button {
+            background: var(--primary); color: var(--btn-text); border: none;
+            padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer;
+            flex: 1; transition: 0.2s; display: flex; align-items: center; justify-content: center;
+        }
         button:hover { filter: brightness(1.1); transform: translateY(-1px); }
         button.secondary { background: transparent; border: 1px solid var(--text); color: var(--text); }
         button.active { background: var(--secondary); border: 2px solid var(--text); }
         button.action { background: var(--accent); color: #000; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        
         .slider-row { margin-bottom: 15px; background: rgba(0,0,0,0.05); padding: 8px; border-radius: 8px; }
         .slider-header { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; font-weight: bold; }
         input[type="range"] { width: 100%; accent-color: var(--secondary); }
-        #progressSlider { -webkit-appearance: none; width: 100%; height: 8px; border-radius: 5px; background: #d3d3d3; outline: none; }
-        #progressSlider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--secondary); cursor: pointer; }
+        
+        #progressSlider {
+            -webkit-appearance: none; width: 100%; height: 8px; border-radius: 5px; background: #d3d3d3; outline: none;
+        }
+        #progressSlider::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--secondary); cursor: pointer;
+        }
+
         details { background: rgba(0,0,0,0.05); padding: 10px; border-radius: 8px; margin-top: 10px; }
         summary { cursor: pointer; font-weight: bold; font-size: 13px; }
         .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
-        input[type="number"], input[type="text"], select { width: 100%; padding: 6px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box; font-family: inherit; }
-        #status-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 10px 20px; border-radius: 20px; font-size: 13px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 3000; }
+        input[type="number"] { width: 100%; padding: 5px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box; font-family: monospace;}
+
+        #status-toast {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: #333; color: white; padding: 10px 20px; border-radius: 20px;
+            font-size: 13px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 3000;
+        }
         .success { background: var(--accent) !important; color: #000 !important; }
         .error { background: var(--danger) !important; color: #fff !important; }
+
         .toggle-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 0 5px; }
         .switch { position: relative; display: inline-block; width: 40px; height: 22px; }
         .switch input { opacity: 0; width: 0; height: 0; }
@@ -60,77 +119,234 @@
         .slider-tog:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
         input:checked + .slider-tog { background-color: var(--secondary); }
         input:checked + .slider-tog:before { transform: translateX(18px); }
-        #toolSettingsArea { background: rgba(0,0,0,0.03); border: 1px dashed var(--secondary); border-radius: 8px; padding: 10px; margin-bottom: 12px; display: none; }
+
+        #toolSettingsArea {
+            background: rgba(0,0,0,0.03);
+            border: 1px dashed var(--secondary);
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 12px;
+            display: none;
+        }
         .tool-setting-group { display: none; }
         .tool-setting-group.active { display: block; }
         .tool-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--secondary); margin-bottom: 5px; display:block;}
+
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
         .stamp-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin-top: 8px; }
         .stamp-btn { font-size: 18px; padding: 5px; background: rgba(0,0,0,0.05); border-radius: 4px; border: 1px solid rgba(0,0,0,0.1); }
+        .stamp-btn:hover { background: var(--secondary); color: white; }
+
         #hiddenTraceBuffer, #vortexScanCanvas { display: none; }
+        select.full-width { width: 100%; padding: 6px; border-radius: 4px; border: 1px solid #ccc; }
+
     </style>
 </head>
 <body data-theme="light">
+
     <div id="mySidebar" class="sidebar">
         <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
-        <a href="/">Designs</a> <a href="/ai_builder">AI Builder</a> <a href="/led_controls">LED Controls</a> <a href="/terminal">Terminal</a>
+        <a href="/">Designs</a> 
+        <a href="/ai_builder">AI Builder</a>
+        <a href="/led_controls">LED Controls</a>
+        <a href="/terminal">Terminal</a>
     </div>
+
     <div class="nav-bar">
         <button style="flex:0; background:none; font-size:24px; color:var(--text); padding:0;" onclick="openNav()">☰</button>
         <h1 style="margin:0; font-size:1.2rem;">Sand Controller Pro</h1>
         <button style="flex:0; background:none; font-size:20px;" onclick="toggleTheme()">☀️</button>
     </div>
+
     <div class="app-container">
         <div class="drawing-panel">
-            <div class="canvas-wrapper" id="canvasContainer"><canvas id="drawCanvas"></canvas></div>
+            <div class="canvas-wrapper" id="canvasContainer">
+                <canvas id="drawCanvas"></canvas>
+            </div>
             <div id="coordDisplay" style="position:absolute; bottom:10px; left:10px; background:rgba(0,0,0,0.5); color:white; padding:4px 8px; border-radius:4px; font-size:11px; pointer-events:none;">X:0 Y:0</div>
         </div>
+
         <div class="controls-panel">
             <div id="designPhaseControls">
                 <h2>Tools</h2>
+                
                 <div class="toggle-row">
                     <span style="font-weight:600; font-size:13px;">🖋️ Stylus Mode</span>
-                    <label class="switch"><input type="checkbox" id="stylusMode"><span class="slider-tog"></span></label>
+                    <label class="switch">
+                        <input type="checkbox" id="stylusMode">
+                        <span class="slider-tog"></span>
+                    </label>
                 </div>
+
                 <div id="toolSettingsArea">
                     <div id="set-pen" class="tool-setting-group">
-                        <div class="toggle-row" style="margin:0;"><span style="font-size:13px;">🔗 Shape Connector</span><label class="switch"><input type="checkbox" id="shapeConnectMode" checked><span class="slider-tog"></span></label></div>
-                        <div style="margin-top:10px;"><span class="tool-label">Add Stamps</span><div class="stamp-grid">
-                            <button class="stamp-btn" onclick="addShape('circle')">⭕</button><button class="stamp-btn" onclick="addShape('square')">⬜</button><button class="stamp-btn" onclick="addShape('triangle')">🔺</button><button class="stamp-btn" onclick="addShape('hexagon')">⬡</button><button class="stamp-btn" onclick="addShape('pentagon')">⬠</button><button class="stamp-btn" onclick="addShape('star')">⭐</button><button class="stamp-btn" onclick="addShape('spiral')">🌀</button><button class="stamp-btn" onclick="addShape('random')">🎲</button>
-                        </div></div>
+                        <div class="toggle-row" style="margin:0;">
+                            <span style="font-size:13px;">🔗 Shape Connector</span>
+                            <label class="switch">
+                                <input type="checkbox" id="shapeConnectMode" checked>
+                                <span class="slider-tog"></span>
+                            </label>
+                        </div>
+                        <div style="margin-top:10px;">
+                            <span class="tool-label">Add Stamps</span>
+                            <div class="stamp-grid">
+                                <button class="stamp-btn" onclick="addShape('circle')">⭕</button>
+                                <button class="stamp-btn" onclick="addShape('square')">⬜</button>
+                                <button class="stamp-btn" onclick="addShape('triangle')">🔺</button>
+                                <button class="stamp-btn" onclick="addShape('hexagon')">⬡</button>
+                                <button class="stamp-btn" onclick="addShape('pentagon')">⬠</button>
+                                <button class="stamp-btn" onclick="addShape('star')">⭐</button>
+                                <button class="stamp-btn" onclick="addShape('spiral')">🌀</button>
+                                <button class="stamp-btn" onclick="addShape('random')">🎲</button>
+                            </div>
+                        </div>
                     </div>
-                    <div id="set-erase" class="tool-setting-group"><span class="tool-label">Eraser Size: <span id="eraseSizeVal">10px</span></span><input type="range" min="2" max="50" value="10" oninput="updateToolSettings()" id="eraserSizeSlider"></div>
+
+                    <div id="set-erase" class="tool-setting-group">
+                        <span class="tool-label">Eraser Size: <span id="eraseSizeVal">10px</span></span>
+                        <input type="range" min="2" max="50" value="10" oninput="updateToolSettings()" id="eraserSizeSlider">
+                    </div>
+
                     <div id="set-text" class="tool-setting-group">
-                        <span class="tool-label" style="color:var(--accent); font-weight:bold;">Text to Path</span><label class="tool-label">Your Text</label><input type="text" id="toolTextInput" value="USU" oninput="renderTextToTrace()">
-                        <div class="settings-grid"><div><label class="tool-label">Size</label><input type="number" id="toolTextSize" value="150" oninput="renderTextToTrace()"></div><div><label class="tool-label">Font</label><select id="toolTextFont" onchange="renderTextToTrace()"><option value="Arial">Arial</option><option value="Serif">Serif</option><option value="Monospace">Mono</option></select></div></div>
-                        <button class="action" style="margin-top:10px; width:100%;" onclick="setTool('draw')">Confirm</button>
+                        <span class="tool-label" style="color:var(--accent); font-weight:bold;">Text to Path</span>
+                        <label class="tool-label">Your Text</label>
+                        <input type="text" id="toolTextInput" value="USU" class="full-width" style="margin-bottom:10px; padding:8px;" oninput="renderTextToTrace()">
+                        <div class="settings-grid">
+                            <div>
+                                <label class="tool-label">Font Size</label>
+                                <input type="number" id="toolTextSize" value="150" oninput="renderTextToTrace()">
+                            </div>
+                            <div>
+                                <label class="tool-label">Font Family</label>
+                                <select id="toolTextFont" class="full-width" onchange="renderTextToTrace()">
+                                    <option value="Arial">Arial</option>
+                                    <option value="Serif">Serif</option>
+                                    <option value="Monospace">Mono</option>
+                                    <option value="Cursive">Cursive</option>
+                                </select>
+                            </div>
+                        </div>
+                        <span class="tool-label" style="margin-top:10px;">Spiral Spacing: <span id="textDensityVal">1.5</span></span>
+                        <input type="range" min="1" max="3" value="1.5" step="0.1" id="textDensityInput" oninput="renderTextToTrace()">
+                        <button class="action" style="margin-top:10px; width:100%;" onclick="setTool('draw')">Confirm Placement</button>
                     </div>
+
                     <div id="set-select" class="tool-setting-group">
-                        <span class="tool-label">Transform Selection</span><div id="traceMoveMsg" style="display:none; color:var(--accent); font-size:11px; margin-bottom:8px;">✨ Trace Active: Drag/Rotate/Resize image</div>
-                        <span class="tool-label">Rotate</span><input type="range" min="-180" max="180" value="0" step="1" id="liveRotSlider" oninput="liveRotate(this.value)" onchange="endLiveTransform(this)">
-                        <span class="tool-label">Resize</span><input type="range" min="10" max="200" value="100" step="1" id="liveScaleSlider" oninput="liveScale(this.value)" onchange="endLiveTransform(this)">
+                        <span class="tool-label">Transform Selection</span>
+                        <div id="traceMoveMsg" style="display:none; color:var(--accent); font-size:11px; margin-bottom:8px;">
+                            ✨ Trace Active: Drag/Rotate/Resize image
+                        </div>
+                        <span class="tool-label">Rotate Live</span>
+                        <input type="range" min="-180" max="180" value="0" step="1" id="liveRotSlider" 
+                               oninput="liveRotate(this.value)" onchange="endLiveTransform(this)">
+                        <div style="text-align:right; font-size:10px; color:#666;" id="liveRotVal">0°</div>
+                        <span class="tool-label" style="margin-top:10px;">Resize Live</span>
+                        <input type="range" min="10" max="200" value="100" step="1" id="liveScaleSlider" 
+                               oninput="liveScale(this.value)" onchange="endLiveTransform(this)">
+                        <div style="text-align:right; font-size:10px; color:#666;" id="liveScaleVal">100%</div>
                     </div>
+
+                    <div id="set-sandify" class="tool-setting-group">
+                        <span class="tool-label" style="color:var(--accent); font-weight:bold;">Vortex Generator</span>
+                        <label class="tool-label">Shape Source</label>
+                        <select id="vortexShape" class="full-width" onchange="updateVortexParams()">
+                            <option value="custom">Current Drawing</option>
+                            <option value="triangle">Triangle</option>
+                            <option value="square">Square</option>
+                            <option value="pentagon">Pentagon</option>
+                            <option value="hexagon">Hexagon</option>
+                            <option value="star">Star</option>
+                            <option value="text">Letter / Symbol</option>
+                        </select>
+                        <div id="vortexTextContainer" style="display:none; margin-top:5px;">
+                             <input type="text" id="vortexChar" maxlength="1" value="S" style="text-align:center; font-weight:bold; width:100%;" oninput="updateVortexParams()">
+                        </div>
+                        <span class="tool-label" style="margin-top:10px;">Loop Count: <span id="val-swirl">20</span></span>
+                        <input type="range" id="vortexSwirl" min="5" max="50" step="1" value="20" oninput="updateVortexParams()">
+                        <span class="tool-label">Shape Zoom: <span id="val-scale">1.0</span></span>
+                        <input type="range" id="vortexScale" min="0.1" max="2.0" step="0.05" value="1.0" oninput="updateVortexParams()">
+                        <span class="tool-label">Twist Angle: <span id="val-twist">5</span></span>
+                        <input type="range" id="vortexTwist" min="-45" max="45" step="0.5" value="5" oninput="updateVortexParams()">
+                        <span class="tool-label">Shift Center (Left/Right): <span id="val-shift">0</span></span>
+                        <input type="range" id="vortexShift" min="-150" max="150" step="1" value="0" oninput="updateVortexParams()">
+                    </div>
+                    
                     <div id="set-trace" class="tool-setting-group">
-                         <span class="tool-label" style="color:var(--accent); font-weight:bold;">Precision Trace</span>
-                         <span class="tool-label">Threshold: <span id="traceThreshVal">150</span></span><input type="range" min="10" max="240" value="150" id="traceThreshInput" oninput="runHighPrecisionTrace()">
-                         <span class="tool-label">Spiral Gap Multiplier: <span id="traceDensityVal">1.5</span></span><input type="range" min="1" max="5" value="1.5" step="0.1" id="traceDensityInput" oninput="runHighPrecisionTrace()">
+                         <span class="tool-label" style="color:var(--accent); font-weight:bold;">High Precision Trace</span>
+                         <span class="tool-label" style="color:#666; font-size:10px;">Tip: Use "Move" tool to reposition image</span>
+                         <span class="tool-label">Contrast Threshold: <span id="traceThreshVal">150</span></span>
+                         <input type="range" min="10" max="240" value="150" id="traceThreshInput" oninput="runHighPrecisionTrace()">
+                         <span class="tool-label">Spiral Spacing: <span id="traceDensityVal">1.5</span></span>
+                         <input type="range" min="1" max="3" value="1.5" step="0.1" id="traceDensityInput" oninput="runHighPrecisionTrace()">
                          <button class="secondary" style="margin-top:10px; font-size:11px;" onclick="document.getElementById('imgUpload').click()">📂 Change Image</button>
                     </div>
                 </div>
-                <div class="btn-group"><button id="btnDraw" onclick="setTool('draw')" class="active">✏️ Draw</button><button id="btnErase" onclick="setTool('erase')" class="secondary">🧼 Erase</button></div>
-                <div class="btn-group"><button id="btnSelect" onclick="setTool('select')" class="secondary">✋ Move</button><button id="btnSandify" onclick="setTool('sandify')" class="secondary">🌀 Vortex</button></div>
-                <div class="btn-group"><button id="btnText" onclick="setTool('text')" class="secondary">🔠 Text</button><input type="file" id="imgUpload" accept="image/*" style="display:none" onchange="handleImageUpload(this)"><button id="btnTrace" class="secondary" onclick="document.getElementById('imgUpload').click()">✨ Trace</button></div>
-                <div class="btn-group"><button onclick="undo()" class="secondary">↶ Undo</button><button onclick="clearCanvas()" class="secondary" style="color:var(--danger); border-color:var(--danger);">✖ Clear</button></div>
+
+                <div class="btn-group">
+                    <button id="btnDraw" onclick="setTool('draw')" class="active">✏️ Draw</button>
+                    <button id="btnErase" onclick="setTool('erase')" class="secondary">🧼 Erase</button>
+                </div>
+
+                <div class="btn-group">
+                    <button id="btnSelect" onclick="setTool('select')" class="secondary">✋ Move</button>
+                    <button id="btnSandify" onclick="setTool('sandify')" class="secondary">🌀 Vortex</button>
+                </div>
+
+                <div class="btn-group">
+                    <button id="btnText" onclick="setTool('text')" class="secondary">🔠 Text</button>
+                    <input type="file" id="imgUpload" accept="image/*" style="display:none" onchange="handleImageUpload(this)">
+                    <button id="btnTrace" class="secondary" onclick="document.getElementById('imgUpload').click()">✨ Trace</button>
+                </div>
+
+                <div class="btn-group">
+                    <button onclick="undo()" class="secondary">↶ Undo</button>
+                    <button onclick="clearCanvas()" class="secondary" style="color:var(--danger); border-color:var(--danger);">✖ Clear</button>
+                </div>
+
                 <hr style="border:0; border-top:1px solid #ddd; margin: 15px 0;">
-                <div class="slider-row"><div class="slider-header"><span>SYMMETRY</span> <span id="symVal">1x</span></div><input type="range" id="symSlider" min="1" max="12" value="1" step="1" oninput="updateUI()"></div>
+                
+                <div class="slider-row">
+                    <div class="slider-header"><span>SYMMETRY</span> <span id="symVal">1x</span></div>
+                    <input type="range" id="symSlider" min="1" max="12" value="1" step="1" oninput="updateUI()">
+                </div>
+
                 <button class="action" onclick="prepareGCode()" style="margin-bottom:15px; font-size:1.1em;">⚙️ Prepare Path</button>
             </div>
-            <div id="productionPhaseControls" style="display:none; margin-bottom:15px;"><button class="secondary" onclick="returnToEditing()" style="width:100%;">✏️ Back to Edit</button></div>
-            <div class="slider-row"><div class="slider-header"><span>SIMULATION</span> <span id="progVal">100%</span></div><input type="range" id="progressSlider" min="0" max="100" value="100" oninput="render()"></div>
-            <div class="btn-group"><button onclick="sendToTable()" class="active">🚀 Run</button><button onclick="saveToServer()" class="secondary">💾 Save</button></div>
+            
+            <div id="productionPhaseControls" style="display:none; margin-bottom:15px;">
+                <button class="secondary" onclick="returnToEditing()" style="width:100%; border:2px dashed #999; color:#444; background: rgba(0,0,0,0.05);">
+                    ✏️ Back to Edit
+                </button>
+            </div>
+
+            <div class="slider-row">
+                <div class="slider-header"><span>SIMULATION</span> <span id="progVal">100%</span></div>
+                <input type="range" id="progressSlider" min="0" max="100" value="100" oninput="render()">
+            </div>
+
+            <div style="text-align:center; font-size:12px; margin-bottom:10px; color:#666;">
+                Status: <span id="statusTxt" style="font-weight:bold; color:var(--primary);">Drawing Mode</span>
+            </div>
+
+            <div class="toggle-row" style="background:rgba(0,0,0,0.03); padding:8px; border-radius:8px; margin-bottom:10px;">
+                <span style="font-weight:600; font-size:13px;">✨ Auto-Clear Before Run</span>
+                <label class="switch">
+                    <input type="checkbox" id="autoClearMode" checked>
+                    <span class="slider-tog"></span>
+                </label>
+            </div>
+
+            <div class="btn-group">
+                <button onclick="sendToTable()" class="active">🚀 Run</button>
+                <button onclick="saveToServer()" class="secondary">💾 Save to Pi</button>
+            </div>
+
             <details>
                 <summary>⚙️ Machine Settings</summary>
                 <div class="settings-grid">
-                    <div><label>Radius (mm)</label><input type="number" id="cfgRadius" value="202.6" onchange="resizeCanvas()"></div>
+                    <div><label>Radius</label><input type="number" id="cfgRadius" value="202.6" onchange="resizeCanvas()"></div>
                     <div><label>Ball Size (mm)</label><input type="number" id="cfgBallSize" value="13" onchange="runHighPrecisionTrace()"></div>
                     <div><label>Center Speed</label><input type="number" id="cfgCenterDelay" value="500"></div>
                     <div><label>Rim Speed</label><input type="number" id="cfgPerimDelay" value="3000"></div>
@@ -142,149 +358,562 @@
             </details>
         </div>
     </div>
+
     <div id="status-toast"></div>
     <canvas id="hiddenTraceBuffer" width="800" height="800"></canvas>
     <canvas id="vortexScanCanvas" width="600" height="600"></canvas>
 
     <script>
-        let rawPoints = [], processedPoints = [], historyStack = [], isDrawing = false, currentTool = 'draw', origin = {x:0, y:0}, scale = 1, generatedGCode = null;
-        let eraserRadius = 10, traceImgData = null, traceState = { active: false, img: null, x: 0, y: 0, scale: 1.0, baseScale: 1.0, rotation: 0 };
-        const canvas = document.getElementById('drawCanvas'), ctx = canvas.getContext('2d'), BASE_URL = window.location.origin;
+        let rawPoints = []; 
+        let processedPoints = []; 
+        let historyStack = [];
+        let isDrawing = false;
+        let currentTool = 'draw';
+        let origin = {x:0, y:0};
+        let scale = 1;
+        let generatedGCode = null;
 
-        function init() { resizeCanvas(); window.addEventListener('resize', resizeCanvas); canvas.addEventListener('pointerdown', startDraw); canvas.addEventListener('pointermove', moveDraw); canvas.addEventListener('pointerup', endDraw); updateUI(); updateToolSettings(); }
-        function getPos(e) { return { x: (e.offsetX - origin.x) / scale, y: -(e.offsetY - origin.y) / scale }; }
-        function startDraw(e) { e.preventDefault(); if(generatedGCode) return; if(currentTool === 'select') { isDrawing = true; canvas.setPointerCapture(e.pointerId); return; } if(currentTool === 'draw' || currentTool === 'erase') { saveState(); isDrawing = true; canvas.setPointerCapture(e.pointerId); processPointer(e); resetStatus(); } }
-        function moveDraw(e) { e.preventDefault(); const pos = getPos(e); document.getElementById('coordDisplay').textContent = `X:${pos.x.toFixed(0)} Y:${pos.toFixed(0)}`; if(!isDrawing) { render(); return; } processPointer(e); }
-        function endDraw(e) { if(!isDrawing) return; isDrawing = false; if(currentTool === 'draw') rawPoints.push({type:'break'}); render(); }
-        function processPointer(e) { const p = getPos(e); if(currentTool === 'draw') rawPoints.push({x: p.x, y: p.y, type: 'point'}); else if (currentTool === 'erase') { rawPoints = rawPoints.filter(pt => pt.type === 'break' || Math.hypot(pt.x - p.x, pt.y - p.y) > eraserRadius); } render(); }
+        let eraserRadius = 10;
+        let traceImgData = null;
+        let traceState = { active: false, img: null, x: 0, y: 0, scale: 1.0, baseScale: 1.0, rotation: 0 }; 
 
-        // --- NEW IMAGE & TEXT LOGIC ---
-        function renderTextToTrace() {
-            const text = document.getElementById('toolTextInput').value, size = document.getElementById('toolTextSize').value, font = document.getElementById('toolTextFont').value;
-            const bCtx = document.getElementById('hiddenTraceBuffer').getContext('2d');
-            bCtx.fillStyle = "white"; bCtx.fillRect(0,0,800,800); bCtx.fillStyle = "black"; bCtx.font = `bold ${size}px ${font}`; bCtx.textAlign = "center"; bCtx.textBaseline = "middle"; bCtx.fillText(text, 400, 400);
-            traceImgData = bCtx.getImageData(0,0,800,800); runHighPrecisionTrace();
+        let lastRotVal = 0;
+        let lastScaleVal = 100;
+
+        const vortexState = { radiusMap: new Float32Array(720) };
+        let vortexSourcePath = [];
+
+        const canvas = document.getElementById('drawCanvas');
+        const ctx = canvas.getContext('2d');
+        const BASE_URL = window.location.origin;
+
+        // --- MATH HELPERS ---
+        function distSq(p1, p2) { return (p1.x-p2.x)**2 + (p1.y-p2.y)**2; }
+        function dist(p1, p2) { return Math.sqrt(distSq(p1, p2)); }
+        function getBounds(shape) {
+            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+            shape.forEach(p => { if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y; });
+            return { minX, maxX, minY, maxY, area: (maxX-minX)*(maxY-minY), w: maxX-minX, h: maxY-minY, cx: (minX+maxX)/2, cy: (minY+maxY)/2 };
         }
-
-        function handleImageUpload(input) {
-            const file = input.files[0]; if(!file) return;
-            const reader = new FileReader(); reader.onload = (e) => {
-                const img = new Image(); img.onload = () => { traceState.active = true; traceState.img = img; traceState.x = 0; traceState.y = 0; commitTraceMove(); setTool('trace_set'); }; img.src = e.target.result;
-            }; reader.readAsDataURL(file);
+        function getIntersection(A, B, C, D) {
+            const det = (B.x - A.x) * (D.y - C.y) - (D.x - C.x) * (B.y - A.y);
+            if (det === 0) return null; 
+            const lambda = ((D.y - C.y) * (D.x - A.x) + (C.x - D.x) * (D.y - A.y)) / det;
+            const gamma = ((A.y - B.y) * (D.x - A.x) + (B.x - A.x) * (D.y - A.y)) / det;
+            if (lambda > 0.001 && lambda < 0.999 && gamma > 0.001 && gamma < 0.999) {
+                return { x: A.x + lambda * (B.x - A.x), y: A.y + lambda * (B.y - A.y) };
+            }
+            return null;
         }
-
-        function commitTraceMove() {
-            const bCtx = document.getElementById('hiddenTraceBuffer').getContext('2d'); bCtx.fillStyle = "white"; bCtx.fillRect(0,0,800,800);
-            bCtx.save(); bCtx.translate(400,400); bCtx.drawImage(traceState.img, -200, -200, 400, 400); bCtx.restore();
-            traceImgData = bCtx.getImageData(0,0,800,800); runHighPrecisionTrace();
+        function distToPoly(pt, poly) {
+            let minD = Infinity; for(let i=0; i<poly.length; i++) { let d = Math.hypot(poly[i].x - pt.x, poly[i].y - pt.y); if(d < minD) minD = d; } return minD;
         }
-
-        // --- THE TUNED TRACE ENGINE ---
-        function runHighPrecisionTrace() {
-            if(!traceImgData) return;
-            const thresh = parseInt(document.getElementById('traceThreshInput').value);
-            const ballSizeMm = parseFloat(document.getElementById('cfgBallSize').value);
-            const tableRadiusMm = parseFloat(document.getElementById('cfgRadius').value);
-            const densityMult = parseFloat(document.getElementById('traceDensityInput').value);
-            
-            // Step 1: Calculate pixel equivalence for ball size
-            // Buffer is 800px wide, representing Table Diameter (tableRadiusMm * 2)
-            const mmToPx = 800 / (tableRadiusMm * 2);
-            const ballPx = ballSizeMm * mmToPx;
-            
-            // Offset logic: We need shapes to be far enough from spiral to avoid bleed
-            const offsetPx = ballPx * 0.5; // Half-ball buffer
-            const spacingPx = ballPx * densityMult;
-
-            let pixelGrid = new Uint8Array(800*800);
-            for(let i=0; i<800*800; i++) pixelGrid[i] = traceImgData.data[i*4] < thresh ? 1 : 0;
-
-            // Step 2: Line Merging (Thin lines -> Single Path)
-            // Morphological closing/thinning simplified: Check neighbors to bridge small gaps
-            let mergedGrid = new Uint8Array(800*800);
-            for(let y=2; y<798; y++) {
-                for(let x=2; x<798; x++) {
-                    if(pixelGrid[y*800+x]) {
-                        mergedGrid[y*800+x] = 1;
-                        // Bridge 1px gaps
-                        if(pixelGrid[y*800+(x+2)]) mergedGrid[y*800+(x+1)] = 1;
-                        if(pixelGrid[(y+2)*800+x]) mergedGrid[(y+1)*800+x] = 1;
-                    }
+        function getPerimeterPath(idx1, idx2, poly) {
+            if(idx1 === -1 || idx2 === -1) return [];
+            if(idx1 === idx2) return [poly[idx1]];
+            let isClosed = dist(poly[0], poly[poly.length-1]) < 2.0;
+            if (!isClosed) {
+                let path = []; let step = (idx1 < idx2) ? 1 : -1;
+                for(let i=idx1; i !== idx2; i+=step) path.push(poly[i]); path.push(poly[idx2]); return path;
+            }
+            let len = poly.length; let cwDist = 0, ccwDist = 0; let curr = idx1;
+            while(curr !== idx2) { let next = (curr + 1) % len; cwDist += dist(poly[curr], poly[next]); curr = next; }
+            curr = idx1; while(curr !== idx2) { let next = (curr - 1 + len) % len; ccwDist += dist(poly[curr], poly[next]); curr = next; }
+            let path = [];
+            if(cwDist < ccwDist) { curr = idx1; while(curr !== idx2) { let next = (curr + 1) % len; path.push(poly[next]); curr = next; } } 
+            else { curr = idx1; while(curr !== idx2) { let next = (curr - 1 + len) % len; path.push(poly[next]); curr = next; } }
+            path.push(poly[idx2]); return path;
+        }
+        function routeConnect(start, end, shapes, depth=0) {
+            if (depth > 5) return [end]; 
+            let collision = null; let minD = Infinity;
+            for (let sIdx = 0; sIdx < shapes.length; sIdx++) {
+                let poly = shapes[sIdx]; let isClosed = dist(poly[0], poly[poly.length-1]) < 2.0; let limit = isClosed ? poly.length : poly.length - 1;
+                for (let i = 0; i < limit; i++) {
+                    let p1 = poly[i]; let p2 = poly[(i+1)%poly.length];
+                    if (dist(start, p1) < 0.1 || dist(start, p2) < 0.1) continue;
+                    let hit = getIntersection(start, end, p1, p2);
+                    if (hit) { let d = dist(start, hit); if (d < minD) { minD = d; collision = { pt: hit, poly: poly, idx: i }; } }
                 }
             }
+            if (!collision) return [end];
+            let obstacle = collision.poly; let exitIdx = -1, minExitD = Infinity;
+            for(let i=0; i<obstacle.length; i++) { let d = dist(obstacle[i], end); if(d < minExitD) { minExitD = d; exitIdx = i; } }
+            let entryIdx = -1, minEntryD = Infinity;
+            for(let i=0; i<obstacle.length; i++) { let d = dist(obstacle[i], collision.pt); if(d < minEntryD) { minEntryD = d; entryIdx = i; } }
+            let surfPath = getPerimeterPath(entryIdx, exitIdx, obstacle);
+            let exitPoint = obstacle[exitIdx];
+            let remainingPath = routeConnect(exitPoint, end, shapes, depth+1);
+            return surfPath.concat(remainingPath);
+        }
 
-            // Step 3: High Precision Path Finding
-            let contours = []; const traced = new Uint8Array(800*800).fill(0);
-            for(let y=1; y<799; y++) {
-                for(let x=1; x<799; x++) {
-                    const idx = y*800 + x;
-                    if(mergedGrid[idx] && !traced[idx]) {
-                        // Boundary tracing logic
-                        let path = []; let cx=x, cy=y;
-                        while(path.length < 5000) {
-                            path.push({x:cx, y:cy}); traced[cy*800+cx] = 1;
-                            let neighbors = [{x:1,y:0},{x:1,y:1},{x:0,y:1},{x:-1,y:1},{x:-1,y:0},{x:-1,y:-1},{x:0,y:-1},{x:1,y:-1}];
-                            let found = false;
-                            for(let n of neighbors) {
-                                let nx=cx+n.x, ny=cy+n.y;
-                                if(nx>=0 && nx<800 && ny>=0 && ny<800 && mergedGrid[ny*800+nx] && !traced[ny*800+nx]) { cx=nx; cy=ny; found=true; break; }
-                            }
-                            if(!found) break;
-                        }
-                        if(path.length > 10) contours.push(path);
-                    }
-                }
+        function init() {
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            canvas.addEventListener('pointerdown', startDraw);
+            canvas.addEventListener('pointermove', moveDraw);
+            canvas.addEventListener('pointerup', endDraw);
+            canvas.addEventListener('pointerleave', endDraw);
+            canvas.style.touchAction = "none";
+            updateUI();
+            updateToolSettings();
+        }
+
+        let dragStart = null;
+
+        // --- DRAWING LOGIC ---
+        function startDraw(e) {
+            e.preventDefault();
+            if(generatedGCode) return;
+            const smart = document.getElementById('stylusMode').checked;
+            if(smart && currentTool !== 'select' && currentTool !== 'sandify') {
+                if(e.pointerType === 'pen') setTool('draw');
+                else if(e.pointerType === 'touch') setTool('erase');
             }
-
-            // Step 4: Calibrated Spiral Fill
-            let spiral = []; let angle = 0, r = 0;
-            while(r < 395) {
-                // Adjust spiral radius to maintain "ball-width" gap
-                r = (spacingPx / (2*Math.PI)) * angle;
-                let tx = 400 + Math.cos(angle)*r, ty = 400 + Math.sin(angle)*r;
-                let ix = Math.floor(tx), iy = Math.floor(ty);
-                
-                // Calibration: Check if current spiral point is within the "No-Fly Zone" of a shape
-                let tooClose = false;
-                if(ix>=0 && ix<800 && iy>=0 && iy<800) {
-                    // Check local neighborhood around ball size
-                    let checkRad = Math.ceil(offsetPx);
-                    outer: for(let dy=-checkRad; dy<=checkRad; dy++) {
-                        for(let dx=-checkRad; dx<=checkRad; dx++) {
-                            if(mergedGrid[(iy+dy)*800+(ix+dx)]) { tooClose = true; break outer; }
-                        }
-                    }
-                }
-                if(!tooClose) spiral.push({x:tx, y:ty});
-                angle += 0.05;
+            if(currentTool === 'select') {
+                isDrawing = true; dragStart = getPos(e); canvas.setPointerCapture(e.pointerId); return;
             }
+            if(currentTool === 'sandify' || currentTool === 'trace_set' || currentTool === 'text') return;
+            saveState(); isDrawing = true; canvas.setPointerCapture(e.pointerId); processPointer(e); resetStatus();
+        }
 
-            // Convert to Table Units
-            const mmScale = (tableRadiusMm * 2) / 800;
-            rawPoints = []; rawPoints.push({type:'break'});
-            spiral.forEach(p => rawPoints.push({x:(p.x-400)*mmScale, y:(400-p.y)*mmScale, type:'point'}));
-            contours.forEach(c => {
+        function moveDraw(e) {
+            e.preventDefault();
+            const pos = getPos(e);
+            document.getElementById('coordDisplay').textContent = `X:${pos.x.toFixed(0)} Y:${pos.y.toFixed(0)}`;
+            if(currentTool === 'select' && traceState.active && isDrawing && dragStart) {
+                const dx = pos.x - dragStart.x; const dy = pos.y - dragStart.y;
+                const tableR = parseFloat(document.getElementById('cfgRadius').value);
+                const mmToTraceFactor = 800 / (tableR * 2);
+                traceState.x += dx * mmToTraceFactor; traceState.y -= dy * mmToTraceFactor; 
+                dragStart = pos; drawTracePreview(); return;
+            }
+            if(!isDrawing) { render(); drawCursor(pos); return; }
+            if(currentTool === 'select' && dragStart) {
+                const dx = pos.x - dragStart.x; const dy = pos.y - dragStart.y;
+                rawPoints.forEach(p => { if(p.type === 'point') { p.x += dx; p.y += dy; } });
+                dragStart = pos; render(); return;
+            }
+            processPointer(e);
+        }
+
+        function endDraw(e) {
+            if(!isDrawing) return;
+            isDrawing = false; canvas.releasePointerCapture(e.pointerId);
+            if(currentTool === 'select') {
+                dragStart = null; if(traceState.active) commitTraceMove(); else saveState(); return;
+            }
+            if(currentTool === 'draw') {
+                if(document.getElementById('shapeConnectMode').checked) autoConnectAndSmooth();
                 rawPoints.push({type:'break'});
-                c.forEach(p => rawPoints.push({x:(p.x-400)*mmScale, y:(400-p.y)*mmScale, type:'point'}));
-            });
+            }
             render();
         }
 
-        // --- UI & RENDER ---
-        function setTool(t) { currentTool = t; updateToolSettings(); if(t==='text') renderTextToTrace(); }
-        function updateToolSettings() { const area = document.getElementById('toolSettingsArea'); area.style.display = 'block'; document.querySelectorAll('.tool-setting-group').forEach(g => { g.classList.remove('active'); if(g.id === 'set-'+currentTool) g.classList.add('active'); }); }
-        function resizeCanvas() { const size = document.getElementById('canvasContainer').clientWidth; canvas.width = size; canvas.height = size; origin = {x:size/2, y:size/2}; scale = (size/2) / (parseFloat(document.getElementById('cfgRadius').value)*1.05); render(); }
-        function render() {
-            ctx.clearRect(0,0,canvas.width,canvas.height); ctx.save(); ctx.translate(origin.x, origin.y);
-            ctx.beginPath(); ctx.arc(0,0,parseFloat(document.getElementById('cfgRadius').value)*scale, 0, Math.PI*2); ctx.strokeStyle="#ddd"; ctx.stroke();
-            ctx.beginPath(); ctx.strokeStyle = "#007bff"; let isMove = true;
-            rawPoints.forEach(p => { if(p.type==='break') isMove=true; else { if(isMove) ctx.moveTo(p.x*scale, -p.y*scale); else ctx.lineTo(p.x*scale, -p.y*scale); isMove=false; } });
-            ctx.stroke(); ctx.restore();
+        function autoConnectAndSmooth() {
+            let lastBreak = -1;
+            for(let i=rawPoints.length-1; i>=0; i--) { if(rawPoints[i].type === 'break' || rawPoints[i].type === 'cmd') { lastBreak = i; break; } }
+            let stroke = []; let startIndex = lastBreak + 1;
+            for(let i=startIndex; i<rawPoints.length; i++) stroke.push(rawPoints[i]);
+            if(stroke.length < 3) return;
+            let startP = stroke[0]; let endP = stroke[stroke.length-1];
+            let d = Math.hypot(startP.x - endP.x, startP.y - endP.y);
+            if(d < 30.0) { stroke.push({x: startP.x, y: startP.y, type:'point'}); }
+            for(let pass=0; pass<2; pass++) {
+                let smooth = []; smooth.push(stroke[0]);
+                for(let i=0; i<stroke.length-1; i++) {
+                    let p0 = stroke[i]; let p1 = stroke[i+1];
+                    smooth.push({ x: 0.75 * p0.x + 0.25 * p1.x, y: 0.75 * p0.y + 0.25 * p1.y, type: 'point' });
+                    smooth.push({ x: 0.25 * p0.x + 0.75 * p1.x, y: 0.25 * p0.y + 0.75 * p1.y, type: 'point' });
+                }
+                smooth.push(stroke[stroke.length-1]); stroke = smooth;
+            }
+            rawPoints.splice(startIndex, rawPoints.length - startIndex, ...stroke);
         }
-        function saveState() { historyStack.push(JSON.stringify(rawPoints)); }
-        function undo() { if(historyStack.length) rawPoints = JSON.parse(historyStack.pop()); render(); }
-        function clearCanvas() { saveState(); rawPoints = []; render(); }
-        function updateUI() { document.getElementById('symVal').innerText = document.getElementById('symSlider').value+'x'; }
+
+        // --- SHAPE STAMPS ---
+        function addShape(type) {
+            saveState(); const r = 50; let pts = [];
+            if(type==='circle') { for(let i=0; i<=36; i++) { const a = (i/36)*Math.PI*2; pts.push({x: Math.cos(a)*r, y: Math.sin(a)*r}); } } 
+            else if(type==='square') { pts = [{x:-r,y:-r}, {x:r,y:-r}, {x:r,y:r}, {x:-r,y:r}, {x:-r,y:-r}]; } 
+            else if(type==='triangle') { pts = [{x:0,y:r}, {x:r*0.86,y:-r/2}, {x:-r*0.86,y:-r/2}, {x:0,y:r}]; } 
+            else if(type==='hexagon') { for(let i=0; i<=6; i++) { const a = (i/6)*Math.PI*2; pts.push({x: Math.cos(a)*r, y: Math.sin(a)*r}); } } 
+            else if(type==='pentagon') { for(let i=0; i<=5; i++) { const a = (i/5)*Math.PI*2 - Math.PI/2; pts.push({x: Math.cos(a)*r, y: Math.sin(a)*r}); } } 
+            else if(type==='star') { for(let i=0; i<=10; i++) { const a = (i/10)*Math.PI*2 + Math.PI/2; const rad = (i%2===0) ? r : r*0.4; pts.push({x: Math.cos(a)*rad, y: Math.sin(a)*rad}); } } 
+            else if(type==='spiral') { for(let i=0; i<100; i++) { const a = i * 0.3; const rad = (i/100)*r; pts.push({x: Math.cos(a)*rad, y: Math.sin(a)*rad}); } } 
+            else if (type === 'random') {
+                const numPoints = Math.floor(Math.random() * 15) + 1;
+                if(numPoints === 1) { const rx = r * (0.5 + Math.random()); const ry = r * (0.5 + Math.random()); for(let i=0; i<=36; i++) { const a = (i/36)*Math.PI*2; pts.push({x: Math.cos(a)*rx, y: Math.sin(a)*ry}); } } 
+                else if(numPoints === 2) { const angle = Math.random() * Math.PI * 2; const len = r * (0.8 + Math.random() * 0.4); pts.push({x: Math.cos(angle)*len, y: Math.sin(angle)*len}); pts.push({x: Math.cos(angle + Math.PI)*len, y: Math.sin(angle + Math.PI)*len}); } 
+                else { let angles = []; for(let i=0; i<numPoints; i++) angles.push(Math.random() * Math.PI * 2); angles.sort((a,b) => a-b); for(let i=0; i<angles.length; i++) { const rad = r * (0.5 + Math.random() * 0.8); pts.push({x: Math.cos(angles[i])*rad, y: Math.sin(angles[i])*rad}); } pts.push(pts[0]); }
+            }
+            if(rawPoints.length > 0 && rawPoints[rawPoints.length-1].type !== 'break') rawPoints.push({type:'break'});
+            pts.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'})); rawPoints.push({type:'break'}); render();
+        }
+
+        function getPos(e) { return { x: (e.offsetX - origin.x) / scale, y: -(e.offsetY - origin.y) / scale }; }
+
+        function processPointer(e) {
+            const p = getPos(e);
+            if(currentTool === 'draw') { rawPoints.push({x: p.x, y: p.y, type: 'point'}); } 
+            else if (currentTool === 'erase') { const r = eraserRadius; rawPoints = rawPoints.filter(pt => { if(pt.type === 'break') return true; return Math.hypot(pt.x - p.x, pt.y - p.y) > r; }); }
+            render(); if(currentTool==='erase') drawCursor(p);
+        }
+
+        function drawCursor(p) {
+            if(generatedGCode) return;
+            const r = (currentTool === 'erase' ? eraserRadius : 10) * scale;
+            const px = origin.x + p.x * scale; const py = origin.y - p.y * scale;
+            if(currentTool === 'erase') { ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI*2); ctx.strokeStyle = "#999"; ctx.fillStyle = "rgba(200,200,200,0.3)"; ctx.stroke(); ctx.fill(); } 
+            else if (currentTool === 'select') { ctx.font = "20px Arial"; ctx.fillStyle = "black"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("✋", px, py); } 
+        }
+
+        function liveRotate(val) {
+            if(traceState.active) { traceState.rotation = parseFloat(val); drawTracePreview(); return; }
+            if(rawPoints.length === 0) return;
+            const diff = val - lastRotVal; if(diff === 0) return;
+            const rad = (diff * Math.PI) / 180; const cos = Math.cos(rad); const sin = Math.sin(rad);
+            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity; let hasPoints = false;
+            rawPoints.forEach(p => { if(p.type === 'point') { if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y; hasPoints = true; } });
+            if(!hasPoints) return; const cx = (minX + maxX)/2; const cy = (minY + maxY)/2;
+            rawPoints.forEach(p => { if(p.type === 'point') { let tx = p.x - cx; let ty = p.y - cy; p.x = cx + (tx * cos - ty * sin); p.y = cy + (tx * sin + ty * cos); } });
+            lastRotVal = val; document.getElementById('liveRotVal').innerText = val + "°"; render();
+        }
+
+        function liveScale(val) {
+             if(traceState.active) { const factor = val / 100.0; traceState.scale = traceState.baseScale * factor; drawTracePreview(); return; }
+             if(rawPoints.length === 0) return;
+             const factor = val / lastScaleVal; if(factor === 1) return;
+             let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity; let hasPoints = false;
+             rawPoints.forEach(p => { if(p.type === 'point') { if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y; hasPoints = true; } });
+             if(!hasPoints) return; const cx = (minX + maxX)/2; const cy = (minY + maxY)/2;
+             rawPoints.forEach(p => { if(p.type === 'point') { p.x = cx + (p.x - cx) * factor; p.y = cy + (p.y - cy) * factor; } });
+             lastScaleVal = val; document.getElementById('liveScaleVal').innerText = val + "%"; render();
+        }
+
+        function endLiveTransform(slider) {
+            if(traceState.active) { commitTraceMove(); if(slider.id === 'liveScaleSlider') slider.value = 100; if(slider.id === 'liveRotSlider') { slider.value = 0; traceState.rotation = 0; } return; }
+            saveState(); 
+            if(slider.id === 'liveRotSlider') { slider.value = 0; lastRotVal = 0; document.getElementById('liveRotVal').innerText = "0°"; }
+            if(slider.id === 'liveScaleSlider') { slider.value = 100; lastScaleVal = 100; document.getElementById('liveScaleVal').innerText = "100%"; }
+        }
+
+        // --- VORTEX LOGIC ---
+        function updateVortexParams() {
+            if(currentTool === 'sandify') {
+                document.getElementById('val-swirl').innerText = document.getElementById('vortexSwirl').value;
+                document.getElementById('val-scale').innerText = document.getElementById('vortexScale').value;
+                document.getElementById('val-twist').innerText = document.getElementById('vortexTwist').value;
+                document.getElementById('val-shift').innerText = document.getElementById('vortexShift').value;
+                const type = document.getElementById('vortexShape').value;
+                document.getElementById('vortexTextContainer').style.display = type === 'text' ? 'block' : 'none';
+                scanVortexShape(); generateVortex();
+            }
+        }
+
+        function scanVortexShape() {
+            const scanCanvas = document.getElementById('vortexScanCanvas'); const scanCtx = scanCanvas.getContext('2d');
+            const w = scanCanvas.width; const h = scanCanvas.height; const cx = w/2; const cy = h/2; const r = w/2 - 20;
+            const type = document.getElementById('vortexShape').value; const txt = document.getElementById('vortexChar').value;
+            const shiftX = parseFloat(document.getElementById('vortexShift').value);
+            scanCtx.fillStyle = '#000'; scanCtx.fillRect(0, 0, w, h); scanCtx.fillStyle = '#fff'; scanCtx.strokeStyle = '#fff';
+            scanCtx.lineWidth = 15; scanCtx.textAlign = 'center'; scanCtx.textBaseline = 'middle';
+            scanCtx.save(); scanCtx.translate(-shiftX, 0); scanCtx.beginPath();
+            const drawPoly = (sides) => { const offset = -Math.PI / 2; scanCtx.moveTo(cx + r * Math.cos(offset), cy + r * Math.sin(offset)); for (let i = 1; i <= sides; i++) { scanCtx.lineTo(cx + r * Math.cos(offset + i * 2 * Math.PI / sides), cy + r * Math.sin(offset + i * 2 * Math.PI / sides)); } };
+            const drawStar = (pts) => { let rot = Math.PI / 2 * 3; let step = Math.PI / pts; scanCtx.moveTo(cx, cy - r); for (let i = 0; i < pts; i++) { scanCtx.lineTo(cx + Math.cos(rot) * r, cy + Math.sin(rot) * r); rot += step; scanCtx.lineTo(cx + Math.cos(rot) * (r*0.4), cy + Math.sin(rot) * (r*0.4)); rot += step; } scanCtx.lineTo(cx, cy - r); };
+            if (type === 'custom') { const tableR = parseFloat(document.getElementById('cfgRadius').value); const scaleToFit = r / tableR; scanCtx.beginPath(); vortexSourcePath.forEach((p, i) => { if(p.type === 'break' || p.type === 'cmd') return; const sx = cx + (p.x * scaleToFit); const sy = cy - (p.y * scaleToFit); if(i===0 || vortexSourcePath[i-1].type === 'break') scanCtx.moveTo(sx, sy); else scanCtx.lineTo(sx, sy); }); scanCtx.stroke(); }
+            else if (type === 'text') { scanCtx.font = 'bold 450px Arial'; scanCtx.fillText(txt, cx, cy + 30); } 
+            else if (type === 'triangle') drawPoly(3); else if (type === 'square') drawPoly(4); else if (type === 'pentagon') drawPoly(5); else if (type === 'hexagon') drawPoly(6); else if (type === 'star') drawStar(5);
+            if (type !== 'custom') scanCtx.fill(); scanCtx.restore();
+            const pixels = scanCtx.getImageData(0, 0, w, h).data; const steps = 720;
+            for (let i = 0; i < steps; i++) { let maxDist = 0; const angle = (i / steps) * Math.PI * 2; const cos = Math.cos(angle); const sin = Math.sin(angle); for (let dist = 0; dist < r; dist += 2) { const x = Math.floor(cx + cos * dist); const y = Math.floor(cy + sin * dist); const idx = (y * w + x) * 4; if (pixels[idx] > 100) maxDist = dist; } vortexState.radiusMap[i] = maxDist / r; }
+        }
+
+        function generateVortex() {
+            const swirlCount = parseInt(document.getElementById('vortexSwirl').value); const scaleFac = parseFloat(document.getElementById('vortexScale').value);
+            const twistDeg = parseFloat(document.getElementById('vortexTwist').value); const tableRadius = parseFloat(document.getElementById('cfgRadius').value);
+            const iterations = 10000; const centerGap = 4; const newPoints = []; newPoints.push({type:'break'});
+            for (let i = 0; i <= iterations; i++) {
+                const t = (i / iterations) * 2 - 1; const progress = Math.abs(t); const spiralAngle = t * swirlCount * Math.PI * 2;
+                const twistRad = (twistDeg * (Math.PI/180)) * swirlCount * Math.abs(t);
+                let lookupAngle = spiralAngle + twistRad; let normAngle = lookupAngle % (Math.PI * 2); if (normAngle < 0) normAngle += Math.PI * 2;
+                const mapIdx = Math.floor((normAngle / (Math.PI * 2)) * 720) % 720;
+                let shapeFactor = vortexState.radiusMap[mapIdx]; if(shapeFactor < 0.05) shapeFactor = 0.05; 
+                const maxR = tableRadius * scaleFac; const spiralR = centerGap + (progress * (maxR - centerGap)); const r = spiralR * shapeFactor;
+                let x, y; if (t < 0) { x = r * Math.cos(spiralAngle); y = r * Math.sin(spiralAngle); } else { const flipOffset = Math.PI / 2; x = r * Math.cos(spiralAngle + flipOffset); y = r * Math.sin(spiralAngle + flipOffset); }
+                newPoints.push({x: x, y: y, type:'point'});
+            }
+            newPoints.push({type:'break'}); rawPoints = newPoints; render();
+        }
+
+        // --- NEW TEXT TOOL LOGIC ---
+        function renderTextToTrace() {
+            const text = document.getElementById('toolTextInput').value;
+            const size = document.getElementById('toolTextSize').value;
+            const font = document.getElementById('toolTextFont').value;
+            const density = document.getElementById('textDensityInput').value;
+            document.getElementById('textDensityVal').innerText = density;
+            const buff = document.getElementById('hiddenTraceBuffer'); const bCtx = buff.getContext('2d'); const canvasSize = 800;
+            bCtx.fillStyle = "white"; bCtx.fillRect(0, 0, canvasSize, canvasSize);
+            bCtx.fillStyle = "black"; bCtx.font = `bold ${size}px ${font}`; bCtx.textAlign = "center"; bCtx.textBaseline = "middle";
+            bCtx.fillText(text, canvasSize/2, canvasSize/2);
+            traceImgData = bCtx.getImageData(0, 0, canvasSize, canvasSize);
+            const originalDensityInput = document.getElementById('traceDensityInput');
+            const oldVal = originalDensityInput.value;
+            originalDensityInput.value = density;
+            runHighPrecisionTrace();
+            originalDensityInput.value = oldVal;
+        }
+
+        // --- TRACE LOGIC ---
+        function handleImageUpload(input) {
+            const file = input.files[0]; if(!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    traceState.active = true; traceState.img = img; traceState.x = 0; traceState.y = 0; traceState.rotation = 0;
+                    const size = 800; const scale = Math.min(size/img.width, size/img.height) * 0.9;
+                    traceState.baseScale = scale; traceState.scale = scale; commitTraceMove(); setTool('trace_set');
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file); input.value = '';
+        }
+
+        function drawTracePreview() {
+            const w = canvas.width / window.devicePixelRatio; const h = canvas.height / window.devicePixelRatio;
+            ctx.clearRect(0, 0, w, h); ctx.filter = 'none';
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            ctx.save(); ctx.translate(origin.x, origin.y); ctx.beginPath(); ctx.arc(0, 0, tableR*scale, 0, Math.PI*2);
+            ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.stroke();
+            const visualScale = (tableR * 2 / 800) * scale; ctx.save(); ctx.scale(visualScale, visualScale);
+            ctx.translate(traceState.x, traceState.y); ctx.rotate(traceState.rotation * Math.PI / 180);
+            const img = traceState.img; const drawW = img.width * traceState.scale; const drawH = img.height * traceState.scale;
+            ctx.filter = 'grayscale(100%) contrast(1000%) invert(1)'; ctx.drawImage(img, -drawW/2, -drawH/2, drawW, drawH);
+            ctx.restore(); ctx.restore(); ctx.filter = 'none';
+        }
+
+        function commitTraceMove() {
+            const size = 800; const buff = document.getElementById('hiddenTraceBuffer'); const bCtx = buff.getContext('2d');
+            bCtx.fillStyle = "white"; bCtx.fillRect(0, 0, size, size); bCtx.save(); bCtx.translate(size/2, size/2);
+            bCtx.translate(traceState.x, traceState.y); bCtx.rotate(traceState.rotation * Math.PI / 180);
+            const drawW = traceState.img.width * traceState.scale; const drawH = traceState.img.height * traceState.scale;
+            bCtx.drawImage(traceState.img, -drawW/2, -drawH/2, drawW, drawH); bCtx.restore();
+            traceImgData = bCtx.getImageData(0,0,size,size); runHighPrecisionTrace();
+        }
+
+        function runHighPrecisionTrace() {
+            if(!traceImgData) return;
+            const thresh = 150; const densityInput = document.getElementById('traceDensityInput');
+            const density = parseFloat(densityInput.value); 
+            const ballSizeMm = parseFloat(document.getElementById('cfgBallSize').value);
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            
+            // Calibrate offset: Ball Size relative to table coordinates
+            // Ball radius in mm translated to the 800x800 buffer pixel scale
+            const pixelOffset = (ballSizeMm / (tableR * 2)) * 800;
+            
+            const SIZE = 800; const CENTER = SIZE / 2;
+            let pixelGrid = new Uint8Array(SIZE*SIZE); for(let i=0; i<SIZE*SIZE; i++) { pixelGrid[i] = traceImgData.data[i*4] < thresh ? 1 : 0; }
+            let contours = []; const traced = new Uint8Array(SIZE*SIZE).fill(0);
+            
+            const traceBoundary = (sx, sy) => {
+                const path = []; let cx = sx, cy = sy; let bx = sx-1, by = sy; let max = SIZE*4;
+                do {
+                    path.push({x:cx, y:cy}); traced[cy*SIZE+cx] = 1;
+                    const n = [{x:-1,y:0},{x:-1,y:-1},{x:0,y:-1},{x:1,y:-1},{x:1,y:0},{x:1,y:1},{x:0,y:1},{x:-1,y:1}];
+                    let startIdx = 0; for(let i=0; i<8; i++) if(bx===cx+n[i].x && by===cy+n[i].y) startIdx=(i+1)%8;
+                    let found = false;
+                    for(let i=0; i<8; i++) {
+                        const idx = (startIdx + i)%8; const nx = cx + n[idx].x; const ny = cy + n[idx].y;
+                        if(nx>=0 && nx<SIZE && ny>=0 && ny<SIZE && pixelGrid[ny*SIZE+nx]===1) { bx=cx; by=cy; cx=nx; cy=ny; found=true; break; } else { bx=nx; by=ny; }
+                    }
+                    if(!found) break; max--;
+                } while((cx!==sx || cy!==sy) && max>0);
+                return path;
+            };
+
+            for(let y=1; y<SIZE-1; y++) { 
+                for(let x=1; x<SIZE-1; x++) { 
+                    const idx = y*SIZE + x; 
+                    if(pixelGrid[idx] === 1 && pixelGrid[idx-1] === 0 && traced[idx] === 0) { 
+                        const pth = traceBoundary(x, y); 
+                        if(pth.length > 20) { 
+                            let maxDist = 0; let bestIdx = 0; 
+                            pth.forEach((p, i) => { const dist = Math.hypot(p.x - CENTER, p.y - CENTER); if(dist > maxDist) { maxDist = dist; bestIdx = i; } }); 
+                            const reordered = [...pth.slice(bestIdx), ...pth.slice(0, bestIdx)]; reordered.push(reordered[0]); 
+                            contours.push({ points: reordered, trigger: reordered[0], merged: false }); 
+                        } 
+                    } 
+                } 
+            }
+
+            let spiral = []; const maxR = SIZE/2 - 5; spiral.push({x: CENTER, y: CENTER});
+            let angle = 0; let r = 0; const angleStep = 0.02; const spacingPx = density * 4.0; 
+            while(r < maxR) { 
+                r = (spacingPx / (2*Math.PI)) * angle; 
+                let x = CENTER + Math.cos(angle)*r; let y = CENTER + Math.sin(angle)*r; 
+                let wiggle = 0; const ix = Math.floor(x), iy = Math.floor(y); 
+                if(ix>=0 && ix<SIZE && iy>=0 && iy<SIZE) { if(pixelGrid[iy*SIZE+ix] === 1) wiggle = Math.sin(angle * 30) * (spacingPx * 0.3); } 
+                x += Math.cos(angle) * wiggle; y += Math.sin(angle) * wiggle; 
+                spiral.push({ x: x, y: y }); angle += angleStep; 
+            }
+
+            let finalPath = []; 
+            // The shapes should be drawn further away from spiral lines to avoid overlap
+            // Tolerance takes Ball Size into account
+            const distTolerance = Math.max(spacingPx * 1.5, pixelOffset);
+
+            for(let i=0; i<spiral.length; i++) {
+                const sp = spiral[i]; finalPath.push(sp);
+                contours.forEach(c => { 
+                    if(!c.merged) { 
+                        const d = Math.hypot(sp.x - c.trigger.x, sp.y - c.trigger.y); 
+                        if (d < distTolerance) { 
+                            // Add lead-in line to bridge the spiral to the shape
+                            finalPath.push(c.trigger);
+                            c.points.forEach(p => finalPath.push(p)); 
+                            finalPath.push(sp); // Return to spiral
+                            c.merged = true; 
+                        } 
+                    } 
+                });
+            }
+
+            const scaleFac = (tableR * 2) / SIZE;
+            rawPoints = []; if(finalPath.length > 0) rawPoints.push({type:'break'});
+            finalPath.forEach(p => { let tx = (p.x - 400) * scaleFac; let ty = (400 - p.y) * scaleFac; rawPoints.push({ x: tx, y: ty, type: 'point' }); });
+            if(finalPath.length > 0) rawPoints.push({type:'break'});
+            render();
+        }
+
+        // --- CORE UI & RENDER ---
+        function resizeCanvas() {
+            const container = document.getElementById('canvasContainer'); const size = container.getBoundingClientRect().width; const dpr = window.devicePixelRatio || 1;
+            canvas.width = size * dpr; canvas.height = size * dpr; ctx.scale(dpr, dpr); origin = { x: size/2, y: size/2 };
+            const tableR = parseFloat(document.getElementById('cfgRadius').value); scale = (size/2) / (tableR * 1.05); render();
+        }
+        function saveState() { if(historyStack.length>10) historyStack.shift(); historyStack.push(JSON.stringify(rawPoints)); }
+        function undo() { if(historyStack.length===0) return; rawPoints = JSON.parse(historyStack.pop()); render(); }
+        function clearCanvas() { saveState(); rawPoints = []; traceState.active=false; render(); }
+        
+        function setTool(t) {
+            currentTool = t;
+            const buttons = ['btnDraw', 'btnErase', 'btnSelect', 'btnSandify', 'btnTrace', 'btnText'];
+            buttons.forEach(b => {
+                const el = document.getElementById(b);
+                if(el) el.className = (b.toLowerCase().includes(t)) ? 'active' : 'secondary';
+            });
+            updateToolSettings();
+            if(t === 'select' && traceState.active) document.getElementById('traceMoveMsg').style.display = 'block';
+            else document.getElementById('traceMoveMsg').style.display = 'none';
+            if(t === 'sandify') { if (rawPoints.length === 0) addShape('random'); vortexSourcePath = JSON.parse(JSON.stringify(rawPoints)); document.getElementById('vortexShape').value = 'custom'; updateVortexParams(); }
+            if(t === 'text') renderTextToTrace();
+        }
+
+        function updateToolSettings() {
+            const area = document.getElementById('toolSettingsArea'); const grps = document.querySelectorAll('.tool-setting-group'); grps.forEach(g => g.style.display = 'none');
+            let activeGrp = null;
+            if(currentTool === 'draw') activeGrp = document.getElementById('set-pen');
+            else if(currentTool === 'erase') activeGrp = document.getElementById('set-erase');
+            else if(currentTool === 'text') activeGrp = document.getElementById('set-text');
+            else if(currentTool === 'select') activeGrp = document.getElementById('set-select');
+            else if(currentTool === 'sandify') activeGrp = document.getElementById('set-sandify');
+            else if(currentTool === 'trace_set') activeGrp = document.getElementById('set-trace');
+            if(activeGrp) { area.style.display = 'block'; activeGrp.style.display = 'block'; } else area.style.display = 'none';
+            eraserRadius = parseInt(document.getElementById('eraserSizeSlider').value); document.getElementById('eraseSizeVal').innerText = eraserRadius + 'px';
+        }
+
+        function updateUI() { document.getElementById('symVal').textContent = document.getElementById('symSlider').value + 'x'; render(); }
+        function showToast(msg, type) { const t = document.getElementById('status-toast'); t.textContent = msg; t.className = type; t.style.opacity = 1; setTimeout(()=>t.style.opacity=0, 3000); }
+        function openNav() { document.getElementById("mySidebar").style.width = "250px"; }
+        function closeNav() { document.getElementById("mySidebar").style.width = "0"; }
+        function toggleTheme() { const b = document.body; b.setAttribute('data-theme', b.getAttribute('data-theme')==='dark'?'light':'dark'); render(); }
+        function resetStatus() { generatedGCode = null; processedPoints = []; document.getElementById('statusTxt').innerText = "Drawing Mode"; document.getElementById('progressSlider').value = 100; render(); }
+        
+        function render() {
+            const w = canvas.width / window.devicePixelRatio; const h = canvas.height / window.devicePixelRatio; ctx.clearRect(0, 0, w, h); ctx.filter = 'none';
+            const tableR = parseFloat(document.getElementById('cfgRadius').value); const sym = parseInt(document.getElementById('symSlider').value); const dark = document.body.getAttribute('data-theme') === 'dark'; const prog = parseInt(document.getElementById('progressSlider').value); document.getElementById('progVal').textContent = prog + '%';
+            ctx.save(); ctx.translate(origin.x, origin.y); ctx.beginPath(); ctx.arc(0, 0, tableR*scale, 0, Math.PI*2); ctx.strokeStyle = dark ? '#444' : '#ddd'; ctx.lineWidth = 2; ctx.stroke();
+            const showingFinal = (processedPoints.length > 0); const dataToShow = showingFinal ? processedPoints : rawPoints; const limit = Math.floor(dataToShow.length * (prog/100)); const color = showingFinal ? '#ff0000' : (dark ? 'cyan' : '#007bff'); ctx.lineWidth = 1.5; const loopCount = showingFinal ? 1 : sym;
+            for(let s=0; s<loopCount; s++) {
+                const ang = s * (Math.PI*2/sym); ctx.save(); if(!showingFinal) ctx.rotate(ang); ctx.beginPath(); ctx.strokeStyle = color; let isMove = true;
+                for(let i=0; i<limit; i++) { const p = dataToShow[i]; if(p.type === 'break' || p.type === 'cmd') { isMove = true; continue; } const px = p.x * scale; const py = -p.y * scale; if(isMove) { ctx.moveTo(px, py); isMove = false; } else ctx.lineTo(px, py); }
+                ctx.stroke(); ctx.restore();
+            }
+            if(currentTool === 'select' && rawPoints.length > 0 && !generatedGCode && !traceState.active) { let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity; rawPoints.forEach(p => { if(p.type === 'point') { if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x; if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y; } }); if(minX !== Infinity) { ctx.beginPath(); ctx.rect(minX*scale, -maxY*scale, (maxX-minX)*scale, (maxY-minY)*scale); ctx.strokeStyle = dark ? "white" : "black"; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]); } }
+            ctx.restore();
+        }
+
+        // --- GCODE GENERATION ---
+        async function sendToTable() { if(!generatedGCode) return showToast("Click Prepare first", "error"); let code = generatedGCode; if(document.getElementById('autoClearMode').checked) { try { let r = await fetch('./designs/clear.txt'); if(r.ok) code = (await r.text()) + "\n" + code; } catch(e) {} } fetch(BASE_URL+'/send_gcode_block', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({gcode:code}) }).then(r => r.json()).then(d => showToast(d.success ? "Sent!" : "Error", d.success ? "success" : "error")); }
+        async function saveToServer() { if(!generatedGCode) return showToast("Prepare Path first!", "error"); let n = prompt("Enter filename:"); if(n) { if(!n.toLowerCase().endsWith('.txt')) n += ".txt"; fetch(BASE_URL+'/save_design', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({filename:n, gcode:generatedGCode}) }).then(r => r.json()).then(d => showToast(d.success ? "Saved!" : "Failed", d.success ? "success" : "error")); } }
+        function getShortestRotation(raw, last) { let diff = (raw - last) / (2 * Math.PI); let offset = Math.round(diff); return raw - (offset * 2 * Math.PI); }
+        function calculateIK(x, y, lastBaseSteps, lastElbowSteps, L1, L2, gearRatio, stepsPerRad) {
+            let dist = Math.hypot(x, y); if (dist < 2.0) return { base_steps: lastBaseSteps, elbow_steps: -(Math.PI + gearRatio * (-lastBaseSteps / stepsPerRad)) * stepsPerRad };
+            const maxReach = L1 + L2; if (dist > maxReach) { x = (x / dist) * maxReach; y = (y / dist) * maxReach; dist = maxReach; }
+            const lastT1 = -lastBaseSteps / stepsPerRad; let cosBend = (dist*dist - L1*L1 - L2*L2) / (2 * L1 * L2); cosBend = Math.max(-1, Math.min(1, cosBend)); const bend1 = Math.acos(cosBend); const bend2 = -Math.acos(cosBend);
+            const k1_1 = L1 + L2 * Math.cos(bend1); const k2_1 = L2 * Math.sin(bend1); let t1_1 = Math.atan2(y, x) - Math.atan2(k2_1, k1_1); t1_1 = getShortestRotation(t1_1, lastT1);
+            const k1_2 = L1 + L2 * Math.cos(bend2); const k2_2 = L2 * Math.sin(bend2); let t1_2 = Math.atan2(y, x) - Math.atan2(k2_2, k1_2); t1_2 = getShortestRotation(t1_2, lastT1);
+            const b1_steps = -t1_1 * stepsPerRad; const e1_steps = -(bend1 + gearRatio * t1_1) * stepsPerRad; const b2_steps = -t1_2 * stepsPerRad; const e2_steps = -(bend2 + gearRatio * t1_2) * stepsPerRad;
+            return (Math.abs(b1_steps - lastBaseSteps) + Math.abs(e1_steps - lastElbowSteps) <= Math.abs(b2_steps - lastBaseSteps) + Math.abs(e2_steps - lastElbowSteps)) ? { base_steps: b1_steps, elbow_steps: e1_steps } : { base_steps: b2_steps, elbow_steps: e2_steps };
+        }
+        
+        function prepareGCode() {
+            if(rawPoints.length === 0) return showToast("Draw something first!", "error");
+            const tableR = parseFloat(document.getElementById('cfgRadius').value); const sym = parseInt(document.getElementById('symSlider').value);
+            let shapes = []; let curShape = []; rawPoints.forEach(p => { if(p.type === 'break' || p.type === 'cmd') { if(curShape.length > 0) shapes.push(curShape); curShape = []; } else curShape.push(p); });
+            if(curShape.length > 0) shapes.push(curShape);
+            let pool = []; for(let s=0; s<sym; s++) { const ang = s * (Math.PI*2/sym); const c = Math.cos(ang), si = Math.sin(ang); shapes.forEach(sh => { pool.push(sh.map(p => ({ x: p.x*c - p.y*si, y: p.x*si + p.y*c, type: 'point' }))); }); }
+            let bestShapeIdx = 0, maxDist = -1; for (let i=0; i<pool.length; i++) { for (let j=0; j<pool[i].length; j++) { let d = Math.hypot(pool[i][j].x, pool[i][j].y); if (d > maxDist) { maxDist = d; bestShapeIdx = i; } } }
+            let startShape = pool[bestShapeIdx]; pool.splice(bestShapeIdx, 1);
+            if(Math.hypot(startShape[0].x - startShape[startShape.length-1].x, startShape[0].y - startShape[startShape.length-1].y) < 5.0) startShape.push(startShape[0]);
+            else if(Math.hypot(startShape[0].x, startShape[0].y) > Math.hypot(startShape[startShape.length-1].x, startShape[startShape.length-1].y)) startShape.reverse();
+            let sortedShapes = [startShape]; let curPos = startShape[startShape.length-1];
+            while(pool.length > 0) {
+                let bestIdx = -1, bestDist = Infinity, bestRev = false;
+                for(let i=0; i<pool.length; i++) {
+                    let dS = Math.hypot(curPos.x - pool[i][0].x, curPos.y - pool[i][0].y); if(dS < bestDist) { bestDist=dS; bestIdx=i; bestRev=false; }
+                    let dE = Math.hypot(curPos.x - pool[i][pool[i].length-1].x, curPos.y - pool[i][pool[i].length-1].y); if(dE < bestDist) { bestDist=dE; bestIdx=i; bestRev=true; }
+                }
+                let winner = pool[bestIdx]; if(bestRev) winner.reverse(); sortedShapes.push(winner); curPos = winner[winner.length-1]; pool.splice(bestIdx, 1);
+            }
+            processedPoints = []; if(sortedShapes.length > 0) { let fPt = sortedShapes[0][0]; let fA = Math.atan2(fPt.y, fPt.x); processedPoints.push({x: tableR*Math.cos(fA), y: tableR*Math.sin(fA), type:'point'}); }
+            for(let i=0; i<sortedShapes.length; i++) {
+                if(i > 0) { let safePath = routeConnect(sortedShapes[i-1][sortedShapes[i-1].length-1], sortedShapes[i][0], sortedShapes); safePath.forEach(p => processedPoints.push({x:p.x, y:p.y, type:'point'})); }
+                sortedShapes[i].forEach(p => processedPoints.push(p));
+            }
+            if(processedPoints.length > 0) { let lastPt = processedPoints[processedPoints.length-1]; processedPoints.push({type: 'cmd', val: 'M0'}); let eA = Math.atan2(lastPt.y, lastPt.x); processedPoints.push({ x: tableR * Math.cos(eA), y: tableR * Math.sin(eA), type: 'point' }); }
+            generatedGCode = generateGCodeStringFromProcessed();
+            document.getElementById('statusTxt').innerText = `Path Ready! ${sortedShapes.length} shapes.`;
+            document.getElementById('designPhaseControls').style.display = 'none'; document.getElementById('productionPhaseControls').style.display = 'block'; render();
+        }
+
+        function returnToEditing() { processedPoints = []; document.getElementById('designPhaseControls').style.display = 'block'; document.getElementById('productionPhaseControls').style.display = 'none'; resetStatus(); }
+
+        function generateGCodeStringFromProcessed() {
+            const L1 = parseFloat(document.getElementById('cfgL1').value), L2 = parseFloat(document.getElementById('cfgL2').value), gearRatio = 1.125, tableRadius = parseFloat(document.getElementById('cfgRadius').value), stepsPerDeg = parseFloat(document.getElementById('cfgStepsPerDeg').value), stepsPerRad = stepsPerDeg * (180 / Math.PI), centerDelay = parseFloat(document.getElementById('cfgCenterDelay').value), perimDelay = parseFloat(document.getElementById('cfgPerimDelay').value);
+            let cmds = [], prevBase = 0, prevElbow = 0;
+            let startIK = calculateIK(-processedPoints[0].x, processedPoints[0].y, 0, 0, L1, L2, gearRatio, stepsPerRad);
+            prevBase = startIK.base_steps; prevElbow = startIK.elbow_steps;
+            for(let i=0; i<processedPoints.length-1; i++) {
+                let p1 = processedPoints[i], p2 = processedPoints[i+1]; if(p1.type === 'cmd' || p2.type === 'cmd') { if(p1.val === 'M0') cmds.push("M0"); continue; }
+                let steps = Math.max(1, Math.ceil(Math.hypot(p2.x-p1.x, p2.y-p1.y) / 1.0));
+                for(let j=1; j<=steps; j++) {
+                    let x = p1.x + (p2.x - p1.x)*(j/steps), y = p1.y + (p2.y - p1.y)*(j/steps);
+                    let ik = calculateIK(-x, y, prevBase, prevElbow, L1, L2, gearRatio, stepsPerRad);
+                    let dB = Math.round(ik.base_steps - prevBase), dE = Math.round(ik.elbow_steps - prevElbow);
+                    if(dB !== 0 || dE !== 0) {
+                        let delay = Math.round(centerDelay + ((perimDelay - centerDelay) * (Math.hypot(x, y) / tableRadius)));
+                        cmds.push(`G1 ${dE} ${dB} ${delay}`); prevBase += dB; prevElbow += dE;
+                    }
+                }
+            }
+            return cmds.join('\n');
+        }
+
+        function copyGCode() { if(generatedGCode) navigator.clipboard.writeText(generatedGCode).then(() => showToast("Copied!", "success")); }
         init();
     </script>
 </body>
