@@ -9,7 +9,7 @@
         /* --- Modern Variables --- */
         :root {
             --color-accent: #d2b48c; 
-            --color-selected: #4ade80; /* Vibrant Light Green */
+            --color-selected: #4ade80; 
             --color-selected-ring: #22c55e;
             --color-bg: #f8f9fa;
             --color-surface: #ffffff;
@@ -45,13 +45,43 @@
         }
         body[data-theme='dark'] header { background: rgba(30, 30, 30, 0.95); border-bottom: 1px solid rgba(255,255,255,0.05); }
 
-        .header-center { text-align: center; overflow: hidden; }
-        .playing-text { font-weight: 700; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
-        .queue-text { font-size: 0.8rem; opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+        .header-center { text-align: center; overflow: visible; display: flex; flex-direction: column; align-items: center; position: relative; }
+        .playing-text { font-weight: 700; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
         
+        /* Queue Dropdown Styles */
+        .queue-wrapper { position: relative; font-size: 0.8rem; opacity: 0.9; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+        .queue-wrapper:hover { opacity: 1; text-decoration: underline; }
+        .queue-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+        
+        .queue-dropdown {
+            display: none; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+            margin-top: 10px; background: var(--color-surface); 
+            border: 1px solid rgba(0,0,0,0.1); border-radius: 8px; 
+            min-width: 260px; max-width: 90vw;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15); 
+            z-index: 1000; overflow: hidden;
+            text-align: left;
+        }
+        .queue-dropdown.show { display: block; }
+        .queue-list { max-height: 300px; overflow-y: auto; }
+        .queue-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 12px; border-bottom: 1px solid rgba(0,0,0,0.05);
+            font-size: 0.85rem; color: var(--color-text);
+        }
+        .queue-item:last-child { border-bottom: none; }
+        .queue-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 10px; }
+        .btn-remove {
+            background: none; border: none; color: #ef4444; 
+            font-weight: bold; cursor: pointer; padding: 4px 8px;
+            border-radius: 4px; transition: background 0.2s;
+        }
+        .btn-remove:hover { background: rgba(239, 68, 68, 0.1); }
+        .queue-empty-msg { padding: 15px; text-align: center; color: #888; font-style: italic; }
+
         .icon-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--color-text); }
 
-        /* --- Loop Indicator Bar --- */
+        /* --- Loop Indicator --- */
         #loop-indicator {
             background-color: var(--color-selected);
             color: #004d00;
@@ -79,14 +109,12 @@
         /* --- Sent Popup --- */
         #sent-popup {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9);
-            background: rgba(74, 222, 128, 0.85); /* Transparent Green */
-            backdrop-filter: blur(4px);
-            color: #004d00;
+            background: rgba(74, 222, 128, 0.85);
+            backdrop-filter: blur(4px); color: #004d00;
             padding: 25px 50px; border-radius: 25px;
-            font-size: 2rem; font-weight: 800;
-            opacity: 0; pointer-events: none; z-index: 2000;
+            font-size: 2rem; font-weight: 800; opacity: 0; pointer-events: none; z-index: 2000;
             transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
         }
         #sent-popup.active { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 
@@ -100,19 +128,13 @@
             transition: transform 0.2s; cursor: pointer;
             border: 2px solid transparent;
         }
-        
-        /* Selected State */
         .card.selected { border-color: var(--color-selected-ring); background-color: rgba(74, 222, 128, 0.05); transform: scale(0.98); }
 
         .card-img-wrap { position: relative; aspect-ratio: 1/1; background: #fff; width: 100%; }
         
-        /* Mirror Canvas: Updated to handle 180 degree rotation for PNGs and Traces */
-        .card canvas { 
-            width: 100%; height: 100%; display: block; 
-            transform: scale(-1, -1);
-        }
+        /* canvas style - NO FLIP here to allow PNGs to show correctly */
+        .card canvas { width: 100%; height: 100%; display: block; }
         
-        /* Select Dot */
         .select-dot {
             position: absolute; top: 10px; right: 10px;
             width: 24px; height: 24px; border-radius: 50%;
@@ -160,7 +182,16 @@
         <button class="icon-btn" onclick="openNav()">☰</button>
         <div class="header-center">
             <div id="playing-display" class="playing-text">Select a design</div>
-            <div id="queue-display" class="queue-text">Queue empty</div>
+            
+            <div class="queue-wrapper" onclick="toggleQueue(event)">
+                <span id="queue-display" class="queue-text">Queue empty</span>
+                <span>▼</span>
+            </div>
+            <div id="queue-dropdown" class="queue-dropdown">
+                <div id="queue-list" class="queue-list">
+                    </div>
+            </div>
+
         </div>
         <button class="icon-btn" onclick="toggleTheme()">◑</button>
     </header>
@@ -212,52 +243,134 @@
         let selectedFiles = new Set();
         let allFiles = [];
 
-        // --- MATH & LAZY LOADING ---
-        const observer = new IntersectionObserver((e,o)=>{e.forEach(x=>{if(x.isIntersecting){loadPreview(x.target,x.target.dataset.f);o.unobserve(x.target)}})},{rootMargin:"100px"});
+        // --- MATH & OPTIMIZED DRAWING ---
+        const observer = new IntersectionObserver((e,o)=>{e.forEach(x=>{if(x.isIntersecting){loadPreview(x.target,x.target.dataset.f);o.unobserve(x.target)}})},{rootMargin:"150px"});
+        
+        // SCARA Constants
         const L1=101.3, L2=101.3, R=9/8, S_RAD=(3200/360)*(180/Math.PI);
-        const lerp=(a,b,t)=>a+(b-a)*t;
+        const L1_sq = L1*L1, L2_sq = L2*L2; // Pre-calc
+        const TWO_PI = Math.PI * 2;
 
-        function calcFK(b,e){
-            let t1 = -b/S_RAD, tb = -e/S_RAD - (R*(-b/S_RAD)), t2=t1+tb;
-            return {p2:{x:L1*Math.cos(t1)+L2*Math.cos(t2), y:L1*Math.sin(t1)+L2*Math.sin(t2)}, t1:t1, t2:t2, tb:b, te:e};
-        }
-        function interp(f,t,p){
-            let t1=lerp(f.t1,t.t1,p), t2=lerp(f.t2,t.t2,p);
-            return {x:L1*Math.cos(t1)+L2*Math.cos(t2), y:L1*Math.sin(t1)+L2*Math.sin(t2)};
+        function getXY(b, e) {
+            let t1 = -b / S_RAD;
+            let tb = -e / S_RAD - (R * t1); 
+            let t2 = t1 + tb;
+            return {
+                x: L1 * Math.cos(t1) + L2 * Math.cos(t2),
+                y: L1 * Math.sin(t1) + L2 * Math.sin(t2)
+            };
         }
 
+        // OPTIMIZED DRAW TRACE: 
+        // 1. Reduced resolution (larger step) for speed
+        // 2. 180 Rotation Math applied directly
         function drawTrace(cvs, txt) {
             let ctx = cvs.getContext('2d'), w=cvs.width, h=cvs.height;
             ctx.clearRect(0,0,w,h);
-            let cmds = txt.split('\n').filter(l=>l.trim().toUpperCase().startsWith('G1'))
-                .map(l=>{let p=l.substring(2).trim().split(/\s+/); return {e:parseInt(p[0])||0, b:parseInt(p[1])||0}});
-            if(!cmds.length) return;
             
-            let path=[], cur=calcFK(0,0), tb=0, te=0;
-            path.push(cur.p2);
-            for(let c of cmds){
-                tb+=c.b; te+=c.e;
-                let next=calcFK(tb,te);
-                let dist=Math.max(Math.abs(next.tb-cur.tb), Math.abs(next.te-cur.te));
-                let step=Math.max(2, Math.ceil(dist/600)); 
-                for(let i=1; i<=step; i++) path.push(interp(cur,next,i/step));
-                cur=next;
+            // Fast parsing without creating massive array of strings
+            const lines = txt.split('\n');
+            let path = [];
+            let tb=0, te=0;
+            
+            // Start at 0,0
+            let start = getXY(0,0);
+            path.push(start);
+
+            // Optimization: Process G-Code
+            for(let i=0; i<lines.length; i++){
+                let l = lines[i].trim();
+                if(l.length < 3 || l[0] !== 'G' || l[1] !== '1') continue;
+
+                let parts = l.substring(3).trim().split(/\s+/);
+                let db = parseInt(parts[1])||0; // G1 X(e) Y(b) -> Note: typically swapped in sand tables
+                let de = parseInt(parts[0])||0;
+                
+                let next_b = tb + db;
+                let next_e = te + de;
+
+                let startPt = getXY(tb, te);
+                let endPt = getXY(next_b, next_e);
+
+                // Optimization: Dynamic Resolution based on distance
+                // We don't need 600 steps for a thumbnail. 1500 is faster.
+                let dist = Math.max(Math.abs(db), Math.abs(de));
+                let step = Math.max(2, Math.ceil(dist / 1500)); 
+
+                for(let k=1; k<=step; k++){
+                    let t = k/step;
+                    // Linear interpolation of motors (SCARA logic)
+                    let interp_b = tb + (next_b - tb) * t;
+                    let interp_e = te + (next_e - te) * t;
+                    path.push(getXY(interp_b, interp_e));
+                }
+
+                tb = next_b; te = next_e;
             }
 
-            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
-            for(let p of path){ if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y; }
-            let sc = (w/Math.max(maxX-minX||1, maxY-minY||1))*0.9;
-            let cx=(minX+maxX)/2, cy=(minY+maxY)/2;
+            if(path.length < 2) return;
 
-            ctx.beginPath(); ctx.strokeStyle='#333'; ctx.lineWidth=1.5;
-            path.forEach((p,i)=>{
-                // Updated y coordinate calculation to align with 180 degree CSS rotation
-                let x = w/2 + (p.x-cx)*sc, y = h/2 + (p.y-cy)*sc;
-                if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-            });
+            // Auto-Scale
+            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+            for(let p of path){ 
+                if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; 
+                if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y; 
+            }
+            
+            let rangeX = maxX - minX || 1;
+            let rangeY = maxY - minY || 1;
+            let sc = (Math.min(w, h) / Math.max(rangeX, rangeY)) * 0.9;
+            let cx = (minX + maxX) / 2;
+            let cy = (minY + maxY) / 2;
+
+            ctx.beginPath(); 
+            ctx.strokeStyle='#333'; 
+            ctx.lineWidth=1.5;
+            
+            // DRAW LOOP WITH 180 ROTATION LOGIC
+            // Standard: x = w/2 + (p.x-cx)*sc
+            // 180 Deg:  x = w - (standard_x)
+            
+            let p0 = path[0];
+            let sx = w - (w/2 + (p0.x-cx)*sc);
+            let sy = h - (h/2 + (p0.y-cy)*-sc);
+            ctx.moveTo(sx, sy);
+
+            for(let i=1; i<path.length; i++){
+                let p = path[i];
+                let px = w - (w/2 + (p.x-cx)*sc);
+                let py = h - (h/2 + (p.y-cy)*-sc);
+                ctx.lineTo(px, py);
+            }
             ctx.stroke();
         }
 
+        // --- QUEUE LOGIC ---
+        function toggleQueue(e) {
+            e.stopPropagation();
+            document.getElementById('queue-dropdown').classList.toggle('show');
+        }
+
+        async function removeFromQueue(idx, type) {
+            if(!confirm("Remove from queue?")) return;
+            try {
+                await fetch(`${BASE_URL}/remove_from_queue`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({index: idx, type: type})
+                });
+                updateQ(); // Refresh UI
+            } catch(e) { showStatus("Error removing item"); }
+        }
+
+        // Close dropdown if clicked outside
+        window.onclick = function(e) {
+            if(!e.target.closest('.queue-wrapper') && !e.target.closest('.queue-dropdown')) {
+                document.getElementById('queue-dropdown').classList.remove('show');
+            }
+        }
+
+        // --- STANDARD APP LOGIC ---
         function toggleTheme() {
             let b = document.body, n = b.getAttribute('data-theme')==='dark'?'light':'dark';
             b.setAttribute('data-theme', n);
@@ -269,7 +382,6 @@
             setTimeout(()=>el.style.opacity='0', 3000);
         }
 
-        // --- POPUP FUNCTION ---
         function showSentPopup() {
             let p = document.getElementById('sent-popup');
             p.classList.add('active');
@@ -290,14 +402,10 @@
             else bar.classList.remove('active');
         }
 
-        // --- SHUFFLE & LOOP FUNCTION ---
         async function shuffleLoop() {
             if(allFiles.length === 0) { showStatus("No designs found"); return; }
             showStatus("Shuffling Library...");
-            
-            // Random Shuffle
             let shuffled = [...allFiles].sort(() => 0.5 - Math.random());
-            
             await fetch(`${BASE_URL}/set_loop`, {
                 method:"POST", headers:{"Content-Type":"application/json"},
                 body:JSON.stringify({files:shuffled})
@@ -342,33 +450,17 @@
                     txt += `; --- ${f} ---\n${await r.text()}\n\n`;
                 }
             } catch(e) { showStatus("Error fetching files"); return; }
-
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                try {
-                    await navigator.clipboard.writeText(txt);
-                    showStatus("Copied!");
-                    selectedFiles.clear(); renderSel();
-                    return;
-                } catch (err) { console.log("Clipboard API failed, trying fallback..."); }
-            }
-
+            
             const ta = document.createElement("textarea");
-            ta.value = txt;
-            ta.style.position = "fixed"; ta.style.left = "-9999px";
-            document.body.appendChild(ta);
-            ta.focus(); ta.select();
-            try {
-                document.execCommand('copy');
-                showStatus("Copied!");
-                selectedFiles.clear(); renderSel();
-            } catch (err) { showStatus("Copy Failed"); }
+            ta.value = txt; ta.style.position = "fixed"; ta.style.left = "-9999px";
+            document.body.appendChild(ta); ta.focus(); ta.select();
+            try { document.execCommand('copy'); showStatus("Copied!"); selectedFiles.clear(); renderSel(); } 
+            catch (err) { showStatus("Copy Failed"); }
             document.body.removeChild(ta);
         }
 
         async function runDesign(f) {
-            // TRIGGER POPUP
             showSentPopup();
-
             let spd = document.getElementById('speedSelect').value;
             let r=await fetch(`${BASE_URL}/designs/${f}`), txt=await r.text();
             let gcode = txt.split('\n').map(l=>{
@@ -386,6 +478,7 @@
         function resumeDesign() { sendCmd('RESUME'); }
         function clearQueue() { sendCmd('CLEAR'); updateQ(); }
 
+        // --- UPDATED QUEUE POLLER ---
         async function updateQ() {
             try {
                 let r = await fetch(`${BASE_URL}/status_full`);
@@ -394,17 +487,35 @@
                 let playText = "Select a design";
                 if (d.playing) {
                     playText = d.is_paused ? `Paused: ${d.playing}` : `Playing: ${d.playing}`;
-                } 
-                else if (d.is_waiting) {
-                    playText = `Cooling down (Next: ${d.next_up})`;
+                } else if (d.is_waiting) {
+                    playText = `Cooling down...`;
                 }
                 document.getElementById('playing-display').textContent = playText;
                 
+                // Update Queue Text & List
                 let qText = "Queue empty";
-                if(d.queue_count > 0) qText = `Next: ${d.next_up} (+${d.queue_count-1})`;
-                else if(d.is_looping) qText = `Next: ${d.next_up}`;
-                
+                let listHTML = "";
+
+                if(d.queue_items && d.queue_items.length > 0) {
+                    // Update header text
+                    let count = d.queue_count || d.queue_items.length;
+                    qText = `Next: ${d.next_up} (+${count-1})`;
+                    
+                    // Populate List
+                    d.queue_items.forEach(item => {
+                        listHTML += `
+                            <div class="queue-item">
+                                <span>${item.index+1}. ${item.name}</span>
+                                <button class="btn-remove" onclick="removeFromQueue(${item.index}, '${item.type}')">✕</button>
+                            </div>
+                        `;
+                    });
+                } else {
+                    listHTML = `<div class="queue-empty-msg">No items in queue</div>`;
+                }
+
                 document.getElementById('queue-display').textContent = qText;
+                document.getElementById('queue-list').innerHTML = listHTML;
                 document.getElementById('loop-indicator').style.display = d.is_looping ? 'flex' : 'none';
             } catch(e){}
         }
@@ -421,8 +532,7 @@
             let g=document.getElementById('grid'); g.innerHTML='';
             fs.forEach(f=>{
                 let d=document.createElement('div'), clean=f.replace('.txt','');
-                d.className='card'; d.dataset.name=f; d.dataset.hasPng="false";
-                d.dataset.baseTime="0"; 
+                d.className='card'; d.dataset.name=f; d.dataset.hasPng="false"; d.dataset.baseTime="0"; 
                 d.onclick=(e)=>{if(e.target.className!=='select-dot')runDesign(f)};
                 d.innerHTML=`<div class="card-img-wrap"><canvas data-f="${f}" width="300" height="300"></canvas><div class="select-dot" onclick="toggleSelect('${f}', event)"></div></div><div class="card-body"><h3 class="card-title">${clean}</h3><div class="card-meta">Est: <span id="t-${clean}">...</span></div></div>`;
                 g.appendChild(d); observer.observe(d.querySelector('canvas'));
@@ -441,10 +551,8 @@
             document.querySelectorAll('.card').forEach(card => {
                 let base = parseFloat(card.dataset.baseTime);
                 if(base > 0) {
-                    let finalTime = base * speed;
-                    let clean = card.dataset.name.replace('.txt','');
-                    let span = document.getElementById(`t-${clean}`);
-                    if(span) span.textContent = formatTimeFromMicroseconds(finalTime);
+                    let span = document.getElementById(`t-${card.dataset.name.replace('.txt','')}`);
+                    if(span) span.textContent = formatTimeFromMicroseconds(base * speed);
                 }
             });
         }
@@ -454,24 +562,31 @@
             let card = cvs.closest('.card');
             
             fetch(`${BASE_URL}/designs/${f}`).then(r => r.text()).then(t => {
+                // Calc time (simple loop)
                 let tm = 0;
-                t.split('\n').forEach(l => {
-                    let line = l.trim();
-                    if(line.toUpperCase().startsWith('G1')){
-                        let p = line.substring(2).trim().split(/\s+/);
-                        let steps = Math.max(Math.abs(parseInt(p[0])||0), Math.abs(parseInt(p[1])||0));
-                        let delay = parseInt(p[2]) || 1000;
-                        tm += steps * delay;
-                    }
-                });
+                // Faster iteration for time calc
+                let reg = /^G1\s+(\-?\d+)\s+(\-?\d+)\s+(\d+)/i;
+                let lines = t.split('\n');
+                for(let l of lines) {
+                    let m = l.trim().match(reg);
+                    if(m) tm += Math.max(Math.abs(parseInt(m[1])), Math.abs(parseInt(m[2]))) * parseInt(m[3]);
+                }
+
                 card.dataset.baseTime = tm;
                 let currentSpeed = parseFloat(document.getElementById('speedSelect').value) || 1.0;
                 document.getElementById(`t-${clean}`).textContent = formatTimeFromMicroseconds(tm * currentSpeed);
 
                 let img = new Image();
                 img.src = `${BASE_URL}/designs/${clean}.png`;
-                img.onload = () => { cvs.getContext('2d').drawImage(img,0,0,300,300); card.dataset.hasPng="true"; };
-                img.onerror = () => { drawTrace(cvs, t); };
+                img.onload = () => { 
+                    // PNGs draw NORMALLY (Standard Orientation)
+                    cvs.getContext('2d').drawImage(img,0,0,300,300); 
+                    card.dataset.hasPng="true"; 
+                };
+                img.onerror = () => { 
+                    // G-Code Traces get Rotated 180 (via drawTrace)
+                    drawTrace(cvs, t); 
+                };
             });
         }
 
