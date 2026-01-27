@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings & Schedule</title>
+    <style>
+        /* --- Shared Theme (Matches designs.html) --- */
+        :root {
+            --color-accent: #d2b48c; 
+            --color-selected: #4ade80;
+            --color-bg: #f8f9fa;
+            --color-surface: #ffffff;
+            --color-text: #222222;
+            --radius: 16px;
+            --shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+        }
+        body[data-theme='dark'] {
+            --color-bg: #121212;
+            --color-surface: #1e1e1e;
+            --color-text: #e0e0e0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--color-bg); color: var(--color-text);
+            margin: 0; padding-bottom: 50px;
+        }
+        
+        /* Header */
+        header {
+            position: sticky; top: 0; z-index: 100;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            padding: 0 15px; height: 60px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        body[data-theme='dark'] header { background: rgba(30, 30, 30, 0.95); border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .icon-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--color-text); }
+        .page-title { font-weight: 700; font-size: 1.1rem; }
+
+        /* Container */
+        .container { max-width: 800px; margin: 20px auto; padding: 0 15px; }
+        
+        /* Cards */
+        .card {
+            background: var(--color-surface); border-radius: var(--radius);
+            padding: 20px; margin-bottom: 20px;
+            box-shadow: var(--shadow);
+        }
+        h2 { margin-top: 0; font-size: 1.2rem; margin-bottom: 15px; border-bottom: 2px solid var(--color-accent); display: inline-block; padding-bottom: 5px; }
+
+        /* Forms */
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-size: 0.9rem; font-weight: 600; margin-bottom: 5px; opacity: 0.8; }
+        select, input[type="time"], input[type="text"], input[type="color"] {
+            width: 100%; padding: 10px; border-radius: 8px;
+            border: 1px solid rgba(0,0,0,0.1);
+            background: var(--color-bg); color: var(--color-text);
+            font-size: 1rem; box-sizing: border-box;
+        }
+        
+        /* Days Selector */
+        .days-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-top: 5px; }
+        .day-check { display: none; }
+        .day-label {
+            background: var(--color-bg); padding: 10px 0; border-radius: 8px;
+            text-align: center; font-size: 0.8rem; font-weight: bold; cursor: pointer;
+            border: 1px solid transparent; transition: 0.2s;
+        }
+        .day-check:checked + .day-label {
+            background: var(--color-accent); color: white;
+        }
+
+        /* Buttons */
+        .btn {
+            background: var(--color-accent); color: white; border: none;
+            padding: 12px 20px; border-radius: 12px; font-weight: 600;
+            cursor: pointer; width: 100%; margin-top: 10px;
+        }
+        .btn-delete { background: #ff4d4d; width: auto; padding: 6px 12px; font-size: 0.8rem; }
+
+        /* Schedule List */
+        .schedule-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 15px; border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+        .schedule-info { display: flex; flex-direction: column; gap: 4px; }
+        .sch-time { font-weight: 800; font-size: 1.1rem; }
+        .sch-days { font-size: 0.8rem; opacity: 0.7; }
+        .sch-action { font-size: 0.9rem; color: var(--color-accent); font-weight: 600; }
+
+        /* Sidebar & Overlay (Copied from designs.html) */
+        .sidebar { height: 100%; width: 0; position: fixed; top: 0; left: 0; background: var(--color-surface); overflow-x: hidden; z-index: 1100; transition: 0.3s; padding-top: 20px; border-right: 1px solid rgba(0,0,0,0.1); }
+        .sidebar a { padding: 15px 25px; text-decoration: none; font-size: 1.1rem; color: var(--color-text); display: block; font-weight: 600; }
+        .overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); z-index: 1050; display: none; }
+    </style>
+</head>
+<body data-theme="light">
+
+    <header>
+        <button class="icon-btn" onclick="openNav()">☰</button>
+        <div class="page-title">Scheduler</div>
+        <button class="icon-btn" onclick="toggleTheme()">◑</button>
+    </header>
+
+    <div id="overlay" class="overlay" onclick="closeNav()"></div>
+    <div id="mySidebar" class="sidebar">
+        <div style="padding:0 25px; margin-bottom:20px; opacity:0.5;">MENU</div>
+        <a href="/">Designs</a>
+        <a href="/AI_builder">AI Builder</a>
+        <a href="/settings">Settings & Schedule</a>
+        <a href="/led_controls">LED Controls</a>
+        <a href="/terminal">Terminal</a>
+    </div>
+
+    <div class="container">
+        
+        <div class="card">
+            <h2>New Automation</h2>
+            
+            <div class="form-group">
+                <label>Time</label>
+                <input type="time" id="sch-time" value="10:00">
+            </div>
+
+            <div class="form-group">
+                <label>Repeat On</label>
+                <div class="days-grid">
+                    <input type="checkbox" id="d-mon" class="day-check" value="Mon"><label for="d-mon" class="day-label">Mon</label>
+                    <input type="checkbox" id="d-tue" class="day-check" value="Tue"><label for="d-tue" class="day-label">Tue</label>
+                    <input type="checkbox" id="d-wed" class="day-check" value="Wed"><label for="d-wed" class="day-label">Wed</label>
+                    <input type="checkbox" id="d-thu" class="day-check" value="Thu"><label for="d-thu" class="day-label">Thu</label>
+                    <input type="checkbox" id="d-fri" class="day-check" value="Fri"><label for="d-fri" class="day-label">Fri</label>
+                    <input type="checkbox" id="d-sat" class="day-check" value="Sat"><label for="d-sat" class="day-label">Sat</label>
+                    <input type="checkbox" id="d-sun" class="day-check" value="Sun"><label for="d-sun" class="day-label">Sun</label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Action Type</label>
+                <select id="sch-type" onchange="updateFields()">
+                    <option value="led_off">Turn LEDs OFF</option>
+                    <option value="led_color">Set LED Color</option>
+                    <option value="sand_shuffle">Sand: Shuffle Play</option>
+                    <option value="sand_specific">Sand: Play Specific Design</option>
+                    <option value="stop_sand">Stop Sand Table</option>
+                </select>
+            </div>
+
+            <div id="field-color" class="form-group" style="display:none;">
+                <label>Select Color</label>
+                <input type="color" id="sch-color" value="#ff0000">
+            </div>
+
+            <div id="field-file" class="form-group" style="display:none;">
+                <label>Select Design</label>
+                <select id="sch-file"></select>
+            </div>
+
+            <button class="btn" onclick="saveSchedule()">Save Trigger</button>
+        </div>
+
+        <div class="card">
+            <h2>Active Schedules</h2>
+            <div id="schedule-list">
+                </div>
+        </div>
+
+    </div>
+
+    <script>
+        const BASE_URL = `${window.location.protocol}//${window.location.host}`;
+
+        // Load Designs for Dropdown
+        async function loadDesigns() {
+            let r = await fetch('/api/designs');
+            let files = await r.json();
+            let sel = document.getElementById('sch-file');
+            files.forEach(f => {
+                let opt = document.createElement('option');
+                opt.value = f;
+                opt.textContent = f.replace('.txt','');
+                sel.appendChild(opt);
+            });
+        }
+
+        // Toggle Dynamic Fields
+        function updateFields() {
+            let type = document.getElementById('sch-type').value;
+            document.getElementById('field-color').style.display = (type === 'led_color') ? 'block' : 'none';
+            document.getElementById('field-file').style.display = (type === 'sand_specific') ? 'block' : 'none';
+        }
+
+        // Save Schedule
+        async function saveSchedule() {
+            let days = Array.from(document.querySelectorAll('.day-check:checked')).map(cb => cb.value);
+            if(days.length === 0) { alert("Please select at least one day."); return; }
+
+            let data = {
+                time: document.getElementById('sch-time').value,
+                days: days,
+                type: document.getElementById('sch-type').value,
+                value: null
+            };
+
+            if(data.type === 'led_color') data.value = document.getElementById('sch-color').value;
+            if(data.type === 'sand_specific') data.value = document.getElementById('sch-file').value;
+
+            await fetch('/api/schedule', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify(data)
+            });
+            loadSchedules();
+        }
+
+        // Load Schedules
+        async function loadSchedules() {
+            let r = await fetch('/api/schedule');
+            let list = await r.json();
+            let cont = document.getElementById('schedule-list');
+            cont.innerHTML = '';
+
+            if(list.length === 0) { cont.innerHTML = '<div style="opacity:0.6; text-align:center;">No active schedules</div>'; return; }
+
+            list.forEach((item, index) => {
+                let niceType = item.type.replace('_', ' ').toUpperCase();
+                let valDisplay = item.value ? `(${item.value})` : '';
+                
+                let div = document.createElement('div');
+                div.className = 'schedule-item';
+                div.innerHTML = `
+                    <div class="schedule-info">
+                        <span class="sch-time">${item.time}</span>
+                        <span class="sch-days">${item.days.join(', ')}</span>
+                        <span class="sch-action">${niceType} ${valDisplay}</span>
+                    </div>
+                    <button class="btn btn-delete" onclick="deleteSchedule(${index})">Delete</button>
+                `;
+                cont.appendChild(div);
+            });
+        }
+
+        async function deleteSchedule(index) {
+            if(!confirm("Delete this trigger?")) return;
+            await fetch('/api/schedule', {
+                method: 'DELETE',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({index: index})
+            });
+            loadSchedules();
+        }
+
+        // --- Sidebar & Theme (Standard) ---
+        function openNav() { document.getElementById('mySidebar').style.width="250px"; document.getElementById('overlay').style.display="block"; }
+        function closeNav() { document.getElementById('mySidebar').style.width="0"; document.getElementById('overlay').style.display="none"; }
+        function toggleTheme() {
+            let b = document.body, n = b.getAttribute('data-theme')==='dark'?'light':'dark';
+            b.setAttribute('data-theme', n);
+        }
+
+        // Init
+        loadDesigns();
+        loadSchedules();
+    </script>
+</body>
+</html>
