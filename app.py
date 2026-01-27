@@ -14,8 +14,14 @@ app = Flask(__name__)
 app.secret_key = 'your_super_secret_key' 
 
 # === CONFIGURATION ===
-DESIGNS_FOLDER = os.path.join(app.root_path, 'templates', 'designs')
-SCHEDULE_FILE = os.path.join(app.root_path, 'schedules.json')
+# Ensure we use absolute paths for robustness
+BASE_DIR = app.root_path
+DESIGNS_FOLDER = os.path.join(BASE_DIR, 'templates', 'designs')
+SCHEDULE_FILE = os.path.join(BASE_DIR, 'schedules.json')
+
+# Path to your Arduino project for firmware updates
+# Adjust this if your folder structure is different
+ARDUINO_PROJECT_PATH = os.path.join(BASE_DIR, 'Sand') 
 
 if not os.path.exists(DESIGNS_FOLDER):
     try: os.makedirs(DESIGNS_FOLDER)
@@ -53,13 +59,20 @@ arduino = None
 arduino_connected = False
 current_gcode_runner = None
 
-try:
-    arduino = serial.Serial('/dev/ttyACM0', 115200, timeout=0.1) 
-    time.sleep(2) 
-    arduino_connected = True
-except Exception as e:
-    print(f"WARNING: Arduino not connected: {e}") 
-    log_message(f"Arduino Init Failed: {e}")
+def connect_arduino():
+    global arduino, arduino_connected
+    try:
+        arduino = serial.Serial('/dev/ttyACM0', 115200, timeout=0.1) 
+        time.sleep(2) 
+        arduino_connected = True
+        threading.Thread(target=read_from_serial, daemon=True).start()
+        log_message("Arduino Connected")
+    except Exception as e:
+        arduino_connected = False
+        print(f"WARNING: Arduino not connected: {e}") 
+        log_message(f"Arduino Init Failed: {e}")
+
+connect_arduino()
 
 # === SCHEDULER SYSTEM ===
 def load_schedules():
@@ -248,7 +261,7 @@ def start_job(job_data):
 
 # === SERIAL READER ===
 def read_from_serial():
-    while arduino_connected:
+    while arduino_connected and arduino and arduino.is_open:
         try:
             if arduino.in_waiting > 0:
                 line = arduino.readline().decode(errors="ignore").strip()
@@ -256,9 +269,9 @@ def read_from_serial():
                     if "ERROR" in line: log_message(f"Ard: {line}")
                     if current_gcode_runner: current_gcode_runner.process_incoming_serial(line)
             else: time.sleep(0.01) 
-        except: time.sleep(1)
-
-if arduino_connected: threading.Thread(target=read_from_serial, daemon=True).start()
+        except: 
+            time.sleep(1)
+            break 
 
 # === UTILITY ===
 def get_current_ip():
@@ -273,7 +286,6 @@ def get_current_ip():
 
 @app.route("/")
 def index():
-    # Redirect to designs, or wifi setup if in AP mode
     if get_current_ip() in ["10.42.0.1", "192.168.4.1"]: return redirect(url_for('wifi_setup_page'))
     return render_template("designs.html")
 
@@ -285,26 +297,97 @@ def settings_page():
 def script():
     return render_template("script.html")
 
-# --- SCHEDULE API ---
+# --- SYSTEM COMMANDS ---
+
+@app.route("/pull", methods=["POST"])
+def git_pull():
+    try:
+        # Use absolute path and capture stderr for debugging
+        result = subprocess.run(
+            ["git", "pull"], 
+            cwd=BASE_DIR, 
+            capture_output=True, 
+            text=True, 
+            timeout=30
+        )
+        
+        if result.returncode == 0:
+            msg = result.stdout[:500]
+            log_message(f"Git Pull: Success")
+            return jsonify(success=True, message=msg)
+        else:
+            msg = result.stderr
+            log_message(f"Git Pull Failed: {msg}")
+            return jsonify(success=False, message=f"Git Error: {msg}")
+
+    except Exception as e: 
+        log_message(f"Git Pull Error: {str(e)}")
+        return jsonify(success=False, message=str(e))
+
+@app.route("/update_firmware", methods=["POST"])
+def update_firmware():
+    global arduino, arduino_connected
+    
+    # 1. Disconnect Serial
+    if arduino and arduino.is_open:
+        arduino.close()
+        arduino_connected = False
+        
+    try:
+        # 2. Compile & Upload
+        # Adjust FQBN (arduino:avr:uno) and Port (/dev/ttyACM0) if needed
+        cmd_compile = ["arduino-cli", "compile", "--fqbn", "arduino:avr:uno", ARDUINO_PROJECT_PATH]
+        cmd_upload = ["arduino-cli", "upload", "-p", "/dev/ttyACM0", "--fqbn", "arduino:avr:uno", ARDUINO_PROJECT_PATH]
+        
+        log_message("Firmware: Compiling...")
+        subprocess.run(cmd_compile, check=True, capture_output=True)
+        
+        log_message("Firmware: Uploading...")
+        subprocess.run(cmd_upload, check=True, capture_output=True)
+        
+        # 3. Reconnect
+        log_message("Firmware: Success. Reconnecting...")
+        connect_arduino()
+        
+        return jsonify(success=True, message="Firmware Updated & Reconnected")
+        
+    except subprocess.CalledProcessError as e:
+        err = e.stderr.decode() if e.stderr else str(e)
+        log_message(f"FW Update Failed: {err}")
+        # Try to reconnect anyway
+        connect_arduino()
+        return jsonify(success=False, message=f"Update Failed: {err}")
+    except Exception as e:
+        connect_arduino()
+        return jsonify(success=False, message=str(e))
+
+@app.route("/shutdown", methods=["POST"])
+def shutdown():
+    try:
+        subprocess.Popen(["sudo", "shutdown", "now"])
+        return jsonify(success=True, message="System shutting down...")
+    except Exception as e:
+        return jsonify(success=False, message=str(e))
+
+@app.route("/reboot", methods=["POST"])
+def reboot():
+    try:
+        subprocess.Popen(["sudo", "reboot"])
+        return jsonify(success=True, message="System rebooting...")
+    except Exception as e:
+        return jsonify(success=False, message=str(e))
+
+# --- API ROUTES ---
+
 @app.route("/api/schedule", methods=["GET", "POST", "DELETE"])
 def api_schedule():
-    if request.method == "GET":
-        return jsonify(load_schedules())
-    
+    if request.method == "GET": return jsonify(load_schedules())
     if request.method == "POST":
-        data = request.json
-        schedules = load_schedules()
-        schedules.append(data)
-        save_schedules(schedules)
+        data = request.json; schedules = load_schedules(); schedules.append(data); save_schedules(schedules)
         return jsonify(success=True)
-
     if request.method == "DELETE":
-        idx = request.json.get('index')
-        schedules = load_schedules()
-        if 0 <= idx < len(schedules):
-            del schedules[idx]
-            save_schedules(schedules)
-            return jsonify(success=True)
+        idx = request.json.get('index'); schedules = load_schedules()
+        if 0 <= idx < len(schedules): del schedules[idx]; save_schedules(schedules); return jsonify(success=True)
         return jsonify(success=False)
 
 @app.route("/status_full", methods=["GET"])
@@ -335,8 +418,7 @@ def remove_from_queue():
     index = int(data.get("index"))
     q_type = data.get("type")
     try:
-        if q_type == "queue":
-            del job_queue[index]
+        if q_type == "queue": del job_queue[index]
         elif q_type == "loop":
             del loop_playlist[index]
             if not loop_playlist: cancel_loop()
@@ -446,17 +528,6 @@ def forget_wifi_route():
 
 @app.route("/check_password", methods=["POST"])
 def check_password_route(): return jsonify(success=(request.json.get("password") == "2025"))
-
-@app.route("/shutdown", methods=["POST"])
-def shutdown(): subprocess.Popen(["sudo", "shutdown", "now"]); return jsonify(success=True)
-
-@app.route("/reboot", methods=["POST"])
-def reboot(): subprocess.Popen(["sudo", "reboot"]); return jsonify(success=True)
-
-@app.route("/update_firmware", methods=["POST"])
-def update_firmware():
-    # Placeholder for firmware update logic
-    return jsonify(success=True)
 
 # --- PAGES ---
 @app.route("/terminal")
