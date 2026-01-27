@@ -646,7 +646,7 @@
             newPoints.push({type:'break'}); rawPoints = newPoints; render();
         }
 
-        // --- NEW TEXT TOOL LOGIC ---
+        // --- TEXT TOOL LOGIC ---
         function renderTextToTrace() {
             const text = document.getElementById('toolTextInput').value;
             const size = document.getElementById('toolTextSize').value;
@@ -705,17 +705,19 @@
 
         function runHighPrecisionTrace() {
             if(!traceImgData) return;
-            const thresh = 150; const densityInput = document.getElementById('traceDensityInput');
+            const thresh = 150; 
+            const densityInput = document.getElementById('traceDensityInput');
             const density = parseFloat(densityInput.value); 
             const ballSizeMm = parseFloat(document.getElementById('cfgBallSize').value);
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
             
-            // Calibrate offset: Ball Size relative to table coordinates
-            // Ball radius in mm translated to the 800x800 buffer pixel scale
-            const pixelOffset = (ballSizeMm / (tableR * 2)) * 800;
+            // Calibration: Translate ball size to buffer pixel scale
+            const pixelBallSize = (ballSizeMm / (tableR * 2)) * 800;
             
             const SIZE = 800; const CENTER = SIZE / 2;
-            let pixelGrid = new Uint8Array(SIZE*SIZE); for(let i=0; i<SIZE*SIZE; i++) { pixelGrid[i] = traceImgData.data[i*4] < thresh ? 1 : 0; }
+            let pixelGrid = new Uint8Array(SIZE*SIZE); 
+            for(let i=0; i<SIZE*SIZE; i++) { pixelGrid[i] = traceImgData.data[i*4] < thresh ? 1 : 0; }
+            
             let contours = []; const traced = new Uint8Array(SIZE*SIZE).fill(0);
             
             const traceBoundary = (sx, sy) => {
@@ -761,20 +763,32 @@
             }
 
             let finalPath = []; 
-            // The shapes should be drawn further away from spiral lines to avoid overlap
-            // Tolerance takes Ball Size into account
-            const distTolerance = Math.max(spacingPx * 1.5, pixelOffset);
+            // Shape path safety: Ball size dictates how far away shapes need to be drawn
+            const mergeThreshold = Math.max(spacingPx * 1.5, pixelBallSize);
 
             for(let i=0; i<spiral.length; i++) {
                 const sp = spiral[i]; finalPath.push(sp);
+                
                 contours.forEach(c => { 
                     if(!c.merged) { 
                         const d = Math.hypot(sp.x - c.trigger.x, sp.y - c.trigger.y); 
-                        if (d < distTolerance) { 
-                            // Add lead-in line to bridge the spiral to the shape
-                            finalPath.push(c.trigger);
-                            c.points.forEach(p => finalPath.push(p)); 
-                            finalPath.push(sp); // Return to spiral
+                        if (d < mergeThreshold) { 
+                            // BRIDGE LOGIC: INWARD CONNECTION
+                            // Calculate a point further "in" (toward the center) from the spiral circle 
+                            // to provide the lead-in line from the background pattern.
+                            const angleToShape = Math.atan2(c.trigger.y - sp.y, c.trigger.x - sp.x);
+                            const leadInDist = pixelBallSize * 0.5;
+                            const bridgePoint = {
+                                x: sp.x + Math.cos(angleToShape) * leadInDist,
+                                y: sp.y + Math.sin(angleToShape) * leadInDist
+                            };
+                            
+                            finalPath.push(bridgePoint); // Move inward from spiral
+                            finalPath.push(c.trigger);   // Reach shape
+                            c.points.forEach(p => finalPath.push(p)); // Trace shape
+                            finalPath.push(c.trigger);   // Return to start of shape
+                            finalPath.push(bridgePoint); // Lead back out
+                            finalPath.push(sp);          // Resume spiral
                             c.merged = true; 
                         } 
                     } 
