@@ -741,7 +741,6 @@
                     if(pixelGrid[idx] === 1 && pixelGrid[idx-1] === 0 && traced[idx] === 0) { 
                         const pth = traceBoundary(x, y); 
                         if(pth.length > 20) { 
-                            // Analyze contour to find "Top" (Furthest from Center)
                             let maxDist = 0; let bestIdx = 0; 
                             pth.forEach((p, i) => { const dist = Math.hypot(p.x - CENTER, p.y - CENTER); if(dist > maxDist) { maxDist = dist; bestIdx = i; } }); 
                             const reordered = [...pth.slice(bestIdx), ...pth.slice(0, bestIdx)]; reordered.push(reordered[0]); 
@@ -754,7 +753,6 @@
             let spiral = []; const maxR = SIZE/2 - 5; spiral.push({x: CENTER, y: CENTER});
             let angle = 0; let r = 0; const angleStep = 0.02; const spacingPx = density * 4.0; 
             
-            // SPIRAL GENERATION LOOP
             while(r < maxR) { 
                 r = (spacingPx / (2*Math.PI)) * angle; 
                 let x = CENTER + Math.cos(angle)*r; let y = CENTER + Math.sin(angle)*r; 
@@ -764,25 +762,17 @@
                 const sp = {x:x, y:y};
                 spiral.push(sp); 
 
-                // Check for Merges
-                // CRITICAL FIX: Ensure spiral is OUTSIDE the shape before merging
                 const spiralRadius = Math.hypot(sp.x - CENTER, sp.y - CENTER);
-                
                 contours.forEach(c => { 
                     if(!c.merged) { 
-                        // Condition 1: Spiral must be LARGER than shape radius + ball size (wait for it to pass)
-                        if (spiralRadius > (c.maxR + pixelBallSize)) {
-                            // Condition 2: Radial Alignment (Check angles)
+                        // Wait until the spiral is exactly 0.5 * Ball Size past the shape boundary
+                        if (spiralRadius > (c.maxR + (pixelBallSize * 0.5))) {
                             const contourAngle = Math.atan2(c.trigger.y - CENTER, c.trigger.x - CENTER);
-                            // Normalize spiral angle to -PI to PI
                             let normAngle = angle % (2*Math.PI);
                             if (normAngle > Math.PI) normAngle -= 2*Math.PI;
                             
-                            // Check angular proximity
-                            // If angles are close (within ~5 degrees), trigger the merge
                             if (Math.abs(normAngle - contourAngle) < 0.1) {
-                                // BRIDGE LOGIC: INWARD DIP
-                                // Spiral is at Outer Ring -> Connect to Inner Shape -> Trace -> Return
+                                // BRIDGE LOGIC: INWARD DIP with exact 0.5 * Ball Size offset
                                 spiral.push(c.trigger);
                                 c.points.forEach(p => spiral.push(p)); 
                                 spiral.push(c.trigger);
@@ -794,9 +784,6 @@
                 });
                 angle += angleStep; 
             }
-
-            // Cleanup remaining contours (fallback if missed)
-            // contours.forEach(c => { if(!c.merged) { spiral.push(c.trigger); c.points.forEach(p => spiral.push(p)); spiral.push(c.trigger); } });
 
             const scaleFac = (tableR * 2) / SIZE;
             rawPoints = []; if(spiral.length > 0) rawPoints.push({type:'break'});
