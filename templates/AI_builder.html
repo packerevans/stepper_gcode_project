@@ -713,7 +713,6 @@
             
             // Calibration: Translate ball size to buffer pixel scale
             const pixelBallSize = (ballSizeMm / (tableR * 2)) * 800;
-            
             const SIZE = 800; const CENTER = SIZE / 2;
             let pixelGrid = new Uint8Array(SIZE*SIZE); 
             for(let i=0; i<SIZE*SIZE; i++) { pixelGrid[i] = traceImgData.data[i*4] < thresh ? 1 : 0; }
@@ -742,10 +741,11 @@
                     if(pixelGrid[idx] === 1 && pixelGrid[idx-1] === 0 && traced[idx] === 0) { 
                         const pth = traceBoundary(x, y); 
                         if(pth.length > 20) { 
+                            // Analyze contour to find "Top" (Furthest from Center)
                             let maxDist = 0; let bestIdx = 0; 
                             pth.forEach((p, i) => { const dist = Math.hypot(p.x - CENTER, p.y - CENTER); if(dist > maxDist) { maxDist = dist; bestIdx = i; } }); 
                             const reordered = [...pth.slice(bestIdx), ...pth.slice(0, bestIdx)]; reordered.push(reordered[0]); 
-                            contours.push({ points: reordered, trigger: reordered[0], merged: false }); 
+                            contours.push({ points: reordered, trigger: reordered[0], maxR: maxDist, merged: false }); 
                         } 
                     } 
                 } 
@@ -753,52 +753,55 @@
 
             let spiral = []; const maxR = SIZE/2 - 5; spiral.push({x: CENTER, y: CENTER});
             let angle = 0; let r = 0; const angleStep = 0.02; const spacingPx = density * 4.0; 
+            
+            // SPIRAL GENERATION LOOP
             while(r < maxR) { 
                 r = (spacingPx / (2*Math.PI)) * angle; 
                 let x = CENTER + Math.cos(angle)*r; let y = CENTER + Math.sin(angle)*r; 
                 let wiggle = 0; const ix = Math.floor(x), iy = Math.floor(y); 
                 if(ix>=0 && ix<SIZE && iy>=0 && iy<SIZE) { if(pixelGrid[iy*SIZE+ix] === 1) wiggle = Math.sin(angle * 30) * (spacingPx * 0.3); } 
                 x += Math.cos(angle) * wiggle; y += Math.sin(angle) * wiggle; 
-                spiral.push({ x: x, y: y }); angle += angleStep; 
-            }
+                const sp = {x:x, y:y};
+                spiral.push(sp); 
 
-            let finalPath = []; 
-            // Shape path safety: Ball size dictates how far away shapes need to be drawn
-            const mergeThreshold = Math.max(spacingPx * 1.5, pixelBallSize);
-
-            for(let i=0; i<spiral.length; i++) {
-                const sp = spiral[i]; finalPath.push(sp);
+                // Check for Merges
+                // CRITICAL FIX: Ensure spiral is OUTSIDE the shape before merging
+                const spiralRadius = Math.hypot(sp.x - CENTER, sp.y - CENTER);
                 
                 contours.forEach(c => { 
                     if(!c.merged) { 
-                        const d = Math.hypot(sp.x - c.trigger.x, sp.y - c.trigger.y); 
-                        if (d < mergeThreshold) { 
-                            // BRIDGE LOGIC: INWARD DIP (FROM SPIRAL TO SHAPE AND BACK)
-                            // We calculate a bridge point that stays on the spiral path 
-                            // until the last possible second, then dips INWARD to the shape.
-                            const angleToCenter = Math.atan2(CENTER - sp.y, CENTER - sp.x);
+                        // Condition 1: Spiral must be LARGER than shape radius + ball size (wait for it to pass)
+                        if (spiralRadius > (c.maxR + pixelBallSize)) {
+                            // Condition 2: Radial Alignment (Check angles)
+                            const contourAngle = Math.atan2(c.trigger.y - CENTER, c.trigger.x - CENTER);
+                            // Normalize spiral angle to -PI to PI
+                            let normAngle = angle % (2*Math.PI);
+                            if (normAngle > Math.PI) normAngle -= 2*Math.PI;
                             
-                            // Lead-in line: Point dips inward from the spiral to touch the shape's trigger
-                            finalPath.push(c.trigger);
-                            
-                            // Trace the shape
-                            c.points.forEach(p => finalPath.push(p)); 
-                            
-                            // Lead-out line: Point dips back to the same spot on the spiral
-                            // Subsequent rotations of the spiral will naturally overlap this.
-                            finalPath.push(c.trigger);
-                            finalPath.push(sp);
-                            
-                            c.merged = true; 
+                            // Check angular proximity
+                            // If angles are close (within ~5 degrees), trigger the merge
+                            if (Math.abs(normAngle - contourAngle) < 0.1) {
+                                // BRIDGE LOGIC: INWARD DIP
+                                // Spiral is at Outer Ring -> Connect to Inner Shape -> Trace -> Return
+                                spiral.push(c.trigger);
+                                c.points.forEach(p => spiral.push(p)); 
+                                spiral.push(c.trigger);
+                                spiral.push(sp);
+                                c.merged = true; 
+                            }
                         } 
                     } 
                 });
+                angle += angleStep; 
             }
 
+            // Cleanup remaining contours (fallback if missed)
+            // contours.forEach(c => { if(!c.merged) { spiral.push(c.trigger); c.points.forEach(p => spiral.push(p)); spiral.push(c.trigger); } });
+
             const scaleFac = (tableR * 2) / SIZE;
-            rawPoints = []; if(finalPath.length > 0) rawPoints.push({type:'break'});
-            finalPath.forEach(p => { let tx = (p.x - 400) * scaleFac; let ty = (400 - p.y) * scaleFac; rawPoints.push({ x: tx, y: ty, type: 'point' }); });
-            if(finalPath.length > 0) rawPoints.push({type:'break'});
+            rawPoints = []; if(spiral.length > 0) rawPoints.push({type:'break'});
+            spiral.forEach(p => { let tx = (p.x - 400) * scaleFac; let ty = (400 - p.y) * scaleFac; rawPoints.push({ x: tx, y: ty, type: 'point' }); });
+            if(spiral.length > 0) rawPoints.push({type:'break'});
             render();
         }
 
