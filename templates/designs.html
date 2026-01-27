@@ -106,10 +106,10 @@
 
         .card-img-wrap { position: relative; aspect-ratio: 1/1; background: #fff; width: 100%; }
         
-        /* Mirror Canvas */
+        /* Mirror Canvas: Updated to handle 180 degree rotation for PNGs and Traces */
         .card canvas { 
             width: 100%; height: 100%; display: block; 
-            transform: scaleX(-1);
+            transform: scale(-1, -1);
         }
         
         /* Select Dot */
@@ -251,7 +251,8 @@
 
             ctx.beginPath(); ctx.strokeStyle='#333'; ctx.lineWidth=1.5;
             path.forEach((p,i)=>{
-                let x = w/2 + (p.x-cx)*sc, y = h/2 + (p.y-cy)*-sc;
+                // Updated y coordinate calculation to align with 180 degree CSS rotation
+                let x = w/2 + (p.x-cx)*sc, y = h/2 + (p.y-cy)*sc;
                 if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
             });
             ctx.stroke();
