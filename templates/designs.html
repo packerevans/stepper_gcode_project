@@ -249,8 +249,6 @@
         
         // SCARA Constants
         const L1=101.3, L2=101.3, R=9/8, S_RAD=(3200/360)*(180/Math.PI);
-        const L1_sq = L1*L1, L2_sq = L2*L2; // Pre-calc
-        const TWO_PI = Math.PI * 2;
 
         function getXY(b, e) {
             let t1 = -b / S_RAD;
@@ -262,45 +260,33 @@
             };
         }
 
-        // OPTIMIZED DRAW TRACE: 
-        // 1. Reduced resolution (larger step) for speed
-        // 2. 180 Rotation Math applied directly
         function drawTrace(cvs, txt) {
             let ctx = cvs.getContext('2d'), w=cvs.width, h=cvs.height;
             ctx.clearRect(0,0,w,h);
             
-            // Fast parsing without creating massive array of strings
             const lines = txt.split('\n');
             let path = [];
             let tb=0, te=0;
             
-            // Start at 0,0
             let start = getXY(0,0);
             path.push(start);
 
-            // Optimization: Process G-Code
             for(let i=0; i<lines.length; i++){
                 let l = lines[i].trim();
                 if(l.length < 3 || l[0] !== 'G' || l[1] !== '1') continue;
 
                 let parts = l.substring(3).trim().split(/\s+/);
-                let db = parseInt(parts[1])||0; // G1 X(e) Y(b) -> Note: typically swapped in sand tables
+                let db = parseInt(parts[1])||0; 
                 let de = parseInt(parts[0])||0;
                 
                 let next_b = tb + db;
                 let next_e = te + de;
 
-                let startPt = getXY(tb, te);
-                let endPt = getXY(next_b, next_e);
-
-                // Optimization: Dynamic Resolution based on distance
-                // We don't need 600 steps for a thumbnail. 1500 is faster.
                 let dist = Math.max(Math.abs(db), Math.abs(de));
                 let step = Math.max(2, Math.ceil(dist / 1500)); 
 
                 for(let k=1; k<=step; k++){
                     let t = k/step;
-                    // Linear interpolation of motors (SCARA logic)
                     let interp_b = tb + (next_b - tb) * t;
                     let interp_e = te + (next_e - te) * t;
                     path.push(getXY(interp_b, interp_e));
@@ -328,19 +314,16 @@
             ctx.strokeStyle='#333'; 
             ctx.lineWidth=1.5;
             
-            // DRAW LOOP WITH 180 ROTATION LOGIC
-            // Standard: x = w/2 + (p.x-cx)*sc
-            // 180 Deg:  x = w - (standard_x)
-            
+            // --- FIXED: STANDARD ORIENTATION (Reverted 180 Rotation) ---
             let p0 = path[0];
-            let sx = w - (w/2 + (p0.x-cx)*sc);
-            let sy = h - (h/2 + (p0.y-cy)*-sc);
+            let sx = w/2 + (p0.x-cx)*sc;
+            let sy = h/2 + (p0.y-cy)*-sc;
             ctx.moveTo(sx, sy);
 
             for(let i=1; i<path.length; i++){
                 let p = path[i];
-                let px = w - (w/2 + (p.x-cx)*sc);
-                let py = h - (h/2 + (p.y-cy)*-sc);
+                let px = w/2 + (p.x-cx)*sc;
+                let py = h/2 + (p.y-cy)*-sc;
                 ctx.lineTo(px, py);
             }
             ctx.stroke();
@@ -360,11 +343,10 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({index: idx, type: type})
                 });
-                updateQ(); // Refresh UI
+                updateQ(); 
             } catch(e) { showStatus("Error removing item"); }
         }
 
-        // Close dropdown if clicked outside
         window.onclick = function(e) {
             if(!e.target.closest('.queue-wrapper') && !e.target.closest('.queue-dropdown')) {
                 document.getElementById('queue-dropdown').classList.remove('show');
@@ -493,16 +475,13 @@
                 }
                 document.getElementById('playing-display').textContent = playText;
                 
-                // Update Queue Text & List
                 let qText = "Queue empty";
                 let listHTML = "";
 
                 if(d.queue_items && d.queue_items.length > 0) {
-                    // Update header text
                     let count = d.queue_count || d.queue_items.length;
                     qText = `Next: ${d.next_up} (+${count-1})`;
                     
-                    // Populate List
                     d.queue_items.forEach(item => {
                         listHTML += `
                             <div class="queue-item">
@@ -563,9 +542,7 @@
             let card = cvs.closest('.card');
             
             fetch(`${BASE_URL}/designs/${f}`).then(r => r.text()).then(t => {
-                // Calc time (simple loop)
                 let tm = 0;
-                // Faster iteration for time calc
                 let reg = /^G1\s+(\-?\d+)\s+(\-?\d+)\s+(\d+)/i;
                 let lines = t.split('\n');
                 for(let l of lines) {
@@ -580,12 +557,10 @@
                 let img = new Image();
                 img.src = `${BASE_URL}/designs/${clean}.png`;
                 img.onload = () => { 
-                    // PNGs draw NORMALLY (Standard Orientation)
                     cvs.getContext('2d').drawImage(img,0,0,300,300); 
                     card.dataset.hasPng="true"; 
                 };
                 img.onerror = () => { 
-                    // G-Code Traces get Rotated 180 (via drawTrace)
                     drawTrace(cvs, t); 
                 };
             });
