@@ -92,7 +92,7 @@ class SchedulerThread(threading.Thread):
                 self.last_minute_checked = current_time
                 self.check_triggers(current_time, current_day)
             
-            time.sleep(5) # Check every 5 seconds to be snappy
+            time.sleep(5) 
 
     def check_triggers(self, time_str, day_str):
         schedules = load_schedules()
@@ -114,13 +114,11 @@ class SchedulerThread(threading.Thread):
         elif action == "led_color" and val:
             try:
                 r, g, b = hex_to_rgb(val)
-                # Brightness default 16 (Max)
                 asyncio.run_coroutine_threadsafe(ble_controller.send_led_command(r, g, b, 16), ble_controller.loop)
             except: pass
 
         # --- SAND ACTIONS ---
         elif action == "stop_sand":
-             # Similar to CLEAR command
             global current_gcode_runner
             if current_gcode_runner and current_gcode_runner.is_alive():
                 current_gcode_runner.is_running = False 
@@ -149,7 +147,6 @@ class SchedulerThread(threading.Thread):
             path = os.path.join(DESIGNS_FOLDER, val)
             if os.path.exists(path):
                 with open(path, 'r') as f: gcode = f.read()
-                # If busy, add to queue. If not, start.
                 if current_gcode_runner is None or not current_gcode_runner.is_alive():
                     start_job({'gcode': gcode, 'filename': val})
                 else:
@@ -159,7 +156,7 @@ class SchedulerThread(threading.Thread):
 SchedulerThread().start()
 
 
-# === G-CODE RUNNER (Unchanged logic, just compacted for context) ===
+# === G-CODE RUNNER ===
 class GCodeRunner(threading.Thread):
     def __init__(self, gcode_block, filename, on_complete=None):
         super().__init__(daemon=True)
@@ -276,12 +273,17 @@ def get_current_ip():
 
 @app.route("/")
 def index():
+    # Redirect to designs, or wifi setup if in AP mode
     if get_current_ip() in ["10.42.0.1", "192.168.4.1"]: return redirect(url_for('wifi_setup_page'))
     return render_template("designs.html")
 
 @app.route("/settings")
 def settings_page():
     return render_template("settings.html")
+
+@app.route("/script")
+def script():
+    return render_template("script.html")
 
 # --- SCHEDULE API ---
 @app.route("/api/schedule", methods=["GET", "POST", "DELETE"])
@@ -383,6 +385,23 @@ def delete_design():
         return jsonify(success=True)
     except Exception as e: return jsonify(success=False, error=str(e))
 
+@app.route("/save_design", methods=["POST"])
+def save_design():
+    data = request.json
+    filename = data.get("filename")
+    gcode = data.get("gcode")
+    if not filename or not gcode: return jsonify(success=False, error="Missing data")
+    
+    filename = os.path.basename(filename)
+    if not filename.lower().endswith(".txt"): filename += ".txt"
+    file_path = os.path.join(DESIGNS_FOLDER, filename)
+    
+    try:
+        with open(file_path, "w") as f: f.write(gcode)
+        log_message(f"Design saved: {filename}")
+        return jsonify(success=True)
+    except Exception as e: return jsonify(success=False, error=str(e))
+
 @app.route("/send", methods=["POST"])
 def send_command():
     global is_paused, current_gcode_runner, is_looping, loop_playlist
@@ -439,8 +458,7 @@ def update_firmware():
     # Placeholder for firmware update logic
     return jsonify(success=True)
 
-@app.route("/controls")
-def controls(): return render_template("index.html")
+# --- PAGES ---
 @app.route("/terminal")
 def terminal(): return render_template("terminal.html")
 @app.route("/led_controls")
