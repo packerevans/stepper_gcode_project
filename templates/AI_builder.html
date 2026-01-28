@@ -78,10 +78,14 @@
 
         h2 { margin: 0 0 15px 0; font-size: 1.2rem; color: var(--secondary); text-align: center; }
         .btn-group { display: flex; gap: 8px; margin-bottom: 12px; }
+        
         button {
             background: var(--primary); color: var(--btn-text); border: none;
-            padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer;
+            padding: 0 12px; /* Reset vertical padding and use height */
+            height: 48px; /* Fixed height for uniformity */
+            border-radius: 8px; font-weight: 600; cursor: pointer;
             flex: 1; transition: 0.2s; display: flex; align-items: center; justify-content: center;
+            font-size: 14px; /* Consistent font size */
         }
         button:hover { filter: brightness(1.1); transform: translateY(-1px); }
         button.secondary { background: transparent; border: 1px solid var(--text); color: var(--text); }
@@ -136,7 +140,7 @@
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
         .stamp-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin-top: 8px; }
-        .stamp-btn { font-size: 18px; padding: 5px; background: rgba(0,0,0,0.05); border-radius: 4px; border: 1px solid rgba(0,0,0,0.1); }
+        .stamp-btn { font-size: 18px; padding: 5px; height: auto; background: rgba(0,0,0,0.05); border-radius: 4px; border: 1px solid rgba(0,0,0,0.1); }
         .stamp-btn:hover { background: var(--secondary); color: white; }
 
         #hiddenTraceBuffer, #vortexScanCanvas { display: none; }
@@ -156,9 +160,9 @@
     </div>
 
     <div class="nav-bar">
-        <button style="flex:0; background:none; font-size:24px; color:var(--text); padding:0;" onclick="openNav()">☰</button>
+        <button style="flex:0; background:none; font-size:24px; color:var(--text); padding:0; height:auto;" onclick="openNav()">☰</button>
         <h1 style="margin:0; font-size:1.2rem;">Sand Controller Pro</h1>
-        <button style="flex:0; background:none; font-size:20px;" onclick="toggleTheme()">☀️</button>
+        <button style="flex:0; background:none; font-size:20px; height:auto;" onclick="toggleTheme()">☀️</button>
     </div>
 
     <div class="app-container">
@@ -202,6 +206,11 @@
                                 <button class="stamp-btn" onclick="addShape('spiral')">🌀</button>
                                 <button class="stamp-btn" onclick="addShape('random')">🎲</button>
                             </div>
+                        </div>
+                        
+                        <div class="slider-row" style="margin-top:12px;">
+                            <div class="slider-header"><span>SYMMETRY</span> <span id="symVal">1x</span></div>
+                            <input type="range" id="symSlider" min="1" max="12" value="1" step="1" oninput="updateUI()">
                         </div>
                     </div>
 
@@ -311,12 +320,7 @@
 
                 <hr style="border:0; border-top:1px solid #ddd; margin: 15px 0;">
                 
-                <div class="slider-row">
-                    <div class="slider-header"><span>SYMMETRY</span> <span id="symVal">1x</span></div>
-                    <input type="range" id="symSlider" min="1" max="12" value="1" step="1" oninput="updateUI()">
-                </div>
-
-                <button class="action" onclick="prepareGCode()" style="margin-bottom:15px; font-size:1.1em;">⚙️ Prepare Path</button>
+                <button class="action" onclick="prepareGCode()" style="margin-bottom:15px; font-size:1.1em;">⚙️ Generate Path</button>
             </div>
             
             <div id="productionPhaseControls" style="display:none; margin-bottom:15px;">
@@ -325,9 +329,11 @@
                 </button>
             </div>
 
-            <div class="slider-row">
-                <div class="slider-header"><span>SIMULATION</span> <span id="progVal">100%</span></div>
-                <input type="range" id="progressSlider" min="0" max="100" value="100" oninput="render()">
+            <div id="simulationArea" style="display:none;">
+                <div class="slider-row">
+                    <div class="slider-header"><span>SIMULATION</span> <span id="progVal">100%</span></div>
+                    <input type="range" id="progressSlider" min="0" max="100" value="100" oninput="render()">
+                </div>
             </div>
 
             <div style="text-align:center; font-size:12px; margin-bottom:10px; color:#666;">
@@ -337,7 +343,7 @@
             <div class="toggle-row" style="background:rgba(0,0,0,0.03); padding:8px; border-radius:8px; margin-bottom:10px;">
                 <span style="font-weight:600; font-size:13px;">✨ Auto-Clear Before Run</span>
                 <label class="switch">
-                    <input type="checkbox" id="autoClearMode" checked>
+                    <input type="checkbox" id="autoClearMode">
                     <span class="slider-tog"></span>
                 </label>
             </div>
@@ -873,8 +879,8 @@
         }
 
         // --- GCODE GENERATION ---
-        async function sendToTable() { if(!generatedGCode) return showToast("Click Prepare first", "error"); let code = generatedGCode; if(document.getElementById('autoClearMode').checked) { try { let r = await fetch('./designs/clear.txt'); if(r.ok) code = (await r.text()) + "\n" + code; } catch(e) {} } fetch(BASE_URL+'/send_gcode_block', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({gcode:code}) }).then(r => r.json()).then(d => showToast(d.success ? "Sent!" : "Error", d.success ? "success" : "error")); }
-        async function saveToServer() { if(!generatedGCode) return showToast("Prepare Path first!", "error"); let n = prompt("Enter filename:"); if(n) { if(!n.toLowerCase().endsWith('.txt')) n += ".txt"; fetch(BASE_URL+'/save_design', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({filename:n, gcode:generatedGCode}) }).then(r => r.json()).then(d => showToast(d.success ? "Saved!" : "Failed", d.success ? "success" : "error")); } }
+        async function sendToTable() { if(!generatedGCode) return showToast("Click Generate Path first", "error"); let code = generatedGCode; if(document.getElementById('autoClearMode').checked) { try { let r = await fetch('./designs/clear.txt'); if(r.ok) code = (await r.text()) + "\n" + code; } catch(e) {} } fetch(BASE_URL+'/send_gcode_block', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({gcode:code}) }).then(r => r.json()).then(d => showToast(d.success ? "Sent!" : "Error", d.success ? "success" : "error")); }
+        async function saveToServer() { if(!generatedGCode) return showToast("Generate Path first!", "error"); let n = prompt("Enter filename:"); if(n) { if(!n.toLowerCase().endsWith('.txt')) n += ".txt"; fetch(BASE_URL+'/save_design', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({filename:n, gcode:generatedGCode}) }).then(r => r.json()).then(d => showToast(d.success ? "Saved!" : "Failed", d.success ? "success" : "error")); } }
         function getShortestRotation(raw, last) { let diff = (raw - last) / (2 * Math.PI); let offset = Math.round(diff); return raw - (offset * 2 * Math.PI); }
         function calculateIK(x, y, lastBaseSteps, lastElbowSteps, L1, L2, gearRatio, stepsPerRad) {
             let dist = Math.hypot(x, y); if (dist < 2.0) return { base_steps: lastBaseSteps, elbow_steps: -(Math.PI + gearRatio * (-lastBaseSteps / stepsPerRad)) * stepsPerRad };
@@ -913,10 +919,24 @@
             if(processedPoints.length > 0) { let lastPt = processedPoints[processedPoints.length-1]; processedPoints.push({type: 'cmd', val: 'M0'}); let eA = Math.atan2(lastPt.y, lastPt.x); processedPoints.push({ x: tableR * Math.cos(eA), y: tableR * Math.sin(eA), type: 'point' }); }
             generatedGCode = generateGCodeStringFromProcessed();
             document.getElementById('statusTxt').innerText = `Path Ready! ${sortedShapes.length} shapes.`;
-            document.getElementById('designPhaseControls').style.display = 'none'; document.getElementById('productionPhaseControls').style.display = 'block'; render();
+            document.getElementById('designPhaseControls').style.display = 'none'; document.getElementById('productionPhaseControls').style.display = 'block'; 
+            
+            // SHOW THE SIMULATION SLIDER
+            document.getElementById('simulationArea').style.display = 'block';
+            
+            render();
         }
 
-        function returnToEditing() { processedPoints = []; document.getElementById('designPhaseControls').style.display = 'block'; document.getElementById('productionPhaseControls').style.display = 'none'; resetStatus(); }
+        function returnToEditing() { 
+            processedPoints = []; 
+            document.getElementById('designPhaseControls').style.display = 'block'; 
+            document.getElementById('productionPhaseControls').style.display = 'none'; 
+            
+            // HIDE THE SIMULATION SLIDER
+            document.getElementById('simulationArea').style.display = 'none';
+            
+            resetStatus(); 
+        }
 
         function generateGCodeStringFromProcessed() {
             const L1 = parseFloat(document.getElementById('cfgL1').value), L2 = parseFloat(document.getElementById('cfgL2').value), gearRatio = 1.125, tableRadius = parseFloat(document.getElementById('cfgRadius').value), stepsPerDeg = parseFloat(document.getElementById('cfgStepsPerDeg').value), stepsPerRad = stepsPerDeg * (180 / Math.PI), centerDelay = parseFloat(document.getElementById('cfgCenterDelay').value), perimDelay = parseFloat(document.getElementById('cfgPerimDelay').value);
