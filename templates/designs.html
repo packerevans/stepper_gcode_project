@@ -316,14 +316,14 @@
             
             // --- FIXED: STANDARD ORIENTATION (Reverted 180 Rotation) ---
             let p0 = path[0];
-            let sx = w/2 - (p0.x-cx)*sc;
-            let sy = h/2 + (p0.y-cy)*-sc;
+            let sx = w/2 + (p0.x-cx)*sc;
+            let sy = h/2 - (p0.y-cy)*-sc;
             ctx.moveTo(sx, sy);
 
             for(let i=1; i<path.length; i++){
                 let p = path[i];
-                let px = w/2 - (p.x-cx)*sc;
-                let py = h/2 + (p.y-cy)*-sc;
+                let px = w/2 + (p.x-cx)*sc;
+                let py = h/2 - (p.y-cy)*-sc;
                 ctx.lineTo(px, py);
             }
             ctx.stroke();
