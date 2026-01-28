@@ -296,13 +296,16 @@
                 </div>
 
                 <div class="btn-group">
-                    <button id="btnText" onclick="setTool('text')" class="secondary">🔠 Text</button>
+                    <button id="btnTrace" class="secondary" onclick="handleTraceClick()">✨ Trace</button>
                     <input type="file" id="imgUpload" accept="image/*" style="display:none" onchange="handleImageUpload(this)">
-                    <button id="btnTrace" class="secondary" onclick="document.getElementById('imgUpload').click()">✨ Trace</button>
                 </div>
 
                 <div class="btn-group">
+                    <button id="btnText" onclick="setTool('text')" class="secondary">🔠 Text</button>
                     <button onclick="undo()" class="secondary">↶ Undo</button>
+                </div>
+
+                <div class="btn-group">
                     <button onclick="clearCanvas()" class="secondary" style="color:var(--danger); border-color:var(--danger);">✖ Clear</button>
                 </div>
 
@@ -667,6 +670,14 @@
         }
 
         // --- TRACE LOGIC ---
+        function handleTraceClick() {
+            if (traceState.active) {
+                setTool('trace_set');
+            } else {
+                document.getElementById('imgUpload').click();
+            }
+        }
+
         function handleImageUpload(input) {
             const file = input.files[0]; if(!file) return;
             const reader = new FileReader();
@@ -723,7 +734,6 @@
                 let lastAddedX = -10, lastAddedY = -10;
 
                 do {
-                    // Decimate to prevent bleeding and microscopic zig-zags
                     if (Math.hypot(cx - lastAddedX, cy - lastAddedY) > 1.5) {
                         path.push({x:cx, y:cy});
                         lastAddedX = cx; lastAddedY = cy;
@@ -746,7 +756,6 @@
                     const idx = y*SIZE + x; 
                     if(pixelGrid[idx] === 1 && pixelGrid[idx-1] === 0 && traced[idx] === 0) { 
                         const pth = traceBoundary(x, y); 
-                        // Increased noise filter to ignore small artifacts/blobs
                         if(pth.length > 40) { 
                             let maxDist = 0; let bestIdx = 0; 
                             pth.forEach((p, i) => { const dist = Math.hypot(p.x - CENTER, p.y - CENTER); if(dist > maxDist) { maxDist = dist; bestIdx = i; } }); 
@@ -757,7 +766,6 @@
                 } 
             }
 
-            // Order shapes by radius to bridge from center outward logically
             contours.sort((a, b) => a.maxR - b.maxR);
 
             let spiral = []; const maxR = SIZE/2 - 5; spiral.push({x: CENTER, y: CENTER});
@@ -776,14 +784,12 @@
                 const spiralRadius = Math.hypot(sp.x - CENTER, sp.y - CENTER);
                 for (let c of contours) {
                     if(!c.merged) { 
-                        // Bridging logic with safety buffer
                         if (spiralRadius > (c.maxR + (pixelBallSize * 0.4))) {
                             const contourAngle = Math.atan2(c.trigger.y - CENTER, c.trigger.x - CENTER);
                             let normAngle = Math.atan2(Math.sin(angle), Math.cos(angle));
                             
                             if (Math.abs(normAngle - contourAngle) < 0.05) {
                                 spiral.push(c.trigger);
-                                // Decimate contour points to keep motion fluid
                                 c.points.forEach((p, i) => { if(i % 2 === 0) spiral.push(p); }); 
                                 spiral.push(c.trigger);
                                 spiral.push(sp);
@@ -817,7 +823,13 @@
             const buttons = ['btnDraw', 'btnErase', 'btnSelect', 'btnSandify', 'btnTrace', 'btnText'];
             buttons.forEach(b => {
                 const el = document.getElementById(b);
-                if(el) el.className = (b.toLowerCase().includes(t)) ? 'active' : 'secondary';
+                if(el) {
+                    if (t === 'trace_set' && b === 'btnTrace') {
+                        el.className = 'active';
+                    } else {
+                        el.className = (b.toLowerCase().includes(t)) ? 'active' : 'secondary';
+                    }
+                }
             });
             updateToolSettings();
             if(t === 'select' && traceState.active) document.getElementById('traceMoveMsg').style.display = 'block';
@@ -889,7 +901,7 @@
                 let bestIdx = -1, bestDist = Infinity, bestRev = false;
                 for(let i=0; i<pool.length; i++) {
                     let dS = Math.hypot(curPos.x - pool[i][0].x, curPos.y - pool[i][0].y); if(dS < bestDist) { bestDist=dS; bestIdx=i; bestRev=false; }
-                    let dE = Math.hypot(curPos.x - pool[i][pool[i].length-1].x, curPos.y - pool[i][pool[i].length-1].y); if(dE < bestDist) { dE=bestDist; bestIdx=i; bestRev=true; }
+                    let dE = Math.hypot(curPos.x - pool[i][pool[i].length-1].x, curPos.y - pool[i][pool[i].length-1].y); if(dE < bestDist) { bestDist=dE; bestIdx=i; bestRev=true; }
                 }
                 let winner = pool[bestIdx]; if(bestRev) winner.reverse(); sortedShapes.push(winner); curPos = winner[winner.length-1]; pool.splice(bestIdx, 1);
             }
