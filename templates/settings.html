@@ -53,7 +53,7 @@
         /* Forms */
         .form-group { margin-bottom: 15px; }
         label { display: block; font-size: 0.9rem; font-weight: 600; margin-bottom: 5px; opacity: 0.8; }
-        select, input[type="time"], input[type="text"], input[type="color"] {
+        select, input[type="time"], input[type="text"], input[type="color"], input[type="password"] {
             width: 100%; padding: 10px; border-radius: 8px;
             border: 1px solid rgba(0,0,0,0.1);
             background: var(--color-bg); color: var(--color-text);
@@ -117,6 +117,41 @@
     <div class="container">
         
         <div class="card">
+            <h2>Remote Access (Tunneling)</h2>
+            <div style="font-size: 0.9rem; margin-bottom: 15px; opacity: 0.8;">
+                Access your Sand Table from anywhere in the world.
+                <ol style="margin-left: 20px; margin-top: 5px;">
+                    <li><a href="https://dashboard.ngrok.com/get-started/your-authtoken" target="_blank" style="color: var(--color-accent); font-weight: bold;">Click here to get your Auth Key</a> (Ngrok).</li>
+                    <li>Paste the key below and click Connect.</li>
+                </ol>
+            </div>
+
+            <div class="form-group">
+                <label>Auth Token</label>
+                <input type="password" id="tunnel-key" placeholder="Paste key here (starts with 1X...)" onchange="saveTunnelKey()">
+            </div>
+
+            <div class="form-group">
+                <label>Status</label>
+                <div id="tunnel-status" style="padding: 10px; background: rgba(0,0,0,0.05); border-radius: 8px; font-family: monospace; font-weight: bold;">
+                    Checking...
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <button class="btn" onclick="toggleTunnel(true)" style="background: var(--color-selected);">Start Tunnel</button>
+                <button class="btn btn-delete" onclick="toggleTunnel(false)">Stop</button>
+            </div>
+            
+            <div id="public-url-container" style="margin-top: 15px; display: none;">
+                <label>Public URL</label>
+                <a id="public-url-link" href="#" target="_blank" style="display: block; padding: 10px; background: var(--color-accent); color: white; text-align: center; border-radius: 8px; text-decoration: none; font-weight: bold;">
+                    ...
+                </a>
+            </div>
+        </div>
+
+        <div class="card">
             <h2>New Automation</h2>
             
             <div class="form-group">
@@ -163,8 +198,7 @@
 
         <div class="card">
             <h2>Active Schedules</h2>
-            <div id="schedule-list">
-                </div>
+            <div id="schedule-list"></div>
         </div>
 
     </div>
@@ -172,7 +206,54 @@
     <script>
         const BASE_URL = `${window.location.protocol}//${window.location.host}`;
 
-        // Load Designs for Dropdown
+        // --- TUNNEL LOGIC ---
+        async function getTunnelStatus() {
+            try {
+                let r = await fetch('/api/tunnel');
+                let d = await r.json();
+                
+                let statusDiv = document.getElementById('tunnel-status');
+                let urlCont = document.getElementById('public-url-container');
+                let urlLink = document.getElementById('public-url-link');
+                let keyInput = document.getElementById('tunnel-key');
+
+                if(d.public_url) {
+                    statusDiv.textContent = "ONLINE";
+                    statusDiv.style.color = "green";
+                    urlCont.style.display = "block";
+                    urlLink.href = d.public_url;
+                    urlLink.textContent = d.public_url;
+                } else {
+                    statusDiv.textContent = "OFFLINE";
+                    statusDiv.style.color = "grey";
+                    urlCont.style.display = "none";
+                }
+                
+                if(!keyInput.value && d.has_token) {
+                    keyInput.placeholder = "Auth Token Saved (Hidden)";
+                }
+            } catch(e) { console.log(e); }
+        }
+
+        async function saveTunnelKey() {
+            let key = document.getElementById('tunnel-key').value;
+            if(!key) return;
+            await fetch('/api/tunnel/key', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({token: key})
+            });
+            alert("Key Saved!");
+        }
+
+        async function toggleTunnel(state) {
+            let endpoint = state ? '/api/tunnel/start' : '/api/tunnel/stop';
+            let r = await fetch(endpoint, { method: 'POST' });
+            let d = await r.json();
+            if(!d.success) alert("Error: " + d.message);
+            getTunnelStatus();
+        }
+
+        // --- SCHEDULE LOGIC ---
         async function loadDesigns() {
             let r = await fetch('/api/designs');
             let files = await r.json();
@@ -185,49 +266,40 @@
             });
         }
 
-        // Toggle Dynamic Fields
         function updateFields() {
             let type = document.getElementById('sch-type').value;
             document.getElementById('field-color').style.display = (type === 'led_color') ? 'block' : 'none';
             document.getElementById('field-file').style.display = (type === 'sand_specific') ? 'block' : 'none';
         }
 
-        // Save Schedule
         async function saveSchedule() {
             let days = Array.from(document.querySelectorAll('.day-check:checked')).map(cb => cb.value);
             if(days.length === 0) { alert("Please select at least one day."); return; }
-
             let data = {
                 time: document.getElementById('sch-time').value,
                 days: days,
                 type: document.getElementById('sch-type').value,
                 value: null
             };
-
             if(data.type === 'led_color') data.value = document.getElementById('sch-color').value;
             if(data.type === 'sand_specific') data.value = document.getElementById('sch-file').value;
 
             await fetch('/api/schedule', {
-                method: 'POST',
-                headers: {'Content-Type':'application/json'},
+                method: 'POST', headers: {'Content-Type':'application/json'},
                 body: JSON.stringify(data)
             });
             loadSchedules();
         }
 
-        // Load Schedules
         async function loadSchedules() {
             let r = await fetch('/api/schedule');
             let list = await r.json();
             let cont = document.getElementById('schedule-list');
             cont.innerHTML = '';
-
             if(list.length === 0) { cont.innerHTML = '<div style="opacity:0.6; text-align:center;">No active schedules</div>'; return; }
-
             list.forEach((item, index) => {
                 let niceType = item.type.replace('_', ' ').toUpperCase();
                 let valDisplay = item.value ? `(${item.value})` : '';
-                
                 let div = document.createElement('div');
                 div.className = 'schedule-item';
                 div.innerHTML = `
@@ -245,14 +317,13 @@
         async function deleteSchedule(index) {
             if(!confirm("Delete this trigger?")) return;
             await fetch('/api/schedule', {
-                method: 'DELETE',
-                headers: {'Content-Type':'application/json'},
+                method: 'DELETE', headers: {'Content-Type':'application/json'},
                 body: JSON.stringify({index: index})
             });
             loadSchedules();
         }
 
-        // --- Sidebar & Theme (Standard) ---
+        // --- COMMON ---
         function openNav() { document.getElementById('mySidebar').style.width="250px"; document.getElementById('overlay').style.display="block"; }
         function closeNav() { document.getElementById('mySidebar').style.width="0"; document.getElementById('overlay').style.display="none"; }
         function toggleTheme() {
@@ -260,9 +331,10 @@
             b.setAttribute('data-theme', n);
         }
 
-        // Init
         loadDesigns();
         loadSchedules();
+        getTunnelStatus();
+        setInterval(getTunnelStatus, 5000);
     </script>
 </body>
 </html>
