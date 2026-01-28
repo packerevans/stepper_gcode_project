@@ -1,6 +1,6 @@
 // ==========================================
-//      ARDUINO SAND TABLE FIRMWARE v5
-//      Restored Pins + Auto-Pause (M0)
+//      ARDUINO SAND TABLE FIRMWARE v6
+//      High-Speed Baud + Smoothness Fix
 // ==========================================
 
 // --- YOUR SPECIFIC MOTOR PINS ---
@@ -10,17 +10,23 @@ const int stepArm  = 10;
 const int dirArm   = 11;
 const int enPin    = 3;
 
-// Microstepping Pins (Optional, keep if you use them)
+// Microstepping Pins
 const int ms1 = 4;
 const int ms2 = 5;
 const int ms3 = 6;
 
 // --- SETTINGS ---
-// MUST match your Python script (usually 9600 for older scripts)
-#define BAUD_RATE 115200 
+#define BAUD_RATE 115200  // Matches your new Python setting
+
+// SPEED MULTIPLIER (The "Smoothness" Fix)
+// Since data arrives faster now, we multiply the delay to slow
+// the physical motors down to a graceful speed.
+// 1.0 = Raw Speed (Fast/Jerky)
+// 2.0 = Half Speed (Smoother)
+const float SPEED_MULTIPLIER = 2.0; 
 
 // --- STATE VARIABLES ---
-bool paused = true; 
+bool paused = true;
 const int MAX_QUEUE_SIZE = 50;
 
 // Command Types
@@ -31,7 +37,7 @@ struct GCommand {
   int type;       // 0 = Move, 1 = Wait (M0)
   long armSteps;
   long baseSteps;
-  int speed;
+  int speed;      // This is actually the delay in microseconds
 };
 
 GCommand queue[MAX_QUEUE_SIZE];
@@ -46,7 +52,7 @@ void setup() {
   pinMode(stepArm, OUTPUT);  pinMode(dirArm, OUTPUT);
   pinMode(enPin, OUTPUT);
 
-  // 1/32 Microstepping Setup (from your original file)
+  // 1/32 Microstepping Setup
   pinMode(ms1, OUTPUT); pinMode(ms2, OUTPUT); pinMode(ms3, OUTPUT);
   digitalWrite(ms1, HIGH); digitalWrite(ms2, HIGH); digitalWrite(ms3, HIGH);
 
@@ -55,10 +61,8 @@ void setup() {
 }
 
 void loop() {
-  // Always check for new data
   if (Serial.available()) handleSerial();
 
-  // Execute queue if not paused by user
   if (!paused && queueCount > 0) {
     executeNextCommand();
   }
@@ -70,7 +74,6 @@ void handleSerial() {
     cmd.trim();
     if (cmd.length() == 0) continue;
 
-    // --- IMMEDIATE COMMANDS ---
     if (cmd.equalsIgnoreCase("PAUSE")) {
       paused = true;
       digitalWrite(enPin, HIGH);
@@ -85,7 +88,6 @@ void handleSerial() {
       queueHead = queueTail = queueCount = 0;
       Serial.println(F("Cleared"));
     }
-    // --- QUEUED COMMANDS ---
     else if (cmd.startsWith("G1")) {
       parseAndEnqueueMove(cmd);
     }
@@ -120,16 +122,12 @@ void parseAndEnqueueMove(String cmd) {
   int s3 = cmd.indexOf(' ', s2 + 1);
 
   if (s1 > 0) {
-    // Parse Elbow (Arm)
     armSteps = cmd.substring(s1 + 1, s2).toInt();
-    
     if (s2 > 0) {
       if (s3 > 0) {
-        // Parse Base & Speed
         baseSteps = cmd.substring(s2 + 1, s3).toInt();
         speed = cmd.substring(s3 + 1).toInt();
       } else {
-        // Parse Base only (default speed)
         baseSteps = cmd.substring(s2 + 1).toInt();
       }
     }
@@ -155,20 +153,16 @@ void executeNextCommand() {
   
   if (cmd.type == CMD_MOVE) {
     moveBresenham(cmd.armSteps, cmd.baseSteps, cmd.speed);
-    Serial.println(F("Done")); // Signal to Python that we are ready for more
+    Serial.println(F("Done"));
   } 
   else if (cmd.type == CMD_WAIT) {
     performProgrammedPause();
   }
 }
 
-// Blocks everything until "R" or "RESUME" is received
 void performProgrammedPause() {
-  Serial.println(F("Done")); // Tell Python the "M0" command is processed so it doesn't timeout
-  // NOTE: Depending on your Python script, you might want to send a specific status here.
-  // But usually sending "Done" satisfies the script to wait.
-  
-  digitalWrite(enPin, HIGH); // Disable motors (Pause state)
+  Serial.println(F("Done")); 
+  digitalWrite(enPin, HIGH);
   
   bool waiting = true;
   while (waiting) {
@@ -177,12 +171,10 @@ void performProgrammedPause() {
       input.trim();
       if (input.equalsIgnoreCase("R") || input.equalsIgnoreCase("RESUME")) {
         waiting = false;
-        digitalWrite(enPin, LOW); // Re-enable motors
-        // Serial.println(F("Resumed")); // Optional debug
+        digitalWrite(enPin, LOW);
       }
-      // Handle immediate stop even during M0
       if (input.equalsIgnoreCase("PAUSE")) {
-        paused = true; 
+        paused = true;
       }
     }
     delay(50);
@@ -190,24 +182,26 @@ void performProgrammedPause() {
 }
 
 void moveBresenham(long da, long db, int delayUs) {
-  digitalWrite(enPin, LOW); // Enable motors
+  digitalWrite(enPin, LOW);
 
   digitalWrite(dirArm, (da >= 0) ? HIGH : LOW);
   digitalWrite(dirBase, (db >= 0) ? HIGH : LOW);
 
   long ad = abs(da);
   long bd = abs(db);
-  
   long steps = max(ad, bd); 
 
   long accA = steps / 2;
   long accB = steps / 2;
 
+  // --- SMOOTHNESS LOGIC APPLIED HERE ---
+  // We multiply the requested delay by our factor.
+  // This slows down the loop, making the movement smoother 
+  // despite the high-speed data connection.
+  int finalDelay = delayUs * SPEED_MULTIPLIER; 
+
   for (long i = 0; i < steps; i++) {
-    // Check Serial frequently to prevent buffer overflow
     if (Serial.available()) handleSerial();
-    
-    // Immediate pause check
     if (paused) break;
 
     accA -= ad;
@@ -222,12 +216,12 @@ void moveBresenham(long da, long db, int delayUs) {
       accB += steps;
     }
     
-    delayMicroseconds(delayUs);
+    delayMicroseconds(finalDelay);
   }
 }
 
 void pulsePin(int pin) {
   digitalWrite(pin, HIGH);
-  delayMicroseconds(2); 
+  delayMicroseconds(2);
   digitalWrite(pin, LOW);
 }
