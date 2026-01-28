@@ -706,13 +706,11 @@
 
         function runHighPrecisionTrace() {
             if(!traceImgData) return;
-            const thresh = 150; 
-            const densityInput = document.getElementById('traceDensityInput');
-            const density = parseFloat(densityInput.value); 
+            const thresh = parseInt(document.getElementById('traceThreshInput').value); 
+            const density = parseFloat(document.getElementById('traceDensityInput').value); 
             const ballSizeMm = parseFloat(document.getElementById('cfgBallSize').value);
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
             
-            // Calibration: Translate ball size to buffer pixel scale
             const pixelBallSize = (ballSizeMm / (tableR * 2)) * 800;
             const SIZE = 800; const CENTER = SIZE / 2;
             let pixelGrid = new Uint8Array(SIZE*SIZE); 
@@ -721,9 +719,16 @@
             let contours = []; const traced = new Uint8Array(SIZE*SIZE).fill(0);
             
             const traceBoundary = (sx, sy) => {
-                const path = []; let cx = sx, cy = sy; let bx = sx-1, by = sy; let max = SIZE*4;
+                const path = []; let cx = sx, cy = sy; let bx = sx-1, by = sy; let max = SIZE*10;
+                let lastAddedX = -10, lastAddedY = -10;
+
                 do {
-                    path.push({x:cx, y:cy}); traced[cy*SIZE+cx] = 1;
+                    // Decimate to prevent bleeding and microscopic zig-zags
+                    if (Math.hypot(cx - lastAddedX, cy - lastAddedY) > 1.5) {
+                        path.push({x:cx, y:cy});
+                        lastAddedX = cx; lastAddedY = cy;
+                    }
+                    traced[cy*SIZE+cx] = 1;
                     const n = [{x:-1,y:0},{x:-1,y:-1},{x:0,y:-1},{x:1,y:-1},{x:1,y:0},{x:1,y:1},{x:0,y:1},{x:-1,y:1}];
                     let startIdx = 0; for(let i=0; i<8; i++) if(bx===cx+n[i].x && by===cy+n[i].y) startIdx=(i+1)%8;
                     let found = false;
@@ -741,7 +746,8 @@
                     const idx = y*SIZE + x; 
                     if(pixelGrid[idx] === 1 && pixelGrid[idx-1] === 0 && traced[idx] === 0) { 
                         const pth = traceBoundary(x, y); 
-                        if(pth.length > 20) { 
+                        // Increased noise filter to ignore small artifacts/blobs
+                        if(pth.length > 40) { 
                             let maxDist = 0; let bestIdx = 0; 
                             pth.forEach((p, i) => { const dist = Math.hypot(p.x - CENTER, p.y - CENTER); if(dist > maxDist) { maxDist = dist; bestIdx = i; } }); 
                             const reordered = [...pth.slice(bestIdx), ...pth.slice(0, bestIdx)]; reordered.push(reordered[0]); 
@@ -751,38 +757,41 @@
                 } 
             }
 
+            // Order shapes by radius to bridge from center outward logically
+            contours.sort((a, b) => a.maxR - b.maxR);
+
             let spiral = []; const maxR = SIZE/2 - 5; spiral.push({x: CENTER, y: CENTER});
             let angle = 0; let r = 0; const angleStep = 0.02; const spacingPx = density * 4.0; 
             
             while(r < maxR) { 
                 r = (spacingPx / (2*Math.PI)) * angle; 
                 let x = CENTER + Math.cos(angle)*r; let y = CENTER + Math.sin(angle)*r; 
+                
                 let wiggle = 0; const ix = Math.floor(x), iy = Math.floor(y); 
-                if(ix>=0 && ix<SIZE && iy>=0 && iy<SIZE) { if(pixelGrid[iy*SIZE+ix] === 1) wiggle = Math.sin(angle * 30) * (spacingPx * 0.3); } 
+                if(ix>=0 && ix<SIZE && iy>=0 && iy<SIZE) { if(pixelGrid[iy*SIZE+ix] === 1) wiggle = Math.sin(angle * 30) * (spacingPx * 0.2); } 
                 x += Math.cos(angle) * wiggle; y += Math.sin(angle) * wiggle; 
                 const sp = {x:x, y:y};
                 spiral.push(sp); 
 
                 const spiralRadius = Math.hypot(sp.x - CENTER, sp.y - CENTER);
-                contours.forEach(c => { 
+                for (let c of contours) {
                     if(!c.merged) { 
-                        // Wait until the spiral is exactly 0.5 * Ball Size past the shape boundary
-                        if (spiralRadius > (c.maxR + (pixelBallSize * 0.5))) {
+                        // Bridging logic with safety buffer
+                        if (spiralRadius > (c.maxR + (pixelBallSize * 0.4))) {
                             const contourAngle = Math.atan2(c.trigger.y - CENTER, c.trigger.x - CENTER);
-                            let normAngle = angle % (2*Math.PI);
-                            if (normAngle > Math.PI) normAngle -= 2*Math.PI;
+                            let normAngle = Math.atan2(Math.sin(angle), Math.cos(angle));
                             
-                            if (Math.abs(normAngle - contourAngle) < 0.1) {
-                                // BRIDGE LOGIC: INWARD DIP with exact 0.5 * Ball Size offset
+                            if (Math.abs(normAngle - contourAngle) < 0.05) {
                                 spiral.push(c.trigger);
-                                c.points.forEach(p => spiral.push(p)); 
+                                // Decimate contour points to keep motion fluid
+                                c.points.forEach((p, i) => { if(i % 2 === 0) spiral.push(p); }); 
                                 spiral.push(c.trigger);
                                 spiral.push(sp);
                                 c.merged = true; 
                             }
                         } 
                     } 
-                });
+                }
                 angle += angleStep; 
             }
 
@@ -880,7 +889,7 @@
                 let bestIdx = -1, bestDist = Infinity, bestRev = false;
                 for(let i=0; i<pool.length; i++) {
                     let dS = Math.hypot(curPos.x - pool[i][0].x, curPos.y - pool[i][0].y); if(dS < bestDist) { bestDist=dS; bestIdx=i; bestRev=false; }
-                    let dE = Math.hypot(curPos.x - pool[i][pool[i].length-1].x, curPos.y - pool[i][pool[i].length-1].y); if(dE < bestDist) { bestDist=dE; bestIdx=i; bestRev=true; }
+                    let dE = Math.hypot(curPos.x - pool[i][pool[i].length-1].x, curPos.y - pool[i][pool[i].length-1].y); if(dE < bestDist) { dE=bestDist; bestIdx=i; bestRev=true; }
                 }
                 let winner = pool[bestIdx]; if(bestRev) winner.reverse(); sortedShapes.push(winner); curPos = winner[winner.length-1]; pool.splice(bestIdx, 1);
             }
