@@ -9,7 +9,7 @@ import datetime
 from collections import deque
 import wifi_tools 
 import ble_controller 
-from pyngrok import ngrok, conf  # <--- NEW IMPORT
+from pyngrok import ngrok, conf 
 
 app = Flask(__name__)
 app.secret_key = 'your_super_secret_key' 
@@ -59,6 +59,7 @@ current_gcode_runner = None
 def connect_arduino():
     global arduino, arduino_connected
     try:
+        # Changed to 115200 to match your updated firmware
         arduino = serial.Serial('/dev/ttyACM0', 115200, timeout=0.1) 
         time.sleep(2) 
         arduino_connected = True
@@ -275,29 +276,29 @@ def get_tunnel_status():
         "has_token": has_token
     })
 
-@app.route("/api/tunnel/start", methods=["POST"])
-def start_tunnel():
-    # 1. Force kill any stuck processes first
-    # This fixes the "Already Online" / 502 Error
+@app.route("/api/tunnel/key", methods=["POST"])
+def set_tunnel_key():
+    data = request.json
+    token = data.get("token")
+    if not token: return jsonify(success=False, message="No token provided")
+    
     try:
-        ngrok.kill()
-        time.sleep(1) # Give it a second to close fully
-    except: pass
-
-    try:
-        # 2. Start a fresh connection
-        url = ngrok.connect(5000).public_url
-        log_message(f"Tunnel Started: {url}")
-        return jsonify(success=True, public_url=url)
+        ngrok.set_auth_token(token)
+        log_message("Tunnel: Auth Token Saved")
+        return jsonify(success=True)
     except Exception as e:
-        log_message(f"Tunnel Error: {e}")
         return jsonify(success=False, message=str(e))
 
 @app.route("/api/tunnel/start", methods=["POST"])
 def start_tunnel():
+    # 1. Force kill any stuck processes first
     try:
-        if ngrok.get_tunnels():
-            return jsonify(success=True, message="Already running")
+        ngrok.kill()
+        time.sleep(1)
+    except: pass
+
+    try:
+        # 2. Start a fresh connection
         url = ngrok.connect(5000).public_url
         log_message(f"Tunnel Started: {url}")
         return jsonify(success=True, public_url=url)
