@@ -20,6 +20,21 @@ DESIGNS_FOLDER = os.path.join(BASE_DIR, 'templates', 'designs')
 SCHEDULE_FILE = os.path.join(BASE_DIR, 'schedules.json')
 ARDUINO_PROJECT_PATH = os.path.join(BASE_DIR, 'Sand') 
 
+# === AUTO-PORT SELECTION ===
+SERVER_PORT = 5000 # Default fallback
+
+def find_available_port(start_port=5000):
+    """Try to bind to a port. If busy, try next one."""
+    port = start_port
+    while port < 5100: # Try up to 100 ports
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind(('0.0.0.0', port))
+                return port
+            except OSError:
+                port += 1
+    return 5000 # Fallback
+
 if not os.path.exists(DESIGNS_FOLDER):
     try: os.makedirs(DESIGNS_FOLDER)
     except: pass
@@ -59,7 +74,7 @@ current_gcode_runner = None
 def connect_arduino():
     global arduino, arduino_connected
     try:
-        # Changed to 115200 to match your updated firmware
+        # 115200 to match updated firmware
         arduino = serial.Serial('/dev/ttyACM0', 115200, timeout=0.1) 
         time.sleep(2) 
         arduino_connected = True
@@ -298,9 +313,9 @@ def start_tunnel():
     except: pass
 
     try:
-        # 2. Start a fresh connection
-        url = ngrok.connect(5000).public_url
-        log_message(f"Tunnel Started: {url}")
+        # 2. AUTO-PORT: Start a fresh connection using the dynamic port
+        url = ngrok.connect(SERVER_PORT).public_url
+        log_message(f"Tunnel Started on port {SERVER_PORT}: {url}")
         return jsonify(success=True, public_url=url)
     except Exception as e:
         log_message(f"Tunnel Error: {e}")
@@ -530,4 +545,7 @@ def get_logs():
     with lock: return jsonify(list(serial_log))
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False)
+    # AUTO-PORT LOGIC:
+    SERVER_PORT = find_available_port(5000)
+    print(f"Starting server on port {SERVER_PORT}...")
+    app.run(host="0.0.0.0", port=SERVER_PORT, debug=True, use_reloader=False)
