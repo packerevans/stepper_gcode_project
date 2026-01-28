@@ -316,7 +316,7 @@
             
             // --- FIXED: STANDARD ORIENTATION (Reverted 180 Rotation) ---
             let p0 = path[0];
-            let sx = w/2 - (p0.x-cx)*sc;
+            let sx = w/2 + (p0.x-cx)*sc;
             let sy = h/2 - (p0.y-cy)*-sc;
             ctx.moveTo(sx, sy);
 
