@@ -277,14 +277,23 @@ def read_from_serial():
 
 @app.route("/api/tunnel", methods=["GET"])
 def get_tunnel_status():
-    tunnels = ngrok.get_tunnels()
-    public_url = tunnels[0].public_url if tunnels else None
+    # 1. Safely check for tunnels (Fixes "None/api/tunnels" error)
+    public_url = None
+    try:
+        tunnels = ngrok.get_tunnels()
+        public_url = tunnels[0].public_url if tunnels else None
+    except Exception:
+        # If ngrok is not running, just assume offline instead of crashing
+        pass
     
-    config_path = conf.get_default().config_path
+    # 2. Check if token exists
     has_token = False
-    if os.path.exists(config_path):
-        with open(config_path, 'r') as f:
-            if "authtoken" in f.read(): has_token = True
+    try:
+        config_path = conf.get_default().config_path
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                if "authtoken" in f.read(): has_token = True
+    except: pass
 
     return jsonify({
         "public_url": public_url,
@@ -306,7 +315,7 @@ def set_tunnel_key():
 
 @app.route("/api/tunnel/start", methods=["POST"])
 def start_tunnel():
-    # 1. Force kill any stuck processes first
+    # 1. Force kill any stuck processes first (Fixes 502 Bad Gateway)
     try:
         ngrok.kill()
         time.sleep(1)
