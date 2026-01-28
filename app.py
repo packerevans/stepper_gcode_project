@@ -275,17 +275,22 @@ def get_tunnel_status():
         "has_token": has_token
     })
 
-@app.route("/api/tunnel/key", methods=["POST"])
-def set_tunnel_key():
-    data = request.json
-    token = data.get("token")
-    if not token: return jsonify(success=False, message="No token provided")
-    
+@app.route("/api/tunnel/start", methods=["POST"])
+def start_tunnel():
+    # 1. Force kill any stuck processes first
+    # This fixes the "Already Online" / 502 Error
     try:
-        ngrok.set_auth_token(token)
-        log_message("Tunnel: Auth Token Saved")
-        return jsonify(success=True)
+        ngrok.kill()
+        time.sleep(1) # Give it a second to close fully
+    except: pass
+
+    try:
+        # 2. Start a fresh connection
+        url = ngrok.connect(5000).public_url
+        log_message(f"Tunnel Started: {url}")
+        return jsonify(success=True, public_url=url)
     except Exception as e:
+        log_message(f"Tunnel Error: {e}")
         return jsonify(success=False, message=str(e))
 
 @app.route("/api/tunnel/start", methods=["POST"])
