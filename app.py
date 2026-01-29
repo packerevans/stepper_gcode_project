@@ -75,7 +75,7 @@ def connect_arduino():
     global arduino, arduino_connected
     try:
         # 115200 to match updated firmware
-        arduino = serial.Serial('/dev/ttyACM0', 115200, timeout=0.1) 
+        arduino = serial.Serial('/dev/ttyACM0', 250000, timeout=0.1) 
         time.sleep(2) 
         arduino_connected = True
         threading.Thread(target=read_from_serial, daemon=True).start()
