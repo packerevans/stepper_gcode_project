@@ -20,18 +20,20 @@ DESIGNS_FOLDER = os.path.join(BASE_DIR, 'templates', 'designs')
 SCHEDULE_FILE = os.path.join(BASE_DIR, 'schedules.json')
 ARDUINO_PROJECT_PATH = os.path.join(BASE_DIR, 'Sand') 
 
-# === AUTO-PORT SELECTION ===
+# === AUTO-PORT SELECTION (5000 -> 6000) ===
 SERVER_PORT = 5000 
 
-def find_available_port(start_port=5000):
-    port = start_port
-    while port < 5100: 
+def find_available_port():
+    # Try 5000 first, then 6000
+    for port in [5000, 6000]:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             try:
                 s.bind(('0.0.0.0', port))
                 return port
             except OSError:
-                port += 1
+                print(f" * Port {port} is busy, trying next...")
+                continue
+    # If both are busy, just default to 5000 (and let it crash/fail naturally)
     return 5000 
 
 if not os.path.exists(DESIGNS_FOLDER):
@@ -73,8 +75,7 @@ current_gcode_runner = None
 def connect_arduino():
     global arduino, arduino_connected
     try:
-        # --- CRITICAL FIX: LGT Nano usually is USB0 and 250000 Baud ---
-        # If this fails, try '/dev/ttyACM0' 
+        # LGT Nano / CH340 usually requires /dev/ttyUSB0 and 250000 baud
         arduino = serial.Serial('/dev/ttyUSB0', 250000, timeout=0.1) 
         time.sleep(2) 
         arduino_connected = True
@@ -221,7 +222,6 @@ class GCodeRunner(threading.Thread):
 
         current_job_name = None
         current_gcode_runner = None
-        log_message("Design Completed.")
         if self.on_complete: self.on_complete()
 
 def on_job_finished(): process_queue(wait_enabled=True)
@@ -273,7 +273,7 @@ def read_from_serial():
                     if current_gcode_runner: current_gcode_runner.process_incoming_serial(line)
             else: time.sleep(0.01) 
         except Exception: 
-            time.sleep(1)
+            time.sleep(1) # RETRY on error
 
 # === TUNNELING SERVICE ===
 @app.route("/api/tunnel", methods=["GET"])
@@ -285,7 +285,9 @@ def get_tunnel_status():
     except: pass
     has_token = False
     try:
-        if os.path.exists(conf.get_default().config_path): has_token = True
+        if os.path.exists(conf.get_default().config_path):
+            with open(conf.get_default().config_path, 'r') as f:
+                if "authtoken" in f.read(): has_token = True
     except: pass
     return jsonify({"public_url": public_url, "has_token": has_token})
 
@@ -304,6 +306,7 @@ def start_tunnel():
     except: pass
     try:
         url = ngrok.connect(SERVER_PORT).public_url
+        log_message(f"Tunnel Started: {url}")
         return jsonify(success=True, public_url=url)
     except Exception as e: return jsonify(success=False, message=str(e))
 
@@ -313,6 +316,22 @@ def stop_tunnel():
         ngrok.kill()
         return jsonify(success=True)
     except Exception as e: return jsonify(success=False, message=str(e))
+
+# === AUTO-START NGROK ===
+def auto_start_ngrok():
+    try:
+        config_path = conf.get_default().config_path
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                if "authtoken" in f.read():
+                    log_message("Auto-starting Ngrok...")
+                    try: ngrok.kill()
+                    except: pass
+                    url = ngrok.connect(SERVER_PORT).public_url
+                    log_message(f"Ngrok Auto-Started: {url}")
+                    print(f" * Public URL: {url}")
+    except Exception as e:
+        log_message(f"Ngrok Auto-Start Failed: {e}")
 
 # === FLASK ROUTES ===
 def get_current_ip():
@@ -469,7 +488,23 @@ def get_logs():
     with lock: return jsonify(list(serial_log))
 
 if __name__ == "__main__":
-    connect_arduino()
+    # 1. Determine Port First
+    SERVER_PORT = find_available_port()
+    
+    # 2. Connect Hardware & Scheduler
+    connect_arduino() 
     SchedulerThread().start()
-    SERVER_PORT = find_available_port(5000)
-    app.run(host="0.0.0.0", port=SERVER_PORT, debug=True, use_reloader=False)
+    
+    # 3. Auto-Start Tunnel (if key saved)
+    auto_start_ngrok()
+    
+    # 4. Start PRODUCTION Server
+    print(f"Starting PRODUCTION server on port {SERVER_PORT}...")
+    
+    try:
+        from waitress import serve
+        # threads=4 is ideal for Pi (matches number of cores)
+        serve(app, host="0.0.0.0", port=SERVER_PORT, threads=4)
+    except ImportError:
+        print("Waitress not found. Falling back to Flask Dev Server...")
+        app.run(host="0.0.0.0", port=SERVER_PORT, debug=True, use_reloader=False)
