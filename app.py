@@ -75,7 +75,7 @@ def connect_arduino():
     global arduino, arduino_connected
     try:
         # 115200 to match updated firmware
-        arduino = serial.Serial('/dev/ttyACM0', 250000, timeout=0.1) 
+        arduino = serial.Serial('/dev/ttyACM0', 115200, timeout=0.1) 
         time.sleep(2) 
         arduino_connected = True
         threading.Thread(target=read_from_serial, daemon=True).start()
@@ -208,6 +208,8 @@ class GCodeRunner(threading.Thread):
         current_job_name = self.filename
         is_paused = False 
         
+        log_message(f"Job Started: {self.filename}")
+
         while self.is_running and self.lines_sent < self.total_lines:
             if self.credits <= 0:
                 self.slot_available_event.clear()
@@ -223,6 +225,7 @@ class GCodeRunner(threading.Thread):
 
         current_job_name = None
         current_gcode_runner = None
+        log_message("Design Completed.")
         if self.on_complete: self.on_complete()
 
 def on_job_finished(): process_queue(wait_enabled=True)
@@ -244,6 +247,7 @@ def process_queue(wait_enabled=True):
     if next_job:
         if wait_enabled:
             is_waiting = True
+            log_message("Design complete. Pausing motors for 30s...")
             if arduino_connected:
                 with lock: arduino.write(b"PAUSE\n")
             for _ in range(30): 
@@ -252,6 +256,7 @@ def process_queue(wait_enabled=True):
             is_waiting = False
         start_job(next_job)
     else:
+        log_message("Queue empty. Pausing motors.")
         current_job_name = None
         if arduino_connected:
             with lock: arduino.write(b"PAUSE\n")
@@ -261,6 +266,7 @@ def start_job(job_data):
     with lock: arduino.write(b"RESUME\n") 
     GCodeRunner(job_data['gcode'], job_data['filename'], on_complete=on_job_finished).start()
 
+# --- RESTORED ROBUST SERIAL READER ---
 def read_from_serial():
     global current_gcode_runner
     while arduino_connected:
@@ -272,7 +278,7 @@ def read_from_serial():
                     if current_gcode_runner: current_gcode_runner.process_incoming_serial(line)
             else: time.sleep(0.01) 
         except Exception: 
-            time.sleep(1) # Retry instead of crashing
+            time.sleep(1) # Wait and retry instead of crashing
 
 # === TUNNELING SERVICE (Ngrok) ===
 
@@ -473,10 +479,12 @@ def send_gcode_block_route():
     filename = data.get("filename", "Unknown")
     
     if not gcode: return jsonify(success=False, error="No G-code"), 400
+    # Added this check back from app (7)
     if not arduino_connected: return jsonify(success=False, error="No Arduino"), 500
     
     if current_gcode_runner is None or not current_gcode_runner.is_alive():
         start_job({'gcode': gcode, 'filename': filename})
+        # Restored explicit success message
         return jsonify(success=True, message=f"Started {filename}")
     else:
         job_queue.append({'gcode': gcode, 'filename': filename})
@@ -564,3 +572,4 @@ if __name__ == "__main__":
     SERVER_PORT = find_available_port(5000)
     print(f"Starting server on port {SERVER_PORT}...")
     app.run(host="0.0.0.0", port=SERVER_PORT, debug=True, use_reloader=False)
+    
