@@ -21,19 +21,18 @@ SCHEDULE_FILE = os.path.join(BASE_DIR, 'schedules.json')
 ARDUINO_PROJECT_PATH = os.path.join(BASE_DIR, 'Sand') 
 
 # === AUTO-PORT SELECTION ===
-SERVER_PORT = 5000 # Default fallback
+SERVER_PORT = 5000 
 
 def find_available_port(start_port=5000):
-    """Try to bind to a port. If busy, try next one."""
     port = start_port
-    while port < 5100: # Try up to 100 ports
+    while port < 5100: 
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             try:
                 s.bind(('0.0.0.0', port))
                 return port
             except OSError:
                 port += 1
-    return 5000 # Fallback
+    return 5000 
 
 if not os.path.exists(DESIGNS_FOLDER):
     try: os.makedirs(DESIGNS_FOLDER)
@@ -74,12 +73,12 @@ current_gcode_runner = None
 def connect_arduino():
     global arduino, arduino_connected
     try:
-        # 115200 to match updated firmware
-        arduino = serial.Serial('/dev/ttyACM0', 115200, timeout=0.1) 
+        # --- FIX: Changed to ttyUSB0 as requested ---
+        arduino = serial.Serial('/dev/ttyUSB0', 115200, timeout=0.1) 
         time.sleep(2) 
         arduino_connected = True
         threading.Thread(target=read_from_serial, daemon=True).start()
-        log_message("Arduino Connected")
+        log_message("Arduino Connected on /dev/ttyUSB0")
     except Exception as e:
         arduino_connected = False
         print(f"WARNING: Arduino not connected: {e}") 
@@ -208,8 +207,6 @@ class GCodeRunner(threading.Thread):
         current_job_name = self.filename
         is_paused = False 
         
-        log_message(f"Job Started: {self.filename}")
-
         while self.is_running and self.lines_sent < self.total_lines:
             if self.credits <= 0:
                 self.slot_available_event.clear()
@@ -225,7 +222,6 @@ class GCodeRunner(threading.Thread):
 
         current_job_name = None
         current_gcode_runner = None
-        log_message("Design Completed.")
         if self.on_complete: self.on_complete()
 
 def on_job_finished(): process_queue(wait_enabled=True)
@@ -247,7 +243,6 @@ def process_queue(wait_enabled=True):
     if next_job:
         if wait_enabled:
             is_waiting = True
-            log_message("Design complete. Pausing motors for 30s...")
             if arduino_connected:
                 with lock: arduino.write(b"PAUSE\n")
             for _ in range(30): 
@@ -256,7 +251,6 @@ def process_queue(wait_enabled=True):
             is_waiting = False
         start_job(next_job)
     else:
-        log_message("Queue empty. Pausing motors.")
         current_job_name = None
         if arduino_connected:
             with lock: arduino.write(b"PAUSE\n")
@@ -266,7 +260,6 @@ def start_job(job_data):
     with lock: arduino.write(b"RESUME\n") 
     GCodeRunner(job_data['gcode'], job_data['filename'], on_complete=on_job_finished).start()
 
-# --- RESTORED ROBUST SERIAL READER ---
 def read_from_serial():
     global current_gcode_runner
     while arduino_connected:
@@ -278,13 +271,12 @@ def read_from_serial():
                     if current_gcode_runner: current_gcode_runner.process_incoming_serial(line)
             else: time.sleep(0.01) 
         except Exception: 
-            time.sleep(1) # Wait and retry instead of crashing
+            time.sleep(1) # RETRY, DO NOT BREAK
 
 # === TUNNELING SERVICE (Ngrok) ===
 
 @app.route("/api/tunnel", methods=["GET"])
 def get_tunnel_status():
-    # 1. Safely check for tunnels (Fixes "None/api/tunnels" error)
     public_url = None
     try:
         tunnels = ngrok.get_tunnels()
@@ -292,7 +284,6 @@ def get_tunnel_status():
     except Exception:
         pass
     
-    # 2. Check if token exists
     has_token = False
     try:
         config_path = conf.get_default().config_path
@@ -321,14 +312,12 @@ def set_tunnel_key():
 
 @app.route("/api/tunnel/start", methods=["POST"])
 def start_tunnel():
-    # 1. Force kill any stuck processes first
     try:
         ngrok.kill()
         time.sleep(1)
     except: pass
 
     try:
-        # 2. AUTO-PORT: Start a fresh connection using the dynamic port
         url = ngrok.connect(SERVER_PORT).public_url
         log_message(f"Tunnel Started on port {SERVER_PORT}: {url}")
         return jsonify(success=True, public_url=url)
@@ -479,12 +468,13 @@ def send_gcode_block_route():
     filename = data.get("filename", "Unknown")
     
     if not gcode: return jsonify(success=False, error="No G-code"), 400
-    # Added this check back from app (7)
-    if not arduino_connected: return jsonify(success=False, error="No Arduino"), 500
+    
+    # --- FIX: THIS WAS MISSING. If Arduino isn't connected, tell the website! ---
+    if not arduino_connected: 
+        return jsonify(success=False, error="Arduino not connected (Check Port)"), 500
     
     if current_gcode_runner is None or not current_gcode_runner.is_alive():
         start_job({'gcode': gcode, 'filename': filename})
-        # Restored explicit success message
         return jsonify(success=True, message=f"Started {filename}")
     else:
         job_queue.append({'gcode': gcode, 'filename': filename})
@@ -572,4 +562,3 @@ if __name__ == "__main__":
     SERVER_PORT = find_available_port(5000)
     print(f"Starting server on port {SERVER_PORT}...")
     app.run(host="0.0.0.0", port=SERVER_PORT, debug=True, use_reloader=False)
-    
