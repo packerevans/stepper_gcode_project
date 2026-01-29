@@ -45,15 +45,33 @@
         /* Cards */
         .card {
             background: var(--color-surface); border-radius: var(--radius);
-            padding: 20px; margin-bottom: 20px;
+            padding: 10px 20px; margin-bottom: 20px;
             box-shadow: var(--shadow);
         }
-        h2 { margin-top: 0; font-size: 1.2rem; margin-bottom: 15px; border-bottom: 2px solid var(--color-accent); display: inline-block; padding-bottom: 5px; }
+        
+        /* Collapsible Styles */
+        details { width: 100%; }
+        summary { 
+            cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 0; outline: none; font-weight: 700; font-size: 1.1rem; color: var(--color-text);
+        }
+        summary::-webkit-details-marker { display: none; }
+        summary h2 { margin: 0; border: none; font-size: 1.1rem; display: inline-block; border-bottom: 2px solid transparent; transition: 0.3s; }
+        details[open] summary h2 { border-bottom-color: var(--color-accent); color: var(--color-accent); }
+        summary::after { content: '+'; font-weight: bold; font-size: 1.2rem; color: var(--color-accent); margin-left: 10px; }
+        details[open] summary::after { content: '-'; }
+        
+        .card-content { 
+            margin-top: 15px; margin-bottom: 10px; 
+            border-top: 1px solid rgba(0,0,0,0.05); padding-top: 15px;
+            animation: slideDown 0.3s ease-out; 
+        }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 
         /* Forms */
         .form-group { margin-bottom: 15px; }
         label { display: block; font-size: 0.9rem; font-weight: 600; margin-bottom: 5px; opacity: 0.8; }
-        select, input[type="time"], input[type="text"], input[type="color"], input[type="password"] {
+        select, input[type="time"], input[type="text"], input[type="color"], input[type="password"], input[type="number"] {
             width: 100%; padding: 10px; border-radius: 8px;
             border: 1px solid rgba(0,0,0,0.1);
             background: var(--color-bg); color: var(--color-text);
@@ -90,7 +108,7 @@
         .sch-days { font-size: 0.8rem; opacity: 0.7; }
         .sch-action { font-size: 0.9rem; color: var(--color-accent); font-weight: 600; }
 
-        /* Sidebar & Overlay (Copied from designs.html) */
+        /* Sidebar & Overlay */
         .sidebar { height: 100%; width: 0; position: fixed; top: 0; left: 0; background: var(--color-surface); overflow-x: hidden; z-index: 1100; transition: 0.3s; padding-top: 20px; border-right: 1px solid rgba(0,0,0,0.1); }
         .sidebar a { padding: 15px 25px; text-decoration: none; font-size: 1.1rem; color: var(--color-text); display: block; font-weight: 600; }
         .overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); z-index: 1050; display: none; }
@@ -100,7 +118,7 @@
 
     <header>
         <button class="icon-btn" onclick="openNav()">☰</button>
-        <div class="page-title">Scheduler</div>
+        <div class="page-title">Settings</div>
         <button class="icon-btn" onclick="toggleTheme()">◑</button>
     </header>
 
@@ -117,94 +135,140 @@
     <div class="container">
         
         <div class="card">
-            <h2>Remote Access (Tunneling)</h2>
-            <div style="font-size: 0.9rem; margin-bottom: 15px; opacity: 0.8;">
-                Access your Sand Table from anywhere in the world.
-                <ol style="margin-left: 20px; margin-top: 5px;">
-                    <li><a href="https://dashboard.ngrok.com/get-started/your-authtoken" target="_blank" style="color: var(--color-accent); font-weight: bold;">Click here to get your Auth Key</a> (Ngrok).</li>
-                    <li>Paste the key below and click Connect.</li>
-                </ol>
-            </div>
-
-            <div class="form-group">
-                <label>Auth Token</label>
-                <input type="password" id="tunnel-key" placeholder="Paste key here (starts with 1X...)" onchange="saveTunnelKey()">
-            </div>
-
-            <div class="form-group">
-                <label>Status</label>
-                <div id="tunnel-status" style="padding: 10px; background: rgba(0,0,0,0.05); border-radius: 8px; font-family: monospace; font-weight: bold;">
-                    Checking...
+            <details open>
+                <summary><h2>General & Cooldown</h2></summary>
+                <div class="card-content">
+                    <div class="form-group">
+                        <label>Cooldown Time (Seconds)</label>
+                        <div style="font-size:0.8rem; opacity:0.7; margin-bottom:8px;">
+                            Time to wait between designs when shuffling or looping.
+                        </div>
+                        <input type="number" id="set-cooldown" min="0" max="3600" value="30">
+                    </div>
+                    <button class="btn" onclick="saveGeneralSettings()">Save Settings</button>
                 </div>
-            </div>
-
-            <div style="display: flex; gap: 10px;">
-                <button class="btn" onclick="toggleTunnel(true)" style="background: var(--color-selected);">Start Tunnel</button>
-                <button class="btn btn-delete" onclick="toggleTunnel(false)">Stop</button>
-            </div>
-            
-            <div id="public-url-container" style="margin-top: 15px; display: none;">
-                <label>Public URL</label>
-                <a id="public-url-link" href="#" target="_blank" style="display: block; padding: 10px; background: var(--color-accent); color: white; text-align: center; border-radius: 8px; text-decoration: none; font-weight: bold;">
-                    ...
-                </a>
-            </div>
+            </details>
         </div>
 
         <div class="card">
-            <h2>New Automation</h2>
-            
-            <div class="form-group">
-                <label>Time</label>
-                <input type="time" id="sch-time" value="10:00">
-            </div>
+            <details>
+                <summary><h2>Remote Access</h2></summary>
+                <div class="card-content">
+                    <div style="font-size: 0.9rem; margin-bottom: 15px; opacity: 0.8;">
+                        Access your Sand Table from anywhere.
+                        <ol style="margin-left: 20px; margin-top: 5px;">
+                            <li><a href="https://dashboard.ngrok.com/get-started/your-authtoken" target="_blank" style="color: var(--color-accent); font-weight: bold;">Click here to get Auth Key</a> (Ngrok).</li>
+                            <li>Paste the key below and click Start.</li>
+                        </ol>
+                    </div>
 
-            <div class="form-group">
-                <label>Repeat On</label>
-                <div class="days-grid">
-                    <input type="checkbox" id="d-mon" class="day-check" value="Mon"><label for="d-mon" class="day-label">Mon</label>
-                    <input type="checkbox" id="d-tue" class="day-check" value="Tue"><label for="d-tue" class="day-label">Tue</label>
-                    <input type="checkbox" id="d-wed" class="day-check" value="Wed"><label for="d-wed" class="day-label">Wed</label>
-                    <input type="checkbox" id="d-thu" class="day-check" value="Thu"><label for="d-thu" class="day-label">Thu</label>
-                    <input type="checkbox" id="d-fri" class="day-check" value="Fri"><label for="d-fri" class="day-label">Fri</label>
-                    <input type="checkbox" id="d-sat" class="day-check" value="Sat"><label for="d-sat" class="day-label">Sat</label>
-                    <input type="checkbox" id="d-sun" class="day-check" value="Sun"><label for="d-sun" class="day-label">Sun</label>
+                    <div class="form-group">
+                        <label>Auth Token</label>
+                        <input type="password" id="tunnel-key" placeholder="Paste key here (starts with 1X...)" onchange="saveTunnelKey()">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Status</label>
+                        <div id="tunnel-status" style="padding: 10px; background: rgba(0,0,0,0.05); border-radius: 8px; font-family: monospace; font-weight: bold;">
+                            Checking...
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn" onclick="toggleTunnel(true)" style="background: var(--color-selected);">Start Tunnel</button>
+                        <button class="btn btn-delete" onclick="toggleTunnel(false)">Stop</button>
+                    </div>
+                    
+                    <div id="public-url-container" style="margin-top: 15px; display: none;">
+                        <label>Public URL</label>
+                        <a id="public-url-link" href="#" target="_blank" style="display: block; padding: 10px; background: var(--color-accent); color: white; text-align: center; border-radius: 8px; text-decoration: none; font-weight: bold;">
+                            ...
+                        </a>
+                    </div>
                 </div>
-            </div>
-
-            <div class="form-group">
-                <label>Action Type</label>
-                <select id="sch-type" onchange="updateFields()">
-                    <option value="led_off">Turn LEDs OFF</option>
-                    <option value="led_color">Set LED Color</option>
-                    <option value="sand_shuffle">Sand: Shuffle Play</option>
-                    <option value="sand_specific">Sand: Play Specific Design</option>
-                    <option value="stop_sand">Stop Sand Table</option>
-                </select>
-            </div>
-
-            <div id="field-color" class="form-group" style="display:none;">
-                <label>Select Color</label>
-                <input type="color" id="sch-color" value="#ff0000">
-            </div>
-
-            <div id="field-file" class="form-group" style="display:none;">
-                <label>Select Design</label>
-                <select id="sch-file"></select>
-            </div>
-
-            <button class="btn" onclick="saveSchedule()">Save Trigger</button>
+            </details>
         </div>
 
         <div class="card">
-            <h2>Active Schedules</h2>
-            <div id="schedule-list"></div>
+            <details>
+                <summary><h2>New Automation</h2></summary>
+                <div class="card-content">
+                    <div class="form-group">
+                        <label>Time</label>
+                        <input type="time" id="sch-time" value="10:00">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Repeat On</label>
+                        <div class="days-grid">
+                            <input type="checkbox" id="d-mon" class="day-check" value="Mon"><label for="d-mon" class="day-label">Mon</label>
+                            <input type="checkbox" id="d-tue" class="day-check" value="Tue"><label for="d-tue" class="day-label">Tue</label>
+                            <input type="checkbox" id="d-wed" class="day-check" value="Wed"><label for="d-wed" class="day-label">Wed</label>
+                            <input type="checkbox" id="d-thu" class="day-check" value="Thu"><label for="d-thu" class="day-label">Thu</label>
+                            <input type="checkbox" id="d-fri" class="day-check" value="Fri"><label for="d-fri" class="day-label">Fri</label>
+                            <input type="checkbox" id="d-sat" class="day-check" value="Sat"><label for="d-sat" class="day-label">Sat</label>
+                            <input type="checkbox" id="d-sun" class="day-check" value="Sun"><label for="d-sun" class="day-label">Sun</label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Action Type</label>
+                        <select id="sch-type" onchange="updateFields()">
+                            <option value="led_off">Turn LEDs OFF</option>
+                            <option value="led_color">Set LED Color</option>
+                            <option value="sand_shuffle">Sand: Shuffle Play</option>
+                            <option value="sand_specific">Sand: Play Specific Design</option>
+                            <option value="stop_sand">Stop Sand Table</option>
+                        </select>
+                    </div>
+
+                    <div id="field-color" class="form-group" style="display:none;">
+                        <label>Select Color</label>
+                        <input type="color" id="sch-color" value="#ff0000">
+                    </div>
+
+                    <div id="field-file" class="form-group" style="display:none;">
+                        <label>Select Design</label>
+                        <select id="sch-file"></select>
+                    </div>
+
+                    <button class="btn" onclick="saveSchedule()">Save Trigger</button>
+                </div>
+            </details>
+        </div>
+
+        <div class="card">
+            <details open>
+                <summary><h2>Active Schedules</h2></summary>
+                <div class="card-content">
+                    <div id="schedule-list"></div>
+                </div>
+            </details>
         </div>
 
     </div>
 
     <script>
         const BASE_URL = `${window.location.protocol}//${window.location.host}`;
+
+        // --- GENERAL SETTINGS ---
+        async function loadGeneralSettings() {
+            try {
+                let r = await fetch('/api/settings');
+                let d = await r.json();
+                if(d.cooldown !== undefined) document.getElementById('set-cooldown').value = d.cooldown;
+            } catch(e) { console.log(e); }
+        }
+
+        async function saveGeneralSettings() {
+            let cd = parseInt(document.getElementById('set-cooldown').value);
+            if (isNaN(cd) || cd < 0) { alert("Invalid cooldown time"); return; }
+            await fetch('/api/settings', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({cooldown: cd})
+            });
+            alert("Settings Saved!");
+        }
 
         // --- TUNNEL LOGIC ---
         async function getTunnelStatus() {
@@ -333,6 +397,7 @@
 
         loadDesigns();
         loadSchedules();
+        loadGeneralSettings();
         getTunnelStatus();
         setInterval(getTunnelStatus, 5000);
     </script>
