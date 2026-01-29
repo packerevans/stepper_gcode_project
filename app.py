@@ -197,7 +197,8 @@ class GCodeRunner(threading.Thread):
             self.lines_sent += 1
             self.credits -= 1 
             return True
-        except:
+        except Exception as e:
+            log_message(f"SERIAL ERROR: {e}")
             self.is_running = False
             return False
 
@@ -261,7 +262,8 @@ def start_job(job_data):
     GCodeRunner(job_data['gcode'], job_data['filename'], on_complete=on_job_finished).start()
 
 def read_from_serial():
-    while arduino_connected and arduino and arduino.is_open:
+    global current_gcode_runner
+    while arduino_connected:
         try:
             if arduino.in_waiting > 0:
                 line = arduino.readline().decode(errors="ignore").strip()
@@ -269,9 +271,8 @@ def read_from_serial():
                     if "ERROR" in line: log_message(f"Ard: {line}")
                     if current_gcode_runner: current_gcode_runner.process_incoming_serial(line)
             else: time.sleep(0.01) 
-        except: 
-            time.sleep(1)
-            break 
+        except Exception: 
+            time.sleep(1) # Retry instead of crashing
 
 # === TUNNELING SERVICE (Ngrok) ===
 
@@ -283,7 +284,6 @@ def get_tunnel_status():
         tunnels = ngrok.get_tunnels()
         public_url = tunnels[0].public_url if tunnels else None
     except Exception:
-        # If ngrok is not running, just assume offline instead of crashing
         pass
     
     # 2. Check if token exists
@@ -315,7 +315,7 @@ def set_tunnel_key():
 
 @app.route("/api/tunnel/start", methods=["POST"])
 def start_tunnel():
-    # 1. Force kill any stuck processes first (Fixes 502 Bad Gateway)
+    # 1. Force kill any stuck processes first
     try:
         ngrok.kill()
         time.sleep(1)
@@ -471,10 +471,16 @@ def send_gcode_block_route():
     data = request.json
     gcode = data.get("gcode")
     filename = data.get("filename", "Unknown")
+    
     if not gcode: return jsonify(success=False, error="No G-code"), 400
-    if current_gcode_runner is None or not current_gcode_runner.is_alive(): start_job({'gcode': gcode, 'filename': filename})
-    else: job_queue.append({'gcode': gcode, 'filename': filename})
-    return jsonify(success=True)
+    if not arduino_connected: return jsonify(success=False, error="No Arduino"), 500
+    
+    if current_gcode_runner is None or not current_gcode_runner.is_alive():
+        start_job({'gcode': gcode, 'filename': filename})
+        return jsonify(success=True, message=f"Started {filename}")
+    else:
+        job_queue.append({'gcode': gcode, 'filename': filename})
+        return jsonify(success=True, message="Added to Queue")
 
 @app.route("/delete_design", methods=["POST"])
 def delete_design():
