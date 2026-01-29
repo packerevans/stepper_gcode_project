@@ -178,4 +178,298 @@ class GCodeRunner(threading.Thread):
         self.on_complete = on_complete
         self.ARDUINO_BUFFER_SIZE = 25  
         self.credits = self.ARDUINO_BUFFER_SIZE 
-        self.lines
+        self.lines_sent = 0
+        self.slot_available_event = threading.Event()
+
+    def process_incoming_serial(self, line):
+        if line.strip().upper() == "DONE":
+            with lock:
+                if self.credits < self.ARDUINO_BUFFER_SIZE: self.credits += 1
+                self.slot_available_event.set() 
+
+    def send_line(self, line):
+        try:
+            with lock: arduino.write((line + "\n").encode())
+            self.lines_sent += 1
+            self.credits -= 1 
+            return True
+        except Exception as e:
+            log_message(f"SERIAL ERROR: {e}")
+            self.is_running = False
+            return False
+
+    def run(self):
+        global current_gcode_runner, current_job_name, is_paused
+        current_gcode_runner = self
+        current_job_name = self.filename
+        is_paused = False 
+        
+        log_message(f"Job Started: {self.filename}")
+
+        while self.is_running and self.lines_sent < self.total_lines:
+            if self.credits <= 0:
+                self.slot_available_event.clear()
+                if not self.slot_available_event.wait(timeout=10.0): break
+            if self.is_running:
+                if not self.send_line(self.lines[self.lines_sent]): break
+                time.sleep(0.002) 
+
+        if self.is_running:
+            while self.credits < self.ARDUINO_BUFFER_SIZE:
+                time.sleep(0.2)
+                if not self.is_running: break
+
+        current_job_name = None
+        current_gcode_runner = None
+        log_message("Design Completed.")
+        if self.on_complete: self.on_complete()
+
+def on_job_finished(): process_queue(wait_enabled=True)
+
+def process_queue(wait_enabled=True):
+    global current_job_name, is_looping, is_waiting, is_paused
+    if current_gcode_runner and current_gcode_runner.is_alive(): return
+
+    next_job = None
+    if len(job_queue) > 0: next_job = job_queue.popleft()
+    elif is_looping and len(loop_playlist) > 0:
+        next_file = loop_playlist.pop(0)
+        loop_playlist.append(next_file) 
+        try:
+            with open(os.path.join(DESIGNS_FOLDER, next_file), 'r') as f: 
+                next_job = {'gcode': f.read(), 'filename': next_file}
+        except: process_queue(wait_enabled=False); return
+
+    if next_job:
+        if wait_enabled:
+            is_waiting = True
+            log_message("Cooling down...")
+            if arduino_connected:
+                with lock: arduino.write(b"PAUSE\n")
+            for _ in range(30): 
+                if not is_looping and len(job_queue) == 0: break
+                time.sleep(1)
+            is_waiting = False
+        start_job(next_job)
+    else:
+        log_message("Queue empty.")
+        current_job_name = None
+        if arduino_connected:
+            with lock: arduino.write(b"PAUSE\n")
+
+def start_job(job_data):
+    if not arduino_connected: return
+    with lock: arduino.write(b"RESUME\n") 
+    GCodeRunner(job_data['gcode'], job_data['filename'], on_complete=on_job_finished).start()
+
+def read_from_serial():
+    global current_gcode_runner
+    while arduino_connected:
+        try:
+            if arduino.in_waiting > 0:
+                line = arduino.readline().decode(errors="ignore").strip()
+                if line:
+                    if "ERROR" in line: log_message(f"Ard: {line}")
+                    if current_gcode_runner: current_gcode_runner.process_incoming_serial(line)
+            else: time.sleep(0.01) 
+        except Exception: 
+            time.sleep(1)
+
+# === TUNNELING SERVICE ===
+@app.route("/api/tunnel", methods=["GET"])
+def get_tunnel_status():
+    public_url = None
+    try:
+        tunnels = ngrok.get_tunnels()
+        public_url = tunnels[0].public_url if tunnels else None
+    except: pass
+    has_token = False
+    try:
+        if os.path.exists(conf.get_default().config_path): has_token = True
+    except: pass
+    return jsonify({"public_url": public_url, "has_token": has_token})
+
+@app.route("/api/tunnel/key", methods=["POST"])
+def set_tunnel_key():
+    try:
+        ngrok.set_auth_token(request.json.get("token"))
+        return jsonify(success=True)
+    except Exception as e: return jsonify(success=False, message=str(e))
+
+@app.route("/api/tunnel/start", methods=["POST"])
+def start_tunnel():
+    try:
+        ngrok.kill()
+        time.sleep(1)
+    except: pass
+    try:
+        url = ngrok.connect(SERVER_PORT).public_url
+        return jsonify(success=True, public_url=url)
+    except Exception as e: return jsonify(success=False, message=str(e))
+
+@app.route("/api/tunnel/stop", methods=["POST"])
+def stop_tunnel():
+    try:
+        ngrok.kill()
+        return jsonify(success=True)
+    except Exception as e: return jsonify(success=False, message=str(e))
+
+# === FLASK ROUTES ===
+def get_current_ip():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(('10.254.254.254', 1)) 
+        ip = s.getsockname()[0]; s.close()
+    except: ip = '127.0.0.1'
+    return ip
+
+@app.route("/")
+def index():
+    if get_current_ip() in ["10.42.0.1", "192.168.4.1"]: return redirect(url_for('wifi_setup_page'))
+    return render_template("designs.html")
+
+@app.route("/settings")
+def settings_page(): return render_template("settings.html")
+@app.route("/script")
+def script(): return render_template("script.html")
+
+@app.route("/pull", methods=["POST"])
+def git_pull():
+    try:
+        r = subprocess.run(["git", "pull"], cwd=BASE_DIR, capture_output=True, text=True, timeout=30)
+        return jsonify(success=(r.returncode==0), message=r.stdout[:500] if r.returncode==0 else r.stderr)
+    except Exception as e: return jsonify(success=False, message=str(e))
+
+@app.route("/update_firmware", methods=["POST"])
+def update_firmware():
+    global arduino, arduino_connected
+    if arduino: arduino.close(); arduino_connected = False
+    try:
+        subprocess.run(["arduino-cli", "compile", "--fqbn", "arduino:avr:uno", ARDUINO_PROJECT_PATH], check=True)
+        subprocess.run(["arduino-cli", "upload", "-p", "/dev/ttyUSB0", "--fqbn", "arduino:avr:uno", ARDUINO_PROJECT_PATH], check=True)
+        connect_arduino()
+        return jsonify(success=True, message="Firmware Updated")
+    except Exception as e: 
+        connect_arduino()
+        return jsonify(success=False, message=str(e))
+
+@app.route("/shutdown", methods=["POST"])
+def shutdown(): subprocess.Popen(["sudo", "shutdown", "now"]); return jsonify(success=True)
+@app.route("/reboot", methods=["POST"])
+def reboot(): subprocess.Popen(["sudo", "reboot"]); return jsonify(success=True)
+
+@app.route("/api/schedule", methods=["GET", "POST", "DELETE"])
+def api_schedule():
+    if request.method == "GET": return jsonify(load_schedules())
+    if request.method == "POST":
+        d = request.json; s = load_schedules(); s.append(d); save_schedules(s)
+        return jsonify(success=True)
+    if request.method == "DELETE":
+        idx = request.json.get('index'); s = load_schedules()
+        if 0<=idx<len(s): del s[idx]; save_schedules(s)
+        return jsonify(success=True)
+
+@app.route("/status_full", methods=["GET"])
+def status_full():
+    q = []
+    for i, j in enumerate(job_queue): q.append({"index": i, "name": j['filename'].replace('.txt', ''), "type": "queue"})
+    if is_looping:
+        for i in range(min(len(loop_playlist), 10)): q.append({"index": i, "name": loop_playlist[i].replace('.txt', ''), "type": "loop"})
+    return jsonify({
+        "playing": current_job_name.replace('.txt', '') if current_job_name else None,
+        "queue_count": len(job_queue),
+        "queue_items": q,
+        "next_up": q[0]["name"] if q else "None",
+        "is_looping": is_looping, "is_paused": is_paused, "is_waiting": is_waiting  
+    })
+
+@app.route("/remove_from_queue", methods=["POST"])
+def remove_from_queue():
+    try:
+        idx = int(request.json.get("index")); typ = request.json.get("type")
+        if typ == "queue": del job_queue[idx]
+        elif typ == "loop": del loop_playlist[idx]
+        return jsonify(success=True)
+    except: return jsonify(success=False)
+
+@app.route("/set_loop", methods=["POST"])
+def set_loop():
+    global is_looping, loop_playlist
+    loop_playlist = request.json.get("files", []); is_looping = True
+    if not current_gcode_runner or not current_gcode_runner.is_alive(): process_queue(wait_enabled=False)
+    return jsonify(success=True)
+
+@app.route("/cancel_loop", methods=["POST"])
+def cancel_loop():
+    global is_looping, loop_playlist; is_looping = False; loop_playlist = []; return jsonify(success=True)
+
+@app.route("/send_gcode_block", methods=["POST"])
+def send_gcode_block_route():
+    if not arduino_connected: return jsonify(success=False, error="Arduino Disconnected (Check USB)"), 500
+    d = request.json; g = d.get("gcode"); f = d.get("filename")
+    if not current_gcode_runner or not current_gcode_runner.is_alive():
+        start_job({'gcode': g, 'filename': f}); return jsonify(success=True, message=f"Started {f}")
+    else:
+        job_queue.append({'gcode': g, 'filename': f}); return jsonify(success=True, message="Queued")
+
+@app.route("/delete_design", methods=["POST"])
+def delete_design():
+    f = request.json.get("filename"); p = os.path.join(DESIGNS_FOLDER, f)
+    if os.path.exists(p): os.remove(p); os.remove(p.replace('.txt','.png')); return jsonify(success=True)
+    return jsonify(success=False)
+
+@app.route("/save_design", methods=["POST"])
+def save_design():
+    f = request.json.get("filename"); g = request.json.get("gcode")
+    with open(os.path.join(DESIGNS_FOLDER, f), "w") as file: file.write(g)
+    return jsonify(success=True)
+
+@app.route("/send", methods=["POST"])
+def send_command():
+    global is_paused
+    cmd = request.json.get("command")
+    if cmd == "CLEAR":
+        global is_looping, loop_playlist; is_looping = False; loop_playlist = []; job_queue.clear()
+        if current_gcode_runner: current_gcode_runner.is_running = False
+        if arduino_connected: lock.acquire(); arduino.write(b"CLEAR\n"); lock.release()
+        return jsonify(success=True)
+    if cmd == "PAUSE": is_paused = True
+    elif cmd == "RESUME": is_paused = False
+    elif cmd.startswith("LED:") or cmd in ["POWER:ON", "POWER:OFF"]:
+        asyncio.run_coroutine_threadsafe(ble_controller.handle_command(cmd), ble_controller.loop)
+        return jsonify(success=True)
+    
+    if arduino_connected: lock.acquire(); arduino.write((cmd+"\n").encode()); lock.release(); return jsonify(success=True)
+    return jsonify(success=False)
+
+@app.route("/wifi_setup")
+def wifi_setup_page(): return render_template("wifi_setup.html", networks=wifi_tools.get_wifi_networks(), saved_networks=wifi_tools.get_saved_networks())
+@app.route("/api/forget_wifi", methods=["POST"])
+def forget_wifi_route(): success, msg = wifi_tools.forget_network(request.json.get("ssid")); return jsonify(success=success, message=msg)
+@app.route("/check_password", methods=["POST"])
+def check_password_route(): return jsonify(success=(request.json.get("password") == "2025"))
+
+# --- PAGES ---
+@app.route("/terminal")
+def terminal(): return render_template("terminal.html")
+@app.route("/led_controls")
+def led_controls(): return render_template("led_controls.html")
+@app.route("/AI_builder")
+def AI_builder(): return render_template("AI_builder.html")
+@app.route("/designs")
+def designs(): return render_template("designs.html")
+@app.route('/designs/<path:filename>')
+def serve_design_file(filename): return send_from_directory(DESIGNS_FOLDER, filename)
+@app.route('/api/designs')
+def list_designs():
+    try: return jsonify([f for f in os.listdir(DESIGNS_FOLDER) if f.endswith('.txt')])
+    except: return jsonify([])
+@app.route("/terminal/logs")
+def get_logs():
+    with lock: return jsonify(list(serial_log))
+
+if __name__ == "__main__":
+    connect_arduino()
+    SchedulerThread().start()
+    SERVER_PORT = find_available_port(5000)
+    app.run(host="0.0.0.0", port=SERVER_PORT, debug=True, use_reloader=False)
