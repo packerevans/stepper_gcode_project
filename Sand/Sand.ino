@@ -1,9 +1,7 @@
 // ==========================================
-//      ARDUINO SAND TABLE FIRMWARE v6
-//      High-Speed Baud + Smoothness Fix
+//      DEBUG MODE: SAND TABLE FIRMWARE
 // ==========================================
 
-// --- YOUR SPECIFIC MOTOR PINS ---
 const int stepBase = 8;
 const int dirBase  = 9;
 const int stepArm  = 10;
@@ -15,17 +13,9 @@ const int ms1 = 4;
 const int ms2 = 5;
 const int ms3 = 6;
 
-// --- SETTINGS ---
-#define BAUD_RATE 115200  // Matches your new Python setting
+#define BAUD_RATE 250000  
+const float SPEED_MULTIPLIER = 2.0;
 
-// SPEED MULTIPLIER (The "Smoothness" Fix)
-// Since data arrives faster now, we multiply the delay to slow
-// the physical motors down to a graceful speed.
-// 1.0 = Raw Speed (Fast/Jerky)
-// 2.0 = Half Speed (Smoother)
-const float SPEED_MULTIPLIER = 2.0; 
-
-// --- STATE VARIABLES ---
 bool paused = true;
 const int MAX_QUEUE_SIZE = 50;
 
@@ -34,10 +24,10 @@ const int CMD_MOVE = 0;
 const int CMD_WAIT = 1;
 
 struct GCommand {
-  int type;       // 0 = Move, 1 = Wait (M0)
+  int type;
   long armSteps;
   long baseSteps;
-  int speed;      // This is actually the delay in microseconds
+  int speed;
 };
 
 GCommand queue[MAX_QUEUE_SIZE];
@@ -52,16 +42,21 @@ void setup() {
   pinMode(stepArm, OUTPUT);  pinMode(dirArm, OUTPUT);
   pinMode(enPin, OUTPUT);
 
-  // 1/32 Microstepping Setup
   pinMode(ms1, OUTPUT); pinMode(ms2, OUTPUT); pinMode(ms3, OUTPUT);
   digitalWrite(ms1, HIGH); digitalWrite(ms2, HIGH); digitalWrite(ms3, HIGH);
 
-  digitalWrite(enPin, HIGH); // Start Disabled
-  Serial.println(F("READY"));
+  digitalWrite(enPin, HIGH);
+  
+  // --- DEBUG 1: PROVE STARTUP ---
+  Serial.println(F("--- DEBUG: SYSTEM START ---"));
+  Serial.println(F("LGT_READY"));
 }
 
 void loop() {
-  if (Serial.available()) handleSerial();
+  // Check if data is arriving
+  if (Serial.available()) {
+    handleSerial();
+  }
 
   if (!paused && queueCount > 0) {
     executeNextCommand();
@@ -69,10 +64,29 @@ void loop() {
 }
 
 void handleSerial() {
+  // --- DEBUG 2: PROVE DATA ARRIVAL ---
+  Serial.println(F("DEBUG: Serial Data Detected!")); 
+  
   while (Serial.available() > 0) {
+    // Read the incoming line
     String cmd = Serial.readStringUntil('\n');
+    
+    // --- DEBUG 3: SHOW WHAT WE HEARD ---
+    Serial.print(F("DEBUG: Raw Input: ["));
+    Serial.print(cmd);
+    Serial.println(F("]"));
+
     cmd.trim();
-    if (cmd.length() == 0) continue;
+    
+    // --- DEBUG 4: SHOW TRIMMED COMMAND ---
+    Serial.print(F("DEBUG: Trimmed Input: ["));
+    Serial.print(cmd);
+    Serial.println(F("]"));
+
+    if (cmd.length() == 0) {
+        Serial.println(F("DEBUG: Ignoring empty line."));
+        continue;
+    }
 
     if (cmd.equalsIgnoreCase("PAUSE")) {
       paused = true;
@@ -89,10 +103,15 @@ void handleSerial() {
       Serial.println(F("Cleared"));
     }
     else if (cmd.startsWith("G1")) {
+      Serial.println(F("DEBUG: G1 Move Identified"));
       parseAndEnqueueMove(cmd);
     }
     else if (cmd.startsWith("M0") || cmd.startsWith("m0")) {
       enqueuePause();
+    }
+    else {
+      // --- DEBUG 5: CATCH UNKNOWN COMMANDS ---
+      Serial.println(F("DEBUG: Unknown Command!"));
     }
   }
 }
@@ -103,7 +122,6 @@ void enqueuePause() {
     queue[queueTail].armSteps = 0;
     queue[queueTail].baseSteps = 0;
     queue[queueTail].speed = 0;
-    
     queueTail = (queueTail + 1) % MAX_QUEUE_SIZE;
     queueCount++;
   } else {
@@ -112,7 +130,6 @@ void enqueuePause() {
 }
 
 void parseAndEnqueueMove(String cmd) {
-  // Expected Format: G1 <Elbow> <Base> <Speed>
   long armSteps = 0;
   long baseSteps = 0;
   int speed = 1000;
@@ -133,12 +150,16 @@ void parseAndEnqueueMove(String cmd) {
     }
   }
 
+  Serial.print(F("DEBUG: Queuing Move -> Arm:"));
+  Serial.print(armSteps);
+  Serial.print(F(" Base:"));
+  Serial.println(baseSteps);
+
   if (queueCount < MAX_QUEUE_SIZE) {
     queue[queueTail].type = CMD_MOVE;
     queue[queueTail].armSteps = armSteps;
     queue[queueTail].baseSteps = baseSteps;
     queue[queueTail].speed = speed;
-    
     queueTail = (queueTail + 1) % MAX_QUEUE_SIZE;
     queueCount++;
   } else {
@@ -163,10 +184,10 @@ void executeNextCommand() {
 void performProgrammedPause() {
   Serial.println(F("Done")); 
   digitalWrite(enPin, HIGH);
-  
   bool waiting = true;
   while (waiting) {
     if (Serial.available()) {
+      // READ AND RESPOND DURING PAUSE
       String input = Serial.readStringUntil('\n');
       input.trim();
       if (input.equalsIgnoreCase("R") || input.equalsIgnoreCase("RESUME")) {
@@ -183,7 +204,6 @@ void performProgrammedPause() {
 
 void moveBresenham(long da, long db, int delayUs) {
   digitalWrite(enPin, LOW);
-
   digitalWrite(dirArm, (da >= 0) ? HIGH : LOW);
   digitalWrite(dirBase, (db >= 0) ? HIGH : LOW);
 
@@ -194,10 +214,6 @@ void moveBresenham(long da, long db, int delayUs) {
   long accA = steps / 2;
   long accB = steps / 2;
 
-  // --- SMOOTHNESS LOGIC APPLIED HERE ---
-  // We multiply the requested delay by our factor.
-  // This slows down the loop, making the movement smoother 
-  // despite the high-speed data connection.
   int finalDelay = delayUs * SPEED_MULTIPLIER; 
 
   for (long i = 0; i < steps; i++) {
