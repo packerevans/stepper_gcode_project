@@ -504,7 +504,7 @@ if __name__ == "__main__":
     try:
         from waitress import serve
         # threads=4 is ideal for Pi (matches number of cores)
-        serve(app, host="0.0.0.0", port=SERVER_PORT, threads=4)
+        serve(app, host="0.0.0.0", port=SERVER_PORT, threads=8)
     except ImportError:
         print("Waitress not found. Falling back to Flask Dev Server...")
         app.run(host="0.0.0.0", port=SERVER_PORT, debug=True, use_reloader=False)
