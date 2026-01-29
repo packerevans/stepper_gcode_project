@@ -314,16 +314,16 @@
             ctx.strokeStyle='#333'; 
             ctx.lineWidth=1.5;
             
-            // --- FIXED: STANDARD ORIENTATION (Reverted 180 Rotation) ---
+            // --- BOTH AXES MIRRORED (Rotated 180 degrees) ---
             let p0 = path[0];
-            let sx = w/2 + (p0.x-cx)*sc;
-            let sy = h/2 + (p0.y-cy)*-sc;
+            let sx = w/2 - (p0.x-cx)*sc;  // Horizontal Flip
+            let sy = h/2 - (p0.y-cy)*-sc; // Vertical Flip
             ctx.moveTo(sx, sy);
 
             for(let i=1; i<path.length; i++){
                 let p = path[i];
-                let px = w/2 + (p.x-cx)*sc;
-                let py = h/2 + (p.y-cy)*-sc;
+                let px = w/2 - (p.x-cx)*sc; // Horizontal Flip
+                let py = h/2 - (p.y-cy)*-sc; // Vertical Flip
                 ctx.lineTo(px, py);
             }
             ctx.stroke();
@@ -442,8 +442,8 @@
             document.body.removeChild(ta);
         }
 
+        // --- FIXED: Wait for response before showing "SENT!" ---
         async function runDesign(f) {
-            showSentPopup();
             let spd = document.getElementById('speedSelect').value;
             let r=await fetch(`${BASE_URL}/designs/${f}`), txt=await r.text();
             let gcode = txt.split('\n').map(l=>{
@@ -452,8 +452,22 @@
                     return `G1 ${p[0]} ${p[1]} ${Math.round((parseInt(p[2])||1000)*parseFloat(spd))}`;
                 } return l;
             }).join('\n');
-            await fetch(`${BASE_URL}/send_gcode_block`, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({gcode:gcode, filename:f})});
-            updateQ();
+            
+            // Send to backend and WAIT for response
+            let resp = await fetch(`${BASE_URL}/send_gcode_block`, {
+                method:"POST",
+                headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({gcode:gcode, filename:f})
+            });
+            
+            // Check success
+            let data = await resp.json();
+            if(data.success) {
+                showSentPopup(); // Only show if server says OK
+                updateQ();
+            } else {
+                alert("Error: " + (data.error || "Could not start design"));
+            }
         }
 
         function sendCmd(c) { fetch(`${BASE_URL}/send`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({command:c})}); }
