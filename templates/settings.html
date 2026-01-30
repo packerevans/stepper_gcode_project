@@ -214,11 +214,11 @@
                     <div class="form-group">
                         <label>Action Type</label>
                         <select id="sch-type" onchange="updateFields()">
-                            <option value="led_off">Turn LEDs OFF</option>
+                            <option value="led_off">Set LEDs Black (Off)</option>
                             <option value="led_color">Set LED Color</option>
                             <option value="sand_shuffle">Sand: Shuffle Play</option>
                             <option value="sand_specific">Sand: Play Specific Design</option>
-                            <option value="stop_sand">Stop Sand Table</option>
+                            <option value="stop_sand">Pause Sand Table</option>
                         </select>
                     </div>
 
@@ -364,6 +364,11 @@
             list.forEach((item, index) => {
                 let niceType = item.type.replace('_', ' ').toUpperCase();
                 let valDisplay = item.value ? `(${item.value})` : '';
+                
+                // Pretty-print specific types
+                if(item.type === 'led_off') niceType = 'TURN LEDs BLACK (OFF)';
+                if(item.type === 'stop_sand') niceType = 'PAUSE SAND TABLE';
+
                 let div = document.createElement('div');
                 div.className = 'schedule-item';
                 div.innerHTML = `
