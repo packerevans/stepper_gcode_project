@@ -18,22 +18,46 @@ app.secret_key = 'your_super_secret_key'
 BASE_DIR = app.root_path
 DESIGNS_FOLDER = os.path.join(BASE_DIR, 'templates', 'designs')
 SCHEDULE_FILE = os.path.join(BASE_DIR, 'schedules.json')
+SETTINGS_FILE = os.path.join(BASE_DIR, 'settings.json')
 ARDUINO_PROJECT_PATH = os.path.join(BASE_DIR, 'Sand') 
 
-# === AUTO-PORT SELECTION (5000 -> 6000) ===
+# Default Settings
+DEFAULT_SETTINGS = {
+    "cooldown": 30
+}
+
+# Load Settings Helper
+def load_app_settings():
+    if not os.path.exists(SETTINGS_FILE): return DEFAULT_SETTINGS.copy()
+    try:
+        with open(SETTINGS_FILE, 'r') as f:
+            data = json.load(f)
+            merged = DEFAULT_SETTINGS.copy()
+            merged.update(data)
+            return merged
+    except: return DEFAULT_SETTINGS.copy()
+
+def save_app_settings(data):
+    try:
+        with open(SETTINGS_FILE, 'w') as f: json.dump(data, f)
+    except Exception as e:
+        print(f"Error saving settings: {e}")
+
+# Initialize Global Settings
+SYSTEM_SETTINGS = load_app_settings()
+
+# === AUTO-PORT SELECTION ===
 SERVER_PORT = 5000 
 
 def find_available_port():
-    # Try 5000 first, then 6000
     for port in [5000, 6000]:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             try:
                 s.bind(('0.0.0.0', port))
-                return port
+                return port 
             except OSError:
-                print(f" * Port {port} is busy, trying next...")
+                print(f"⚠️ Port {port} is busy. Trying next...")
                 continue
-    # If both are busy, just default to 5000 (and let it crash/fail naturally)
     return 5000 
 
 if not os.path.exists(DESIGNS_FOLDER):
@@ -86,6 +110,27 @@ def connect_arduino():
         print(f"WARNING: Arduino not connected: {e}") 
         log_message(f"Arduino Init Failed: {e}")
 
+# === PERSISTENT LED HELPER ===
+def send_led_persistent(r, g, b, w=0):
+    """Tries to send color. If disconnected, retries connection up to 3 times."""
+    max_retries = 3
+    for i in range(max_retries):
+        try:
+            # Try sending command
+            asyncio.run_coroutine_threadsafe(ble_controller.send_led_command(r, g, b, w), ble_controller.loop)
+            return True # Success (or at least sent to loop)
+        except Exception as e:
+            log_message(f"LED Send Fail (Attempt {i+1}/{max_retries}): {e}")
+            # Try to reconnect
+            try:
+                log_message("Attempting LED Reconnect...")
+                asyncio.run_coroutine_threadsafe(ble_controller.handle_command("CONNECT"), ble_controller.loop)
+                time.sleep(3) # Wait for connection
+            except: pass
+    
+    log_message("LED: Failed to send after retries.")
+    return False
+
 # === SCHEDULER ===
 def load_schedules():
     if not os.path.exists(SCHEDULE_FILE): return []
@@ -125,28 +170,29 @@ class SchedulerThread(threading.Thread):
                 self.execute_action(item)
 
     def execute_action(self, item):
-        global is_looping, loop_playlist
+        global is_looping, loop_playlist, is_paused
         action = item['type']
         val = item.get('value')
         log_message(f"Scheduler Trigger: {action}")
 
         if action == "led_off":
-            asyncio.run_coroutine_threadsafe(ble_controller.handle_command("POWER:OFF"), ble_controller.loop)
+            # UPDATED: Set Color to Black (Persistent)
+            send_led_persistent(0, 0, 0, 0)
+        
         elif action == "led_color" and val:
             try:
                 r, g, b = hex_to_rgb(val)
-                asyncio.run_coroutine_threadsafe(ble_controller.send_led_command(r, g, b, 16), ble_controller.loop)
+                # UPDATED: Use Persistent Sender
+                send_led_persistent(r, g, b, 16)
             except: pass
+            
         elif action == "stop_sand":
-            global current_gcode_runner
-            if current_gcode_runner and current_gcode_runner.is_alive():
-                current_gcode_runner.is_running = False 
-                current_gcode_runner.slot_available_event.set()
-            job_queue.clear()
-            loop_playlist = []
-            is_looping = False
+            # UPDATED: 'Stop' button logic changed to PAUSE per request
+            is_paused = True
             if arduino_connected:
-                with lock: arduino.write(b"CLEAR\n")
+                with lock: arduino.write(b"PAUSE\n")
+            log_message("Automation: Sand Table Paused.")
+
         elif action == "sand_shuffle":
             try:
                 files = [f for f in os.listdir(DESIGNS_FOLDER) if f.endswith('.txt')]
@@ -243,10 +289,15 @@ def process_queue(wait_enabled=True):
     if next_job:
         if wait_enabled:
             is_waiting = True
-            log_message("Cooling down...")
+            
+            # --- UPDATED COOLDOWN LOGIC ---
+            wait_time = int(SYSTEM_SETTINGS.get('cooldown', 30))
+            log_message(f"Cooling down for {wait_time}s...")
+            
             if arduino_connected:
                 with lock: arduino.write(b"PAUSE\n")
-            for _ in range(30): 
+            
+            for _ in range(wait_time): 
                 if not is_looping and len(job_queue) == 0: break
                 time.sleep(1)
             is_waiting = False
@@ -317,8 +368,10 @@ def stop_tunnel():
         return jsonify(success=True)
     except Exception as e: return jsonify(success=False, message=str(e))
 
-# === AUTO-START NGROK ===
-def auto_start_ngrok():
+# === AUTO-START NGROK (RUNS IN THREAD) ===
+def auto_start_ngrok_thread():
+    # Wait a bit for server to spin up
+    time.sleep(5)
     try:
         config_path = conf.get_default().config_path
         if os.path.exists(config_path):
@@ -327,6 +380,7 @@ def auto_start_ngrok():
                     log_message("Auto-starting Ngrok...")
                     try: ngrok.kill()
                     except: pass
+                    # Connect to determined port
                     url = ngrok.connect(SERVER_PORT).public_url
                     log_message(f"Ngrok Auto-Started: {url}")
                     print(f" * Public URL: {url}")
@@ -351,6 +405,18 @@ def index():
 def settings_page(): return render_template("settings.html")
 @app.route("/script")
 def script(): return render_template("script.html")
+
+# --- SETTINGS API ---
+@app.route("/api/settings", methods=["GET", "POST"])
+def api_settings():
+    global SYSTEM_SETTINGS
+    if request.method == "GET":
+        return jsonify(SYSTEM_SETTINGS)
+    if request.method == "POST":
+        SYSTEM_SETTINGS.update(request.json)
+        save_app_settings(SYSTEM_SETTINGS)
+        log_message(f"Settings updated: {SYSTEM_SETTINGS}")
+        return jsonify(success=True)
 
 @app.route("/pull", methods=["POST"])
 def git_pull():
@@ -455,7 +521,15 @@ def send_command():
     if cmd == "PAUSE": is_paused = True
     elif cmd == "RESUME": is_paused = False
     elif cmd.startswith("LED:") or cmd in ["POWER:ON", "POWER:OFF"]:
-        asyncio.run_coroutine_threadsafe(ble_controller.handle_command(cmd), ble_controller.loop)
+        # Use Persistent Sender
+        if cmd.startswith("LED:"):
+            parts = cmd.split(":")[1].split(",")
+            r, g, b, br = map(int, parts)
+            send_led_persistent(r, g, b, br)
+        else:
+            # Handle power commands or others directly if needed, 
+            # or wrap them too. For now using standard handle.
+            asyncio.run_coroutine_threadsafe(ble_controller.handle_command(cmd), ble_controller.loop)
         return jsonify(success=True)
     
     if arduino_connected: lock.acquire(); arduino.write((cmd+"\n").encode()); lock.release(); return jsonify(success=True)
@@ -488,22 +562,22 @@ def get_logs():
     with lock: return jsonify(list(serial_log))
 
 if __name__ == "__main__":
-    # 1. Determine Port First
+    # 1. Determine Port First (5000 -> 6000)
     SERVER_PORT = find_available_port()
     
     # 2. Connect Hardware & Scheduler
     connect_arduino() 
     SchedulerThread().start()
     
-    # 3. Auto-Start Tunnel (if key saved)
-    auto_start_ngrok()
+    # 3. Auto-Start Tunnel (Background Thread)
+    # This runs in background to avoid blocking server start
+    threading.Thread(target=auto_start_ngrok_thread, daemon=True).start()
     
-    # 4. Start PRODUCTION Server
+    # 4. Start PRODUCTION Server (8 threads)
     print(f"Starting PRODUCTION server on port {SERVER_PORT}...")
     
     try:
         from waitress import serve
-        # threads=4 is ideal for Pi (matches number of cores)
         serve(app, host="0.0.0.0", port=SERVER_PORT, threads=8)
     except ImportError:
         print("Waitress not found. Falling back to Flask Dev Server...")
