@@ -2,7 +2,6 @@ from flask import Flask, render_template, request, jsonify, Response, url_for, s
 import serial, threading, time, subprocess
 import os
 import re
-import asyncio
 import socket
 import json
 import datetime
@@ -108,24 +107,18 @@ def connect_arduino():
         log_message(f"Arduino Init Failed: {e}")
 
 # === PERSISTENT LED HELPER ===
-def send_led_persistent(r, g, b, w=0):
-    """Tries to send color. If disconnected, retries connection up to 3 times."""
-    max_retries = 3
-    for i in range(max_retries):
+def send_led_persistent(r, g, b):
+    """Sends RGB values to Arduino via Serial."""
+    if arduino_connected:
         try:
-            # Try sending command
-            asyncio.run_coroutine_threadsafe(ble_controller.send_led_command(r, g, b, w), ble_controller.loop)
-            return True # Success (or at least sent to loop)
+            cmd = f"{r},{g},{b}\n"
+            with lock: arduino.write(cmd.encode())
+            log_message(f"LED Serial: {r},{g},{b}")
+            return True
         except Exception as e:
-            log_message(f"LED Send Fail (Attempt {i+1}/{max_retries}): {e}")
-            # Try to reconnect
-            try:
-                log_message("Attempting LED Reconnect...")
-                asyncio.run_coroutine_threadsafe(ble_controller.handle_command("CONNECT"), ble_controller.loop)
-                time.sleep(3) # Wait for connection
-            except: pass
-    
-    log_message("LED: Failed to send after retries.")
+            log_message(f"LED Serial Error: {e}")
+    else:
+        log_message("LED Fail: Arduino not connected.")
     return False
 
 # === SCHEDULER ===
@@ -173,14 +166,14 @@ class SchedulerThread(threading.Thread):
         log_message(f"Scheduler Trigger: {action}")
 
         if action == "led_off":
-            # UPDATED: Set Color to Black (Persistent)
-            send_led_persistent(0, 0, 0, 0)
+            # UPDATED: Set Color to Black (Serial)
+            send_led_persistent(0, 0, 0)
         
         elif action == "led_color" and val:
             try:
                 r, g, b = hex_to_rgb(val)
-                # UPDATED: Use Persistent Sender
-                send_led_persistent(r, g, b, 16)
+                # UPDATED: Use Serial Sender
+                send_led_persistent(r, g, b)
             except: pass
             
         elif action == "stop_sand":
@@ -451,6 +444,10 @@ def api_schedule():
         if 0<=idx<len(s): del s[idx]; save_schedules(s)
         return jsonify(success=True)
 
+@app.route("/status")
+def get_status():
+    return jsonify({"connected": arduino_connected})
+
 @app.route("/status_full", methods=["GET"])
 def status_full():
     q = []
@@ -518,15 +515,15 @@ def send_command():
     if cmd == "PAUSE": is_paused = True
     elif cmd == "RESUME": is_paused = False
     elif cmd.startswith("LED:") or cmd in ["POWER:ON", "POWER:OFF"]:
-        # Use Persistent Sender
+        # Use Serial Sender
         if cmd.startswith("LED:"):
             parts = cmd.split(":")[1].split(",")
             r, g, b, br = map(int, parts)
-            send_led_persistent(r, g, b, br)
-        else:
-            # Handle power commands or others directly if needed, 
-            # or wrap them too. For now using standard handle.
-            asyncio.run_coroutine_threadsafe(ble_controller.handle_command(cmd), ble_controller.loop)
+            send_led_persistent(r, g, b)
+        elif cmd == "POWER:OFF":
+            send_led_persistent(0, 0, 0)
+        elif cmd == "POWER:ON":
+            send_led_persistent(255, 255, 255)
         return jsonify(success=True)
     
     if arduino_connected: lock.acquire(); arduino.write((cmd+"\n").encode()); lock.release(); return jsonify(success=True)
