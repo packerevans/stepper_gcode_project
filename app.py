@@ -88,8 +88,6 @@ def log_message(msg):
         if len(serial_log) > 200:
             serial_log.pop(0)
 
-ble_controller.set_logger(log_message)
-
 # === SERIAL CONNECTION ===
 arduino = None
 arduino_connected = False
