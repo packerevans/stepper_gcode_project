@@ -439,13 +439,41 @@ def git_pull():
 @app.route("/update_firmware", methods=["POST"])
 def update_firmware():
     global arduino, arduino_connected, arduino_port
-    if arduino: arduino.close(); arduino_connected = False
+    if arduino: 
+        try: arduino.close()
+        except: pass
+        arduino_connected = False
+    
+    # Standard FQBN for LGT8F328P
+    FQBN = "lgt8fx:avr:328" 
+    
     try:
-        subprocess.run(["arduino-cli", "compile", "--fqbn", "arduino:avr:uno", ARDUINO_PROJECT_PATH], check=True)
-        subprocess.run(["arduino-cli", "upload", "-p", arduino_port, "--fqbn", "arduino:avr:uno", ARDUINO_PROJECT_PATH], check=True)
+        log_message(f"Starting firmware update on {arduino_port}...")
+        
+        # 1. Compile
+        compile_cmd = ["arduino-cli", "compile", "--fqbn", FQBN, ARDUINO_PROJECT_PATH]
+        log_message(f"Compiling: {' '.join(compile_cmd)}")
+        subprocess.run(compile_cmd, check=True, capture_output=True, text=True)
+        
+        # 2. Upload (Using -v for extra debugging in logs)
+        # Note: LGT8F328P often needs -b115200 for RX/TX
+        upload_cmd = ["arduino-cli", "upload", "-p", arduino_port, "--fqbn", FQBN, ARDUINO_PROJECT_PATH, "-v"]
+        log_message(f"Uploading: {' '.join(upload_cmd)}")
+        
+        result = subprocess.run(upload_cmd, capture_output=True, text=True, check=True)
+        
+        log_message("Upload Successful!")
         connect_arduino()
-        return jsonify(success=True, message=f"Firmware Updated on {arduino_port}")
-    except Exception as e: 
+        return jsonify(success=True, message="Firmware Updated Successfully")
+        
+    except subprocess.CalledProcessError as e:
+        error_msg = f"Flash Error: {e.stderr or e.stdout}"
+        log_message(error_msg)
+        print(error_msg)
+        connect_arduino()
+        return jsonify(success=False, message=error_msg)
+    except Exception as e:
+        log_message(f"System Error: {str(e)}")
         connect_arduino()
         return jsonify(success=False, message=str(e))
 
