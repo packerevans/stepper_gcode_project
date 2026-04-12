@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sand Table Controller v17 (Center Pass-Through)</title>
+<style>
+    :root {
+        --bg: #f4f4f9;
+        --panel: #ffffff;
+        --text: #333;
+        --accent: #b08d5c;
+        --accent-hover: #967548;
+        --border: #ddd;
+    }
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: var(--bg);
+        color: var(--text);
+        margin: 0;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    h1 { margin-top: 0; color: var(--accent); }
+    .container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        max-width: 1200px;
+        width: 100%;
+    }
+    @media (max-width: 768px) {
+        .container { grid-template-columns: 1fr; }
+    }
+    .card {
+        background: var(--panel);
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        position: relative;
+    }
+    .full-width { grid-column: 1 / -1; }
+    
+    label { font-weight: 600; font-size: 0.9em; display: block; margin-bottom: 5px; }
+    
+    input[type="number"], input[type="text"], select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        box-sizing: border-box;
+    }
+    textarea {
+        width: 100%;
+        height: 150px;
+        padding: 10px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        font-family: monospace;
+        font-size: 12px;
+        resize: vertical;
+        box-sizing: border-box;
+        white-space: pre;
+        overflow-x: scroll;
+    }
+    
+    button {
+        background-color: var(--accent);
+        color: white;
+        border: none;
+        padding: 12px 20px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 1em;
+        transition: background 0.2s;
+    }
+    button:hover { background-color: var(--accent-hover); }
+    button.secondary {
+        background-color: transparent;
+        border: 2px solid var(--accent);
+        color: var(--accent);
+    }
+    
+    button.send-btn { background-color: #28a745; margin-top: 10px; } 
+    button.send-btn:hover { background-color: #1e7e34; }
+
+    .canvas-container {
+        position: relative;
+        width: 100%;
+        padding-top: 100%;
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+    }
+    canvas {
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        border-radius: 8px;
+    }
+    .status-bar {
+        padding: 15px;
+        background: #eef;
+        border-left: 5px solid var(--accent);
+        border-radius: 4px;
+        font-size: 0.95em;
+        color: #445;
+        white-space: pre-wrap;
+    }
+    .settings-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+</style>
+</head>
+<body>
+
+<h1>Sand Table Controller v17</h1>
+
+<div class="container">
+    <div class="card">
+        <h2>1. Input</h2>
+        <div>
+            <label>Upload File (.thr, .gcode, .txt)</label>
+            <input type="file" id="fileInput" accept=".thr,.gcode,.txt,.nc">
+        </div>
+        <div>
+            <label>Input Format Strategy</label>
+            <select id="inputFormat">
+                <option value="auto">Auto-Detect (Recommended)</option>
+                <option value="thr">Theta-Rho (.thr) - Radians & Normalized</option>
+                <option value="polar_gcode">Polar G-Code (G1 R A) - mm & Degrees</option>
+                <option value="cartesian">Cartesian (G1 X Y)</option>
+            </select>
+        </div>
+        <textarea id="inputData" placeholder="Paste code or upload file here..."></textarea>
+        <div class="status-bar" id="inputStats">Waiting for data...</div>
+    </div>
+
+    <div class="card">
+        <h2>2. Machine Settings</h2>
+        <div class="settings-grid">
+            <div>
+                <label>Table Max Radius (mm)</label>
+                <input type="number" id="tableRadius" value="202.6">
+            </div>
+            
+            <div>
+                <label>Center Delay (Fastest - us)</label>
+                <input type="number" id="centerDelay" value="500">
+            </div>
+            <div>
+                <label>Perimeter Delay (Slowest - us)</label>
+                <input type="number" id="perimeterDelay" value="3000">
+            </div>
+            
+            <div>
+                <label>Arm 1 Length (mm)</label>
+                <input type="number" id="L1" value="101.3">
+            </div>
+            <div>
+                <label>Arm 2 Length (mm)</label>
+                <input type="number" id="L2" value="101.3">
+            </div>
+            <div>
+                <label>Gear Ratio</label>
+                <input type="number" id="gearRatio" value="1.125" step="0.001">
+            </div>
+            <div>
+                <label>Steps per Degree</label>
+                <input type="number" id="stepsPerDeg" value="8.888888" step="0.000001">
+            </div>
+        </div>
+        <label>Interpolation Resolution (mm)</label>
+        <input type="number" id="resolution" value="1.0" title="Smaller values = smoother curves but more data">
+        <button onclick="processData()">Convert & Simulate</button>
+    </div>
+
+    <div class="card full-width">
+        <h2>3. Output Code & Simulation</h2>
+        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 300px;">
+                <label>Output Code (Editable)</label>
+                <textarea id="outputData" style="height: 300px;" placeholder="G-code appears here..."></textarea>
+                
+                <button class="send-btn" onclick="sendToTable()">🚀 Send to Table</button>
+                <div id="sendStatus" style="margin-top:5px; font-size:0.9em; color:#666;"></div>
+
+                <div style="display:flex; gap:10px; margin-top:10px;">
+                    <button onclick="copyOutput()" class="secondary" style="flex:1;">Copy</button>
+                    <button onclick="downloadOutput()" class="secondary" style="flex:1;">Download</button>
+                </div>
+            </div>
+            <div style="flex: 1; min-width: 300px;">
+                <label>Visual Preview</label>
+                <div class="canvas-container">
+                    <canvas id="simCanvas"></canvas>
+                </div>
+                <div style="margin-top:10px; display:flex; gap:10px;">
+                     <button class="secondary" onclick="playSimulation()">▶ Play</button>
+                     <button class="secondary" onclick="stopSimulation()">⏹ Stop</button>
+                     <input type="range" id="simSlider" min="0" max="100" value="0" style="flex-grow:1;">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// --- CONFIGURATION ---
+const BASE_URL = window.location.origin; 
+
+// --- STATE ---
+let RAW_COORDS = []; 
+let ARM_STATES = []; 
+let animId = null;
+
+// --- DOM ELEMENTS ---
+const fileInput = document.getElementById('fileInput');
+const inputData = document.getElementById('inputData');
+const outputData = document.getElementById('outputData');
+const canvas = document.getElementById('simCanvas');
+const ctx = canvas.getContext('2d');
+const simSlider = document.getElementById('simSlider');
+
+// --- INITIALIZATION ---
+window.onload = function() {
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            inputData.value = e.target.result;
+            processData();
+        };
+        reader.readAsText(file);
+    });
+
+    simSlider.addEventListener('input', (e) => {
+        stopSimulation();
+        const idx = Math.floor((parseFloat(e.target.value) / 100) * (ARM_STATES.length - 1));
+        drawSimulation(idx);
+    });
+
+    outputData.addEventListener('input', () => {
+        parseOutputAndSimulate();
+    });
+};
+
+function resizeCanvas() {
+    const container = canvas.parentElement;
+    canvas.width = container.clientWidth;
+    canvas.height = container.clientHeight;
+    if (ARM_STATES.length > 0) {
+        const idx = Math.floor((parseFloat(simSlider.value) / 100) * (ARM_STATES.length - 1));
+        drawSimulation(idx);
+    }
+}
+
+// --- MAIN LOGIC ---
+
+function processData() {
+    const tableRadius = parseFloat(document.getElementById('tableRadius').value);
+    const format = document.getElementById('inputFormat').value;
+    const text = inputData.value;
+    const lines = text.split('\n');
+    
+    RAW_COORDS = [];
+    
+    let mode = format;
+    if (mode === 'auto') {
+        if (text.includes('thetarho')) mode = 'thr';
+        else if (text.match(/G1.*R/i)) mode = 'polar_gcode';
+        else if (text.match(/G1.*X/i)) mode = 'cartesian';
+        else mode = 'thr';
+    }
+
+    document.getElementById('inputStats').innerText = `Detected Mode: ${mode}`;
+
+    for (let line of lines) {
+        line = line.trim();
+        if (!line || line.startsWith('#') || line.startsWith(';')) continue;
+        let p = { x: 0, y: 0, theta: 0, rho: 0, type: 'cartesian' }; 
+
+        if (mode === 'thr') {
+            const parts = line.trim().split(/\s+/);
+            if (parts.length >= 2 && !isNaN(parseFloat(parts[0]))) {
+                p.theta = parseFloat(parts[0]);
+                p.rho = parseFloat(parts[1]);
+                p.type = 'polar';
+                let r_mm = p.rho * tableRadius;
+                p.x = r_mm * Math.cos(p.theta);
+                p.y = r_mm * Math.sin(p.theta);
+                RAW_COORDS.push(p);
+            }
+        } 
+        else if (mode === 'polar_gcode') {
+            const match = line.match(/G1\s+.*R([\d.-]+).*A([\d.-]+)/i);
+            if (match) {
+                let r = parseFloat(match[1]);
+                let deg = parseFloat(match[2]);
+                let rad = deg * (Math.PI / 180);
+                p.type = 'polar';
+                p.rho = r / tableRadius;
+                p.theta = rad;
+                p.x = r * Math.cos(rad);
+                p.y = r * Math.sin(rad);
+                RAW_COORDS.push(p);
+            }
+        }
+        else {
+            const match = line.match(/G1\s+.*X([\d.-]+).*Y([\d.-]+)/i);
+            if (match) {
+                p.x = parseFloat(match[1]);
+                p.y = parseFloat(match[2]);
+                p.type = 'cartesian';
+                RAW_COORDS.push(p);
+            }
+        }
+    }
+
+    if (RAW_COORDS.length === 0) {
+        alert("No valid coordinates found.");
+        return;
+    }
+    interpolateAndGenerate();
+}
+
+function interpolateAndGenerate() {
+    const tableRadius = parseFloat(document.getElementById('tableRadius').value);
+    const res = parseFloat(document.getElementById('resolution').value);
+
+    let interpolated = [];
+    if (RAW_COORDS.length > 0) interpolated.push({x: RAW_COORDS[0].x, y: RAW_COORDS[0].y});
+
+    for (let i = 0; i < RAW_COORDS.length - 1; i++) {
+        let p1 = RAW_COORDS[i];
+        let p2 = RAW_COORDS[i+1];
+        
+        if (p1.type === 'polar' && p2.type === 'polar') {
+            let avgR = (p1.rho + p2.rho) / 2 * tableRadius;
+            let dTheta = Math.abs(p2.theta - p1.theta);
+            let arcDist = avgR * dTheta; 
+            let linDist = Math.abs((p2.rho - p1.rho) * tableRadius);
+            let totalDist = Math.sqrt(arcDist*arcDist + linDist*linDist);
+            
+            let steps = Math.ceil(totalDist / res);
+            steps = Math.max(1, steps);
+
+            for (let j = 1; j <= steps; j++) {
+                let t = j / steps;
+                let interpTheta = p1.theta + (p2.theta - p1.theta) * t;
+                let interpRho = p1.rho + (p2.rho - p1.rho) * t;
+                let r_mm = interpRho * tableRadius;
+                interpolated.push({
+                    x: r_mm * Math.cos(interpTheta),
+                    y: r_mm * Math.sin(interpTheta)
+                });
+            }
+        } else {
+            let dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+            let steps = Math.ceil(dist / res);
+            steps = Math.max(1, steps);
+            for (let j = 1; j <= steps; j++) {
+                let t = j / steps;
+                interpolated.push({
+                    x: p1.x + (p2.x - p1.x) * t,
+                    y: p1.y + (p2.y - p1.y) * t
+                });
+            }
+        }
+    }
+    generateSteps(interpolated);
+}
+
+function generateSteps(pathPoints) {
+    const tableRadius = parseFloat(document.getElementById('tableRadius').value);
+    
+    let commands = [];
+    for (let i = 0; i < pathPoints.length; i++) {
+        let p = pathPoints[i];
+        
+        // Convert Cartesian back to Polar for Theta-Rho format
+        let theta = Math.atan2(p.y, p.x);
+        let rho = Math.hypot(p.x, p.y) / tableRadius;
+        
+        // Ensure Rho is clamped to 1.0
+        if (rho > 1.0) rho = 1.0;
+        
+        // Radians can be large if we track revolutions, 
+        // but for now, we'll send normalized angles.
+        // If your patterns expect continuous rotation, you might need 
+        // to track total theta here.
+        
+        commands.push(`${theta.toFixed(4)} ${rho.toFixed(4)}`);
+    }
+
+    outputData.value = commands.join('\n');
+    parseOutputAndSimulate();
+}
+
+// --- SIMULATION ---
+
+function parseOutputAndSimulate() {
+    const text = outputData.value;
+    const lines = text.split('\n');
+    
+    const L1 = parseFloat(document.getElementById('L1').value);
+    const L2 = parseFloat(document.getElementById('L2').value);
+    const gearRatio = parseFloat(document.getElementById('gearRatio').value);
+    const stepsPerDeg = parseFloat(document.getElementById('stepsPerDeg').value);
+    const stepsPerRad = stepsPerDeg * (180 / Math.PI);
+
+    ARM_STATES = [];
+    
+    // For simulation, we need to reverse the Theta-Rho back to motor steps
+    // to visualize the arm.
+    let prevBase = 0;
+    let prevElbow = 0;
+
+    for (let line of lines) {
+        const parts = line.trim().split(/\s+/);
+        if (parts.length >= 2) {
+            let theta = parseFloat(parts[0]);
+            let rho = parseFloat(parts[1]);
+            
+            if (!isNaN(theta) && !isNaN(rho)) {
+                let x = rho * (L1 + L2) * Math.cos(theta);
+                let y = rho * (L1 + L2) * Math.sin(theta);
+                
+                let ik = calculateIK(x, y, prevBase, prevElbow, L1, L2, gearRatio, stepsPerRad);
+                ARM_STATES.push(calculateFK(ik.base_steps, ik.elbow_steps, L1, L2, gearRatio, stepsPerRad));
+                prevBase = ik.base_steps;
+                prevElbow = ik.elbow_steps;
+            }
+        }
+    }
+    const idx = Math.floor((parseFloat(simSlider.value) / 100) * (ARM_STATES.length - 1));
+    drawSimulation(idx);
+}
+
+// --- KINEMATICS ---
+
+function getShortestRotation(raw, last) {
+    let diff = (raw - last) / (2 * Math.PI);
+    let offset = Math.round(diff);
+    return raw - (offset * 2 * Math.PI);
+}
+
+function calculateIK(x, y, lastBaseSteps, lastElbowSteps, L1, L2, gearRatio, stepsPerRad) {
+    let dist = Math.hypot(x, y);
+    const maxReach = L1 + L2;
+    
+    if (dist > maxReach) {
+        x = (x / dist) * maxReach;
+        y = (y / dist) * maxReach;
+        dist = maxReach;
+    }
+
+    // --- CENTER PASS-THROUGH LOGIC ---
+    // If we are extremely close to the center, force the math to prioritize
+    // keeping the Base Angle steady. This prevents the "Base Spin" issue.
+    // We treat the target as a "fold" at the *current* base angle.
+    
+    if (dist < 1.0) { // Within 1mm of center
+        
+        // We want the base to stay exactly where it was
+        const targetBaseSteps = lastBaseSteps; 
+        
+        // At center (dist=0), the internal angle is PI (180 deg).
+        // Elbow Steps = -(PI + GearRatio * BaseAngle) * StepsPerRad
+        // We need to reverse-engineer BaseAngle from lastBaseSteps
+        const currentBaseAngle = -lastBaseSteps / stepsPerRad;
+        const targetElbowSteps = -(Math.PI + gearRatio * currentBaseAngle) * stepsPerRad;
+        
+        return { base_steps: targetBaseSteps, elbow_steps: targetElbowSteps };
+    }
+
+    // Standard Math for non-center points
+    const lastT1 = -lastBaseSteps / stepsPerRad; 
+    let cosBend = (dist*dist - L1*L1 - L2*L2) / (2 * L1 * L2);
+    cosBend = Math.max(-1, Math.min(1, cosBend));
+    
+    const bend1 = Math.acos(cosBend);
+    const bend2 = -Math.acos(cosBend);
+
+    const k1_1 = L1 + L2 * Math.cos(bend1);
+    const k2_1 = L2 * Math.sin(bend1);
+    let t1_1 = Math.atan2(y, x) - Math.atan2(k2_1, k1_1);
+    t1_1 = getShortestRotation(t1_1, lastT1);
+
+    const k1_2 = L1 + L2 * Math.cos(bend2);
+    const k2_2 = L2 * Math.sin(bend2);
+    let t1_2 = Math.atan2(y, x) - Math.atan2(k2_2, k1_2);
+    t1_2 = getShortestRotation(t1_2, lastT1);
+
+    const b1_steps = -t1_1 * stepsPerRad;
+    const e1_steps = -(bend1 + gearRatio * t1_1) * stepsPerRad;
+    const b2_steps = -t1_2 * stepsPerRad;
+    const e2_steps = -(bend2 + gearRatio * t1_2) * stepsPerRad;
+
+    const cost1 = Math.abs(b1_steps - lastBaseSteps) + Math.abs(e1_steps - lastElbowSteps);
+    const cost2 = Math.abs(b2_steps - lastBaseSteps) + Math.abs(e2_steps - lastElbowSteps);
+
+    return (cost1 <= cost2) ? { base_steps: b1_steps, elbow_steps: e1_steps } 
+                            : { base_steps: b2_steps, elbow_steps: e2_steps };
+}
+
+function calculateFK(baseSteps, elbowSteps, L1, L2, gearRatio, stepsPerRad) {
+    const alpha = -baseSteps / stepsPerRad;
+    const combined = -elbowSteps / stepsPerRad;
+    const beta = combined - (gearRatio * alpha);
+    const elbowX = L1 * Math.cos(alpha);
+    const elbowY = L1 * Math.sin(alpha);
+    return { 
+        x1: elbowX, y1: elbowY, 
+        x2: elbowX + L2 * Math.cos(alpha + beta), 
+        y2: elbowY + L2 * Math.sin(alpha + beta) 
+    };
+}
+
+function drawSimulation(index) {
+    const width = canvas.width;
+    const height = canvas.height;
+    const tableRadius = parseFloat(document.getElementById('tableRadius').value);
+    
+    ctx.clearRect(0, 0, width, height);
+    ctx.save();
+    ctx.translate(width/2, height/2);
+    const scale = (width/2) / (tableRadius * 1.1);
+    ctx.scale(scale, -scale);
+
+    ctx.beginPath();
+    ctx.arc(0, 0, tableRadius, 0, Math.PI*2);
+    ctx.strokeStyle = "#ddd";
+    ctx.lineWidth = 2 / scale;
+    ctx.stroke();
+
+    if (ARM_STATES.length > 0) {
+        ctx.beginPath();
+        ctx.strokeStyle = "rgba(255, 0, 0, 0.5)";
+        ctx.lineWidth = 1.5 / scale;
+        
+        let safeIndex = Math.min(index, ARM_STATES.length - 1);
+        if (safeIndex < 0) safeIndex = 0;
+
+        ctx.moveTo(ARM_STATES[0].x2, ARM_STATES[0].y2);
+        for(let i=1; i<=safeIndex; i++) {
+             ctx.lineTo(ARM_STATES[i].x2, ARM_STATES[i].y2);
+        }
+        ctx.stroke();
+
+        const state = ARM_STATES[safeIndex];
+        ctx.strokeStyle = "#333";
+        ctx.lineWidth = 4 / scale;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(0,0);
+        ctx.lineTo(state.x1, state.y1);
+        ctx.lineTo(state.x2, state.y2);
+        ctx.stroke();
+
+        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+        ctx.beginPath(); ctx.arc(0,0, 6/scale, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(state.x1, state.y1, 5/scale, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+}
+
+function playSimulation() {
+    if (animId) return;
+    let i = parseInt(simSlider.value) / 100 * (ARM_STATES.length - 1);
+    function loop() {
+        i += 5; 
+        if (i >= ARM_STATES.length) i = 0;
+        simSlider.value = (i / ARM_STATES.length) * 100;
+        drawSimulation(Math.floor(i));
+        animId = requestAnimationFrame(loop);
+    }
+    loop();
+}
+
+function stopSimulation() {
+    if (animId) cancelAnimationFrame(animId);
+    animId = null;
+}
+
+async function sendToTable() {
+    const code = outputData.value;
+    const statusDiv = document.getElementById('sendStatus');
+
+    if (!code) {
+        statusDiv.innerText = "❌ Generate code first!";
+        statusDiv.style.color = "red";
+        return;
+    }
+
+    statusDiv.innerText = "⏳ Sending...";
+    statusDiv.style.color = "#666";
+
+    try {
+        const response = await fetch(`${BASE_URL}/send_gcode_block`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ 
+                gcode: code,
+                speed_override: null 
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            statusDiv.innerText = "✅ Sent successfully!";
+            statusDiv.style.color = "green";
+        } else {
+            statusDiv.innerText = "❌ Error: " + (data.error || "Unknown");
+            statusDiv.style.color = "red";
+        }
+
+    } catch (e) {
+        statusDiv.innerText = "❌ Network Error: " + e.message;
+        statusDiv.style.color = "red";
+    }
+}
+
+function copyOutput() {
+    outputData.select();
+    document.execCommand('copy');
+    alert("Copied!");
+}
+
+function downloadOutput() {
+    const text = outputData.value;
+    const blob = new Blob([text], { type: 'text/plain' });
+    const anchor = document.createElement('a');
+    anchor.download = 'sand_gcode.txt';
+    anchor.href = window.URL.createObjectURL(blob);
+    anchor.click();
+}
+</script>
+</body>
+</html>

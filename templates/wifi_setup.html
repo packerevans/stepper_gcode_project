@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sand Table Connection Manager</title>
+    <style>
+        :root {
+            --bg-color: #f0f0f0; --card-bg: #ffffff; --text-color: #333;
+            --accent-color: #d2b48c; --secondary-text: #666; --border-color: #ddd;
+            --warning-bg: #fff3cd; --warning-text: #856404; --input-bg: #fff; --hover-bg: #f8f8f8;
+            --danger-color: #d9534f;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #1e1e1e; --card-bg: #2c2c2c; --text-color: #e0e0e0;
+            --accent-color: #b08d5c; --secondary-text: #aaa; --border-color: #444;
+            --warning-bg: #4d3e12; --warning-text: #ffeeba; --input-bg: #333; --hover-bg: #3a3a3a;
+            --danger-color: #ff6b6b;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color); color: var(--text-color);
+            padding: 20px; display: flex; flex-direction: column; align-items: center; margin: 0;
+        }
+
+        .card {
+            background-color: var(--card-bg); padding: 25px; border-radius: 16px;
+            width: 100%; max-width: 450px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); box-sizing: border-box;
+        }
+
+        h2, h3 { margin-top: 0; color: var(--accent-color); text-align: center; }
+        h3 { font-size: 1rem; margin-top: 20px; text-align: left; border-bottom: 1px solid var(--border-color); padding-bottom: 5px; }
+
+        /* --- WARNING BOX --- */
+        .screenshot-warning {
+            border: 2px dashed var(--accent-color); background-color: var(--warning-bg);
+            color: var(--warning-text); padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center;
+        }
+        .address-link { font-family: monospace; font-size: 1.1rem; color: var(--text-color); font-weight: bold; }
+
+        /* --- LISTS --- */
+        .network-list { max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 10px; }
+        .network-item {
+            padding: 12px; border-bottom: 1px solid var(--border-color); cursor: pointer;
+            display: flex; justify-content: space-between; align-items: center; transition: background 0.2s;
+        }
+        .network-item:hover { background-color: var(--hover-bg); }
+        .signal { font-size: 0.8rem; color: var(--secondary-text); }
+
+        /* --- SAVED NETWORKS --- */
+        .saved-item {
+            padding: 10px; border-bottom: 1px solid var(--border-color);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .forget-btn {
+            background: transparent; border: 1px solid var(--danger-color); color: var(--danger-color);
+            padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;
+        }
+        .forget-btn:hover { background: var(--danger-color); color: white; }
+
+        /* --- INPUTS --- */
+        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-color); box-sizing: border-box; }
+        button.action-btn { width: 100%; padding: 14px; border-radius: 8px; border: none; background-color: var(--accent-color); color: #fff; font-weight: bold; font-size: 1rem; cursor: pointer; margin-top: 10px; }
+        button.cancel { background-color: var(--secondary-text); }
+        .theme-toggle { position: absolute; top: 10px; right: 10px; background: none; border: none; font-size: 1.5rem; cursor: pointer; }
+    </style>
+</head>
+<body data-theme="dark">
+    <button class="theme-toggle" onclick="toggleTheme()" id="themeIcon">☀️</button>
+
+    <div class="card">
+        <h2>Wi-Fi Manager</h2>
+
+        <div class="screenshot-warning">
+            <strong>📸 SCREENSHOT NOW!</strong><br>
+            <div style="margin-top:8px; font-size:0.9rem;">Apple/Mac:</div>
+            <div class="address-link">http://{{ hostname }}.local:5000</div>
+            <div style="margin-top:8px; font-size:0.9rem;">Windows/Android:</div>
+            <div class="address-link">http://{{ hostname }}.local:5000</div>
+            <div style="font-size:0.7rem; opacity:0.8;">(Or check router for new IP)</div>
+        </div>
+
+        {% if saved_networks %}
+        <h3>Saved Networks</h3>
+        <div class="network-list" style="max-height: 150px;">
+            {% for net in saved_networks %}
+            <div class="saved-item">
+                <strong>{{ net }}</strong>
+                <button class="forget-btn" onclick="forgetNetwork('{{ net }}')">Forget</button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <h3>Available Networks</h3>
+        <div id="network-list" class="network-list">
+            {% for net in networks %}
+            <div class="network-item" onclick="selectNetwork('{{net.ssid}}')">
+                <strong>{{net.ssid}}</strong> 
+                <span class="signal">{{net.signal}}%</span>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div id="credentials" style="display:none; margin-top:20px;">
+            <h3 id="selected-ssid" style="text-align: center; border:none; color: var(--accent-color);"></h3>
+            <input type="password" id="password" placeholder="Enter Password">
+            <button class="action-btn" onclick="connect()">Connect & Reboot</button>
+            <button class="action-btn cancel" onclick="location.reload()">Cancel</button>
+        </div>
+    </div>
+
+    <script>
+        function toggleTheme() {
+            const b = document.body; const i = document.getElementById('themeIcon');
+            const newTheme = b.getAttribute('data-theme')==='dark'?'light':'dark';
+            b.setAttribute('data-theme', newTheme);
+            i.innerText = newTheme==='dark'?'☀️':'🌙';
+        }
+
+        let selectedSSID = "";
+        function selectNetwork(ssid) {
+            selectedSSID = ssid;
+            document.getElementById('network-list').style.display = 'none';
+            document.getElementById('credentials').style.display = 'block';
+            document.getElementById('selected-ssid').innerText = "Join " + ssid;
+        }
+
+        async function forgetNetwork(ssid) {
+            if(!confirm("Forget network '" + ssid + "'? The table will no longer connect to it.")) return;
+            try {
+                const res = await fetch('/api/forget_wifi', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ ssid: ssid })
+                });
+                const data = await res.json();
+                alert(data.message);
+                if(data.success) location.reload();
+            } catch(e) { alert("Error: " + e); }
+        }
+
+        async function connect() {
+            const pass = document.getElementById('password').value;
+            const btn = document.querySelector('button.action-btn');
+            btn.innerText = "Saving..."; btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/configure_wifi', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ ssid: selectedSSID, password: pass })
+                });
+                const data = await res.json();
+                if(data.success) alert("✅ Saved! Rebooting now...");
+                else { alert("Error: " + data.message); btn.innerText = "Connect & Reboot"; btn.disabled = false; }
+            } catch (e) { alert("Error: " + e); btn.innerText = "Connect & Reboot"; btn.disabled = false; }
+        }
+    </script>
+</body>
+</html>

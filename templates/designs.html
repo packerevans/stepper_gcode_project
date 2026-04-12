@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sand Table</title>
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
+    <style>
+        /* --- Modern Variables --- */
+        :root {
+            --color-accent: #d2b48c; 
+            --color-selected: #4ade80; 
+            --color-selected-ring: #22c55e;
+            --color-bg: #f8f9fa;
+            --color-surface: #ffffff;
+            --color-text: #222222;
+            --shadow-float: 0 10px 15px -3px rgba(0,0,0,0.1);
+            --radius: 16px;
+        }
+
+        body[data-theme='dark'] {
+            --color-bg: #121212;
+            --color-surface: #1e1e1e;
+            --color-text: #e0e0e0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--color-bg);
+            color: var(--color-text);
+            margin: 0; padding-bottom: 100px;
+            transition: background 0.3s, color 0.3s;
+        }
+
+        /* --- Header --- */
+        header {
+            position: sticky; top: 0; z-index: 100;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            display: grid; 
+            grid-template-columns: 40px 1fr 40px;
+            align-items: center;
+            padding: 0 15px; height: 60px;
+        }
+        body[data-theme='dark'] header { background: rgba(30, 30, 30, 0.95); border-bottom: 1px solid rgba(255,255,255,0.05); }
+
+        .header-center { text-align: center; overflow: visible; display: flex; flex-direction: column; align-items: center; position: relative; }
+        .playing-text { font-weight: 700; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+        
+        /* Queue Dropdown Styles */
+        .queue-wrapper { position: relative; font-size: 0.8rem; opacity: 0.9; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+        .queue-wrapper:hover { opacity: 1; text-decoration: underline; }
+        .queue-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+        
+        .queue-dropdown {
+            display: none; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+            margin-top: 10px; background: var(--color-surface); 
+            border: 1px solid rgba(0,0,0,0.1); border-radius: 8px; 
+            min-width: 260px; max-width: 90vw;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15); 
+            z-index: 1000; overflow: hidden;
+            text-align: left;
+        }
+        .queue-dropdown.show { display: block; }
+        .queue-list { max-height: 300px; overflow-y: auto; }
+        .queue-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 12px; border-bottom: 1px solid rgba(0,0,0,0.05);
+            font-size: 0.85rem; color: var(--color-text);
+        }
+        .queue-item:last-child { border-bottom: none; }
+        .queue-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 10px; }
+        .btn-remove {
+            background: none; border: none; color: #ef4444; 
+            font-weight: bold; cursor: pointer; padding: 4px 8px;
+            border-radius: 4px; transition: background 0.2s;
+        }
+        .btn-remove:hover { background: rgba(239, 68, 68, 0.1); }
+        .queue-empty-msg { padding: 15px; text-align: center; color: #888; font-style: italic; }
+
+        .icon-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--color-text); }
+
+        /* --- Loop Indicator --- */
+        #loop-indicator {
+            background-color: var(--color-selected);
+            color: #004d00;
+            text-align: center; padding: 8px; font-weight: 700; font-size: 0.9rem;
+            display: none; justify-content: center; align-items: center; gap: 10px;
+        }
+        .close-loop { background: none; border: 1px solid #004d00; border-radius: 50%; width:20px; height:20px; line-height:18px; cursor: pointer; font-size:12px; }
+
+        /* --- Hero --- */
+        .hero-container { width: 100%; max-width: 1200px; margin: 0 auto; padding: 20px 15px 0; }
+        .hero-image { width: 100%; height: 200px; object-fit: cover; border-radius: var(--radius); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+
+        /* --- Controls --- */
+        .controls-wrapper { max-width: 1200px; margin: 20px auto 10px; padding: 0 15px; }
+        .status-pill { background: var(--color-accent); color: #fff; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; opacity: 0; transition: opacity 0.3s; display: inline-block; margin-bottom: 10px; }
+        .main-actions { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 5px; }
+        
+        select, button.action-btn {
+            background: var(--color-surface); color: var(--color-text);
+            border: 1px solid rgba(0,0,0,0.1); padding: 10px 16px;
+            border-radius: 12px; font-weight: 600; font-size: 0.9rem; cursor: pointer; white-space: nowrap;
+        }
+        .btn-primary { background: var(--color-accent) !important; color: white !important; border: none !important; }
+
+        /* --- Sent Popup --- */
+        #sent-popup {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9);
+            background: rgba(74, 222, 128, 0.85);
+            backdrop-filter: blur(4px); color: #004d00;
+            padding: 25px 50px; border-radius: 25px;
+            font-size: 2rem; font-weight: 800; opacity: 0; pointer-events: none; z-index: 2000;
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        #sent-popup.active { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+        /* --- Grid --- */
+        .grid { display: grid; gap: 16px; padding: 15px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); max-width: 1200px; margin: 0 auto; }
+
+        .card {
+            background: var(--color-surface); border-radius: var(--radius);
+            overflow: hidden; position: relative;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            transition: transform 0.2s; cursor: pointer;
+            border: 2px solid transparent;
+        }
+        .card.selected { border-color: var(--color-selected-ring); background-color: rgba(74, 222, 128, 0.05); transform: scale(0.98); }
+
+        .card-img-wrap { position: relative; aspect-ratio: 1/1; background: #fff; width: 100%; }
+        
+        /* canvas style - NO FLIP here to allow PNGs to show correctly */
+        .card canvas { width: 100%; height: 100%; display: block; }
+        
+        .select-dot {
+            position: absolute; top: 10px; right: 10px;
+            width: 24px; height: 24px; border-radius: 50%;
+            background: rgba(0,0,0,0.2); border: 2px solid #fff;
+            z-index: 10; transition: 0.2s;
+        }
+        .card.selected .select-dot { background: var(--color-selected); border-color: var(--color-selected); }
+        
+        .card-body { padding: 12px; }
+        .card-title { margin: 0; font-size: 0.9rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .card-meta { font-size: 0.75rem; opacity: 0.6; margin-top: 4px; }
+
+        /* --- Floating Selection Bar --- */
+        .selection-bar {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(150px);
+            background: var(--color-text); color: var(--color-bg);
+            padding: 12px 20px; border-radius: 50px;
+            display: flex; gap: 15px; align-items: center;
+            box-shadow: var(--shadow-float); z-index: 1000;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            min-width: 300px; justify-content: space-between;
+        }
+        .selection-bar.active { transform: translateX(-50%) translateY(0); }
+        .bar-actions { display: flex; gap: 10px; }
+        .bar-btn { background: rgba(255,255,255,0.2); border: none; color: inherit; padding: 8px 16px; border-radius: 20px; cursor: pointer; font-size: 0.9rem; font-weight: 600; }
+        .bar-btn.loop { background: var(--color-selected); color: #004d00; }
+        .bar-btn.danger { background: #ff4d4d; color: white; }
+
+        /* Sidebar */
+        .sidebar { height: 100%; width: 0; position: fixed; top: 0; left: 0; background: var(--color-surface); overflow-x: hidden; z-index: 1100; transition: 0.3s; padding-top: 20px; border-right: 1px solid rgba(0,0,0,0.1); }
+        .sidebar a { padding: 15px 25px; text-decoration: none; font-size: 1.1rem; color: var(--color-text); display: block; font-weight: 600; }
+        .overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); z-index: 1050; display: none; }
+    </style>
+</head>
+<body data-theme="light">
+
+    <div id="sent-popup">SENT!</div>
+
+    <div id="loop-indicator">
+        <span>Drawing on Repeat</span>
+        <button class="close-loop" onclick="cancelLoop()">✕</button>
+    </div>
+
+    <header>
+        <button class="icon-btn" onclick="openNav()">☰</button>
+        <div class="header-center">
+            <div id="playing-display" class="playing-text">Select a design</div>
+            
+            <div class="queue-wrapper" onclick="toggleQueue(event)">
+                <span id="queue-display" class="queue-text">Queue empty</span>
+                <span>▼</span>
+            </div>
+            <div id="queue-dropdown" class="queue-dropdown">
+                <div id="queue-list" class="queue-list">
+                    </div>
+            </div>
+
+        </div>
+        <button class="icon-btn" onclick="toggleTheme()">◑</button>
+    </header>
+
+    <div id="overlay" class="overlay" onclick="closeNav()"></div>
+    <div id="mySidebar" class="sidebar">
+        <div style="padding:0 25px; margin-bottom:20px; opacity:0.5;">MENU</div>
+        <a href="/">Designs</a>
+        <a href="/AI_builder">AI Builder</a>
+        <a href="/led_controls">LED Controls</a>
+        <a href="/settings">Settings</a>
+        <a href="/terminal">Terminal</a>
+    </div>
+
+    <div class="hero-container">
+        <img src="/static/sand.png" alt="Sand Table" class="hero-image">
+    </div>
+
+    <div class="controls-wrapper">
+        <div id="status-pill" class="status-pill">Ready</div>
+        <div class="main-actions">
+            <select id="speedSelect" onchange="updateAllTimes()">
+                <option value="0.5">Speed: Fast</option>
+                <option value="1.0" selected>Speed: Normal</option>
+                <option value="2.0">Speed: Slow</option>
+            </select>
+            <button class="action-btn" onclick="shuffleLoop()">Shuffle All</button>
+            <button class="action-btn btn-primary" onclick="resumeDesign()">Resume</button>
+            <button class="action-btn" onclick="pauseDesign()">Pause</button>
+            <button class="action-btn" onclick="clearQueue()">Clear All</button>
+        </div>
+    </div>
+
+    <div id="grid" class="grid"></div>
+    <div style="text-align:center; margin-top:20px;">
+        <button id="more-btn" class="action-btn" style="display:none;" onclick="showAll()">Show All Designs</button>
+    </div>
+
+    <div id="selection-bar" class="selection-bar">
+        <span style="font-weight:600; padding-left:5px;" id="sel-count">0 Selected</span>
+        <div class="bar-actions">
+            <button class="bar-btn loop" onclick="loopSelected()">Loop</button>
+            <button class="bar-btn" onclick="copySelected()">Copy</button>
+            <button class="bar-btn danger" onclick="deleteSelected()">Delete</button>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = `${window.location.protocol}//${window.location.host}`;
+        let selectedFiles = new Set();
+        let allFiles = [];
+
+        // --- MATH & OPTIMIZED DRAWING ---
+        const observer = new IntersectionObserver((e,o)=>{e.forEach(x=>{if(x.isIntersecting){loadPreview(x.target,x.target.dataset.f);o.unobserve(x.target)}})},{rootMargin:"150px"});
+        
+        // SCARA Constants
+        const L1=101.3, L2=101.3, R=9/8, S_RAD=(3200/360)*(180/Math.PI);
+
+        function getXY(b, e) {
+            let t1 = -b / S_RAD;
+            let tb = -e / S_RAD - (R * t1); 
+            let t2 = t1 + tb;
+            return {
+                x: L1 * Math.cos(t1) + L2 * Math.cos(t2),
+                y: L1 * Math.sin(t1) + L2 * Math.sin(t2)
+            };
+        }
+
+        function drawTrace(cvs, txt) {
+            let ctx = cvs.getContext('2d'), w=cvs.width, h=cvs.height;
+            ctx.clearRect(0,0,w,h);
+            
+            const lines = txt.split('\n');
+            let path = [];
+            let tb=0, te=0;
+            
+            let start = getXY(0,0);
+            path.push(start);
+
+            for(let i=0; i<lines.length; i++){
+                let l = lines[i].trim();
+                if(l.length < 3 || l[0] !== 'G' || l[1] !== '1') continue;
+
+                let parts = l.substring(3).trim().split(/\s+/);
+                let db = parseInt(parts[1])||0; 
+                let de = parseInt(parts[0])||0;
+                
+                let next_b = tb + db;
+                let next_e = te + de;
+
+                let dist = Math.max(Math.abs(db), Math.abs(de));
+                let step = Math.max(2, Math.ceil(dist / 1500)); 
+
+                for(let k=1; k<=step; k++){
+                    let t = k/step;
+                    let interp_b = tb + (next_b - tb) * t;
+                    let interp_e = te + (next_e - te) * t;
+                    path.push(getXY(interp_b, interp_e));
+                }
+
+                tb = next_b; te = next_e;
+            }
+
+            if(path.length < 2) return;
+
+            // Auto-Scale
+            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+            for(let p of path){ 
+                if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; 
+                if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y; 
+            }
+            
+            let rangeX = maxX - minX || 1;
+            let rangeY = maxY - minY || 1;
+            let sc = (Math.min(w, h) / Math.max(rangeX, rangeY)) * 0.9;
+            let cx = (minX + maxX) / 2;
+            let cy = (minY + maxY) / 2;
+
+            ctx.beginPath(); 
+            ctx.strokeStyle='#333'; 
+            ctx.lineWidth=1.5;
+            
+            // --- BOTH AXES MIRRORED (Rotated 180 degrees) ---
+            let p0 = path[0];
+            let sx = w/2 - (p0.x-cx)*sc;  // Horizontal Flip
+            let sy = h/2 - (p0.y-cy)*-sc; // Vertical Flip
+            ctx.moveTo(sx, sy);
+
+            for(let i=1; i<path.length; i++){
+                let p = path[i];
+                let px = w/2 - (p.x-cx)*sc; // Horizontal Flip
+                let py = h/2 - (p.y-cy)*-sc; // Vertical Flip
+                ctx.lineTo(px, py);
+            }
+            ctx.stroke();
+        }
+
+        // --- QUEUE LOGIC ---
+        function toggleQueue(e) {
+            e.stopPropagation();
+            document.getElementById('queue-dropdown').classList.toggle('show');
+        }
+
+        async function removeFromQueue(idx, type) {
+            if(!confirm("Remove from queue?")) return;
+            try {
+                await fetch(`${BASE_URL}/remove_from_queue`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({index: idx, type: type})
+                });
+                updateQ(); 
+            } catch(e) { showStatus("Error removing item"); }
+        }
+
+        window.onclick = function(e) {
+            if(!e.target.closest('.queue-wrapper') && !e.target.closest('.queue-dropdown')) {
+                document.getElementById('queue-dropdown').classList.remove('show');
+            }
+        }
+
+        // --- STANDARD APP LOGIC ---
+        function toggleTheme() {
+            let b = document.body, n = b.getAttribute('data-theme')==='dark'?'light':'dark';
+            b.setAttribute('data-theme', n);
+        }
+
+        function showStatus(msg) {
+            let el = document.getElementById('status-pill');
+            el.textContent = msg; el.style.opacity='1';
+            setTimeout(()=>el.style.opacity='0', 3000);
+        }
+
+        function showSentPopup() {
+            let p = document.getElementById('sent-popup');
+            p.classList.add('active');
+            setTimeout(() => { p.classList.remove('active'); }, 800);
+        }
+
+        function toggleSelect(f, e) {
+            e.stopPropagation();
+            if(selectedFiles.has(f)) selectedFiles.delete(f); else selectedFiles.add(f);
+            renderSel();
+        }
+        function renderSel() {
+            document.querySelectorAll('.card').forEach(c=>{
+                if(selectedFiles.has(c.dataset.name)) c.classList.add('selected'); else c.classList.remove('selected');
+            });
+            let bar=document.getElementById('selection-bar');
+            if(selectedFiles.size>0){ bar.classList.add('active'); document.getElementById('sel-count').textContent=`${selectedFiles.size} Selected`; }
+            else bar.classList.remove('active');
+        }
+
+        async function shuffleLoop() {
+            if(allFiles.length === 0) { showStatus("No designs found"); return; }
+            showStatus("Shuffling Library...");
+            let shuffled = [...allFiles].sort(() => 0.5 - Math.random());
+            await fetch(`${BASE_URL}/set_loop`, {
+                method:"POST", headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({files:shuffled})
+            });
+            updateQ();
+        }
+
+        async function loopSelected() {
+            let files = Array.from(selectedFiles);
+            if(files.length === 0) return;
+            showStatus("Starting Loop...");
+            await fetch(`${BASE_URL}/set_loop`, {
+                method:"POST", headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({files:files})
+            });
+            selectedFiles.clear(); renderSel(); updateQ();
+        }
+
+        async function cancelLoop() {
+            await fetch(`${BASE_URL}/cancel_loop`, {method:"POST"});
+            updateQ();
+        }
+
+        async function deleteSelected() {
+            let toDel = [], protected = 0;
+            for(let f of selectedFiles) {
+                let c = document.querySelector(`.card[data-name="${f}"]`);
+                if(c && c.dataset.hasPng==="true") protected++; else toDel.push(f);
+            }
+            if(!toDel.length) { if(protected) alert("Protected files skipped."); return; }
+            if(!confirm(`Delete ${toDel.length} files?`)) return;
+            for(let f of toDel) await fetch(`${BASE_URL}/delete_design`, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filename:f})});
+            selectedFiles.clear(); renderSel(); loadLib();
+        }
+
+        async function copySelected() {
+            let txt = "";
+            showStatus("Fetching code...");
+            try {
+                for(let f of selectedFiles) {
+                    let r = await fetch(`${BASE_URL}/designs/${f}`);
+                    txt += `; --- ${f} ---\n${await r.text()}\n\n`;
+                }
+            } catch(e) { showStatus("Error fetching files"); return; }
+            
+            const ta = document.createElement("textarea");
+            ta.value = txt; ta.style.position = "fixed"; ta.style.left = "-9999px";
+            document.body.appendChild(ta); ta.focus(); ta.select();
+            try { document.execCommand('copy'); showStatus("Copied!"); selectedFiles.clear(); renderSel(); } 
+            catch (err) { showStatus("Copy Failed"); }
+            document.body.removeChild(ta);
+        }
+
+        // --- FIXED: Wait for response before showing "SENT!" ---
+        async function runDesign(f) {
+            let spd = document.getElementById('speedSelect').value;
+            let r=await fetch(`${BASE_URL}/designs/${f}`), txt=await r.text();
+            let gcode = txt.split('\n').map(l=>{
+                if(l.trim().toUpperCase().startsWith('G1')){
+                    let p=l.substring(2).trim().split(/\s+/);
+                    return `G1 ${p[0]} ${p[1]} ${Math.round((parseInt(p[2])||1000)*parseFloat(spd))}`;
+                } return l;
+            }).join('\n');
+            
+            // Send to backend and WAIT for response
+            let resp = await fetch(`${BASE_URL}/send_gcode_block`, {
+                method:"POST",
+                headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({gcode:gcode, filename:f})
+            });
+            
+            // Check success
+            let data = await resp.json();
+            if(data.success) {
+                showSentPopup(); // Only show if server says OK
+                updateQ();
+            } else {
+                alert("Error: " + (data.error || "Could not start design"));
+            }
+        }
+
+        function sendCmd(c) { fetch(`${BASE_URL}/send`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({command:c})}); }
+        function pauseDesign() { sendCmd('PAUSE'); }
+        function resumeDesign() { sendCmd('RESUME'); }
+        function clearQueue() { sendCmd('CLEAR'); updateQ(); }
+
+        // --- UPDATED QUEUE POLLER ---
+        async function updateQ() {
+            try {
+                let r = await fetch(`${BASE_URL}/status_full`);
+                let d = await r.json();
+                
+                let playText = "Select a design";
+                if (d.playing) {
+                    playText = d.is_paused ? `Paused: ${d.playing}` : `Playing: ${d.playing}`;
+                } else if (d.is_waiting) {
+                    playText = `Cooling down...`;
+                }
+                document.getElementById('playing-display').textContent = playText;
+                
+                let qText = "Queue empty";
+                let listHTML = "";
+
+                if(d.queue_items && d.queue_items.length > 0) {
+                    let count = d.queue_count || d.queue_items.length;
+                    qText = `Next: ${d.next_up} (+${count-1})`;
+                    
+                    d.queue_items.forEach(item => {
+                        listHTML += `
+                            <div class="queue-item">
+                                <span>${item.index+1}. ${item.name}</span>
+                                <button class="btn-remove" onclick="removeFromQueue(${item.index}, '${item.type}')">✕</button>
+                            </div>
+                        `;
+                    });
+                } else {
+                    listHTML = `<div class="queue-empty-msg">No items in queue</div>`;
+                }
+
+                document.getElementById('queue-display').textContent = qText;
+                document.getElementById('queue-list').innerHTML = listHTML;
+                document.getElementById('loop-indicator').style.display = d.is_looping ? 'flex' : 'none';
+            } catch(e){}
+        }
+
+        async function loadLib() {
+            let g=document.getElementById('grid'); g.innerHTML='Loading...';
+            let r=await fetch(`${BASE_URL}/api/designs`), files=await r.json();
+            allFiles=files; renderGrid(files.slice(0,15));
+            if(files.length>15) document.getElementById('more-btn').style.display='inline-block';
+        }
+        function showAll() { renderGrid(allFiles); document.getElementById('more-btn').style.display='none'; }
+        
+        function renderGrid(fs) {
+            let g=document.getElementById('grid'); g.innerHTML='';
+            fs.forEach(f=>{
+                let d=document.createElement('div'), clean=f.replace('.txt','');
+                d.className='card'; d.dataset.name=f; d.dataset.hasPng="false"; d.dataset.baseTime="0"; 
+                d.onclick=(e)=>{if(e.target.className!=='select-dot')runDesign(f)};
+                d.innerHTML=`<div class="card-img-wrap"><canvas data-f="${f}" width="300" height="300"></canvas><div class="select-dot" onclick="toggleSelect('${f}', event)"></div></div><div class="card-body"><h3 class="card-title">${clean}</h3><div class="card-meta">Est: <span id="t-${clean}">...</span></div></div>`;
+                g.appendChild(d); observer.observe(d.querySelector('canvas'));
+            }); renderSel();
+        }
+
+        function formatTimeFromMicroseconds(us) {
+            if(!us) return "...";
+            let seconds = Math.round(us / 1000000);
+            if (seconds < 60) return seconds + "s";
+            return Math.ceil(seconds / 60) + "m";
+        }
+
+        function updateAllTimes() {
+            let speed = parseFloat(document.getElementById('speedSelect').value) || 1.0;
+            document.querySelectorAll('.card').forEach(card => {
+                let base = parseFloat(card.dataset.baseTime);
+                if(base > 0) {
+                    let span = document.getElementById(`t-${card.dataset.name.replace('.txt','')}`);
+                    if(span) span.textContent = formatTimeFromMicroseconds(base * speed);
+                }
+            });
+        }
+
+        function loadPreview(cvs, f) {
+            let clean = f.replace('.txt','');
+            let card = cvs.closest('.card');
+            
+            fetch(`${BASE_URL}/designs/${f}`).then(r => r.text()).then(t => {
+                let tm = 0;
+                let reg = /^G1\s+(\-?\d+)\s+(\-?\d+)\s+(\d+)/i;
+                let lines = t.split('\n');
+                for(let l of lines) {
+                    let m = l.trim().match(reg);
+                    if(m) tm += Math.max(Math.abs(parseInt(m[1])), Math.abs(parseInt(m[2]))) * parseInt(m[3]);
+                }
+
+                card.dataset.baseTime = tm;
+                let currentSpeed = parseFloat(document.getElementById('speedSelect').value) || 1.0;
+                document.getElementById(`t-${clean}`).textContent = formatTimeFromMicroseconds(tm * currentSpeed);
+
+                let img = new Image();
+                img.src = `${BASE_URL}/designs/${clean}.png`;
+                img.onload = () => { 
+                    cvs.getContext('2d').drawImage(img,0,0,300,300); 
+                    card.dataset.hasPng="true"; 
+                };
+                img.onerror = () => { 
+                    drawTrace(cvs, t); 
+                };
+            });
+        }
+
+        function openNav() { document.getElementById('mySidebar').style.width="250px"; document.getElementById('overlay').style.display="block"; }
+        function closeNav() { document.getElementById('mySidebar').style.width="0"; document.getElementById('overlay').style.display="none"; }
+
+        loadLib(); updateQ(); setInterval(updateQ, 3000);
+    </script>
+</body>
+</html>
