@@ -448,17 +448,26 @@ def update_firmware():
     # Adding variant=lgt8fx8p ensures it uses the correct bootloader protocol
     FQBN = "lgt8fx:avr:328:variant=lgt8fx8p" 
     
+    # LGT8fx index URL
+    LGT_URL = "https://raw.githubusercontent.com/dbuezas/lgt8fx/master/package_lgt8fx_index.json"
+    
     try:
         log_message(f"Starting firmware update on {arduino_port}...")
         
-        # 1. Compile
-        compile_cmd = ["arduino-cli", "compile", "--fqbn", FQBN, ARDUINO_PROJECT_PATH]
+        # 1. Compile (Explicitly adding the URL)
+        compile_cmd = ["arduino-cli", "compile", "--additional-urls", LGT_URL, "--fqbn", FQBN, ARDUINO_PROJECT_PATH]
         log_message(f"Compiling: {' '.join(compile_cmd)}")
         subprocess.run(compile_cmd, check=True, capture_output=True, text=True)
         
-        # 2. Upload
-        # Force 115200 baud for direct RX/TX flashing
-        upload_cmd = ["arduino-cli", "upload", "-p", arduino_port, "--fqbn", FQBN, ARDUINO_PROJECT_PATH, "--upload-property", "upload.speed=115200"]
+        # 2. Upload (Explicitly adding the URL)
+        upload_cmd = [
+            "arduino-cli", "upload", 
+            "--additional-urls", LGT_URL,
+            "-p", arduino_port, 
+            "--fqbn", FQBN, 
+            ARDUINO_PROJECT_PATH, 
+            "--upload-property", "upload.speed=115200"
+        ]
         log_message(f"Uploading: {' '.join(upload_cmd)}")
         
         subprocess.run(upload_cmd, capture_output=True, text=True, check=True)
