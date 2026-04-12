@@ -8,7 +8,6 @@ import json
 import datetime
 from collections import deque
 import wifi_tools 
-import ble_controller 
 from pyngrok import ngrok, conf 
 
 app = Flask(__name__)
