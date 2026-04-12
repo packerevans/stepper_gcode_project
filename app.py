@@ -444,8 +444,9 @@ def update_firmware():
         except: pass
         arduino_connected = False
     
-    # Standard FQBN for LGT8F328P
-    FQBN = "lgt8fx:avr:328" 
+    # Specific FQBN for LGT8F328P-LQFP32 (Nano Style)
+    # Adding variant=lgt8fx8p ensures it uses the correct bootloader protocol
+    FQBN = "lgt8fx:avr:328:variant=lgt8fx8p" 
     
     try:
         log_message(f"Starting firmware update on {arduino_port}...")
@@ -455,12 +456,12 @@ def update_firmware():
         log_message(f"Compiling: {' '.join(compile_cmd)}")
         subprocess.run(compile_cmd, check=True, capture_output=True, text=True)
         
-        # 2. Upload (Using -v for extra debugging in logs)
-        # Note: LGT8F328P often needs -b115200 for RX/TX
-        upload_cmd = ["arduino-cli", "upload", "-p", arduino_port, "--fqbn", FQBN, ARDUINO_PROJECT_PATH, "-v"]
+        # 2. Upload
+        # Force 115200 baud for direct RX/TX flashing
+        upload_cmd = ["arduino-cli", "upload", "-p", arduino_port, "--fqbn", FQBN, ARDUINO_PROJECT_PATH, "--upload-property", "upload.speed=115200"]
         log_message(f"Uploading: {' '.join(upload_cmd)}")
         
-        result = subprocess.run(upload_cmd, capture_output=True, text=True, check=True)
+        subprocess.run(upload_cmd, capture_output=True, text=True, check=True)
         
         log_message("Upload Successful!")
         connect_arduino()
