@@ -58,9 +58,9 @@ def find_available_port():
     return 5000 
 
 def find_arduino_port():
-    # Common USB and Hardware UART ports
+    # Priority for Hardware UART (RX/TX on pins 8/10)
     ports = [
-        '/dev/serial0', '/dev/ttyS0', '/dev/ttyAMA0', # Hardware UART (RX/TX)
+        '/dev/serial0', '/dev/ttyAMA0', '/dev/ttyS0', # Hardware UART (RX/TX)
         '/dev/ttyUSB0', '/dev/ttyUSB1',               # USB Serial (CH340/FTDI)
         '/dev/ttyACM0', '/dev/ttyACM1'                # USB CDC (Uno/Mega/Leo)
     ]
@@ -76,6 +76,35 @@ def get_current_ip():
         ip = s.getsockname()[0]; s.close()
     except: ip = '127.0.0.1'
     return ip
+
+# === STATE MANAGEMENT ===
+job_queue = deque()      
+loop_playlist = []       
+is_looping = False       
+is_paused = False        
+is_waiting = False       
+is_calibrating = False   
+calibration_done = False 
+skip_cooldown = False    
+
+current_job_name = None  
+next_job_name = None     
+
+serial_log = []
+lock = threading.Lock()
+
+def log_message(msg):
+    timestamp = time.strftime("[%H:%M:%S] ")
+    with lock:
+        serial_log.append(timestamp + msg)
+        if len(serial_log) > 200:
+            serial_log.pop(0)
+
+# === SERIAL CONNECTION ===
+arduino = None
+arduino_connected = False
+current_gcode_runner = None
+arduino_port = "/dev/ttyUSB0" # Default
 
 def send_speed_to_arduino():
     global arduino_connected
