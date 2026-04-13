@@ -108,6 +108,20 @@
         .sch-days { font-size: 0.8rem; opacity: 0.7; }
         .sch-action { font-size: 0.9rem; color: var(--color-accent); font-weight: 600; }
 
+        /* --- General Popup (Matches designs.html) --- */
+        #sent-popup {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9);
+            background: rgba(74, 222, 128, 0.9);
+            backdrop-filter: blur(8px); color: #004d00;
+            padding: 25px 50px; border-radius: 30px;
+            font-size: 2rem; font-weight: 800; opacity: 0; pointer-events: none; z-index: 2000;
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+            text-transform: uppercase;
+        }
+        #sent-popup.active { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        #sent-popup.error { background: rgba(239, 68, 68, 0.9); color: #fff; }
+
         /* Sidebar & Overlay */
         .sidebar { height: 100%; width: 0; position: fixed; top: 0; left: 0; background: var(--color-surface); overflow-x: hidden; z-index: 1100; transition: 0.3s; padding-top: 20px; border-right: 1px solid rgba(0,0,0,0.1); }
         .sidebar a { padding: 15px 25px; text-decoration: none; font-size: 1.1rem; color: var(--color-text); display: block; font-weight: 600; }
@@ -126,14 +140,49 @@
     <div id="mySidebar" class="sidebar">
         <div style="padding:0 25px; margin-bottom:20px; opacity:0.5;">MENU</div>
         <a href="/">Designs</a>
-        <a href="/AI_builder">AI Builder</a>
+        <a href="/controller">Controller</a>
+        <a href="/sketch">Sketch</a>
         <a href="/led_controls">LED Controls</a>
         <a href="/settings">Settings</a>
         <a href="/terminal">Terminal</a>
     </div>
 
+    <div id="sent-popup">SENT!</div>
+
     <div class="container">
         
+        <div class="card">
+            <details open>
+                <summary><h2>Movement</h2></summary>
+                <div class="card-content">
+                    <div style="font-size: 0.9rem; margin-bottom: 15px; opacity: 0.8;">
+                        Manually control the table state or recalibrate the arm position.
+                    </div>
+                    
+                    <div class="form-group" style="margin-bottom: 25px; border-bottom: 1px solid rgba(0,0,0,0.05); padding-bottom: 20px;">
+                        <label>Global Speed Multiplier (<span id="speed-val">1.0</span>x)</label>
+                        <div style="font-size:0.8rem; opacity:0.7; margin-bottom:8px;">
+                            Adjusts how fast the table moves for all designs and manual control.
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <span>0.1x</span>
+                            <input type="range" id="set-speed" min="0.1" max="2.0" step="0.1" value="1.0" oninput="document.getElementById('speed-val').textContent = this.value" style="flex:1;">
+                            <span>2.0x</span>
+                        </div>
+                        <button class="btn" onclick="saveGeneralSettings()" style="margin-top:15px; background: var(--color-accent);">Save Speed & Settings</button>
+                    </div>
+
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn" onclick="sendCmd('CALIBRATE', 'Calibrating...')" style="background: var(--color-selected); color: #004d00; margin-top:0;">Calibrate Arm</button>
+                        <button class="btn btn-delete" onclick="clearQueue()" style="width: 100%; margin-top: 0;">Clear All / E-Stop</button>
+                    </div>
+                    <div id="cal-status-text" style="margin-top: 10px; font-weight: bold; text-align: center; color: var(--color-accent); display: none;">
+                        Calibration in progress...
+                    </div>
+                </div>
+            </details>
+        </div>
+
         <div class="card">
             <details open>
                 <summary><h2>General & Cooldown</h2></summary>
@@ -251,21 +300,64 @@
     <script>
         const BASE_URL = `${window.location.protocol}//${window.location.host}`;
 
+        function showPopup(text, isError = false) {
+            let p = document.getElementById('sent-popup');
+            p.textContent = text;
+            if(isError) p.classList.add('error'); else p.classList.remove('error');
+            p.classList.add('active');
+            setTimeout(() => { p.classList.remove('active'); }, 1000);
+        }
+
+        function sendCmd(c, popupText) { 
+            if(popupText) showPopup(popupText);
+            fetch(`${BASE_URL}/send`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({command:c})}); 
+            if(c === 'CALIBRATE') {
+                document.getElementById('cal-status-text').style.display = 'block';
+                setTimeout(pollCalibration, 2000);
+            }
+        }
+
+        async function pollCalibration() {
+            try {
+                let r = await fetch('/api/calibration_status');
+                let d = await r.json();
+                if(d.calibration_done) {
+                    showPopup("CALIBRATED!");
+                    document.getElementById('cal-status-text').style.display = 'none';
+                } else if(d.is_calibrating) {
+                    setTimeout(pollCalibration, 1000);
+                } else {
+                    document.getElementById('cal-status-text').style.display = 'none';
+                }
+            } catch(e) { console.log(e); }
+        }
+
+        function clearQueue() {
+            if(confirm("Emergency Stop? This clears all jobs.")) {
+                sendCmd('CLEAR', 'STOPPED');
+            }
+        }
+
         // --- GENERAL SETTINGS ---
         async function loadGeneralSettings() {
             try {
                 let r = await fetch('/api/settings');
                 let d = await r.json();
                 if(d.cooldown !== undefined) document.getElementById('set-cooldown').value = d.cooldown;
+                if(d.speed !== undefined) {
+                    document.getElementById('set-speed').value = d.speed;
+                    document.getElementById('speed-val').textContent = d.speed;
+                }
             } catch(e) { console.log(e); }
         }
 
         async function saveGeneralSettings() {
             let cd = parseInt(document.getElementById('set-cooldown').value);
+            let sp = parseFloat(document.getElementById('set-speed').value);
             if (isNaN(cd) || cd < 0) { alert("Invalid cooldown time"); return; }
             await fetch('/api/settings', {
                 method: 'POST', headers: {'Content-Type':'application/json'},
-                body: JSON.stringify({cooldown: cd})
+                body: JSON.stringify({cooldown: cd, speed: sp})
             });
             alert("Settings Saved!");
         }

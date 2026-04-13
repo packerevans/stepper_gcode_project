@@ -106,17 +106,19 @@
         }
         .btn-primary { background: var(--color-accent) !important; color: white !important; border: none !important; }
 
-        /* --- Sent Popup --- */
+        /* --- General Popup --- */
         #sent-popup {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9);
-            background: rgba(74, 222, 128, 0.85);
-            backdrop-filter: blur(4px); color: #004d00;
-            padding: 25px 50px; border-radius: 25px;
+            background: rgba(74, 222, 128, 0.9);
+            backdrop-filter: blur(8px); color: #004d00;
+            padding: 25px 50px; border-radius: 30px;
             font-size: 2rem; font-weight: 800; opacity: 0; pointer-events: none; z-index: 2000;
             transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+            text-transform: uppercase;
         }
         #sent-popup.active { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        #sent-popup.error { background: rgba(239, 68, 68, 0.9); color: #fff; }
 
         /* --- Grid --- */
         .grid { display: grid; gap: 16px; padding: 15px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); max-width: 1200px; margin: 0 auto; }
@@ -173,6 +175,19 @@
 
     <div id="sent-popup">SENT!</div>
 
+    <!-- Cooldown Modal -->
+    <div id="cooldown-modal" class="overlay" style="display:none; justify-content: center; align-items: center; z-index: 3000;">
+        <div style="background: var(--color-surface); padding: 30px; border-radius: var(--radius); box-shadow: var(--shadow-float); max-width: 400px; width: 90%; text-align: center;">
+            <h2 style="margin-top: 0;">Table in Cooldown</h2>
+            <p>Do you want to start this design now or add to queue?</p>
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
+                <button class="btn-primary action-btn" onclick="cooldownChoice('now')">Start Now</button>
+                <button class="action-btn" onclick="cooldownChoice('queue')">Add to Queue</button>
+                <button class="action-btn" style="background:#eee; color:#333; border:none;" onclick="cooldownChoice('cancel')">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <div id="loop-indicator">
         <span>Drawing on Repeat</span>
         <button class="close-loop" onclick="cancelLoop()">✕</button>
@@ -200,7 +215,8 @@
     <div id="mySidebar" class="sidebar">
         <div style="padding:0 25px; margin-bottom:20px; opacity:0.5;">MENU</div>
         <a href="/">Designs</a>
-        <a href="/AI_builder">AI Builder</a>
+        <a href="/controller">Controller</a>
+        <a href="/sketch">Sketch</a>
         <a href="/led_controls">LED Controls</a>
         <a href="/settings">Settings</a>
         <a href="/terminal">Terminal</a>
@@ -213,15 +229,9 @@
     <div class="controls-wrapper">
         <div id="status-pill" class="status-pill">Ready</div>
         <div class="main-actions">
-            <select id="speedSelect" onchange="updateAllTimes()">
-                <option value="0.5">Speed: Fast</option>
-                <option value="1.0" selected>Speed: Normal</option>
-                <option value="2.0">Speed: Slow</option>
-            </select>
             <button class="action-btn" onclick="shuffleLoop()">Shuffle All</button>
             <button class="action-btn btn-primary" onclick="resumeDesign()">Resume</button>
             <button class="action-btn" onclick="pauseDesign()">Pause</button>
-            <button class="action-btn" onclick="clearQueue()">Clear All</button>
         </div>
     </div>
 
@@ -243,6 +253,18 @@
         const BASE_URL = `${window.location.protocol}//${window.location.host}`;
         let selectedFiles = new Set();
         let allFiles = [];
+        let isWaiting = false; // Global track of cooldown state
+        let pendingDesign = null;
+        let globalSettings = { speed: 1.0, cooldown: 30 };
+
+        // Fetch settings once on load
+        async function refreshSettings() {
+            try {
+                let r = await fetch('/api/settings');
+                globalSettings = await r.json();
+            } catch(e) { console.error("Failed to load settings", e); }
+        }
+        refreshSettings();
 
         // --- MATH & OPTIMIZED DRAWING ---
         const observer = new IntersectionObserver((e,o)=>{e.forEach(x=>{if(x.isIntersecting){loadPreview(x.target,x.target.dataset.f);o.unobserve(x.target)}})},{rootMargin:"150px"});
@@ -266,27 +288,46 @@
             
             const lines = txt.split('\n');
             let path = [];
-            let tb=0, te=0;
+            let curTheta=0, curRho=0;
+            let tb=0, te=0; // Stepper positions for IK
             
-            let start = getXY(0,0);
-            path.push(start);
+            // Initial position at center
+            path.push(getXY(0,0));
 
             for(let i=0; i<lines.length; i++){
                 let l = lines[i].trim();
-                if(l.length < 3 || l[0] !== 'G' || l[1] !== '1') continue;
+                if(l.length < 1 || l.startsWith('#')) continue;
 
-                let parts = l.substring(3).trim().split(/\s+/);
-                let db = parseInt(parts[1])||0; 
-                let de = parseInt(parts[0])||0;
+                let theta, rho;
+
+                if(l.toUpperCase().startsWith('G1')){
+                    let parts = l.substring(3).trim().split(/\s+/);
+                    theta = parseFloat(parts[0]) || 0;
+                    rho = parseFloat(parts[1]) || 0;
+                } else {
+                    // New "theta rho" format
+                    let parts = l.split(/\s+/);
+                    if(parts.length < 2) continue;
+                    theta = parseFloat(parts[0]);
+                    rho = parseFloat(parts[1]);
+                }
+
+                if(isNaN(theta) || isNaN(rho)) continue;
+
+                // For preview, we still use the IK math to show the SCARA arm path
+                // We need to convert Theta/Rho to the stepper steps the IK expects
+                // Or simplify: just show the polar plot. 
+                // Let's stick to the IK preview since it shows the actual 'sand' path.
                 
-                let next_b = tb + db;
-                let next_e = te + de;
+                // Approximate "steps" for the previewer's IK function
+                let next_b = -theta * S_RAD; 
+                let next_e = -rho * S_RAD; // This is a simplification for the preview
 
-                let dist = Math.max(Math.abs(db), Math.abs(de));
-                let step = Math.max(2, Math.ceil(dist / 1500)); 
+                let dist = Math.max(Math.abs(next_b - tb), Math.abs(next_e - te));
+                let stepCount = Math.max(2, Math.ceil(dist / 50)); 
 
-                for(let k=1; k<=step; k++){
-                    let t = k/step;
+                for(let k=1; k<=stepCount; k++){
+                    let t = k/stepCount;
                     let interp_b = tb + (next_b - tb) * t;
                     let interp_e = te + (next_e - te) * t;
                     path.push(getXY(interp_b, interp_e));
@@ -314,16 +355,15 @@
             ctx.strokeStyle='#333'; 
             ctx.lineWidth=1.5;
             
-            // --- BOTH AXES MIRRORED (Rotated 180 degrees) ---
             let p0 = path[0];
-            let sx = w/2 - (p0.x-cx)*sc;  // Horizontal Flip
-            let sy = h/2 - (p0.y-cy)*-sc; // Vertical Flip
+            let sx = w/2 - (p0.x-cx)*sc;
+            let sy = h/2 - (p0.y-cy)*-sc;
             ctx.moveTo(sx, sy);
 
             for(let i=1; i<path.length; i++){
                 let p = path[i];
-                let px = w/2 - (p.x-cx)*sc; // Horizontal Flip
-                let py = h/2 - (p.y-cy)*-sc; // Vertical Flip
+                let px = w/2 - (p.x-cx)*sc;
+                let py = h/2 - (p.y-cy)*-sc;
                 ctx.lineTo(px, py);
             }
             ctx.stroke();
@@ -359,16 +399,12 @@
             b.setAttribute('data-theme', n);
         }
 
-        function showStatus(msg) {
-            let el = document.getElementById('status-pill');
-            el.textContent = msg; el.style.opacity='1';
-            setTimeout(()=>el.style.opacity='0', 3000);
-        }
-
-        function showSentPopup() {
+        function showPopup(text, isError = false) {
             let p = document.getElementById('sent-popup');
+            p.textContent = text;
+            if(isError) p.classList.add('error'); else p.classList.remove('error');
             p.classList.add('active');
-            setTimeout(() => { p.classList.remove('active'); }, 800);
+            setTimeout(() => { p.classList.remove('active'); }, 1000);
         }
 
         function toggleSelect(f, e) {
@@ -386,8 +422,8 @@
         }
 
         async function shuffleLoop() {
-            if(allFiles.length === 0) { showStatus("No designs found"); return; }
-            showStatus("Shuffling Library...");
+            if(allFiles.length === 0) { showPopup("No designs", true); return; }
+            showPopup("Shuffling...");
             let shuffled = [...allFiles].sort(() => 0.5 - Math.random());
             await fetch(`${BASE_URL}/set_loop`, {
                 method:"POST", headers:{"Content-Type":"application/json"},
@@ -399,7 +435,7 @@
         async function loopSelected() {
             let files = Array.from(selectedFiles);
             if(files.length === 0) return;
-            showStatus("Starting Loop...");
+            showPopup("Looping...");
             await fetch(`${BASE_URL}/set_loop`, {
                 method:"POST", headers:{"Content-Type":"application/json"},
                 body:JSON.stringify({files:files})
@@ -408,50 +444,93 @@
         }
 
         async function cancelLoop() {
+            showPopup("Loop Cancelled");
             await fetch(`${BASE_URL}/cancel_loop`, {method:"POST"});
             updateQ();
         }
 
         async function deleteSelected() {
-            let toDel = [], protected = 0;
+            let toDel = [], protectedCount = 0;
             for(let f of selectedFiles) {
                 let c = document.querySelector(`.card[data-name="${f}"]`);
-                if(c && c.dataset.hasPng==="true") protected++; else toDel.push(f);
+                if(c && c.dataset.hasPng==="true") protectedCount++; else toDel.push(f);
             }
-            if(!toDel.length) { if(protected) alert("Protected files skipped."); return; }
+            if(!toDel.length) { if(protectedCount) showPopup("Protected!", true); return; }
             if(!confirm(`Delete ${toDel.length} files?`)) return;
+            showPopup("Deleting...");
             for(let f of toDel) await fetch(`${BASE_URL}/delete_design`, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filename:f})});
             selectedFiles.clear(); renderSel(); loadLib();
         }
 
         async function copySelected() {
             let txt = "";
-            showStatus("Fetching code...");
+            showPopup("Copying...");
             try {
                 for(let f of selectedFiles) {
                     let r = await fetch(`${BASE_URL}/designs/${f}`);
                     txt += `; --- ${f} ---\n${await r.text()}\n\n`;
                 }
-            } catch(e) { showStatus("Error fetching files"); return; }
+            } catch(e) { showPopup("Error", true); return; }
             
             const ta = document.createElement("textarea");
             ta.value = txt; ta.style.position = "fixed"; ta.style.left = "-9999px";
             document.body.appendChild(ta); ta.focus(); ta.select();
-            try { document.execCommand('copy'); showStatus("Copied!"); selectedFiles.clear(); renderSel(); } 
-            catch (err) { showStatus("Copy Failed"); }
+            try { document.execCommand('copy'); showPopup("Copied!"); selectedFiles.clear(); renderSel(); } 
+            catch (err) { showPopup("Copy Failed", true); }
             document.body.removeChild(ta);
         }
 
-        // --- FIXED: Wait for response before showing "SENT!" ---
         async function runDesign(f) {
-            let spd = document.getElementById('speedSelect').value;
+            // Check if table is in cooldown
+            if (isWaiting) {
+                pendingDesign = f;
+                document.getElementById('cooldown-modal').style.display = 'flex';
+                return;
+            }
+            await executeDesign(f);
+        }
+
+        async function cooldownChoice(choice) {
+            document.getElementById('cooldown-modal').style.display = 'none';
+            if (!pendingDesign) return;
+
+            if (choice === 'now') {
+                await fetch(`${BASE_URL}/api/skip_cooldown`, { method: "POST" });
+                await executeDesign(pendingDesign);
+            } else if (choice === 'queue') {
+                await executeDesign(pendingDesign);
+            }
+            pendingDesign = null;
+        }
+
+        async function executeDesign(f) {
+            // Check if table is in cooldown
+            if (isWaiting) {
+                pendingDesign = f;
+                document.getElementById('cooldown-modal').style.display = 'flex';
+                return;
+            }
+
+            // Use cached speed
+            let speed = globalSettings.speed || 1.0;
             let r=await fetch(`${BASE_URL}/designs/${f}`), txt=await r.text();
+            
+            // If it's the new format, we send it as-is (with comments stripped)
+            // If it's the old G1 format, we handle the speed scaling
             let gcode = txt.split('\n').map(l=>{
-                if(l.trim().toUpperCase().startsWith('G1')){
-                    let p=l.substring(2).trim().split(/\s+/);
-                    return `G1 ${p[0]} ${p[1]} ${Math.round((parseInt(p[2])||1000)*parseFloat(spd))}`;
-                } return l;
-            }).join('\n');
+                let trimmed = l.trim();
+                if(trimmed.startsWith('#') || trimmed === "") return "";
+                
+                if(trimmed.toUpperCase().startsWith('G1')){
+                    let p=trimmed.substring(2).trim().split(/\s+/);
+                    // Standard G1: G1 theta rho feedrate
+                    // Scale the feedrate (3rd param)
+                    let feed = Math.round((parseInt(p[2])||1000) * speed);
+                    return `G1 ${p[0]} ${p[1]} ${feed}`;
+                } 
+                // Just return the raw line (theta rho)
+                return trimmed;
+            }).filter(l => l !== "").join('\n');
             
             // Send to backend and WAIT for response
             let resp = await fetch(`${BASE_URL}/send_gcode_block`, {
@@ -463,23 +542,33 @@
             // Check success
             let data = await resp.json();
             if(data.success) {
-                showSentPopup(); // Only show if server says OK
+                showPopup("Sent!");
                 updateQ();
             } else {
-                alert("Error: " + (data.error || "Could not start design"));
+                showPopup("Error!", true);
             }
         }
 
-        function sendCmd(c) { fetch(`${BASE_URL}/send`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({command:c})}); }
-        function pauseDesign() { sendCmd('PAUSE'); }
-        function resumeDesign() { sendCmd('RESUME'); }
-        function clearQueue() { sendCmd('CLEAR'); updateQ(); }
+        function sendCmd(c, popupText) { 
+            if(popupText) showPopup(popupText);
+            fetch(`${BASE_URL}/send`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({command:c})}); 
+        }
+        function pauseDesign() { sendCmd('PAUSE', 'Paused'); }
+        function resumeDesign() { sendCmd('RESUME', 'Resumed'); }
+        function clearQueue() { 
+            if(confirm("Stop all and clear queue?")) {
+                sendCmd('CLEAR', 'Cleared'); 
+                updateQ();
+            }
+        }
 
         // --- UPDATED QUEUE POLLER ---
         async function updateQ() {
             try {
                 let r = await fetch(`${BASE_URL}/status_full`);
                 let d = await r.json();
+                
+                isWaiting = d.is_waiting; // Sync global state
                 
                 let playText = "Select a design";
                 if (d.playing) {
@@ -540,8 +629,9 @@
             return Math.ceil(seconds / 60) + "m";
         }
 
-        function updateAllTimes() {
-            let speed = parseFloat(document.getElementById('speedSelect').value) || 1.0;
+        async function updateAllTimes() {
+            let speed = globalSettings.speed || 1.0;
+
             document.querySelectorAll('.card').forEach(card => {
                 let base = parseFloat(card.dataset.baseTime);
                 if(base > 0) {
@@ -555,18 +645,26 @@
             let clean = f.replace('.txt','');
             let card = cvs.closest('.card');
             
-            fetch(`${BASE_URL}/designs/${f}`).then(r => r.text()).then(t => {
+            fetch(`${BASE_URL}/designs/${f}`).then(r => r.text()).then(async t => {
                 let tm = 0;
-                let reg = /^G1\s+(\-?\d+)\s+(\-?\d+)\s+(\d+)/i;
                 let lines = t.split('\n');
+                
                 for(let l of lines) {
-                    let m = l.trim().match(reg);
-                    if(m) tm += Math.max(Math.abs(parseInt(m[1])), Math.abs(parseInt(m[2]))) * parseInt(m[3]);
+                    let trimmed = l.trim();
+                    if(trimmed === "" || trimmed.startsWith('#')) continue;
+                    
+                    if(trimmed.toUpperCase().startsWith('G1')){
+                        let m = trimmed.match(/^G1\s+(\-?\d+\.?\d*)\s+(\-?\d+\.?\d*)\s+(\d+)/i);
+                        if(m) tm += Math.max(Math.abs(parseFloat(m[1])), Math.abs(parseFloat(m[2]))) * parseInt(m[3]);
+                    } else {
+                        tm += 20000; 
+                    }
                 }
 
                 card.dataset.baseTime = tm;
-                let currentSpeed = parseFloat(document.getElementById('speedSelect').value) || 1.0;
-                document.getElementById(`t-${clean}`).textContent = formatTimeFromMicroseconds(tm * currentSpeed);
+                
+                let speed = globalSettings.speed || 1.0;
+                document.getElementById(`t-${clean}`).textContent = formatTimeFromMicroseconds(tm * speed);
 
                 let img = new Image();
                 img.src = `${BASE_URL}/designs/${clean}.png`;

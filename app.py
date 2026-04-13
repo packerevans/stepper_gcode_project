@@ -21,7 +21,8 @@ ARDUINO_PROJECT_PATH = os.path.join(BASE_DIR, 'Sand')
 
 # Default Settings
 DEFAULT_SETTINGS = {
-    "cooldown": 30
+    "cooldown": 30,
+    "speed": 1.0
 }
 
 # Load Settings Helper
@@ -44,66 +45,13 @@ def save_app_settings(data):
 # Initialize Global Settings
 SYSTEM_SETTINGS = load_app_settings()
 
-# === AUTO-PORT SELECTION ===
-SERVER_PORT = 5000 
-
-def find_available_port():
-    for port in [5000, 6000]:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            try:
-                s.bind(('0.0.0.0', port))
-                return port 
-            except OSError:
-                print(f"⚠️ Port {port} is busy. Trying next...")
-                continue
-    return 5000 
-
-if not os.path.exists(DESIGNS_FOLDER):
-    try: os.makedirs(DESIGNS_FOLDER)
-    except: pass
-
-@app.after_request
-def apply_ngrok_header(response: Response):
-    response.headers["ngrok-skip-browser-warning"] = "true"
-    return response
-
-# === STATE MANAGEMENT ===
-job_queue = deque()      
-loop_playlist = []       
-is_looping = False       
-is_paused = False        
-is_waiting = False       
-
-current_job_name = None  
-next_job_name = None     
-
-serial_log = []
-lock = threading.Lock()
-
-def log_message(msg):
-    timestamp = time.strftime("[%H:%M:%S] ")
-    with lock:
-        serial_log.append(timestamp + msg)
-        if len(serial_log) > 200:
-            serial_log.pop(0)
-
-# === SERIAL CONNECTION ===
-arduino = None
-arduino_connected = False
-current_gcode_runner = None
-arduino_port = "/dev/ttyUSB0" # Default
-
-def find_arduino_port():
-    # Common USB and Hardware UART ports
-    ports = [
-        '/dev/serial0', '/dev/ttyS0', '/dev/ttyAMA0', # Hardware UART (RX/TX)
-        '/dev/ttyUSB0', '/dev/ttyUSB1',               # USB Serial (CH340/FTDI)
-        '/dev/ttyACM0', '/dev/ttyACM1'                # USB CDC (Uno/Mega/Leo)
-    ]
-    for p in ports:
-        if os.path.exists(p):
-            return p
-    return None
+def send_speed_to_arduino():
+    global arduino_connected
+    if arduino_connected:
+        spd = SYSTEM_SETTINGS.get("speed", 1.0)
+        cmd = f"SPEED {spd}\n"
+        with lock: arduino.write(cmd.encode())
+        log_message(f"Sent initial speed: {spd}")
 
 def connect_arduino():
     global arduino, arduino_connected, arduino_port
@@ -113,13 +61,16 @@ def connect_arduino():
             raise Exception("No serial port found (UART or USB)")
         
         arduino_port = port
-        # Using 115200 for better reliability on direct RX/TX pins
-        arduino = serial.Serial(port, 115200, timeout=0.1) 
+        # Updated to 250000 baud per request
+        arduino = serial.Serial(port, 250000, timeout=0.1) 
         time.sleep(2) 
         arduino_connected = True
         threading.Thread(target=read_from_serial, daemon=True).start()
-        log_message(f"Arduino Connected: {port} @ 115200")
+        log_message(f"Arduino Connected: {port} @ 250000")
         print(f"Connected to Arduino on {port}")
+        
+        # Send current speed setting
+        send_speed_to_arduino()
     except Exception as e:
         arduino_connected = False
         print(f"WARNING: Arduino not connected: {e}") 
@@ -309,9 +260,11 @@ def process_queue(wait_enabled=True):
                 with lock: arduino.write(b"PAUSE\n")
             
             for _ in range(wait_time): 
+                if skip_cooldown: break
                 if not is_looping and len(job_queue) == 0: break
                 time.sleep(1)
             is_waiting = False
+            skip_cooldown = False
         start_job(next_job)
     else:
         log_message("Queue empty.")
@@ -325,17 +278,40 @@ def start_job(job_data):
     GCodeRunner(job_data['gcode'], job_data['filename'], on_complete=on_job_finished).start()
 
 def read_from_serial():
-    global current_gcode_runner
+    global current_gcode_runner, is_calibrating, calibration_done
     while arduino_connected:
         try:
             if arduino.in_waiting > 0:
                 line = arduino.readline().decode(errors="ignore").strip()
                 if line:
                     if "ERROR" in line: log_message(f"Ard: {line}")
+                    if "STATUS:CALIBRATING" in line:
+                        is_calibrating = True
+                        calibration_done = False
+                        log_message("Calibration Started...")
+                    if "CALIBRATION_COMPLETE" in line:
+                        is_calibrating = False
+                        calibration_done = True
+                        log_message("CALIBRATION COMPLETE!")
+                    
                     if current_gcode_runner: current_gcode_runner.process_incoming_serial(line)
             else: time.sleep(0.01) 
         except Exception: 
             time.sleep(1) # RETRY on error
+
+@app.route("/api/calibration_status")
+def calibration_status():
+    global is_calibrating, calibration_done
+    return jsonify({
+        "is_calibrating": is_calibrating,
+        "calibration_done": calibration_done
+    })
+
+@app.route("/api/skip_cooldown", methods=["POST"])
+def skip_cooldown_route():
+    global skip_cooldown
+    skip_cooldown = True
+    return jsonify(success=True)
 
 # === TUNNELING SERVICE ===
 @app.route("/api/tunnel", methods=["GET"])
@@ -412,6 +388,20 @@ def index():
     if get_current_ip() in ["10.42.0.1", "192.168.4.1"]: return redirect(url_for('wifi_setup_page'))
     return render_template("designs.html")
 
+@app.route("/controller")
+def controller_page(): return render_template("controller.html")
+
+@app.route("/api/move", methods=["POST"])
+def manual_move():
+    if not arduino_connected: return jsonify(success=False, error="Arduino Disconnected")
+    data = request.json
+    theta = data.get("theta")
+    rho = data.get("rho")
+    # Send as raw theta rho to the firmware
+    cmd = f"{theta} {rho}\n"
+    with lock: arduino.write(cmd.encode())
+    return jsonify(success=True)
+
 @app.route("/settings")
 def settings_page(): return render_template("settings.html")
 @app.route("/script")
@@ -424,8 +414,11 @@ def api_settings():
     if request.method == "GET":
         return jsonify(SYSTEM_SETTINGS)
     if request.method == "POST":
-        SYSTEM_SETTINGS.update(request.json)
+        data = request.json
+        SYSTEM_SETTINGS.update(data)
         save_app_settings(SYSTEM_SETTINGS)
+        if 'speed' in data:
+            send_speed_to_arduino()
         log_message(f"Settings updated: {SYSTEM_SETTINGS}")
         return jsonify(success=True)
 
@@ -444,37 +437,33 @@ def update_firmware():
         except: pass
         arduino_connected = False
     
-    # Specific FQBN for LGT8F328P-LQFP32 (Nano Style)
-    # Adding variant=lgt8fx8p ensures it uses the correct bootloader protocol
-    FQBN = "lgt8fx:avr:328:variant=lgt8fx8p" 
+    # EXACT FQBN and Parameters that worked manually
+    FQBN = "lgt8fx:avr:328:clock_source=internal,clock_div=1,variant=modelP,upload_speed=115200"
     
-    # LGT8fx index URL
+    # LGT8fx index URL (kept as safety)
     LGT_URL = "https://raw.githubusercontent.com/dbuezas/lgt8fx/master/package_lgt8fx_index.json"
     
     try:
         log_message(f"Starting firmware update on {arduino_port}...")
         
-        # 1. Compile (Explicitly adding the URL)
-        compile_cmd = ["arduino-cli", "compile", "--additional-urls", LGT_URL, "--fqbn", FQBN, ARDUINO_PROJECT_PATH]
-        log_message(f"Compiling: {' '.join(compile_cmd)}")
-        subprocess.run(compile_cmd, check=True, capture_output=True, text=True)
-        
-        # 2. Upload (Explicitly adding the URL)
-        upload_cmd = [
-            "arduino-cli", "upload", 
+        # 1. Compile & Upload in one go (EXACTLY matching working manual command)
+        # Using the same --upload flag and parameters
+        flash_cmd = [
+            "arduino-cli", "compile", 
             "--additional-urls", LGT_URL,
-            "-p", arduino_port, 
             "--fqbn", FQBN, 
             ARDUINO_PROJECT_PATH, 
-            "--upload-property", "upload.speed=115200"
+            "--upload", "-p", arduino_port
         ]
-        log_message(f"Uploading: {' '.join(upload_cmd)}")
         
-        subprocess.run(upload_cmd, capture_output=True, text=True, check=True)
+        log_message(f"Flashing: {' '.join(flash_cmd)}")
+        
+        # Run and capture output
+        result = subprocess.run(flash_cmd, capture_output=True, text=True, check=True)
         
         log_message("Upload Successful!")
         connect_arduino()
-        return jsonify(success=True, message="Firmware Updated Successfully")
+        return jsonify(success=True, message="Firmware Updated Successfully!")
         
     except subprocess.CalledProcessError as e:
         error_msg = f"Flash Error: {e.stderr or e.stdout}"
@@ -600,8 +589,8 @@ def check_password_route(): return jsonify(success=(request.json.get("password")
 def terminal(): return render_template("terminal.html")
 @app.route("/led_controls")
 def led_controls(): return render_template("led_controls.html")
-@app.route("/AI_builder")
-def AI_builder(): return render_template("AI_builder.html")
+@app.route("/sketch")
+def sketch_page(): return render_template("sketch.html")
 @app.route("/designs")
 def designs(): return render_template("designs.html")
 @app.route('/designs/<path:filename>')
