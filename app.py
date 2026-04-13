@@ -45,6 +45,38 @@ def save_app_settings(data):
 # Initialize Global Settings
 SYSTEM_SETTINGS = load_app_settings()
 
+# === UTILITIES ===
+def find_available_port():
+    for port in [5000, 6000]:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind(('0.0.0.0', port))
+                return port 
+            except OSError:
+                print(f"⚠️ Port {port} is busy. Trying next...")
+                continue
+    return 5000 
+
+def find_arduino_port():
+    # Common USB and Hardware UART ports
+    ports = [
+        '/dev/serial0', '/dev/ttyS0', '/dev/ttyAMA0', # Hardware UART (RX/TX)
+        '/dev/ttyUSB0', '/dev/ttyUSB1',               # USB Serial (CH340/FTDI)
+        '/dev/ttyACM0', '/dev/ttyACM1'                # USB CDC (Uno/Mega/Leo)
+    ]
+    for p in ports:
+        if os.path.exists(p):
+            return p
+    return None
+
+def get_current_ip():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(('10.254.254.254', 1))
+        ip = s.getsockname()[0]; s.close()
+    except: ip = '127.0.0.1'
+    return ip
+
 def send_speed_to_arduino():
     global arduino_connected
     if arduino_connected:
