@@ -418,33 +418,28 @@ def stop_tunnel():
 
 # === AUTO-START NGROK (RUNS IN THREAD) ===
 def auto_start_ngrok_thread():
-    # Wait 15 seconds in the background to let the main server and WiFi boot completely
-    time.sleep(15)
+    # Wait 90 seconds to match the successful manual connection timestamp
+    time.sleep(90)
     log_message("Checking network connection for Ngrok auto-start...")
     
     try:
         # Try exactly once to reach an external server
         socket.create_connection(("8.8.8.8", 53), timeout=3)
     except OSError:
-        log_message("No internet/WiFi detected on first check. Skipping Ngrok auto-start.")
+        log_message("No internet/WiFi detected. Skipping Ngrok auto-start.")
         return
 
     try:
-        config_path = conf.get_default().config_path
-        if os.path.exists(config_path):
-            with open(config_path, 'r') as f:
-                if "authtoken" in f.read():
-                    log_message("Internet confirmed. Auto-starting Ngrok...")
-                    try: ngrok.kill()
-                    except: pass
-                    # Connect to determined port
-                    url = ngrok.connect(SERVER_PORT).public_url
-                    log_message(f"Ngrok Auto-Started: {url}")
-                    print(f" * Public URL: {url}")
-                else:
-                    log_message("No Ngrok token found. Skipping auto-start.")
-        else:
-            log_message("No Ngrok config found. Skipping auto-start.")
+        # Replicating the successful manual start logic to avoid the NoneType config error
+        try:
+            ngrok.kill()
+            time.sleep(1)
+        except: pass
+        
+        log_message("Internet confirmed. Auto-starting Ngrok...")
+        url = ngrok.connect(SERVER_PORT).public_url
+        log_message(f"Ngrok Auto-Started: {url}")
+        print(f" * Public URL: {url}")
     except Exception as e:
         log_message(f"Ngrok Auto-Start Failed: {e}")
 
