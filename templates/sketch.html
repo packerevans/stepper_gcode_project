@@ -294,6 +294,15 @@
                             <option value="hexagon">Hexagon</option>
                             <option value="star">Star</option>
                         </select>
+                        
+                        <div class="toggle-row" style="margin-top:12px; margin-bottom:5px;">
+                            <span class="tool-label" style="margin-bottom:0;">Stretch Connect</span>
+                            <label class="switch">
+                                <input type="checkbox" id="loopStretchMode" checked onchange="updateLoopParams()">
+                                <span class="slider-tog"></span>
+                            </label>
+                        </div>
+                        
                         <span class="tool-label" style="margin-top:10px;">Iterations: <span id="val-loop-iter">50</span></span>
                         <input type="range" id="loopIter" min="1" max="200" step="1" value="50" oninput="updateLoopParams()">
                         
@@ -415,7 +424,7 @@
         let lastRotVal = 0;
         let lastScaleVal = 100;
         
-        let activeEffectType = null; // Track if we are actively viewing a live generated effect
+        let activeEffectType = null; 
         const vortexState = { radiusMap: new Float32Array(3600) };
         let vortexSourcePath = [];
         let loopSourcePath = [];
@@ -488,7 +497,6 @@
             if(currentTool === 'select' && dragStart) {
                 const dx = pos.x - dragStart.x; const dy = pos.y - dragStart.y;
                 
-                // If a live effect is active, move the base invisible core shape instead of just the final result, then regenerate
                 if (activeEffectType === 'loop' && loopSourcePath) {
                     loopSourcePath.forEach(p => { if(p.type === 'point') { p.x += dx; p.y += dy; } });
                     generateLoop();
@@ -685,7 +693,6 @@
                 const type = document.getElementById('loopShape').value;
                 
                 if (type !== 'custom') {
-                    // Mathematically generate clean vector paths instead of pixel-scanning
                     let pts = []; const r = 50;
                     if(type==='circle') { for(let i=0; i<=36; i++) { const a = (i/36)*Math.PI*2; pts.push({x: Math.cos(a)*r, y: Math.sin(a)*r, type:'point'}); } } 
                     else if(type==='square') { pts = [{x:-r,y:-r,type:'point'}, {x:r,y:-r,type:'point'}, {x:r,y:r,type:'point'}, {x:-r,y:r,type:'point'}, {x:-r,y:-r,type:'point'}]; } 
@@ -695,7 +702,6 @@
                     else if(type==='star') { for(let i=0; i<=10; i++) { const a = (i/10)*Math.PI*2 + Math.PI/2; const rad = (i%2===0) ? r : r*0.4; pts.push({x: Math.cos(a)*rad, y: Math.sin(a)*rad, type:'point'}); } }
                     loopSourcePath = pts;
                 }
-                // Custom leaves loopSourcePath exactly as is
 
                 generateLoop();
             }
@@ -706,36 +712,55 @@
             const angleStepDeg = parseFloat(document.getElementById('loopAngle').value);
             const scaleFac = parseFloat(document.getElementById('loopScale').value);
             const oscRate = parseFloat(document.getElementById('loopOsc').value);
+            const stretchMode = document.getElementById('loopStretchMode').checked;
 
             let newPoints = [];
+            newPoints.push({type: 'break'});
+
+            // Filter out breaks to just get points for calculating interpolation step
+            const pointsOnly = loopSourcePath.filter(p => p.type === 'point');
+            const numPts = pointsOnly.length;
 
             for(let i=0; i<iterations; i++) {
-                const currentAngle = i * angleStepDeg * (Math.PI / 180);
+                let ptIdx = 0;
                 
-                let oscScale = 1.0;
-                if (oscRate > 0) {
-                    const freq = oscRate * 0.1;
-                    oscScale = 1.0 + 0.4 * Math.sin(i * freq);
-                }
-                const currentScale = scaleFac * oscScale;
-
                 loopSourcePath.forEach((p, idx) => {
                     if(p.type === 'break' || p.type === 'cmd') {
-                        // Strip breaks between consecutive shape loops to keep a continuous line 
-                        // for the machine without picking up the pen.
-                        if (idx !== 0 && idx !== loopSourcePath.length - 1) {
-                            newPoints.push({...p});
+                        // If not stretching, keep internal breaks to separate loops
+                        if (!stretchMode) {
+                            if (idx !== 0 && idx !== loopSourcePath.length - 1) {
+                                newPoints.push({...p});
+                            }
                         }
                     } else {
-                        // Math applies scale then rotational offset
+                        // Apply stretching progressively across the points of the shape
+                        let shapeProgress = stretchMode ? (numPts > 1 ? ptIdx / (numPts - 1) : 0) : 0;
+                        let effectiveIter = i + shapeProgress;
+                        
+                        const currentAngle = effectiveIter * angleStepDeg * (Math.PI / 180);
+                        
+                        let oscScale = 1.0;
+                        if (oscRate > 0) {
+                            const freq = oscRate * 0.1;
+                            oscScale = 1.0 + 0.4 * Math.sin(effectiveIter * freq);
+                        }
+                        const currentScale = scaleFac * oscScale;
+
                         let sx = p.x * currentScale;
                         let sy = p.y * currentScale;
                         let rx = sx * Math.cos(currentAngle) - sy * Math.sin(currentAngle);
                         let ry = sx * Math.sin(currentAngle) + sy * Math.cos(currentAngle);
+                        
                         newPoints.push({x: rx, y: ry, type: 'point'});
+                        ptIdx++;
                     }
                 });
+                
+                if (!stretchMode && i < iterations - 1) {
+                    newPoints.push({type: 'break'});
+                }
             }
+            
             newPoints.push({type: 'break'});
             rawPoints = newPoints;
             render();
@@ -932,7 +957,6 @@
                 }
             });
             
-            // Unlink active effect if entering manual draw/erase tools to 'bake' the effect
             if (t !== 'select' && t !== 'sandify' && t !== 'loop') {
                 activeEffectType = null;
             }
