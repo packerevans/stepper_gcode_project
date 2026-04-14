@@ -515,18 +515,15 @@
             let speed = globalSettings.speed || 1.0;
             let r=await fetch(`${BASE_URL}/designs/${f}`), txt=await r.text();
             
-            // If it's the new format, we send it as-is (with comments stripped)
-            // If it's the old G1 format, we handle the speed scaling
+            // Ensure we send raw "theta rho" without G1 prefix as firmware doesn't support it
             let gcode = txt.split('\n').map(l=>{
                 let trimmed = l.trim();
-                if(trimmed.startsWith('#') || trimmed === "") return "";
+                if(trimmed.startsWith('#') || trimmed.startsWith(';') || trimmed === "") return "";
                 
                 if(trimmed.toUpperCase().startsWith('G1')){
                     let p=trimmed.substring(2).trim().split(/\s+/);
-                    // Standard G1: G1 theta rho feedrate
-                    // Scale the feedrate (3rd param)
-                    let feed = Math.round((parseInt(p[2])||1000) * speed);
-                    return `G1 ${p[0]} ${p[1]} ${feed}`;
+                    // p[0] is theta, p[1] is rho
+                    return `${p[0]} ${p[1]}`;
                 } 
                 // Just return the raw line (theta rho)
                 return trimmed;
