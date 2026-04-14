@@ -418,20 +418,39 @@ def stop_tunnel():
 
 # === AUTO-START NGROK (RUNS IN THREAD) ===
 def auto_start_ngrok_thread():
-    # Wait a bit for server to spin up
-    time.sleep(5)
+    log_message("Waiting for network connection to start Ngrok...")
+    
+    # Wait up to 60 seconds for an active internet connection
+    internet_connected = False
+    for _ in range(30):
+        try:
+            # Check for actual internet access by testing a reliable external connection
+            socket.create_connection(("8.8.8.8", 53), timeout=2)
+            internet_connected = True
+            break
+        except OSError:
+            time.sleep(2)
+            
+    if not internet_connected:
+        log_message("No internet/WiFi detected. Skipping Ngrok auto-start.")
+        return
+
     try:
         config_path = conf.get_default().config_path
         if os.path.exists(config_path):
             with open(config_path, 'r') as f:
                 if "authtoken" in f.read():
-                    log_message("Auto-starting Ngrok...")
+                    log_message("Internet confirmed. Auto-starting Ngrok...")
                     try: ngrok.kill()
                     except: pass
                     # Connect to determined port
                     url = ngrok.connect(SERVER_PORT).public_url
                     log_message(f"Ngrok Auto-Started: {url}")
                     print(f" * Public URL: {url}")
+                else:
+                    log_message("No Ngrok token found. Skipping auto-start.")
+        else:
+            log_message("No Ngrok config found. Skipping auto-start.")
     except Exception as e:
         log_message(f"Ngrok Auto-Start Failed: {e}")
 
