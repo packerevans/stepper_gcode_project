@@ -387,30 +387,25 @@ function generateSteps(pathPoints) {
     const tableRadius = parseFloat(document.getElementById('tableRadius').value);
     
     let commands = [];
-    let prevTheta = null; // We need to track the unrolled angle
+    let prevTheta = null; 
     
     for (let i = 0; i < pathPoints.length; i++) {
         let p = pathPoints[i];
         
-        // Get the strict [-PI, PI] angle from Cartesian
         let rawTheta = Math.atan2(p.y, p.x);
         let rho = Math.hypot(p.x, p.y) / tableRadius;
         
-        // Ensure Rho is clamped to 1.0
         if (rho > 1.0) rho = 1.0;
         
-        // Phase Unwrapping: Keep the rotation continuous
         if (prevTheta === null) {
             prevTheta = rawTheta;
         } else {
-            // Find the shortest angular difference
             let diff = rawTheta - (prevTheta % (2 * Math.PI));
             
-            // Normalize the difference to avoid the pi/-pi jump
             if (diff > Math.PI) diff -= 2 * Math.PI;
             if (diff < -Math.PI) diff += 2 * Math.PI;
             
-            prevTheta += diff; // Accumulate continuous rotation
+            prevTheta += diff; 
         }
         
         commands.push(`${prevTheta.toFixed(4)} ${rho.toFixed(4)}`);
@@ -434,8 +429,6 @@ function parseOutputAndSimulate() {
 
     ARM_STATES = [];
     
-    // For simulation, we need to reverse the Theta-Rho back to motor steps
-    // to visualize the arm.
     let prevBase = 0;
     let prevElbow = 0;
 
@@ -478,53 +471,29 @@ function calculateIK(x, y, lastBaseSteps, lastElbowSteps, L1, L2, gearRatio, ste
         dist = maxReach;
     }
 
-    // --- CENTER PASS-THROUGH LOGIC ---
-    // If we are extremely close to the center, force the math to prioritize
-    // keeping the Base Angle steady. This prevents the "Base Spin" issue.
-    // We treat the target as a "fold" at the *current* base angle.
-    
-    if (dist < 1.0) { // Within 1mm of center
-        
-        // We want the base to stay exactly where it was
-        const targetBaseSteps = lastBaseSteps; 
-        
-        // At center (dist=0), the internal angle is PI (180 deg).
-        // Elbow Steps = -(PI + GearRatio * BaseAngle) * StepsPerRad
-        // We need to reverse-engineer BaseAngle from lastBaseSteps
-        const currentBaseAngle = -lastBaseSteps / stepsPerRad;
-        const targetElbowSteps = -(Math.PI + gearRatio * currentBaseAngle) * stepsPerRad;
-        
-        return { base_steps: targetBaseSteps, elbow_steps: targetElbowSteps };
+    if (dist < 1.0) { 
+        return { base_steps: 0, elbow_steps: Math.round(-Math.PI * stepsPerRad) };
     }
 
-    // Standard Math for non-center points
     const lastT1 = -lastBaseSteps / stepsPerRad; 
     let cosBend = (dist*dist - L1*L1 - L2*L2) / (2 * L1 * L2);
     cosBend = Math.max(-1, Math.min(1, cosBend));
     
-    const bend1 = Math.acos(cosBend);
-    const bend2 = -Math.acos(cosBend);
+    const bend = Math.acos(cosBend);
 
-    const k1_1 = L1 + L2 * Math.cos(bend1);
-    const k2_1 = L2 * Math.sin(bend1);
-    let t1_1 = Math.atan2(y, x) - Math.atan2(k2_1, k1_1);
-    t1_1 = getShortestRotation(t1_1, lastT1);
+    const k1 = L1 + L2 * Math.cos(bend);
+    const k2 = L2 * Math.sin(bend);
+    let t1 = Math.atan2(y, x) - Math.atan2(k2, k1);
 
-    const k1_2 = L1 + L2 * Math.cos(bend2);
-    const k2_2 = L2 * Math.sin(bend2);
-    let t1_2 = Math.atan2(y, x) - Math.atan2(k2_2, k1_2);
-    t1_2 = getShortestRotation(t1_2, lastT1);
+    t1 = getShortestRotation(t1, lastT1);
 
-    const b1_steps = -t1_1 * stepsPerRad;
-    const e1_steps = -(bend1 + gearRatio * t1_1) * stepsPerRad;
-    const b2_steps = -t1_2 * stepsPerRad;
-    const e2_steps = -(bend2 + gearRatio * t1_2) * stepsPerRad;
+    const b_steps = -t1 * stepsPerRad;
+    const e_steps = -(bend + gearRatio * t1) * stepsPerRad;
 
-    const cost1 = Math.abs(b1_steps - lastBaseSteps) + Math.abs(e1_steps - lastElbowSteps);
-    const cost2 = Math.abs(b2_steps - lastBaseSteps) + Math.abs(e2_steps - lastElbowSteps);
-
-    return (cost1 <= cost2) ? { base_steps: b1_steps, elbow_steps: e1_steps } 
-                            : { base_steps: b2_steps, elbow_steps: e2_steps };
+    return { 
+        base_steps: Math.round(b_steps), 
+        elbow_steps: Math.round(e_steps) 
+    };
 }
 
 function calculateFK(baseSteps, elbowSteps, L1, L2, gearRatio, stepsPerRad) {
