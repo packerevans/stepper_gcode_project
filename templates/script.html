@@ -387,22 +387,33 @@ function generateSteps(pathPoints) {
     const tableRadius = parseFloat(document.getElementById('tableRadius').value);
     
     let commands = [];
+    let prevTheta = null; // We need to track the unrolled angle
+    
     for (let i = 0; i < pathPoints.length; i++) {
         let p = pathPoints[i];
         
-        // Convert Cartesian back to Polar for Theta-Rho format
-        let theta = Math.atan2(p.y, p.x);
+        // Get the strict [-PI, PI] angle from Cartesian
+        let rawTheta = Math.atan2(p.y, p.x);
         let rho = Math.hypot(p.x, p.y) / tableRadius;
         
         // Ensure Rho is clamped to 1.0
         if (rho > 1.0) rho = 1.0;
         
-        // Radians can be large if we track revolutions, 
-        // but for now, we'll send normalized angles.
-        // If your patterns expect continuous rotation, you might need 
-        // to track total theta here.
+        // Phase Unwrapping: Keep the rotation continuous
+        if (prevTheta === null) {
+            prevTheta = rawTheta;
+        } else {
+            // Find the shortest angular difference
+            let diff = rawTheta - (prevTheta % (2 * Math.PI));
+            
+            // Normalize the difference to avoid the pi/-pi jump
+            if (diff > Math.PI) diff -= 2 * Math.PI;
+            if (diff < -Math.PI) diff += 2 * Math.PI;
+            
+            prevTheta += diff; // Accumulate continuous rotation
+        }
         
-        commands.push(`${theta.toFixed(4)} ${rho.toFixed(4)}`);
+        commands.push(`${prevTheta.toFixed(4)} ${rho.toFixed(4)}`);
     }
 
     outputData.value = commands.join('\n');
