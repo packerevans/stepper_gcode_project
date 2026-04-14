@@ -81,11 +81,11 @@
         
         button {
             background: var(--primary); color: var(--btn-text); border: none;
-            padding: 0 12px; /* Reset vertical padding and use height */
-            height: 48px; /* Fixed height for uniformity */
+            padding: 0 12px; 
+            height: 48px; 
             border-radius: 8px; font-weight: 600; cursor: pointer;
             flex: 1; transition: 0.2s; display: flex; align-items: center; justify-content: center;
-            font-size: 14px; /* Consistent font size */
+            font-size: 14px; 
         }
         button:hover { filter: brightness(1.1); transform: translateY(-1px); }
         button.secondary { background: transparent; border: 1px solid var(--text); color: var(--text); }
@@ -261,27 +261,38 @@
 
                     <div id="set-sandify" class="tool-setting-group">
                         <span class="tool-label" style="color:var(--accent); font-weight:bold;">Vortex Generator</span>
-                        <label class="tool-label">Shape Source</label>
-                        <select id="vortexShape" class="full-width" onchange="updateVortexParams()">
-                            <option value="custom">Current Drawing</option>
-                            <option value="triangle">Triangle</option>
-                            <option value="square">Square</option>
-                            <option value="pentagon">Pentagon</option>
-                            <option value="hexagon">Hexagon</option>
-                            <option value="star">Star</option>
-                            <option value="text">Letter / Symbol</option>
-                        </select>
-                        <div id="vortexTextContainer" style="display:none; margin-top:5px;">
+                        
+                        <div class="settings-grid" style="margin-bottom: 10px;">
+                            <div>
+                                <label class="tool-label">Pattern Mode</label>
+                                <select id="vortexMode" class="full-width" onchange="updateVortexParams()">
+                                    <option value="spiral">Spiral</option>
+                                    <option value="loop">Loop</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="tool-label">Shape Source</label>
+                                <select id="vortexShape" class="full-width" onchange="updateVortexParams()">
+                                    <option value="custom">Current Drawing</option>
+                                    <option value="triangle">Triangle</option>
+                                    <option value="square">Square</option>
+                                    <option value="pentagon">Pentagon</option>
+                                    <option value="hexagon">Hexagon</option>
+                                    <option value="star">Star</option>
+                                    <option value="text">Letter</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div id="vortexTextContainer" style="display:none; margin-bottom:10px;">
                              <input type="text" id="vortexChar" maxlength="1" value="S" style="text-align:center; font-weight:bold; width:100%;" oninput="updateVortexParams()">
                         </div>
-                        <span class="tool-label" style="margin-top:10px;">Loop Count: <span id="val-swirl">20</span></span>
+                        <span class="tool-label">Loop Count: <span id="val-swirl">20</span></span>
                         <input type="range" id="vortexSwirl" min="5" max="50" step="1" value="20" oninput="updateVortexParams()">
-                        <span class="tool-label">Shape Zoom: <span id="val-scale">1.0</span></span>
+                        <span class="tool-label">Zoom Scale: <span id="val-scale">1.0</span></span>
                         <input type="range" id="vortexScale" min="0.1" max="2.0" step="0.05" value="1.0" oninput="updateVortexParams()">
                         <span class="tool-label">Twist Angle: <span id="val-twist">5</span></span>
                         <input type="range" id="vortexTwist" min="-45" max="45" step="0.5" value="5" oninput="updateVortexParams()">
-                        <span class="tool-label">Shift Center (Left/Right): <span id="val-shift">0</span></span>
-                        <input type="range" id="vortexShift" min="-150" max="150" step="1" value="0" oninput="updateVortexParams()">
                     </div>
                     
                     <div id="set-trace" class="tool-setting-group">
@@ -434,28 +445,6 @@
             if(cwDist < ccwDist) { curr = idx1; while(curr !== idx2) { let next = (curr + 1) % len; path.push(poly[next]); curr = next; } } 
             else { curr = idx1; while(curr !== idx2) { let next = (curr - 1 + len) % len; path.push(poly[next]); curr = next; } }
             path.push(poly[idx2]); return path;
-        }
-        function routeConnect(start, end, shapes, depth=0) {
-            if (depth > 5) return [end]; 
-            let collision = null; let minD = Infinity;
-            for (let sIdx = 0; sIdx < shapes.length; sIdx++) {
-                let poly = shapes[sIdx]; let isClosed = dist(poly[0], poly[poly.length-1]) < 2.0; let limit = isClosed ? poly.length : poly.length - 1;
-                for (let i = 0; i < limit; i++) {
-                    let p1 = poly[i]; let p2 = poly[(i+1)%poly.length];
-                    if (dist(start, p1) < 0.1 || dist(start, p2) < 0.1) continue;
-                    let hit = getIntersection(start, end, p1, p2);
-                    if (hit) { let d = dist(start, hit); if (d < minD) { minD = d; collision = { pt: hit, poly: poly, idx: i }; } }
-                }
-            }
-            if (!collision) return [end];
-            let obstacle = collision.poly; let exitIdx = -1, minExitD = Infinity;
-            for(let i=0; i<obstacle.length; i++) { let d = dist(obstacle[i], end); if(d < minExitD) { minExitD = d; exitIdx = i; } }
-            let entryIdx = -1, minEntryD = Infinity;
-            for(let i=0; i<obstacle.length; i++) { let d = dist(obstacle[i], collision.pt); if(d < minEntryD) { minEntryD = d; entryIdx = i; } }
-            let surfPath = getPerimeterPath(entryIdx, exitIdx, obstacle);
-            let exitPoint = obstacle[exitIdx];
-            let remainingPath = routeConnect(exitPoint, end, shapes, depth+1);
-            return surfPath.concat(remainingPath);
         }
 
         function init() {
@@ -615,46 +604,154 @@
                 document.getElementById('val-swirl').innerText = document.getElementById('vortexSwirl').value;
                 document.getElementById('val-scale').innerText = document.getElementById('vortexScale').value;
                 document.getElementById('val-twist').innerText = document.getElementById('vortexTwist').value;
-                document.getElementById('val-shift').innerText = document.getElementById('vortexShift').value;
+                
                 const type = document.getElementById('vortexShape').value;
                 document.getElementById('vortexTextContainer').style.display = type === 'text' ? 'block' : 'none';
-                scanVortexShape(); generateVortex();
+                scanVortexShape(); 
+                generateVortex();
             }
         }
 
         function scanVortexShape() {
-            const scanCanvas = document.getElementById('vortexScanCanvas'); const scanCtx = scanCanvas.getContext('2d');
-            const w = scanCanvas.width; const h = scanCanvas.height; const cx = w/2; const cy = h/2; const r = w/2 - 20;
-            const type = document.getElementById('vortexShape').value; const txt = document.getElementById('vortexChar').value;
-            const shiftX = parseFloat(document.getElementById('vortexShift').value);
-            scanCtx.fillStyle = '#000'; scanCtx.fillRect(0, 0, w, h); scanCtx.fillStyle = '#fff'; scanCtx.strokeStyle = '#fff';
-            scanCtx.lineWidth = 15; scanCtx.textAlign = 'center'; scanCtx.textBaseline = 'middle';
-            scanCtx.save(); scanCtx.translate(-shiftX, 0); scanCtx.beginPath();
+            const scanCanvas = document.getElementById('vortexScanCanvas'); 
+            const scanCtx = scanCanvas.getContext('2d');
+            const w = scanCanvas.width; 
+            const h = scanCanvas.height; 
+            const cx = w/2; 
+            const cy = h/2; 
+            const r = w/2 - 20;
+            const type = document.getElementById('vortexShape').value; 
+            const txt = document.getElementById('vortexChar').value;
+            
+            scanCtx.fillStyle = '#000'; 
+            scanCtx.fillRect(0, 0, w, h); 
+            scanCtx.fillStyle = '#fff'; 
+            scanCtx.strokeStyle = '#fff';
+            scanCtx.lineWidth = 15; 
+            scanCtx.textAlign = 'center'; 
+            scanCtx.textBaseline = 'middle';
+            
+            scanCtx.save(); 
+            scanCtx.beginPath();
+            
             const drawPoly = (sides) => { const offset = -Math.PI / 2; scanCtx.moveTo(cx + r * Math.cos(offset), cy + r * Math.sin(offset)); for (let i = 1; i <= sides; i++) { scanCtx.lineTo(cx + r * Math.cos(offset + i * 2 * Math.PI / sides), cy + r * Math.sin(offset + i * 2 * Math.PI / sides)); } };
             const drawStar = (pts) => { let rot = Math.PI / 2 * 3; let step = Math.PI / pts; scanCtx.moveTo(cx, cy - r); for (let i = 0; i < pts; i++) { scanCtx.lineTo(cx + Math.cos(rot) * r, cy + Math.sin(rot) * r); rot += step; scanCtx.lineTo(cx + Math.cos(rot) * (r*0.4), cy + Math.sin(rot) * (r*0.4)); rot += step; } scanCtx.lineTo(cx, cy - r); };
-            if (type === 'custom') { const tableR = parseFloat(document.getElementById('cfgRadius').value); const scaleToFit = r / tableR; scanCtx.beginPath(); vortexSourcePath.forEach((p, i) => { if(p.type === 'break' || p.type === 'cmd') return; const sx = cx + (p.x * scaleToFit); const sy = cy - (p.y * scaleToFit); if(i===0 || vortexSourcePath[i-1].type === 'break') scanCtx.moveTo(sx, sy); else scanCtx.lineTo(sx, sy); }); scanCtx.stroke(); }
+            
+            if (type === 'custom') { 
+                const tableR = parseFloat(document.getElementById('cfgRadius').value); 
+                const scaleToFit = r / tableR; 
+                scanCtx.beginPath(); 
+                vortexSourcePath.forEach((p, i) => { 
+                    if(p.type === 'break' || p.type === 'cmd') return; 
+                    const sx = cx + (p.x * scaleToFit); 
+                    const sy = cy - (p.y * scaleToFit); 
+                    if(i===0 || vortexSourcePath[i-1].type === 'break') scanCtx.moveTo(sx, sy); 
+                    else scanCtx.lineTo(sx, sy); 
+                }); 
+                scanCtx.stroke(); 
+            }
             else if (type === 'text') { scanCtx.font = 'bold 450px Arial'; scanCtx.fillText(txt, cx, cy + 30); } 
-            else if (type === 'triangle') drawPoly(3); else if (type === 'square') drawPoly(4); else if (type === 'pentagon') drawPoly(5); else if (type === 'hexagon') drawPoly(6); else if (type === 'star') drawStar(5);
-            if (type !== 'custom') scanCtx.fill(); scanCtx.restore();
-            const pixels = scanCtx.getImageData(0, 0, w, h).data; const steps = 720;
-            for (let i = 0; i < steps; i++) { let maxDist = 0; const angle = (i / steps) * Math.PI * 2; const cos = Math.cos(angle); const sin = Math.sin(angle); for (let dist = 0; dist < r; dist += 2) { const x = Math.floor(cx + cos * dist); const y = Math.floor(cy + sin * dist); const idx = (y * w + x) * 4; if (pixels[idx] > 100) maxDist = dist; } vortexState.radiusMap[i] = maxDist / r; }
+            else if (type === 'triangle') drawPoly(3); 
+            else if (type === 'square') drawPoly(4); 
+            else if (type === 'pentagon') drawPoly(5); 
+            else if (type === 'hexagon') drawPoly(6); 
+            else if (type === 'star') drawStar(5);
+            
+            if (type !== 'custom') scanCtx.fill(); 
+            scanCtx.restore();
+            
+            const pixels = scanCtx.getImageData(0, 0, w, h).data; 
+            const steps = 720;
+            
+            for (let i = 0; i < steps; i++) { 
+                let maxDist = 0; 
+                const angle = (i / steps) * Math.PI * 2; 
+                const cos = Math.cos(angle); 
+                const sin = Math.sin(angle); 
+                for (let dist = 0; dist < r; dist += 2) { 
+                    const x = Math.floor(cx + cos * dist); 
+                    const y = Math.floor(cy + sin * dist); 
+                    const idx = (y * w + x) * 4; 
+                    if (pixels[idx] > 100) maxDist = dist; 
+                } 
+                vortexState.radiusMap[i] = maxDist / r; 
+            }
         }
 
         function generateVortex() {
-            const swirlCount = parseInt(document.getElementById('vortexSwirl').value); const scaleFac = parseFloat(document.getElementById('vortexScale').value);
-            const twistDeg = parseFloat(document.getElementById('vortexTwist').value); const tableRadius = parseFloat(document.getElementById('cfgRadius').value);
-            const iterations = 10000; const centerGap = 4; const newPoints = []; newPoints.push({type:'break'});
-            for (let i = 0; i <= iterations; i++) {
-                const t = (i / iterations) * 2 - 1; const progress = Math.abs(t); const spiralAngle = t * swirlCount * Math.PI * 2;
-                const twistRad = (twistDeg * (Math.PI/180)) * swirlCount * Math.abs(t);
-                let lookupAngle = spiralAngle + twistRad; let normAngle = lookupAngle % (Math.PI * 2); if (normAngle < 0) normAngle += Math.PI * 2;
-                const mapIdx = Math.floor((normAngle / (Math.PI * 2)) * 720) % 720;
-                let shapeFactor = vortexState.radiusMap[mapIdx]; if(shapeFactor < 0.05) shapeFactor = 0.05; 
-                const maxR = tableRadius * scaleFac; const spiralR = centerGap + (progress * (maxR - centerGap)); const r = spiralR * shapeFactor;
-                let x, y; if (t < 0) { x = r * Math.cos(spiralAngle); y = r * Math.sin(spiralAngle); } else { const flipOffset = Math.PI / 2; x = r * Math.cos(spiralAngle + flipOffset); y = r * Math.sin(spiralAngle + flipOffset); }
-                newPoints.push({x: x, y: y, type:'point'});
+            const mode = document.getElementById('vortexMode').value;
+            const swirlCount = parseInt(document.getElementById('vortexSwirl').value); 
+            const scaleFac = parseFloat(document.getElementById('vortexScale').value);
+            const twistDeg = parseFloat(document.getElementById('vortexTwist').value); 
+            const tableRadius = parseFloat(document.getElementById('cfgRadius').value);
+            
+            const iterations = 8000; 
+            const newPoints = []; 
+            newPoints.push({type:'break'});
+
+            // Helper for clean, linearly interpolated radius mapping
+            function getShapeRadius(angle) {
+                let norm = angle % (Math.PI * 2);
+                if (norm < 0) norm += Math.PI * 2;
+                const floatIdx = (norm / (Math.PI * 2)) * 720;
+                const idx1 = Math.floor(floatIdx) % 720;
+                const idx2 = (idx1 + 1) % 720;
+                const frac = floatIdx - Math.floor(floatIdx);
+                return vortexState.radiusMap[idx1] * (1 - frac) + vortexState.radiusMap[idx2] * frac;
             }
-            newPoints.push({type:'break'}); rawPoints = newPoints; render();
+
+            if (mode === 'spiral') {
+                for (let i = 0; i <= iterations; i++) {
+                    // t goes from -1 to 1 to draw an continuous double spiral crossing the origin
+                    const t = (i / iterations) * 2 - 1; 
+                    const progress = Math.abs(t); 
+                    const spiralAngle = t * swirlCount * Math.PI * 2;
+                    const twistRad = (twistDeg * (Math.PI/180)) * progress * swirlCount;
+                    
+                    let shapeFactor = getShapeRadius(spiralAngle + twistRad);
+                    if (shapeFactor < 0.05) shapeFactor = 0.05; 
+                    
+                    const maxR = tableRadius * scaleFac; 
+                    // When t is negative, r is naturally negative, which draws the mirror spiral perfectly continuously!
+                    const r = t * maxR * shapeFactor;
+                    
+                    newPoints.push({
+                        x: r * Math.cos(spiralAngle), 
+                        y: r * Math.sin(spiralAngle), 
+                        type:'point'
+                    });
+                }
+            } else if (mode === 'loop') {
+                // Loop Mode generating circular continuous patterns
+                const baseR = tableRadius * 0.4 * scaleFac; // Base track radius
+                const loopScale = tableRadius * 0.4 * scaleFac; // Local shape scaling
+                
+                for (let i = 0; i <= iterations; i++) {
+                    const progress = i / iterations;
+                    const trackAngle = progress * Math.PI * 2; // Track makes 1 full rotation
+                    const shapeAngle = progress * swirlCount * Math.PI * 2; // Loops spin SwirlCount times
+                    const twistRad = (twistDeg * (Math.PI/180)) * progress * swirlCount;
+                    
+                    let shapeFactor = getShapeRadius(shapeAngle + twistRad);
+                    if (shapeFactor < 0.05) shapeFactor = 0.05;
+                    
+                    const localR = loopScale * shapeFactor;
+                    
+                    // Base coordinates
+                    const bx = baseR * Math.cos(trackAngle);
+                    const by = baseR * Math.sin(trackAngle);
+                    
+                    // Superimposed local pattern 
+                    const x = bx + localR * Math.cos(shapeAngle);
+                    const y = by + localR * Math.sin(shapeAngle);
+                    
+                    newPoints.push({x: x, y: y, type:'point'});
+                }
+            }
+            
+            newPoints.push({type:'break'}); 
+            rawPoints = newPoints; 
+            render();
         }
 
         // --- TEXT TOOL LOGIC ---
@@ -707,330 +804,4 @@
                 };
                 img.src = e.target.result;
             };
-            reader.readAsDataURL(file); input.value = '';
-        }
-
-        function drawTracePreview() {
-            const w = canvas.width / window.devicePixelRatio; const h = canvas.height / window.devicePixelRatio;
-            ctx.clearRect(0, 0, w, h); ctx.filter = 'none';
-            const tableR = parseFloat(document.getElementById('cfgRadius').value);
-            ctx.save(); ctx.translate(origin.x, origin.y); ctx.beginPath(); ctx.arc(0, 0, tableR*scale, 0, Math.PI*2);
-            ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.stroke();
-            const visualScale = (tableR * 2 / 800) * scale; ctx.save(); ctx.scale(visualScale, visualScale);
-            ctx.translate(traceState.x, traceState.y); ctx.rotate(traceState.rotation * Math.PI / 180);
-            const img = traceState.img; const drawW = img.width * traceState.scale; const drawH = img.height * traceState.scale;
-            ctx.filter = 'grayscale(100%) contrast(1000%) invert(1)'; ctx.drawImage(img, -drawW/2, -drawH/2, drawW, drawH);
-            ctx.restore(); ctx.restore(); ctx.filter = 'none';
-        }
-
-        function commitTraceMove() {
-            const size = 800; const buff = document.getElementById('hiddenTraceBuffer'); const bCtx = buff.getContext('2d');
-            bCtx.fillStyle = "white"; bCtx.fillRect(0, 0, size, size); bCtx.save(); bCtx.translate(size/2, size/2);
-            bCtx.translate(traceState.x, traceState.y); bCtx.rotate(traceState.rotation * Math.PI / 180);
-            const drawW = traceState.img.width * traceState.scale; const drawH = traceState.img.height * traceState.scale;
-            bCtx.drawImage(traceState.img, -drawW/2, -drawH/2, drawW, drawH); bCtx.restore();
-            traceImgData = bCtx.getImageData(0,0,size,size); runHighPrecisionTrace();
-        }
-
-        function runHighPrecisionTrace() {
-            if(!traceImgData) return;
-            const thresh = parseInt(document.getElementById('traceThreshInput').value); 
-            const density = parseFloat(document.getElementById('traceDensityInput').value); 
-            const ballSizeMm = parseFloat(document.getElementById('cfgBallSize').value);
-            const tableR = parseFloat(document.getElementById('cfgRadius').value);
-            
-            const pixelBallSize = (ballSizeMm / (tableR * 2)) * 800;
-            const SIZE = 800; const CENTER = SIZE / 2;
-            let pixelGrid = new Uint8Array(SIZE*SIZE); 
-            for(let i=0; i<SIZE*SIZE; i++) { pixelGrid[i] = traceImgData.data[i*4] < thresh ? 1 : 0; }
-            
-            let contours = []; const traced = new Uint8Array(SIZE*SIZE).fill(0);
-            
-            const traceBoundary = (sx, sy) => {
-                const path = []; let cx = sx, cy = sy; let bx = sx-1, by = sy; let max = SIZE*10;
-                let lastAddedX = -10, lastAddedY = -10;
-
-                do {
-                    if (Math.hypot(cx - lastAddedX, cy - lastAddedY) > 1.5) {
-                        path.push({x:cx, y:cy});
-                        lastAddedX = cx; lastAddedY = cy;
-                    }
-                    traced[cy*SIZE+cx] = 1;
-                    const n = [{x:-1,y:0},{x:-1,y:-1},{x:0,y:-1},{x:1,y:-1},{x:1,y:0},{x:1,y:1},{x:0,y:1},{x:-1,y:1}];
-                    let startIdx = 0; for(let i=0; i<8; i++) if(bx===cx+n[i].x && by===cy+n[i].y) startIdx=(i+1)%8;
-                    let found = false;
-                    for(let i=0; i<8; i++) {
-                        const idx = (startIdx + i)%8; const nx = cx + n[idx].x; const ny = cy + n[idx].y;
-                        if(nx>=0 && nx<SIZE && ny>=0 && ny<SIZE && pixelGrid[ny*SIZE+nx]===1) { bx=cx; by=cy; cx=nx; cy=ny; found=true; break; } else { bx=nx; by=ny; }
-                    }
-                    if(!found) break; max--;
-                } while((cx!==sx || cy!==sy) && max>0);
-                return path;
-            };
-
-            for(let y=1; y<SIZE-1; y++) { 
-                for(let x=1; x<SIZE-1; x++) { 
-                    const idx = y*SIZE + x; 
-                    if(pixelGrid[idx] === 1 && pixelGrid[idx-1] === 0 && traced[idx] === 0) { 
-                        const pth = traceBoundary(x, y); 
-                        if(pth.length > 40) { 
-                            let maxDist = 0; let bestIdx = 0; 
-                            pth.forEach((p, i) => { const dist = Math.hypot(p.x - CENTER, p.y - CENTER); if(dist > maxDist) { maxDist = dist; bestIdx = i; } }); 
-                            const reordered = [...pth.slice(bestIdx), ...pth.slice(0, bestIdx)]; reordered.push(reordered[0]); 
-                            contours.push({ points: reordered, trigger: reordered[0], maxR: maxDist, merged: false }); 
-                        } 
-                    } 
-                } 
-            }
-
-            contours.sort((a, b) => a.maxR - b.maxR);
-
-            let spiral = []; const maxR = SIZE/2 - 5; spiral.push({x: CENTER, y: CENTER});
-            let angle = 0; let r = 0; const angleStep = 0.02; const spacingPx = density * 4.0; 
-            
-            while(r < maxR) { 
-                r = (spacingPx / (2*Math.PI)) * angle; 
-                let x = CENTER + Math.cos(angle)*r; let y = CENTER + Math.sin(angle)*r; 
-                
-                let wiggle = 0; const ix = Math.floor(x), iy = Math.floor(y); 
-                if(ix>=0 && ix<SIZE && iy>=0 && iy<SIZE) { if(pixelGrid[iy*SIZE+ix] === 1) wiggle = Math.sin(angle * 30) * (spacingPx * 0.2); } 
-                x += Math.cos(angle) * wiggle; y += Math.sin(angle) * wiggle; 
-                const sp = {x:x, y:y};
-                spiral.push(sp); 
-
-                const spiralRadius = Math.hypot(sp.x - CENTER, sp.y - CENTER);
-                for (let c of contours) {
-                    if(!c.merged) { 
-                        if (spiralRadius > (c.maxR + (pixelBallSize * 0.4))) {
-                            const contourAngle = Math.atan2(c.trigger.y - CENTER, c.trigger.x - CENTER);
-                            let normAngle = Math.atan2(Math.sin(angle), Math.cos(angle));
-                            
-                            if (Math.abs(normAngle - contourAngle) < 0.05) {
-                                spiral.push(c.trigger);
-                                c.points.forEach((p, i) => { if(i % 2 === 0) spiral.push(p); }); 
-                                spiral.push(c.trigger);
-                                spiral.push(sp);
-                                c.merged = true; 
-                            }
-                        } 
-                    } 
-                }
-                angle += angleStep; 
-            }
-
-            const scaleFac = (tableR * 2) / SIZE;
-            rawPoints = []; if(spiral.length > 0) rawPoints.push({type:'break'});
-            spiral.forEach(p => { let tx = (p.x - 400) * scaleFac; let ty = (400 - p.y) * scaleFac; rawPoints.push({ x: tx, y: ty, type: 'point' }); });
-            if(spiral.length > 0) rawPoints.push({type:'break'});
-            render();
-        }
-
-        // --- CORE UI & RENDER ---
-        function resizeCanvas() {
-            const container = document.getElementById('canvasContainer'); const size = container.getBoundingClientRect().width; const dpr = window.devicePixelRatio || 1;
-            canvas.width = size * dpr; canvas.height = size * dpr; ctx.scale(dpr, dpr); origin = { x: size/2, y: size/2 };
-            const tableR = parseFloat(document.getElementById('cfgRadius').value); scale = (size/2) / (tableR * 1.05); render();
-        }
-        function saveState() { if(historyStack.length>10) historyStack.shift(); historyStack.push(JSON.stringify(rawPoints)); }
-        function undo() { if(historyStack.length===0) return; rawPoints = JSON.parse(historyStack.pop()); render(); }
-        function clearCanvas() { saveState(); rawPoints = []; traceState.active=false; render(); }
-        
-        function setTool(t) {
-            currentTool = t;
-            const buttons = ['btnDraw', 'btnErase', 'btnSelect', 'btnSandify', 'btnTrace', 'btnText'];
-            buttons.forEach(b => {
-                const el = document.getElementById(b);
-                if(el) {
-                    if (t === 'trace_set' && b === 'btnTrace') {
-                        el.className = 'active';
-                    } else {
-                        el.className = (b.toLowerCase().includes(t)) ? 'active' : 'secondary';
-                    }
-                }
-            });
-            updateToolSettings();
-            if(t === 'select' && traceState.active) document.getElementById('traceMoveMsg').style.display = 'block';
-            else document.getElementById('traceMoveMsg').style.display = 'none';
-            if(t === 'sandify') { if (rawPoints.length === 0) addShape('random'); vortexSourcePath = JSON.parse(JSON.stringify(rawPoints)); document.getElementById('vortexShape').value = 'custom'; updateVortexParams(); }
-            if(t === 'text') renderTextToTrace();
-        }
-
-        function updateToolSettings() {
-            const area = document.getElementById('toolSettingsArea'); const grps = document.querySelectorAll('.tool-setting-group'); grps.forEach(g => g.style.display = 'none');
-            let activeGrp = null;
-            if(currentTool === 'draw') activeGrp = document.getElementById('set-pen');
-            else if(currentTool === 'erase') activeGrp = document.getElementById('set-erase');
-            else if(currentTool === 'text') activeGrp = document.getElementById('set-text');
-            else if(currentTool === 'select') activeGrp = document.getElementById('set-select');
-            else if(currentTool === 'sandify') activeGrp = document.getElementById('set-sandify');
-            else if(currentTool === 'trace_set') activeGrp = document.getElementById('set-trace');
-            if(activeGrp) { area.style.display = 'block'; activeGrp.style.display = 'block'; } else area.style.display = 'none';
-            eraserRadius = parseInt(document.getElementById('eraserSizeSlider').value); document.getElementById('eraseSizeVal').innerText = eraserRadius + 'px';
-        }
-
-        function updateUI() { document.getElementById('symVal').textContent = document.getElementById('symSlider').value + 'x'; render(); }
-        function showToast(msg, type) { const t = document.getElementById('status-toast'); t.textContent = msg; t.className = type; t.style.opacity = 1; setTimeout(()=>t.style.opacity=0, 3000); }
-        function openNav() { document.getElementById("mySidebar").style.width = "250px"; }
-        function closeNav() { document.getElementById("mySidebar").style.width = "0"; }
-        function toggleTheme() { const b = document.body; b.setAttribute('data-theme', b.getAttribute('data-theme')==='dark'?'light':'dark'); render(); }
-        function resetStatus() { generatedGCode = null; processedPoints = []; document.getElementById('statusTxt').innerText = "Drawing Mode"; document.getElementById('progressSlider').value = 100; render(); }
-        
-        function render() {
-            const w = canvas.width / window.devicePixelRatio; const h = canvas.height / window.devicePixelRatio; ctx.clearRect(0, 0, w, h); ctx.filter = 'none';
-            const tableR = parseFloat(document.getElementById('cfgRadius').value); const sym = parseInt(document.getElementById('symSlider').value); const dark = document.body.getAttribute('data-theme') === 'dark'; const prog = parseInt(document.getElementById('progressSlider').value); document.getElementById('progVal').textContent = prog + '%';
-            ctx.save(); ctx.translate(origin.x, origin.y); ctx.beginPath(); ctx.arc(0, 0, tableR*scale, 0, Math.PI*2); ctx.strokeStyle = dark ? '#444' : '#ddd'; ctx.lineWidth = 2; ctx.stroke();
-            const showingFinal = (processedPoints.length > 0); const dataToShow = showingFinal ? processedPoints : rawPoints; const limit = Math.floor(dataToShow.length * (prog/100)); const color = showingFinal ? '#ff0000' : (dark ? 'cyan' : '#007bff'); ctx.lineWidth = 1.5; const loopCount = showingFinal ? 1 : sym;
-            for(let s=0; s<loopCount; s++) {
-                const ang = s * (Math.PI*2/sym); ctx.save(); if(!showingFinal) ctx.rotate(ang); ctx.beginPath(); ctx.strokeStyle = color; let isMove = true;
-                for(let i=0; i<limit; i++) { const p = dataToShow[i]; if(p.type === 'break' || p.type === 'cmd') { isMove = true; continue; } const px = p.x * scale; const py = -p.y * scale; if(isMove) { ctx.moveTo(px, py); isMove = false; } else ctx.lineTo(px, py); }
-                ctx.stroke(); ctx.restore();
-            }
-            if(currentTool === 'select' && rawPoints.length > 0 && !generatedGCode && !traceState.active) { let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity; rawPoints.forEach(p => { if(p.type === 'point') { if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x; if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y; } }); if(minX !== Infinity) { ctx.beginPath(); ctx.rect(minX*scale, -maxY*scale, (maxX-minX)*scale, (maxY-minY)*scale); ctx.strokeStyle = dark ? "white" : "black"; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]); } }
-            ctx.restore();
-        }
-
-        // --- GCODE GENERATION ---
-        async function sendToTable() { if(!generatedGCode) return showToast("Click Generate Path first", "error"); let code = generatedGCode; if(document.getElementById('autoClearMode').checked) { try { let r = await fetch('./designs/clear.txt'); if(r.ok) code = (await r.text()) + "\n" + code; } catch(e) {} } fetch(BASE_URL+'/send_gcode_block', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({gcode:code}) }).then(r => r.json()).then(d => showToast(d.success ? "Sent!" : "Error", d.success ? "success" : "error")); }
-        async function saveToServer() { if(!generatedGCode) return showToast("Generate Path first!", "error"); let n = prompt("Enter filename:"); if(n) { if(!n.toLowerCase().endsWith('.txt')) n += ".txt"; fetch(BASE_URL+'/save_design', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({filename:n, gcode:generatedGCode}) }).then(r => r.json()).then(d => showToast(d.success ? "Saved!" : "Failed", d.success ? "success" : "error")); } }
-        function getShortestRotation(raw, last) { let diff = (raw - last) / (2 * Math.PI); let offset = Math.round(diff); return raw - (offset * 2 * Math.PI); }
-        function calculateIK(x, y, lastBaseSteps, lastElbowSteps, L1, L2, gearRatio, stepsPerRad) {
-            let dist = Math.hypot(x, y); if (dist < 2.0) return { base_steps: lastBaseSteps, elbow_steps: -(Math.PI + gearRatio * (-lastBaseSteps / stepsPerRad)) * stepsPerRad };
-            const maxReach = L1 + L2; if (dist > maxReach) { x = (x / dist) * maxReach; y = (y / dist) * maxReach; dist = maxReach; }
-            const lastT1 = -lastBaseSteps / stepsPerRad; let cosBend = (dist*dist - L1*L1 - L2*L2) / (2 * L1 * L2); cosBend = Math.max(-1, Math.min(1, cosBend)); const bend1 = Math.acos(cosBend); const bend2 = -Math.acos(cosBend);
-            const k1_1 = L1 + L2 * Math.cos(bend1); const k2_1 = L2 * Math.sin(bend1); let t1_1 = Math.atan2(y, x) - Math.atan2(k2_1, k1_1); t1_1 = getShortestRotation(t1_1, lastT1);
-            const k1_2 = L1 + L2 * Math.cos(bend2); const k2_2 = L2 * Math.sin(bend2); let t1_2 = Math.atan2(y, x) - Math.atan2(k2_2, k1_2); t1_2 = getShortestRotation(t1_2, lastT1);
-            const b1_steps = -t1_1 * stepsPerRad; const e1_steps = -(bend1 + gearRatio * t1_1) * stepsPerRad; const b2_steps = -t1_2 * stepsPerRad; const e2_steps = -(bend2 + gearRatio * t1_2) * stepsPerRad;
-            return (Math.abs(b1_steps - lastBaseSteps) + Math.abs(e1_steps - lastElbowSteps) <= Math.abs(b2_steps - lastBaseSteps) + Math.abs(e2_steps - lastElbowSteps)) ? { base_steps: b1_steps, elbow_steps: e1_steps } : { base_steps: b2_steps, elbow_steps: e2_steps };
-        }
-        
-        function prepareGCode() {
-            if(rawPoints.length === 0) return showToast("Draw something first!", "error");
-            const tableR = parseFloat(document.getElementById('cfgRadius').value); 
-            const sym = parseInt(document.getElementById('symSlider').value);
-
-            let shapes = []; 
-            let curShape = []; 
-            rawPoints.forEach(p => { 
-                if(p.type === 'break' || p.type === 'cmd') { 
-                    if(curShape.length > 0) shapes.push(curShape); 
-                    curShape = []; 
-                } else curShape.push(p); 
-            });
-            if(curShape.length > 0) shapes.push(curShape);
-
-            // Symmetry expansion
-            let pool = []; 
-            for(let s=0; s<sym; s++) { 
-                const ang = s * (Math.PI*2/sym); 
-                const c = Math.cos(ang), si = Math.sin(ang); 
-                shapes.forEach(sh => { 
-                    pool.push(sh.map(p => ({ x: p.x*c - p.y*si, y: p.x*si + p.y*c, type: 'point' }))); 
-                }); 
-            }
-
-            // Path sorting (simple TSP-ish)
-            let sortedShapes = [];
-            if (pool.length > 0) {
-                // Find shape closest to perimeter to start
-                let bestIdx = 0, maxR = -1;
-                for(let i=0; i<pool.length; i++) {
-                    let d = Math.hypot(pool[i][0].x, pool[i][0].y);
-                    if(d > maxR) { maxR = d; bestIdx = i; }
-                    d = Math.hypot(pool[i][pool[i].length-1].x, pool[i][pool[i].length-1].y);
-                    if(d > maxR) { maxR = d; bestIdx = i; }
-                }
-
-                let startShape = pool[bestIdx];
-                pool.splice(bestIdx, 1);
-
-                // Ensure startShape starts towards outside
-                if(Math.hypot(startShape[0].x, startShape[0].y) < Math.hypot(startShape[startShape.length-1].x, startShape[startShape.length-1].y)) {
-                    startShape.reverse();
-                }
-                sortedShapes.push(startShape);
-
-                let curPos = startShape[startShape.length-1];
-                while(pool.length > 0) {
-                    let bIdx = -1, bDist = Infinity, bRev = false;
-                    for(let i=0; i<pool.length; i++) {
-                        let dS = Math.hypot(curPos.x - pool[i][0].x, curPos.y - pool[i][0].y);
-                        if(dS < bDist) { bDist=dS; bIdx=i; bRev=false; }
-                        let dE = Math.hypot(curPos.x - pool[i][pool[i].length-1].x, curPos.y - pool[i][pool[i].length-1].y);
-                        if(dE < bDist) { bDist=dE; bIdx=i; bRev=true; }
-                    }
-                    let winner = pool[bIdx];
-                    if(bRev) winner.reverse();
-                    sortedShapes.push(winner);
-                    curPos = winner[winner.length-1];
-                    pool.splice(bIdx, 1);
-                }
-            }
-
-            processedPoints = [];
-            if(sortedShapes.length > 0) {
-                // 1. START AT PERIMETER
-                let fPt = sortedShapes[0][0];
-                let fAng = Math.atan2(fPt.y, fPt.x);
-                // Move from perimeter to first point
-                processedPoints.push({x: tableR * Math.cos(fAng), y: tableR * Math.sin(fAng), type: 'point'});
-
-                for(let i=0; i<sortedShapes.length; i++) {
-                    // Connect shapes
-                    if(i > 0) {
-                        let prev = sortedShapes[i-1][sortedShapes[i-1].length-1];
-                        let next = sortedShapes[i][0];
-                        // Simple direct connect for now (or use routeConnect if defined)
-                        processedPoints.push({x: next.x, y: next.y, type: 'point'});
-                    }
-                    sortedShapes[i].forEach(p => processedPoints.push(p));
-                }
-
-                // 2. END AT PERIMETER
-                let lPt = processedPoints[processedPoints.length-1];
-                let lAng = Math.atan2(lPt.y, lPt.x);
-                processedPoints.push({x: tableR * Math.cos(lAng), y: tableR * Math.sin(lAng), type: 'point'});
-            }
-
-            generatedGCode = generateGCodeStringFromProcessed();
-            document.getElementById('statusTxt').innerText = `Path Ready! ${sortedShapes.length} shapes.`;
-            document.getElementById('designPhaseControls').style.display = 'none'; 
-            document.getElementById('productionPhaseControls').style.display = 'block';
-            document.getElementById('simulationArea').style.display = 'block';
-            render();
-        }
-        function returnToEditing() { 
-            processedPoints = []; 
-            document.getElementById('designPhaseControls').style.display = 'block'; 
-            document.getElementById('productionPhaseControls').style.display = 'none'; 
-            
-            // HIDE THE SIMULATION SLIDER
-            document.getElementById('simulationArea').style.display = 'none';
-            
-            resetStatus(); 
-        }
-
-        function generateGCodeStringFromProcessed() {
-            const tableRadius = parseFloat(document.getElementById('cfgRadius').value);
-            let cmds = [];
-            
-            for(let i=0; i<processedPoints.length; i++) {
-                let p = processedPoints[i];
-                if(p.type === 'cmd') continue;
-                
-                // Convert Cartesian to Polar for Theta-Rho format
-                // In firmware, Theta is radians, Rho is 0.0 to 1.0
-                let theta = Math.atan2(p.y, p.x);
-                let rho = Math.hypot(p.x, p.y) / tableRadius;
-                
-                if (rho > 1.0) rho = 1.0;
-                
-                cmds.push(`${theta.toFixed(4)} ${rho.toFixed(4)}`);
-            }
-            return cmds.join('\n');
-        }
-
-        function copyGCode() { if(generatedGCode) navigator.clipboard.writeText(generatedGCode).then(() => showToast("Copied!", "success")); }
-        init();
-    </script>
-</body>
-</html>
+            reader.readAsDataURL(file); input.value
