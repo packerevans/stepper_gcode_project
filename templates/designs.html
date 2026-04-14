@@ -134,8 +134,13 @@
 
         .card-img-wrap { position: relative; aspect-ratio: 1/1; background: #fff; width: 100%; }
         
-        /* canvas style - NO FLIP here to allow PNGs to show correctly */
-        .card canvas { width: 100%; height: 100%; display: block; }
+        /* canvas style - Rotated 180 degrees clockwise visually */
+        .card canvas { 
+            width: 100%; 
+            height: 100%; 
+            display: block; 
+            transform: rotate(180deg);
+        }
         
         .select-dot {
             position: absolute; top: 10px; right: 10px;
