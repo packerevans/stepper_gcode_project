@@ -1366,18 +1366,20 @@
 
             let sortedShapes = [];
             if (pool.length > 0) {
-                let bestIdx = 0, maxR = -1;
+                // Find shape closest to center to start
+                let bestIdx = 0, minDist = Infinity;
                 for(let i=0; i<pool.length; i++) {
-                    let d = Math.hypot(pool[i][0].x, pool[i][0].y);
-                    if(d > maxR) { maxR = d; bestIdx = i; }
-                    d = Math.hypot(pool[i][pool[i].length-1].x, pool[i][pool[i].length-1].y);
-                    if(d > maxR) { maxR = d; bestIdx = i; }
+                    let d1 = Math.hypot(pool[i][0].x, pool[i][0].y);
+                    let d2 = Math.hypot(pool[i][pool[i].length-1].x, pool[i][pool[i].length-1].y);
+                    if(d1 < minDist) { minDist = d1; bestIdx = i; }
+                    if(d2 < minDist) { minDist = d2; bestIdx = i; }
                 }
 
                 let startShape = pool[bestIdx];
                 pool.splice(bestIdx, 1);
 
-                if(Math.hypot(startShape[0].x, startShape[0].y) < Math.hypot(startShape[startShape.length-1].x, startShape[startShape.length-1].y)) {
+                // Ensure startShape starts towards inside
+                if(Math.hypot(startShape[0].x, startShape[0].y) > Math.hypot(startShape[startShape.length-1].x, startShape[startShape.length-1].y)) {
                     startShape.reverse();
                 }
                 sortedShapes.push(startShape);
