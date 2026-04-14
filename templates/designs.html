@@ -2,222 +2,168 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sand Table</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sand Controller Pro</title>
+    
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
-    <style>
-        /* --- Modern Variables --- */
-        :root {
-            --color-accent: #d2b48c; 
-            --color-selected: #4ade80; 
-            --color-selected-ring: #22c55e;
-            --color-bg: #f8f9fa;
-            --color-surface: #ffffff;
-            --color-text: #222222;
-            --shadow-float: 0 10px 15px -3px rgba(0,0,0,0.1);
-            --radius: 16px;
-        }
+    <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
 
+    <style>
+        :root {
+            --primary: #d2b48c; 
+            --secondary: #b08d5c; 
+            --bg: #f4f4f4; 
+            --panel: #ffffff; 
+            --text: #333;
+            --accent: #2ecc71;
+            --danger: #e74c3c;
+            --btn-text: #fff;
+        }
         body[data-theme='dark'] {
-            --color-bg: #121212;
-            --color-surface: #1e1e1e;
-            --color-text: #e0e0e0;
+            --bg: #121212; --panel: #1e1e1e; --text: #e0e0e0; --btn-text: #000;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background: var(--color-bg);
-            color: var(--color-text);
-            margin: 0; padding-bottom: 100px;
-            transition: background 0.3s, color 0.3s;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg); color: var(--text);
+            margin: 0; padding: 0; height: 100vh;
+            display: flex; flex-direction: column; overflow: hidden;
         }
 
-        /* --- Header --- */
-        header {
-            position: sticky; top: 0; z-index: 100;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(0,0,0,0.05);
-            display: grid; 
-            grid-template-columns: 40px 1fr 40px;
-            align-items: center;
-            padding: 0 15px; height: 60px;
-        }
-        body[data-theme='dark'] header { background: rgba(30, 30, 30, 0.95); border-bottom: 1px solid rgba(255,255,255,0.05); }
-
-        .header-center { text-align: center; overflow: visible; display: flex; flex-direction: column; align-items: center; position: relative; }
-        .playing-text { font-weight: 700; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-        
-        /* Queue Dropdown Styles */
-        .queue-wrapper { position: relative; font-size: 0.8rem; opacity: 0.9; cursor: pointer; display: flex; align-items: center; gap: 4px; }
-        .queue-wrapper:hover { opacity: 1; text-decoration: underline; }
-        .queue-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
-        
-        .queue-dropdown {
-            display: none; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
-            margin-top: 10px; background: var(--color-surface); 
-            border: 1px solid rgba(0,0,0,0.1); border-radius: 8px; 
-            min-width: 260px; max-width: 90vw;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.15); 
-            z-index: 1000; overflow: hidden;
-            text-align: left;
-        }
-        .queue-dropdown.show { display: block; }
-        .queue-list { max-height: 300px; overflow-y: auto; }
-        .queue-item {
+        .nav-bar {
             display: flex; justify-content: space-between; align-items: center;
-            padding: 8px 12px; border-bottom: 1px solid rgba(0,0,0,0.05);
-            font-size: 0.85rem; color: var(--color-text);
+            padding: 10px 15px; background: var(--panel);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 100;
         }
-        .queue-item:last-child { border-bottom: none; }
-        .queue-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 10px; }
-        .btn-remove {
-            background: none; border: none; color: #ef4444; 
-            font-weight: bold; cursor: pointer; padding: 4px 8px;
-            border-radius: 4px; transition: background 0.2s;
+        .sidebar {
+            height: 100%; width: 0; position: fixed; top: 0; left: 0;
+            background-color: var(--primary); overflow-x: hidden;
+            transition: 0.3s; padding-top: 60px; z-index: 2000;
+            box-shadow: 4px 0 10px rgba(0,0,0,0.3);
         }
-        .btn-remove:hover { background: rgba(239, 68, 68, 0.1); }
-        .queue-empty-msg { padding: 15px; text-align: center; color: #888; font-style: italic; }
-
-        .icon-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--color-text); }
-
-        /* --- Loop Indicator --- */
-        #loop-indicator {
-            background-color: var(--color-selected);
-            color: #004d00;
-            text-align: center; padding: 8px; font-weight: 700; font-size: 0.9rem;
-            display: none; justify-content: center; align-items: center; gap: 10px;
+        .sidebar a {
+            padding: 15px 24px; text-decoration: none; font-size: 18px;
+            color: #fff; display: block; font-weight: 500;
         }
-        .close-loop { background: none; border: 1px solid #004d00; border-radius: 50%; width:20px; height:20px; line-height:18px; cursor: pointer; font-size:12px; }
 
-        /* --- Hero --- */
-        .hero-container { width: 100%; max-width: 1200px; margin: 0 auto; padding: 20px 15px 0; }
-        .hero-image { width: 100%; height: 200px; object-fit: cover; border-radius: var(--radius); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+        .app-container {
+            display: flex; flex-direction: column; height: 100%; width: 100%;
+            padding: 10px; box-sizing: border-box; gap: 10px; overflow-y: auto;
+        }
+        @media (min-width: 768px) {
+            .app-container { flex-direction: row; overflow: hidden; }
+            .drawing-panel { flex: 2; border-radius: 16px; background: var(--panel); position: relative; display: flex; align-items: center; justify-content: center; }
+            .controls-panel { flex: 1; max-width: 400px; border-radius: 16px; background: var(--panel); padding: 20px; overflow-y: auto; }
+        }
+        @media (max-width: 767px) {
+            .drawing-panel { width: 100%; aspect-ratio: 1/1; border-radius: 16px; background: var(--panel); flex-shrink: 0; position: relative;}
+            .controls-panel { flex: 1; border-radius: 16px; background: var(--panel); padding: 15px; }
+        }
 
-        /* --- Controls --- */
-        .controls-wrapper { max-width: 1200px; margin: 20px auto 10px; padding: 0 15px; }
-        .status-pill { background: var(--color-accent); color: #fff; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; opacity: 0; transition: opacity 0.3s; display: inline-block; margin-bottom: 10px; }
-        .main-actions { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 5px; }
+        .canvas-wrapper {
+            position: relative;
+            width: 95vmin; 
+            height: 95vmin; 
+            max-width: 95%; 
+            max-height: 95%; 
+            aspect-ratio: 1 / 1; 
+            margin: auto;
+            border-radius: 50%;
+            border: 4px solid var(--primary); 
+            background: #fff;
+            touch-action: none; cursor: crosshair; overflow: hidden;
+        }
+        body[data-theme='dark'] .canvas-wrapper { background: #222; border-color: var(--secondary); }
+        canvas { display: block; width: 100%; height: 100%; border-radius: 50%; }
+
+        h2 { margin: 0 0 15px 0; font-size: 1.2rem; color: var(--secondary); text-align: center; }
+        .btn-group { display: flex; gap: 8px; margin-bottom: 12px; }
         
-        select, button.action-btn {
-            background: var(--color-surface); color: var(--color-text);
-            border: 1px solid rgba(0,0,0,0.1); padding: 10px 16px;
-            border-radius: 12px; font-weight: 600; font-size: 0.9rem; cursor: pointer; white-space: nowrap;
+        button {
+            background: var(--primary); color: var(--btn-text); border: none;
+            padding: 0 12px; 
+            height: 48px; 
+            border-radius: 8px; font-weight: 600; cursor: pointer;
+            flex: 1; transition: 0.2s; display: flex; align-items: center; justify-content: center;
+            font-size: 14px; 
         }
-        .btn-primary { background: var(--color-accent) !important; color: white !important; border: none !important; }
-
-        /* --- General Popup --- */
-        #sent-popup {
-            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9);
-            background: rgba(74, 222, 128, 0.9);
-            backdrop-filter: blur(8px); color: #004d00;
-            padding: 25px 50px; border-radius: 30px;
-            font-size: 2rem; font-weight: 800; opacity: 0; pointer-events: none; z-index: 2000;
-            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
-            text-transform: uppercase;
-        }
-        #sent-popup.active { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-        #sent-popup.error { background: rgba(239, 68, 68, 0.9); color: #fff; }
-
-        /* --- Grid --- */
-        .grid { display: grid; gap: 16px; padding: 15px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); max-width: 1200px; margin: 0 auto; }
-
-        .card {
-            background: var(--color-surface); border-radius: var(--radius);
-            overflow: hidden; position: relative;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            transition: transform 0.2s; cursor: pointer;
-            border: 2px solid transparent;
-        }
-        .card.selected { border-color: var(--color-selected-ring); background-color: rgba(74, 222, 128, 0.05); transform: scale(0.98); }
-
-        .card-img-wrap { position: relative; aspect-ratio: 1/1; background: #fff; width: 100%; }
+        button:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        button.secondary { background: transparent; border: 1px solid var(--text); color: var(--text); }
+        button.active { background: var(--secondary); border: 2px solid var(--text); }
+        button.action { background: var(--accent); color: #000; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         
-        /* canvas style - Rotated 180 degrees clockwise visually */
-        .card canvas { 
-            width: 100%; 
-            height: 100%; 
-            display: block; 
-            transform: rotate(180deg);
-        }
+        .slider-row { margin-bottom: 15px; background: rgba(0,0,0,0.05); padding: 8px; border-radius: 8px; }
+        .slider-header { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; font-weight: bold; }
+        input[type="range"] { width: 100%; accent-color: var(--secondary); }
         
-        .select-dot {
-            position: absolute; top: 10px; right: 10px;
-            width: 24px; height: 24px; border-radius: 50%;
-            background: rgba(0,0,0,0.2); border: 2px solid #fff;
-            z-index: 10; transition: 0.2s;
+        #progressSlider {
+            -webkit-appearance: none; width: 100%; height: 8px; border-radius: 5px; background: #d3d3d3; outline: none;
         }
-        .card.selected .select-dot { background: var(--color-selected); border-color: var(--color-selected); }
+        #progressSlider::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--secondary); cursor: pointer;
+        }
+
+        details { background: rgba(0,0,0,0.05); padding: 10px; border-radius: 8px; margin-top: 10px; }
+        summary { cursor: pointer; font-weight: bold; font-size: 13px; }
+        .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+        input[type="number"] { width: 100%; padding: 5px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box; font-family: monospace;}
+
+        #status-toast {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: #333; color: white; padding: 10px 20px; border-radius: 20px;
+            font-size: 13px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 3000;
+        }
+        .success { background: var(--accent) !important; color: #000 !important; }
+        .error { background: var(--danger) !important; color: #fff !important; }
+
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 0 5px; }
+        .switch { position: relative; display: inline-block; width: 40px; height: 22px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider-tog { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
+        .slider-tog:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider-tog { background-color: var(--secondary); }
+        input:checked + .slider-tog:before { transform: translateX(18px); }
+
+        #toolSettingsArea {
+            background: rgba(0,0,0,0.03);
+            border: 1px dashed var(--secondary);
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 12px;
+            display: none;
+        }
+        .tool-setting-group { display: none; }
+        .tool-setting-group.active { display: block; }
+        .tool-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--secondary); margin-bottom: 5px; display:block;}
+
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .stamp-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin-top: 8px; }
+        .stamp-btn { font-size: 18px; padding: 5px; height: auto; background: rgba(0,0,0,0.05); border-radius: 4px; border: 1px solid rgba(0,0,0,0.1); }
+        .stamp-btn:hover { background: var(--secondary); color: white; }
+
+        #hiddenTraceBuffer, #vortexScanCanvas { display: none; }
+        select.full-width { width: 100%; padding: 6px; border-radius: 4px; border: 1px solid #ccc; }
         
-        .card-body { padding: 12px; }
-        .card-title { margin: 0; font-size: 0.9rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .card-meta { font-size: 0.75rem; opacity: 0.6; margin-top: 4px; }
-
-        /* --- Floating Selection Bar --- */
-        .selection-bar {
-            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(150px);
-            background: var(--color-text); color: var(--color-bg);
-            padding: 12px 20px; border-radius: 50px;
-            display: flex; gap: 15px; align-items: center;
-            box-shadow: var(--shadow-float); z-index: 1000;
-            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            min-width: 300px; justify-content: space-between;
+        #pathModal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); z-index: 4000; flex-direction: column;
+            align-items: center; justify-content: center; backdrop-filter: blur(4px);
         }
-        .selection-bar.active { transform: translateX(-50%) translateY(0); }
-        .bar-actions { display: flex; gap: 10px; }
-        .bar-btn { background: rgba(255,255,255,0.2); border: none; color: inherit; padding: 8px 16px; border-radius: 20px; cursor: pointer; font-size: 0.9rem; font-weight: 600; }
-        .bar-btn.loop { background: var(--color-selected); color: #004d00; }
-        .bar-btn.danger { background: #ff4d4d; color: white; }
+        .modal-canvas-wrap {
+            background: #fff; border-radius: 50%; width: 90vmin; height: 90vmin;
+            max-width: 500px; max-height: 500px; position: relative;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); overflow: hidden;
+            touch-action: none;
+        }
 
-        /* Sidebar */
-        .sidebar { height: 100%; width: 0; position: fixed; top: 0; left: 0; background: var(--color-surface); overflow-x: hidden; z-index: 1100; transition: 0.3s; padding-top: 20px; border-right: 1px solid rgba(0,0,0,0.1); }
-        .sidebar a { padding: 15px 25px; text-decoration: none; font-size: 1.1rem; color: var(--color-text); display: block; font-weight: 600; }
-        .overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); z-index: 1050; display: none; }
     </style>
 </head>
 <body data-theme="light">
 
-    <div id="sent-popup">SENT!</div>
-
-    <div id="cooldown-modal" class="overlay" style="display:none; justify-content: center; align-items: center; z-index: 3000;">
-        <div style="background: var(--color-surface); padding: 30px; border-radius: var(--radius); box-shadow: var(--shadow-float); max-width: 400px; width: 90%; text-align: center;">
-            <h2 style="margin-top: 0;">Table in Cooldown</h2>
-            <p>Do you want to start this design now or add to queue?</p>
-            <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
-                <button class="btn-primary action-btn" onclick="cooldownChoice('now')">Start Now</button>
-                <button class="action-btn" onclick="cooldownChoice('queue')">Add to Queue</button>
-                <button class="action-btn" style="background:#eee; color:#333; border:none;" onclick="cooldownChoice('cancel')">Cancel</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="loop-indicator">
-        <span>Drawing on Repeat</span>
-        <button class="close-loop" onclick="cancelLoop()">✕</button>
-    </div>
-
-    <header>
-        <button class="icon-btn" onclick="openNav()">☰</button>
-        <div class="header-center">
-            <div id="playing-display" class="playing-text">Select a design</div>
-            
-            <div class="queue-wrapper" onclick="toggleQueue(event)">
-                <span id="queue-display" class="queue-text">Queue empty</span>
-                <span>▼</span>
-            </div>
-            <div id="queue-dropdown" class="queue-dropdown">
-                <div id="queue-list" class="queue-list">
-                    </div>
-            </div>
-
-        </div>
-        <button class="icon-btn" onclick="toggleTheme()">◑</button>
-    </header>
-
-    <div id="overlay" class="overlay" onclick="closeNav()"></div>
     <div id="mySidebar" class="sidebar">
-        <div style="padding:0 25px; margin-bottom:20px; opacity:0.5;">MENU</div>
+        <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
         <a href="/">Designs</a>
         <a href="/controller">Controller</a>
         <a href="/sketch">Sketch</a>
@@ -226,482 +172,1282 @@
         <a href="/terminal">Terminal</a>
     </div>
 
-    <div class="hero-container">
-        <img src="/static/sand.png" alt="Sand Table" class="hero-image">
+    <div class="nav-bar">
+        <button style="flex:0; background:none; font-size:24px; color:var(--text); padding:0; height:auto;" onclick="openNav()">☰</button>
+        <h1 style="margin:0; font-size:1.2rem;">Sand Table - Sketch</h1>
+        <button style="flex:0; background:none; font-size:20px; height:auto;" onclick="toggleTheme()">☀️</button>
     </div>
 
-    <div class="controls-wrapper">
-        <div id="status-pill" class="status-pill">Ready</div>
-        <div class="main-actions">
-            <button class="action-btn" onclick="shuffleLoop()">Shuffle All</button>
-            <button class="action-btn btn-primary" onclick="resumeDesign()">Resume</button>
-            <button class="action-btn" onclick="pauseDesign()">Pause</button>
+    <div class="app-container">
+        <div class="drawing-panel">
+            <div class="canvas-wrapper" id="canvasContainer">
+                <canvas id="drawCanvas"></canvas>
+            </div>
+            <div id="coordDisplay" style="position:absolute; bottom:10px; left:10px; background:rgba(0,0,0,0.5); color:white; padding:4px 8px; border-radius:4px; font-size:11px; pointer-events:none;">X:0 Y:0</div>
+        </div>
+
+        <div class="controls-panel">
+            <div id="designPhaseControls">
+                <h2>Tools</h2>
+                
+                <div class="toggle-row" id="stylusModeWrapper">
+                    <span style="font-weight:600; font-size:13px;">🖋️ Stylus Mode</span>
+                    <label class="switch">
+                        <input type="checkbox" id="stylusMode">
+                        <span class="slider-tog"></span>
+                    </label>
+                </div>
+
+                <div id="toolSettingsArea">
+                    <div id="set-pen" class="tool-setting-group">
+                        <div class="toggle-row" style="margin:0;">
+                            <span style="font-size:13px;">🔗 Shape Connector</span>
+                            <label class="switch">
+                                <input type="checkbox" id="shapeConnectMode" checked>
+                                <span class="slider-tog"></span>
+                            </label>
+                        </div>
+                        <div style="margin-top:10px;">
+                            <span class="tool-label">Add Stamps</span>
+                            <div class="stamp-grid">
+                                <button class="stamp-btn" onclick="addShape('circle')">⭕</button>
+                                <button class="stamp-btn" onclick="addShape('square')">⬜</button>
+                                <button class="stamp-btn" onclick="addShape('triangle')">🔺</button>
+                                <button class="stamp-btn" onclick="addShape('hexagon')">⬡</button>
+                                <button class="stamp-btn" onclick="addShape('pentagon')">⬠</button>
+                                <button class="stamp-btn" onclick="addShape('star')">⭐</button>
+                                <button class="stamp-btn" onclick="addShape('spiral')">🌀</button>
+                                <button class="stamp-btn" onclick="addShape('random')">🎲</button>
+                            </div>
+                        </div>
+                        
+                        <div class="slider-row" style="margin-top:12px;">
+                            <div class="slider-header"><span>SYMMETRY</span> <span id="symVal">1x</span></div>
+                            <input type="range" id="symSlider" min="1" max="12" value="1" step="1" oninput="updateUI()">
+                        </div>
+                    </div>
+
+                    <div id="set-erase" class="tool-setting-group">
+                        <span class="tool-label">Eraser Size: <span id="eraseSizeVal">10px</span></span>
+                        <input type="range" min="2" max="50" value="10" oninput="updateToolSettings()" id="eraserSizeSlider">
+                    </div>
+
+                    <div id="set-text" class="tool-setting-group">
+                        <span class="tool-label" style="color:var(--accent); font-weight:bold;">Text to Path</span>
+                        <label class="tool-label">Your Text (Multi-line ok)</label>
+                        <textarea id="toolTextInput" class="full-width" style="margin-bottom:10px; padding:8px; height:80px; resize:vertical; font-family: inherit;" oninput="renderTextToTrace()">Sketch</textarea>
+                        <div class="settings-grid">
+                            <div>
+                                <label class="tool-label">Font Size</label>
+                                <input type="number" id="toolTextSize" value="120" oninput="renderTextToTrace()">
+                            </div>
+                            <div>
+                                <label class="tool-label">Font Family</label>
+                                <select id="toolTextFont" class="full-width" onchange="renderTextToTrace()">
+                                    <option value="Arial">Arial</option>
+                                    <option value="Serif">Serif</option>
+                                    <option value="Monospace">Mono</option>
+                                    <option value="Cursive">Cursive</option>
+                                </select>
+                            </div>
+                        </div>
+                        <span class="tool-label" style="margin-top:10px;">Spiral Spacing: <span id="textDensityVal">3</span></span>
+                        <input type="range" min="1" max="5" value="3" step="0.1" id="textDensityInput" oninput="renderTextToTrace()">
+                        <button class="action" style="margin-top:10px; width:100%;" onclick="setTool('draw')">Confirm Placement</button>
+                    </div>
+
+                    <div id="set-select" class="tool-setting-group">
+                        <span class="tool-label">Transform Selection</span>
+                        <div id="traceMoveMsg" style="display:none; color:var(--accent); font-size:11px; margin-bottom:8px;">
+                            ✨ Trace Active: Drag/Rotate/Resize image
+                        </div>
+                        <span class="tool-label">Rotate Live</span>
+                        <input type="range" min="-180" max="180" value="0" step="1" id="liveRotSlider" 
+                               oninput="liveRotate(this.value)" onchange="endLiveTransform(this)">
+                        <div style="text-align:right; font-size:10px; color:#666;" id="liveRotVal">0°</div>
+                        <span class="tool-label" style="margin-top:10px;">Resize Live</span>
+                        <input type="range" min="10" max="200" value="100" step="1" id="liveScaleSlider" 
+                               oninput="liveScale(this.value)" onchange="endLiveTransform(this)">
+                        <div style="text-align:right; font-size:10px; color:#666;" id="liveScaleVal">100%</div>
+                    </div>
+
+                    <div id="set-sandify" class="tool-setting-group">
+                        <span class="tool-label" style="color:var(--accent); font-weight:bold;">Vortex Generator</span>
+                        <label class="tool-label">Shape Source</label>
+                        <select id="vortexShape" class="full-width" onchange="updateVortexParams()">
+                            <option value="custom">Current Drawing</option>
+                            <option value="triangle">Triangle</option>
+                            <option value="square">Square</option>
+                            <option value="pentagon">Pentagon</option>
+                            <option value="hexagon">Hexagon</option>
+                            <option value="star">Star</option>
+                            <option value="text">Letter / Symbol</option>
+                        </select>
+                        <div id="vortexTextContainer" style="display:none; margin-top:5px;">
+                             <input type="text" id="vortexChar" maxlength="1" value="S" style="text-align:center; font-weight:bold; width:100%;" oninput="updateVortexParams()">
+                        </div>
+                        <span class="tool-label" style="margin-top:10px;">Loop Count: <span id="val-swirl">20</span></span>
+                        <input type="range" id="vortexSwirl" min="5" max="50" step="1" value="20" oninput="updateVortexParams()">
+                        <span class="tool-label">Shape Zoom: <span id="val-scale">1.0</span></span>
+                        <input type="range" id="vortexScale" min="0.1" max="2.0" step="0.05" value="1.0" oninput="updateVortexParams()">
+                        <span class="tool-label">Twist Angle: <span id="val-twist">5</span></span>
+                        <input type="range" id="vortexTwist" min="-45" max="45" step="0.5" value="5" oninput="updateVortexParams()">
+                    </div>
+
+                    <div id="set-loop" class="tool-setting-group">
+                        <span class="tool-label" style="color:var(--accent); font-weight:bold;">Continuous Loop</span>
+                        <label class="tool-label">Shape Source</label>
+                        <select id="loopShape" class="full-width" onchange="updateLoopParams()">
+                            <option value="custom">Current Drawing</option>
+                            <option value="circle">Circle</option>
+                            <option value="triangle">Triangle</option>
+                            <option value="square">Square</option>
+                            <option value="pentagon">Pentagon</option>
+                            <option value="hexagon">Hexagon</option>
+                            <option value="star">Star</option>
+                        </select>
+
+                        <div class="toggle-row" style="margin-top:12px; margin-bottom:5px;">
+                            <span class="tool-label" style="margin-bottom:0;">Guide Path</span>
+                            <div style="display:flex; gap:5px;">
+                                <select id="loopGuidePath" onchange="updateLoopParams()" style="flex:2; padding:5px; border-radius:4px; font-size:12px;">
+                                    <option value="circle">Circle</option>
+                                    <option value="square">Square</option>
+                                    <option value="figure8">Figure 8</option>
+                                    <option value="custom">Custom Drawn</option>
+                                </select>
+                                <button class="secondary" style="flex:1; height:30px; font-size:12px; padding:0 5px;" onclick="openPathModal()">✎ Draw</button>
+                            </div>
+                        </div>
+                        
+                        <div class="toggle-row" style="margin-top:12px; margin-bottom:5px;">
+                            <span class="tool-label" style="margin-bottom:0;">Stretch Connect</span>
+                            <label class="switch">
+                                <input type="checkbox" id="loopStretchMode" checked onchange="updateLoopParams()">
+                                <span class="slider-tog"></span>
+                            </label>
+                        </div>
+                        
+                        <span class="tool-label" style="margin-top:10px;">Iterations: <span id="val-loop-iter">50</span></span>
+                        <input type="range" id="loopIter" min="1" max="200" step="1" value="50" oninput="updateLoopParams()">
+                        
+                        <span class="tool-label">Rotation Step (°): <span id="val-loop-angle">5</span></span>
+                        <input type="range" id="loopAngle" min="0" max="180" step="1" value="5" oninput="updateLoopParams()">
+
+                        <span class="tool-label">Spin Step (°): <span id="val-loop-spin">0</span></span>
+                        <input type="range" id="loopSpin" min="0" max="30" step="1" value="0" oninput="updateLoopParams()">
+                        
+                        <span class="tool-label">Base Zoom: <span id="val-loop-scale">1.0</span></span>
+                        <input type="range" id="loopScale" min="0.1" max="2.0" step="0.05" value="1.0" oninput="updateLoopParams()">
+
+                        <span class="tool-label">Shrink/Grow Rate: <span id="val-loop-osc">0</span></span>
+                        <input type="range" id="loopOsc" min="0" max="20" step="1" value="0" oninput="updateLoopParams()">
+                    </div>
+                    
+                    <div id="set-trace" class="tool-setting-group">
+                         <span class="tool-label" style="color:var(--accent); font-weight:bold;">High Precision Trace</span>
+                         <span class="tool-label" style="color:#666; font-size:10px;">Tip: Use "Move" tool to reposition image</span>
+                         <span class="tool-label">Contrast Threshold: <span id="traceThreshVal">150</span></span>
+                         <input type="range" min="10" max="240" value="150" id="traceThreshInput" oninput="runHighPrecisionTrace()">
+                         <span class="tool-label">Spiral Spacing: <span id="traceDensityVal">3</span></span>
+                         <input type="range" min="1" max="5" value="3" step="0.1" id="traceDensityInput" oninput="runHighPrecisionTrace()">
+                         <button class="secondary" style="margin-top:10px; font-size:11px;" onclick="document.getElementById('imgUpload').click()">📂 Change Image</button>
+                    </div>
+                </div>
+
+                <div class="btn-group">
+                    <button id="btnDraw" onclick="setTool('draw')" class="active">✏️ Draw</button>
+                    <button id="btnErase" onclick="setTool('erase')" class="secondary">🧼 Erase</button>
+                </div>
+
+                <div class="btn-group">
+                    <button id="btnSelect" onclick="setTool('select')" class="secondary">✋ Move</button>
+                    <button id="btnSandify" onclick="setTool('sandify')" class="secondary">🌀 Vortex</button>
+                    <button id="btnLoop" onclick="setTool('loop')" class="secondary">🔁 Loop</button>
+                </div>
+
+                <div class="btn-group">
+                    <button id="btnTrace" class="secondary" onclick="handleTraceClick()">✨ Trace</button>
+                    <input type="file" id="imgUpload" accept="image/*" style="display:none" onchange="handleImageUpload(this)">
+                    <button id="btnText" onclick="setTool('text')" class="secondary">🔠 Text</button>
+                </div>
+
+                <div class="btn-group">
+                    <button onclick="clearCanvas()" class="secondary" style="color:var(--danger); border-color:var(--danger);">✖ Clear</button>
+                    <button onclick="undo()" class="secondary">↶ Undo</button>
+                </div>
+
+                <hr style="border:0; border-top:1px solid #ddd; margin: 15px 0;">
+                
+                <div class="toggle-row" style="background:rgba(0,0,0,0.03); padding:8px; border-radius:8px; margin-bottom:10px;">
+                    <span style="font-weight:600; font-size:13px;">🌀 Spiral Connect Drawing</span>
+                    <label class="switch">
+                        <input type="checkbox" id="spiralConnectMode" checked>
+                        <span class="slider-tog"></span>
+                    </label>
+                </div>
+
+                <button class="action" onclick="prepareGCode()" style="margin-bottom:15px; font-size:1.1em;">⚙️ Generate Path</button>
+            </div>
+            
+            <div id="productionPhaseControls" style="display:none; margin-bottom:15px;">
+                <button class="secondary" onclick="returnToEditing()" style="width:100%; border:2px dashed #999; color:#444; background: rgba(0,0,0,0.05);">
+                    ✏️ Back to Edit
+                </button>
+            </div>
+
+            <div id="simulationArea" style="display:none;">
+                <div class="slider-row">
+                    <div class="slider-header"><span>SIMULATION</span> <span id="progVal">100%</span></div>
+                    <input type="range" id="progressSlider" min="0" max="100" value="100" oninput="render()">
+                </div>
+            </div>
+
+            <div style="text-align:center; font-size:12px; margin-bottom:10px; color:#666;">
+                Status: <span id="statusTxt" style="font-weight:bold; color:var(--primary);">Drawing Mode</span>
+            </div>
+
+            <div class="btn-group">
+                <button onclick="sendToTable()" class="active">🚀 Run</button>
+                <button onclick="saveToServer()" class="secondary">💾 Save to Pi</button>
+            </div>
+
+            <details>
+                <summary>⚙️ Machine Settings</summary>
+                <div class="settings-grid">
+                    <div><label>Radius</label><input type="number" id="cfgRadius" value="202.6" onchange="resizeCanvas()"></div>
+                    <div><label>Ball Size (mm)</label><input type="number" id="cfgBallSize" value="13" onchange="runHighPrecisionTrace()"></div>
+                    <div><label>Center Speed</label><input type="number" id="cfgCenterDelay" value="500"></div>
+                    <div><label>Rim Speed</label><input type="number" id="cfgPerimDelay" value="3000"></div>
+                    <div><label>Steps/Deg</label><input type="number" id="cfgStepsPerDeg" value="8.888888"></div>
+                    <div><label>Arm 1</label><input type="number" id="cfgL1" value="101.3"></div>
+                    <div><label>Arm 2</label><input type="number" id="cfgL2" value="101.3"></div>
+                </div>
+                <button class="secondary" onclick="copyGCode()" style="margin-top:10px; width:100%;">📋 Copy GCode</button>
+            </details>
         </div>
     </div>
 
-    <div id="grid" class="grid"></div>
-    <div style="text-align:center; margin-top:20px;">
-        <button id="more-btn" class="action-btn" style="display:none;" onclick="showAll()">Show All Designs</button>
-    </div>
-
-    <div id="selection-bar" class="selection-bar">
-        <span style="font-weight:600; padding-left:5px;" id="sel-count">0 Selected</span>
-        <div class="bar-actions">
-            <button class="bar-btn loop" onclick="loopSelected()">Loop</button>
-            <button class="bar-btn" onclick="copySelected()">Copy</button>
-            <button class="bar-btn danger" onclick="deleteSelected()">Delete</button>
+    <div id="pathModal">
+        <h3 style="color:white; margin-top:0; font-size:1.4rem;">Draw Custom Guide Path</h3>
+        <p style="color:#ccc; font-size:12px; margin-bottom: 20px;">Draw the track for your loops to follow.</p>
+        <div class="modal-canvas-wrap">
+            <canvas id="pathCanvas" onpointerdown="startDrawPath(event)" onpointermove="moveDrawPath(event)" onpointerup="endDrawPath(event)" onpointerleave="endDrawPath(event)"></canvas>
+        </div>
+        <div style="margin-top:20px; display:flex; gap:10px; width:90vmin; max-width:500px;">
+            <button onclick="clearPathCanvas()" class="secondary" style="background:#fff; color:#333;">↶ Retry</button>
+            <button onclick="savePathCanvas()" class="action">Complete</button>
+            <button onclick="closePathModal()" class="secondary" style="background:#555; color:white; border:none;">Cancel</button>
         </div>
     </div>
+
+    <div id="status-toast"></div>
+    <canvas id="hiddenTraceBuffer" width="800" height="800"></canvas>
+    <canvas id="vortexScanCanvas" width="600" height="600"></canvas>
 
     <script>
-        const BASE_URL = `${window.location.protocol}//${window.location.host}`;
-        let selectedFiles = new Set();
-        let allFiles = [];
-        let isWaiting = false; // Global track of cooldown state
-        let pendingDesign = null;
-        let globalSettings = { speed: 1.0, cooldown: 30 };
+        let rawPoints = []; 
+        let processedPoints = []; 
+        let historyStack = [];
+        let isDrawing = false;
+        let currentTool = 'draw';
+        let origin = {x:0, y:0};
+        let scale = 1;
+        let generatedGCode = null;
 
-        // Fetch settings once on load
-        async function refreshSettings() {
-            try {
-                let r = await fetch('/api/settings');
-                globalSettings = await r.json();
-            } catch(e) { console.error("Failed to load settings", e); }
-        }
-        refreshSettings();
+        let eraserRadius = 10;
+        let traceImgData = null;
+        let traceState = { active: false, img: null, x: 0, y: 0, scale: 1.0, baseScale: 1.0, rotation: 0 }; 
 
-        // --- MATH & OPTIMIZED DRAWING ---
-        const observer = new IntersectionObserver((e,o)=>{e.forEach(x=>{if(x.isIntersecting){loadPreview(x.target,x.target.dataset.f);o.unobserve(x.target)}})},{rootMargin:"150px"});
+        let lastRotVal = 0;
+        let lastScaleVal = 100;
         
-        // SCARA Constants
-        const L1=101.3, L2=101.3, R=9/8, S_RAD=(3200/360)*(180/Math.PI);
+        let activeEffectType = null; 
+        const vortexState = { radiusMap: new Float32Array(3600) };
+        let vortexSourcePath = [];
+        
+        let loopSourcePath = [];
+        let loopPathOffset = {x: 0, y: 0};
+        
+        // Custom Path Variables
+        let isDrawingPath = false;
+        let pathRawPoints = [];
+        let customPathPoints = [];
 
-        function getShortestRotation(raw, last) {
-            let diff = (raw - last) / (2 * Math.PI);
-            return raw - (Math.round(diff) * 2 * Math.PI);
+        const canvas = document.getElementById('drawCanvas');
+        const ctx = canvas.getContext('2d');
+        const BASE_URL = window.location.origin;
+
+        // --- MATH HELPERS ---
+        function distSq(p1, p2) { return (p1.x-p2.x)**2 + (p1.y-p2.y)**2; }
+        function dist(p1, p2) { return Math.sqrt(distSq(p1, p2)); }
+        function getBounds(shape) {
+            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+            shape.forEach(p => { if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y; });
+            return { minX, maxX, minY, maxY, area: (maxX-minX)*(maxY-minY), w: maxX-minX, h: maxY-minY, cx: (minX+maxX)/2, cy: (minY+maxY)/2 };
+        }
+        function getIntersection(A, B, C, D) {
+            const det = (B.x - A.x) * (D.y - C.y) - (D.x - C.x) * (B.y - A.y);
+            if (det === 0) return null; 
+            const lambda = ((D.y - C.y) * (D.x - A.x) + (C.x - D.x) * (D.y - A.y)) / det;
+            const gamma = ((A.y - B.y) * (D.x - A.x) + (B.x - A.x) * (D.y - A.y)) / det;
+            if (lambda > 0.001 && lambda < 0.999 && gamma > 0.001 && gamma < 0.999) {
+                return { x: A.x + lambda * (B.x - A.x), y: A.y + lambda * (B.y - A.y) };
+            }
+            return null;
         }
 
-        function calculateIK(x, y, lastBaseSteps) {
-            let dist = Math.hypot(x, y);
-            const maxReach = L1 + L2;
-            if (dist > maxReach) { x = (x / dist) * maxReach; y = (y / dist) * maxReach; dist = maxReach; }
-            if (dist < 1.0) return { b: 0, e: -Math.PI * S_RAD };
-
-            const lastT1 = -lastBaseSteps / S_RAD; 
-            let cosBend = Math.max(-1, Math.min(1, (dist*dist - L1*L1 - L2*L2) / (2 * L1 * L2)));
-            const bend = Math.acos(cosBend);
-            const k1 = L1 + L2 * Math.cos(bend), k2 = L2 * Math.sin(bend);
-            let t1 = Math.atan2(y, x) - Math.atan2(k2, k1);
-            t1 = getShortestRotation(t1, lastT1);
-
-            return { b: -t1 * S_RAD, e: -(bend + R * t1) * S_RAD };
+        function init() {
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            canvas.addEventListener('pointerdown', startDraw);
+            canvas.addEventListener('pointermove', moveDraw);
+            canvas.addEventListener('pointerup', endDraw);
+            canvas.addEventListener('pointerleave', endDraw);
+            canvas.style.touchAction = "none";
+            updateUI();
+            updateToolSettings();
         }
 
-        function getXY(b, e) {
-            let t1 = -b / S_RAD;
-            let tb = -e / S_RAD - (R * t1); 
-            let t2 = t1 + tb;
+        let dragStart = null;
+
+        // --- DRAWING LOGIC ---
+        function startDraw(e) {
+            e.preventDefault();
+            if(generatedGCode) return;
+            const smart = document.getElementById('stylusMode').checked;
+            if(smart && currentTool !== 'select' && currentTool !== 'sandify' && currentTool !== 'loop') {
+                if(e.pointerType === 'pen') setTool('draw');
+                else if(e.pointerType === 'touch') setTool('erase');
+            }
+            
+            if(currentTool === 'select' || currentTool === 'loop') {
+                isDrawing = true; dragStart = getPos(e); canvas.setPointerCapture(e.pointerId); return;
+            }
+            if(currentTool === 'sandify' || currentTool === 'trace_set' || currentTool === 'text') return;
+            saveState(); isDrawing = true; canvas.setPointerCapture(e.pointerId); processPointer(e); resetStatus();
+        }
+
+        function moveDraw(e) {
+            e.preventDefault();
+            const pos = getPos(e);
+            document.getElementById('coordDisplay').textContent = `X:${pos.x.toFixed(0)} Y:${pos.y.toFixed(0)}`;
+            if(currentTool === 'select' && traceState.active && isDrawing && dragStart) {
+                const dx = pos.x - dragStart.x; const dy = pos.y - dragStart.y;
+                const tableR = parseFloat(document.getElementById('cfgRadius').value);
+                const mmToTraceFactor = 800 / (tableR * 2);
+                traceState.x += dx * mmToTraceFactor; traceState.y -= dy * mmToTraceFactor; 
+                dragStart = pos; drawTracePreview(); return;
+            }
+            if(!isDrawing) { render(); drawCursor(pos); return; }
+            
+            if((currentTool === 'select' || currentTool === 'loop') && dragStart) {
+                const dx = pos.x - dragStart.x; const dy = pos.y - dragStart.y;
+                
+                if (currentTool === 'loop' || (activeEffectType === 'loop' && currentTool === 'select')) {
+                    loopPathOffset.x += dx;
+                    loopPathOffset.y += dy;
+                    generateLoop();
+                } else if (activeEffectType === 'sandify' && vortexSourcePath) {
+                    vortexSourcePath.forEach(p => { if(p.type === 'point') { p.x += dx; p.y += dy; } });
+                    scanVortexShape(); generateVortex();
+                } else {
+                    rawPoints.forEach(p => { if(p.type === 'point') { p.x += dx; p.y += dy; } });
+                }
+                dragStart = pos; render(); return;
+            }
+            processPointer(e);
+        }
+
+        function endDraw(e) {
+            if(!isDrawing) return;
+            isDrawing = false; canvas.releasePointerCapture(e.pointerId);
+            if(currentTool === 'select' || currentTool === 'loop') {
+                dragStart = null; if(traceState.active) commitTraceMove(); else saveState(); return;
+            }
+            if(currentTool === 'draw') {
+                if(document.getElementById('shapeConnectMode').checked) autoConnectAndSmooth();
+                rawPoints.push({type:'break'});
+            }
+            render();
+        }
+
+        function autoConnectAndSmooth() {
+            let lastBreak = -1;
+            for(let i=rawPoints.length-1; i>=0; i--) { if(rawPoints[i].type === 'break' || rawPoints[i].type === 'cmd') { lastBreak = i; break; } }
+            let stroke = []; let startIndex = lastBreak + 1;
+            for(let i=startIndex; i<rawPoints.length; i++) stroke.push(rawPoints[i]);
+            if(stroke.length < 3) return;
+            let startP = stroke[0]; let endP = stroke[stroke.length-1];
+            let d = Math.hypot(startP.x - endP.x, startP.y - endP.y);
+            if(d < 30.0) { stroke.push({x: startP.x, y: startP.y, type:'point', source: startP.source}); }
+            for(let pass=0; pass<2; pass++) {
+                let smooth = []; smooth.push(stroke[0]);
+                for(let i=0; i<stroke.length-1; i++) {
+                    let p0 = stroke[i]; let p1 = stroke[i+1];
+                    smooth.push({ x: 0.75 * p0.x + 0.25 * p1.x, y: 0.75 * p0.y + 0.25 * p1.y, type: 'point', source: p0.source });
+                    smooth.push({ x: 0.25 * p0.x + 0.75 * p1.x, y: 0.25 * p0.y + 0.75 * p1.y, type: 'point', source: p0.source });
+                }
+                smooth.push(stroke[stroke.length-1]); stroke = smooth;
+            }
+            rawPoints.splice(startIndex, rawPoints.length - startIndex, ...stroke);
+        }
+
+        // --- SHAPE STAMPS ---
+        function addShape(type) {
+            saveState(); const r = 50; let pts = [];
+            if(type==='circle') { for(let i=0; i<=36; i++) { const a = (i/36)*Math.PI*2; pts.push({x: Math.cos(a)*r, y: Math.sin(a)*r}); } } 
+            else if(type==='square') { pts = [{x:-r,y:-r}, {x:r,y:-r}, {x:r,y:r}, {x:-r,y:r}, {x:-r,y:-r}]; } 
+            else if(type==='triangle') { pts = [{x:0,y:r}, {x:r*0.86,y:-r/2}, {x:-r*0.86,y:-r/2}, {x:0,y:r}]; } 
+            else if(type==='hexagon') { for(let i=0; i<=6; i++) { const a = (i/6)*Math.PI*2; pts.push({x: Math.cos(a)*r, y: Math.sin(a)*r}); } } 
+            else if(type==='pentagon') { for(let i=0; i<=5; i++) { const a = (i/5)*Math.PI*2 - Math.PI/2; pts.push({x: Math.cos(a)*r, y: Math.sin(a)*r}); } } 
+            else if(type==='star') { for(let i=0; i<=10; i++) { const a = (i/10)*Math.PI*2 + Math.PI/2; const rad = (i%2===0) ? r : r*0.4; pts.push({x: Math.cos(a)*rad, y: Math.sin(a)*rad}); } } 
+            else if(type==='spiral') { for(let i=0; i<100; i++) { const a = i * 0.3; const rad = (i/100)*r; pts.push({x: Math.cos(a)*rad, y: Math.sin(a)*rad}); } } 
+            else if (type === 'random') {
+                const numPoints = Math.floor(Math.random() * 15) + 1;
+                if(numPoints === 1) { const rx = r * (0.5 + Math.random()); const ry = r * (0.5 + Math.random()); for(let i=0; i<=36; i++) { const a = (i/36)*Math.PI*2; pts.push({x: Math.cos(a)*rx, y: Math.sin(a)*ry}); } } 
+                else if(numPoints === 2) { const angle = Math.random() * Math.PI * 2; const len = r * (0.8 + Math.random() * 0.4); pts.push({x: Math.cos(angle)*len, y: Math.sin(angle)*len}); pts.push({x: Math.cos(angle + Math.PI)*len, y: Math.sin(angle + Math.PI)*len}); } 
+                else { let angles = []; for(let i=0; i<numPoints; i++) angles.push(Math.random() * Math.PI * 2); angles.sort((a,b) => a-b); for(let i=0; i<angles.length; i++) { const rad = r * (0.5 + Math.random() * 0.8); pts.push({x: Math.cos(angles[i])*rad, y: Math.sin(angles[i])*rad}); } pts.push(pts[0]); }
+            }
+            if(rawPoints.length > 0 && rawPoints[rawPoints.length-1].type !== 'break') rawPoints.push({type:'break'});
+            pts.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'})); rawPoints.push({type:'break'}); render();
+        }
+
+        function getPos(e) { return { x: (e.offsetX - origin.x) / scale, y: -(e.offsetY - origin.y) / scale }; }
+
+        function processPointer(e) {
+            const p = getPos(e);
+            if(currentTool === 'draw') { rawPoints.push({x: p.x, y: p.y, type: 'point', source: 'draw'}); } 
+            else if (currentTool === 'erase') { const r = eraserRadius; rawPoints = rawPoints.filter(pt => { if(pt.type === 'break') return true; return Math.hypot(pt.x - p.x, pt.y - p.y) > r; }); }
+            render(); if(currentTool==='erase') drawCursor(p);
+        }
+
+        function drawCursor(p) {
+            if(generatedGCode) return;
+            const r = (currentTool === 'erase' ? eraserRadius : 10) * scale;
+            const px = origin.x + p.x * scale; const py = origin.y - p.y * scale;
+            if(currentTool === 'erase') { ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI*2); ctx.strokeStyle = "#999"; ctx.fillStyle = "rgba(200,200,200,0.3)"; ctx.stroke(); ctx.fill(); } 
+            else if (currentTool === 'select') { ctx.font = "20px Arial"; ctx.fillStyle = "black"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("✋", px, py); } 
+        }
+
+        function liveRotate(val) {
+            if(traceState.active) { traceState.rotation = parseFloat(val); drawTracePreview(); return; }
+            
+            let targetPoints = rawPoints;
+            if (activeEffectType === 'loop') targetPoints = loopSourcePath;
+            else if (activeEffectType === 'sandify') targetPoints = vortexSourcePath;
+
+            if(targetPoints.length === 0) return;
+            const diff = val - lastRotVal; if(diff === 0) return;
+            const rad = (diff * Math.PI) / 180; const cos = Math.cos(rad); const sin = Math.sin(rad);
+            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity; let hasPoints = false;
+            
+            targetPoints.forEach(p => { if(p.type === 'point') { if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y; hasPoints = true; } });
+            if(!hasPoints) return; const cx = (minX + maxX)/2; const cy = (minY + maxY)/2;
+            
+            targetPoints.forEach(p => { if(p.type === 'point') { let tx = p.x - cx; let ty = p.y - cy; p.x = cx + (tx * cos - ty * sin); p.y = cy + (tx * sin + ty * cos); } });
+            
+            lastRotVal = val; document.getElementById('liveRotVal').innerText = val + "°"; 
+            
+            if (activeEffectType === 'loop') generateLoop();
+            else if (activeEffectType === 'sandify') { scanVortexShape(); generateVortex(); }
+            else render();
+        }
+
+        function liveScale(val) {
+             if(traceState.active) { const factor = val / 100.0; traceState.scale = traceState.baseScale * factor; drawTracePreview(); return; }
+             
+             let targetPoints = rawPoints;
+             if (activeEffectType === 'loop') targetPoints = loopSourcePath;
+             else if (activeEffectType === 'sandify') targetPoints = vortexSourcePath;
+
+             if(targetPoints.length === 0) return;
+             const factor = val / lastScaleVal; if(factor === 1) return;
+             let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity; let hasPoints = false;
+             
+             targetPoints.forEach(p => { if(p.type === 'point') { if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y; hasPoints = true; } });
+             if(!hasPoints) return; const cx = (minX + maxX)/2; const cy = (minY + maxY)/2;
+             
+             targetPoints.forEach(p => { if(p.type === 'point') { p.x = cx + (p.x - cx) * factor; p.y = cy + (p.y - cy) * factor; } });
+             
+             lastScaleVal = val; document.getElementById('liveScaleVal').innerText = val + "%"; 
+             
+             if (activeEffectType === 'loop') generateLoop();
+             else if (activeEffectType === 'sandify') { scanVortexShape(); generateVortex(); }
+             else render();
+        }
+
+        function endLiveTransform(slider) {
+            if(traceState.active) { commitTraceMove(); if(slider.id === 'liveScaleSlider') slider.value = 100; if(slider.id === 'liveRotSlider') { slider.value = 0; traceState.rotation = 0; } return; }
+            saveState(); 
+            if(slider.id === 'liveRotSlider') { slider.value = 0; lastRotVal = 0; document.getElementById('liveRotVal').innerText = "0°"; }
+            if(slider.id === 'liveScaleSlider') { slider.value = 100; lastScaleVal = 100; document.getElementById('liveScaleVal').innerText = "100%"; }
+        }
+
+        // --- VORTEX LOGIC ---
+        function updateVortexParams() {
+            if(currentTool === 'sandify') {
+                document.getElementById('val-swirl').innerText = document.getElementById('vortexSwirl').value;
+                document.getElementById('val-scale').innerText = document.getElementById('vortexScale').value;
+                document.getElementById('val-twist').innerText = document.getElementById('vortexTwist').value;
+                const type = document.getElementById('vortexShape').value;
+                document.getElementById('vortexTextContainer').style.display = type === 'text' ? 'block' : 'none';
+                scanVortexShape(); generateVortex();
+            }
+        }
+
+        function scanVortexShape() {
+            const scanCanvas = document.getElementById('vortexScanCanvas'); const scanCtx = scanCanvas.getContext('2d');
+            const w = scanCanvas.width; const h = scanCanvas.height; const cx = w/2; const cy = h/2; const r = w/2 - 20;
+            const type = document.getElementById('vortexShape').value; const txt = document.getElementById('vortexChar').value;
+            scanCtx.fillStyle = '#000'; scanCtx.fillRect(0, 0, w, h); scanCtx.fillStyle = '#fff'; scanCtx.strokeStyle = '#fff';
+            scanCtx.lineWidth = 15; scanCtx.textAlign = 'center'; scanCtx.textBaseline = 'middle';
+            scanCtx.save(); scanCtx.beginPath();
+            const drawPoly = (sides) => { const offset = -Math.PI / 2; scanCtx.moveTo(cx + r * Math.cos(offset), cy + r * Math.sin(offset)); for (let i = 1; i <= sides; i++) { scanCtx.lineTo(cx + r * Math.cos(offset + i * 2 * Math.PI / sides), cy + r * Math.sin(offset + i * 2 * Math.PI / sides)); } };
+            const drawStar = (pts) => { let rot = Math.PI / 2 * 3; let step = Math.PI / pts; scanCtx.moveTo(cx, cy - r); for (let i = 0; i < pts; i++) { scanCtx.lineTo(cx + Math.cos(rot) * r, cy + Math.sin(rot) * r); rot += step; scanCtx.lineTo(cx + Math.cos(rot) * (r*0.4), cy + Math.sin(rot) * (r*0.4)); rot += step; } scanCtx.lineTo(cx, cy - r); };
+            if (type === 'custom') { const tableR = parseFloat(document.getElementById('cfgRadius').value); const scaleToFit = r / tableR; scanCtx.beginPath(); vortexSourcePath.forEach((p, i) => { if(p.type === 'break' || p.type === 'cmd') return; const sx = cx + (p.x * scaleToFit); const sy = cy - (p.y * scaleToFit); if(i===0 || vortexSourcePath[i-1].type === 'break') scanCtx.moveTo(sx, sy); else scanCtx.lineTo(sx, sy); }); scanCtx.stroke(); }
+            else if (type === 'text') { scanCtx.font = 'bold 450px Arial'; scanCtx.fillText(txt, cx, cy + 30); } 
+            else if (type === 'triangle') drawPoly(3); else if (type === 'square') drawPoly(4); else if (type === 'pentagon') drawPoly(5); else if (type === 'hexagon') drawPoly(6); else if (type === 'star') drawStar(5);
+            if (type !== 'custom') scanCtx.fill(); scanCtx.restore();
+            const pixels = scanCtx.getImageData(0, 0, w, h).data; const steps = 3600;
+            for (let i = 0; i < steps; i++) { let maxDist = 0; const angle = (i / steps) * Math.PI * 2; const cos = Math.cos(angle); const sin = Math.sin(angle); for (let dist = 0; dist < r; dist += 2) { const x = Math.floor(cx + cos * dist); const y = Math.floor(cy + sin * dist); const idx = (y * w + x) * 4; if (pixels[idx] > 100) maxDist = dist; } vortexState.radiusMap[i] = maxDist / r; }
+        }
+
+        function generateVortex() {
+            const swirlCount = parseInt(document.getElementById('vortexSwirl').value); const scaleFac = parseFloat(document.getElementById('vortexScale').value);
+            const twistDeg = parseFloat(document.getElementById('vortexTwist').value); const tableRadius = parseFloat(document.getElementById('cfgRadius').value);
+            const iterations = 20000; const centerGap = 4; const newPoints = []; newPoints.push({type:'break'});
+            for (let i = 0; i <= iterations; i++) {
+                const t = (i / iterations) * 2 - 1; const progress = Math.abs(t); const spiralAngle = t * swirlCount * Math.PI * 2;
+                const twistRad = (twistDeg * (Math.PI/180)) * swirlCount * Math.abs(t);
+                let lookupAngle = spiralAngle + twistRad; let normAngle = lookupAngle % (Math.PI * 2); if (normAngle < 0) normAngle += Math.PI * 2;
+                const mapIdx = Math.floor((normAngle / (Math.PI * 2)) * 3600) % 3600;
+                let shapeFactor = vortexState.radiusMap[mapIdx]; if(shapeFactor < 0.05) shapeFactor = 0.05; 
+                const maxR = tableRadius * scaleFac; const spiralR = centerGap + (progress * (maxR - centerGap)); const r = spiralR * shapeFactor;
+                let x, y; if (t < 0) { x = r * Math.cos(spiralAngle); y = r * Math.sin(spiralAngle); } else { const flipOffset = Math.PI / 2; x = r * Math.cos(spiralAngle + flipOffset); y = r * Math.sin(spiralAngle + flipOffset); }
+                newPoints.push({x: x, y: y, type:'point'});
+            }
+            newPoints.push({type:'break'}); rawPoints = newPoints; render();
+        }
+
+        // --- LOOP LOGIC & CUSTOM PATH ---
+        function getPathPos(e) {
+            const pathCanvas = document.getElementById('pathCanvas');
+            const rect = pathCanvas.getBoundingClientRect();
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            const scaleP = (rect.width/2) / (tableR * 1.05);
+            
+            const px = e.clientX - rect.left;
+            const py = e.clientY - rect.top;
+            
             return {
-                x: L1 * Math.cos(t1) + L2 * Math.cos(t2),
-                y: L1 * Math.sin(t1) + L2 * Math.sin(t2)
+                x: (px - rect.width/2) / scaleP,
+                y: -(py - rect.height/2) / scaleP
             };
         }
-
-        function drawTrace(cvs, txt) {
-            let ctx = cvs.getContext('2d'), w=cvs.width, h=cvs.height;
-            ctx.clearRect(0,0,w,h);
-            
-            const lines = txt.split('\n');
-            let path = [];
-            let tb=0, te=0; 
-            
-            path.push(getXY(0,0));
-
-            for(let i=0; i<lines.length; i++){
-                let l = lines[i].trim();
-                if(l.length < 1 || l.startsWith('#')) continue;
-
-                let theta, rho;
-
-                if(l.toUpperCase().startsWith('G1')){
-                    let parts = l.substring(3).trim().split(/\s+/);
-                    theta = parseFloat(parts[0]) || 0;
-                    rho = parseFloat(parts[1]) || 0;
-                } else {
-                    let parts = l.split(/\s+/);
-                    if(parts.length < 2) continue;
-                    theta = parseFloat(parts[0]);
-                    rho = parseFloat(parts[1]);
-                }
-
-                if(isNaN(theta) || isNaN(rho)) continue;
-
-                // Step 1: Convert input to target Cartesian space
-                let x = rho * (L1 + L2) * Math.cos(theta);
-                let y = rho * (L1 + L2) * Math.sin(theta);
-                
-                // Step 2: Run proper Single-Solution IK
-                let ik = calculateIK(x, y, tb);
-                let next_b = ik.b;
-                let next_e = ik.e;
-
-                let dist = Math.max(Math.abs(next_b - tb), Math.abs(next_e - te));
-                let stepCount = Math.max(2, Math.ceil(dist / 50)); 
-
-                // Step 3: Interpolate the motor steps to show true arm path
-                for(let k=1; k<=stepCount; k++){
-                    let t = k/stepCount;
-                    let interp_b = tb + (next_b - tb) * t;
-                    let interp_e = te + (next_e - te) * t;
-                    path.push(getXY(interp_b, interp_e));
-                }
-
-                tb = next_b; te = next_e;
-            }
-
-            if(path.length < 2) return;
-
-            // Auto-Scale
-            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
-            for(let p of path){ 
-                if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; 
-                if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y; 
-            }
-            
-            let rangeX = maxX - minX || 1;
-            let rangeY = maxY - minY || 1;
-            let sc = (Math.min(w, h) / Math.max(rangeX, rangeY)) * 0.9;
-            let cx = (minX + maxX) / 2;
-            let cy = (minY + maxY) / 2;
-
-            ctx.beginPath(); 
-            ctx.strokeStyle='#333'; 
-            ctx.lineWidth=1.5;
-            
-            let p0 = path[0];
-            let sx = w/2 - (p0.x-cx)*sc;
-            let sy = h/2 - (p0.y-cy)*-sc;
-            ctx.moveTo(sx, sy);
-
-            for(let i=1; i<path.length; i++){
-                let p = path[i];
-                let px = w/2 - (p.x-cx)*sc;
-                let py = h/2 - (p.y-cy)*-sc;
-                ctx.lineTo(px, py);
-            }
-            ctx.stroke();
-        }
-
-        // --- QUEUE LOGIC ---
-        function toggleQueue(e) {
-            e.stopPropagation();
-            document.getElementById('queue-dropdown').classList.toggle('show');
-        }
-
-        async function removeFromQueue(idx, type) {
-            if(!confirm("Remove from queue?")) return;
-            try {
-                await fetch(`${BASE_URL}/remove_from_queue`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({index: idx, type: type})
-                });
-                updateQ(); 
-            } catch(e) { showStatus("Error removing item"); }
-        }
-
-        window.onclick = function(e) {
-            if(!e.target.closest('.queue-wrapper') && !e.target.closest('.queue-dropdown')) {
-                document.getElementById('queue-dropdown').classList.remove('show');
-            }
-        }
-
-        // --- STANDARD APP LOGIC ---
-        function toggleTheme() {
-            let b = document.body, n = b.getAttribute('data-theme')==='dark'?'light':'dark';
-            b.setAttribute('data-theme', n);
-        }
-
-        function showPopup(text, isError = false) {
-            let p = document.getElementById('sent-popup');
-            p.textContent = text;
-            if(isError) p.classList.add('error'); else p.classList.remove('error');
-            p.classList.add('active');
-            setTimeout(() => { p.classList.remove('active'); }, 1000);
-        }
-
-        function toggleSelect(f, e) {
-            e.stopPropagation();
-            if(selectedFiles.has(f)) selectedFiles.delete(f); else selectedFiles.add(f);
-            renderSel();
-        }
-        function renderSel() {
-            document.querySelectorAll('.card').forEach(c=>{
-                if(selectedFiles.has(c.dataset.name)) c.classList.add('selected'); else c.classList.remove('selected');
-            });
-            let bar=document.getElementById('selection-bar');
-            if(selectedFiles.size>0){ bar.classList.add('active'); document.getElementById('sel-count').textContent=`${selectedFiles.size} Selected`; }
-            else bar.classList.remove('active');
-        }
-
-        async function shuffleLoop() {
-            if(allFiles.length === 0) { showPopup("No designs", true); return; }
-            showPopup("Shuffling...");
-            let shuffled = [...allFiles].sort(() => 0.5 - Math.random());
-            await fetch(`${BASE_URL}/set_loop`, {
-                method:"POST", headers:{"Content-Type":"application/json"},
-                body:JSON.stringify({files:shuffled})
-            });
-            updateQ();
-        }
-
-        async function loopSelected() {
-            let files = Array.from(selectedFiles);
-            if(files.length === 0) return;
-            showPopup("Looping...");
-            await fetch(`${BASE_URL}/set_loop`, {
-                method:"POST", headers:{"Content-Type":"application/json"},
-                body:JSON.stringify({files:files})
-            });
-            selectedFiles.clear(); renderSel(); updateQ();
-        }
-
-        async function cancelLoop() {
-            showPopup("Loop Cancelled");
-            await fetch(`${BASE_URL}/cancel_loop`, {method:"POST"});
-            updateQ();
-        }
-
-        async function deleteSelected() {
-            let toDel = [], protectedCount = 0;
-            for(let f of selectedFiles) {
-                let c = document.querySelector(`.card[data-name="${f}"]`);
-                if(c && c.dataset.hasPng==="true") protectedCount++; else toDel.push(f);
-            }
-            if(!toDel.length) { if(protectedCount) showPopup("Protected!", true); return; }
-            if(!confirm(`Delete ${toDel.length} files?`)) return;
-            showPopup("Deleting...");
-            for(let f of toDel) await fetch(`${BASE_URL}/delete_design`, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filename:f})});
-            selectedFiles.clear(); renderSel(); loadLib();
-        }
-
-        async function copySelected() {
-            let txt = "";
-            showPopup("Copying...");
-            try {
-                for(let f of selectedFiles) {
-                    let r = await fetch(`${BASE_URL}/designs/${f}`);
-                    txt += `; --- ${f} ---\n${await r.text()}\n\n`;
-                }
-            } catch(e) { showPopup("Error", true); return; }
-            
-            const ta = document.createElement("textarea");
-            ta.value = txt; ta.style.position = "fixed"; ta.style.left = "-9999px";
-            document.body.appendChild(ta); ta.focus(); ta.select();
-            try { document.execCommand('copy'); showPopup("Copied!"); selectedFiles.clear(); renderSel(); } 
-            catch (err) { showPopup("Copy Failed", true); }
-            document.body.removeChild(ta);
-        }
-
-        async function runDesign(f) {
-            // Check if table is in cooldown
-            if (isWaiting) {
-                pendingDesign = f;
-                document.getElementById('cooldown-modal').style.display = 'flex';
-                return;
-            }
-            await executeDesign(f);
-        }
-
-        async function cooldownChoice(choice) {
-            document.getElementById('cooldown-modal').style.display = 'none';
-            if (!pendingDesign) return;
-
-            if (choice === 'now') {
-                await fetch(`${BASE_URL}/api/skip_cooldown`, { method: "POST" });
-                await executeDesign(pendingDesign);
-            } else if (choice === 'queue') {
-                await executeDesign(pendingDesign);
-            }
-            pendingDesign = null;
-        }
-
-        async function executeDesign(f) {
-            // Check if table is in cooldown
-            if (isWaiting) {
-                pendingDesign = f;
-                document.getElementById('cooldown-modal').style.display = 'flex';
-                return;
-            }
-
-            // Use cached speed
-            let speed = globalSettings.speed || 1.0;
-            let r=await fetch(`${BASE_URL}/designs/${f}`), txt=await r.text();
-            
-            // Ensure we send raw "theta rho" without G1 prefix as firmware doesn't support it
-            let gcode = txt.split('\n').map(l=>{
-                let trimmed = l.trim();
-                if(trimmed.startsWith('#') || trimmed.startsWith(';') || trimmed === "") return "";
-                
-                if(trimmed.toUpperCase().startsWith('G1')){
-                    let p=trimmed.substring(2).trim().split(/\s+/);
-                    // p[0] is theta, p[1] is rho
-                    return `${p[0]} ${p[1]}`;
-                } 
-                // Just return the raw line (theta rho)
-                return trimmed;
-            }).filter(l => l !== "").join('\n');
-            
-            // Send to backend and WAIT for response
-            let resp = await fetch(`${BASE_URL}/send_gcode_block`, {
-                method:"POST",
-                headers:{"Content-Type":"application/json"},
-                body:JSON.stringify({gcode:gcode, filename:f})
-            });
-            
-            // Check success
-            let data = await resp.json();
-            if(data.success) {
-                showPopup("Sent!");
-                updateQ();
-            } else {
-                showPopup("Error!", true);
-            }
-        }
-
-        function sendCmd(c, popupText) { 
-            if(popupText) showPopup(popupText);
-            fetch(`${BASE_URL}/send`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({command:c})}); 
-        }
-        function pauseDesign() { sendCmd('PAUSE', 'Paused'); }
-        function resumeDesign() { sendCmd('RESUME', 'Resumed'); }
-        function clearQueue() { 
-            if(confirm("Stop all and clear queue?")) {
-                sendCmd('CLEAR', 'Cleared'); 
-                updateQ();
-            }
-        }
-
-        // --- UPDATED QUEUE POLLER ---
-        async function updateQ() {
-            try {
-                let r = await fetch(`${BASE_URL}/status_full`);
-                let d = await r.json();
-                
-                isWaiting = d.is_waiting; // Sync global state
-                
-                let playText = "Select a design";
-                if (d.playing) {
-                    playText = d.is_paused ? `Paused: ${d.playing}` : `Playing: ${d.playing}`;
-                } else if (d.is_waiting) {
-                    playText = `Cooling down...`;
-                }
-                document.getElementById('playing-display').textContent = playText;
-                
-                let qText = "Queue empty";
-                let listHTML = "";
-
-                if(d.queue_items && d.queue_items.length > 0) {
-                    let count = d.queue_count || d.queue_items.length;
-                    qText = `Next: ${d.next_up} (+${count-1})`;
-                    
-                    d.queue_items.forEach(item => {
-                        listHTML += `
-                            <div class="queue-item">
-                                <span>${item.index+1}. ${item.name}</span>
-                                <button class="btn-remove" onclick="removeFromQueue(${item.index}, '${item.type}')">✕</button>
-                            </div>
-                        `;
-                    });
-                } else {
-                    listHTML = `<div class="queue-empty-msg">No items in queue</div>`;
-                }
-
-                document.getElementById('queue-display').textContent = qText;
-                document.getElementById('queue-list').innerHTML = listHTML;
-                document.getElementById('loop-indicator').style.display = d.is_looping ? 'flex' : 'none';
-            } catch(e){}
-        }
-
-        async function loadLib() {
-            let g=document.getElementById('grid'); g.innerHTML='Loading...';
-            let r=await fetch(`${BASE_URL}/api/designs`), files=await r.json();
-            allFiles=files; renderGrid(files.slice(0,15));
-            if(files.length>15) document.getElementById('more-btn').style.display='inline-block';
-        }
-        function showAll() { renderGrid(allFiles); document.getElementById('more-btn').style.display='none'; }
         
-        function renderGrid(fs) {
-            let g=document.getElementById('grid'); g.innerHTML='';
-            fs.forEach(f=>{
-                let d=document.createElement('div'), clean=f.replace('.txt','');
-                d.className='card'; d.dataset.name=f; d.dataset.hasPng="false"; d.dataset.baseTime="0"; 
-                d.onclick=(e)=>{if(e.target.className!=='select-dot')runDesign(f)};
-                d.innerHTML=`<div class="card-img-wrap"><canvas data-f="${f}" width="300" height="300"></canvas><div class="select-dot" onclick="toggleSelect('${f}', event)"></div></div><div class="card-body"><h3 class="card-title">${clean}</h3><div class="card-meta">Est: <span id="t-${clean}">...</span></div></div>`;
-                g.appendChild(d); observer.observe(d.querySelector('canvas'));
-            }); renderSel();
+        function openPathModal() {
+            document.getElementById('pathModal').style.display = 'flex';
+            const pathCanvas = document.getElementById('pathCanvas');
+            const rect = pathCanvas.parentElement.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            pathCanvas.width = rect.width * dpr;
+            pathCanvas.height = rect.height * dpr;
+            const ctxP = pathCanvas.getContext('2d');
+            ctxP.scale(dpr, dpr);
+            renderPathCanvas();
         }
 
-        function formatTimeFromMicroseconds(us) {
-            if(!us) return "...";
-            let seconds = Math.round(us / 1000000);
-            if (seconds < 60) return seconds + "s";
-            return Math.ceil(seconds / 60) + "m";
+        function closePathModal() {
+            document.getElementById('pathModal').style.display = 'none';
         }
 
-        async function updateAllTimes() {
-            let speed = globalSettings.speed || 1.0;
-
-            document.querySelectorAll('.card').forEach(card => {
-                let base = parseFloat(card.dataset.baseTime);
-                if(base > 0) {
-                    let span = document.getElementById(`t-${card.dataset.name.replace('.txt','')}`);
-                    if(span) span.textContent = formatTimeFromMicroseconds(base * speed);
-                }
-            });
+        function clearPathCanvas() {
+            pathRawPoints = [];
+            renderPathCanvas();
         }
 
-        function loadPreview(cvs, f) {
-            let clean = f.replace('.txt','');
-            let card = cvs.closest('.card');
-            
-            fetch(`${BASE_URL}/designs/${f}`).then(r => r.text()).then(async t => {
-                let tm = 0;
-                let lines = t.split('\n');
-                
-                for(let l of lines) {
-                    let trimmed = l.trim();
-                    if(trimmed === "" || trimmed.startsWith('#')) continue;
-                    
-                    if(trimmed.toUpperCase().startsWith('G1')){
-                        let m = trimmed.match(/^G1\s+(\-?\d+\.?\d*)\s+(\-?\d+\.?\d*)\s+(\d+)/i);
-                        if(m) tm += Math.max(Math.abs(parseFloat(m[1])), Math.abs(parseFloat(m[2]))) * parseInt(m[3]);
-                    } else {
-                        tm += 20000; 
+        function startDrawPath(e) {
+            e.preventDefault();
+            isDrawingPath = true;
+            pathRawPoints = [];
+            document.getElementById('pathCanvas').setPointerCapture(e.pointerId);
+            pathRawPoints.push(getPathPos(e));
+            renderPathCanvas();
+        }
+
+        function moveDrawPath(e) {
+            e.preventDefault();
+            if(!isDrawingPath) return;
+            pathRawPoints.push(getPathPos(e));
+            renderPathCanvas();
+        }
+
+        function endDrawPath(e) {
+            if(!isDrawingPath) return;
+            isDrawingPath = false;
+            document.getElementById('pathCanvas').releasePointerCapture(e.pointerId);
+        }
+
+        function savePathCanvas() {
+            if(pathRawPoints.length > 1) {
+                let totalDist = 0;
+                let processed = [{...pathRawPoints[0], d: 0}];
+                for(let i=1; i<pathRawPoints.length; i++) {
+                    let d = Math.hypot(pathRawPoints[i].x - pathRawPoints[i-1].x, pathRawPoints[i].y - pathRawPoints[i-1].y);
+                    if(d > 0.1) {
+                        totalDist += d;
+                        processed.push({...pathRawPoints[i], d: totalDist});
                     }
                 }
-
-                card.dataset.baseTime = tm;
-                
-                let speed = globalSettings.speed || 1.0;
-                document.getElementById(`t-${clean}`).textContent = formatTimeFromMicroseconds(tm * speed);
-
-                let img = new Image();
-                img.src = `${BASE_URL}/designs/${clean}.png`;
-                img.onload = () => { 
-                    cvs.getContext('2d').drawImage(img,0,0,300,300); 
-                    card.dataset.hasPng="true"; 
-                };
-                img.onerror = () => { 
-                    drawTrace(cvs, t); 
-                };
-            });
+                if (totalDist > 0) {
+                    processed.forEach(p => p.t = p.d / totalDist);
+                    customPathPoints = processed;
+                }
+            }
+            closePathModal();
+            document.getElementById('loopGuidePath').value = 'custom';
+            updateLoopParams();
         }
 
-        function openNav() { document.getElementById('mySidebar').style.width="250px"; document.getElementById('overlay').style.display="block"; }
-        function closeNav() { document.getElementById('mySidebar').style.width="0"; document.getElementById('overlay').style.display="none"; }
+        function renderPathCanvas() {
+            const pathCanvas = document.getElementById('pathCanvas');
+            const ctxP = pathCanvas.getContext('2d');
+            const rect = pathCanvas.parentElement.getBoundingClientRect();
+            ctxP.clearRect(0, 0, rect.width, rect.height);
+            
+            // Draw background table edge guide
+            ctxP.beginPath();
+            ctxP.arc(rect.width/2, rect.height/2, rect.width/2 - 4, 0, Math.PI*2);
+            ctxP.lineWidth = 4;
+            ctxP.strokeStyle = "black";
+            ctxP.stroke();
+            
+            if(pathRawPoints.length > 0) {
+                const tableR = parseFloat(document.getElementById('cfgRadius').value);
+                const scaleP = (rect.width/2) / (tableR * 1.05);
+                
+                ctxP.beginPath();
+                ctxP.strokeStyle = "var(--accent)";
+                ctxP.lineWidth = 4;
+                ctxP.lineCap = "round";
+                ctxP.lineJoin = "round";
+                
+                pathRawPoints.forEach((p, i) => {
+                    let px = rect.width/2 + p.x * scaleP;
+                    let py = rect.height/2 - p.y * scaleP;
+                    if(i===0) ctxP.moveTo(px, py);
+                    else ctxP.lineTo(px, py);
+                });
+                ctxP.stroke();
+            }
+        }
 
-        loadLib(); updateQ(); setInterval(updateQ, 3000);
+        function getLoopPathPoint(t) {
+            let pathType = document.getElementById('loopGuidePath').value;
+            if (pathType === 'circle') {
+                return { x: 75 * Math.cos(t * Math.PI * 2), y: 75 * Math.sin(t * Math.PI * 2) };
+            } else if (pathType === 'square') {
+                let d = (t % 1) * 4;
+                let side = Math.floor(d);
+                let frac = d - side;
+                let x, y;
+                if (side === 0) { x = -75 + 150 * frac; y = -75; }
+                else if (side === 1) { x = 75; y = -75 + 150 * frac; }
+                else if (side === 2) { x = 75 - 150 * frac; y = 75; }
+                else { x = -75; y = 75 - 150 * frac; }
+                return { x, y };
+            } else if (pathType === 'figure8') {
+                let ang = t * Math.PI * 2;
+                return { x: 100 * Math.sin(ang), y: 100 * Math.sin(ang) * Math.cos(ang) };
+            } else if (pathType === 'custom') {
+                if (customPathPoints.length === 0) {
+                    // Fallback if they pick custom but haven't drawn anything
+                    return { x: 75 * Math.cos(t * Math.PI * 2), y: 75 * Math.sin(t * Math.PI * 2) };
+                }
+                let normT = t % 1;
+                for (let i = 0; i < customPathPoints.length - 1; i++) {
+                    if (normT >= customPathPoints[i].t && normT <= customPathPoints[i+1].t) {
+                        let p1 = customPathPoints[i];
+                        let p2 = customPathPoints[i+1];
+                        let range = p2.t - p1.t;
+                        let frac = range === 0 ? 0 : (normT - p1.t) / range;
+                        return {
+                            x: p1.x + (p2.x - p1.x) * frac,
+                            y: p1.y + (p2.y - p1.y) * frac
+                        };
+                    }
+                }
+                return { x: customPathPoints[customPathPoints.length-1].x, y: customPathPoints[customPathPoints.length-1].y };
+            }
+            return {x:0, y:0};
+        }
+
+        function updateLoopParams() {
+            if(currentTool === 'loop') {
+                document.getElementById('val-loop-iter').innerText = document.getElementById('loopIter').value;
+                document.getElementById('val-loop-angle').innerText = document.getElementById('loopAngle').value;
+                document.getElementById('val-loop-spin').innerText = document.getElementById('loopSpin').value;
+                document.getElementById('val-loop-scale').innerText = document.getElementById('loopScale').value;
+                document.getElementById('val-loop-osc').innerText = document.getElementById('loopOsc').value;
+
+                const type = document.getElementById('loopShape').value;
+                
+                if (type !== 'custom') {
+                    let pts = []; const r = 50; 
+                    const ox = 0; 
+                    if(type==='circle') { for(let i=0; i<=36; i++) { const a = (i/36)*Math.PI*2; pts.push({x: ox + Math.cos(a)*r, y: Math.sin(a)*r, type:'point'}); } } 
+                    else if(type==='square') { pts = [{x:ox-r,y:-r,type:'point'}, {x:ox+r,y:-r,type:'point'}, {x:ox+r,y:r,type:'point'}, {x:ox-r,y:r,type:'point'}, {x:ox-r,y:-r,type:'point'}]; } 
+                    else if(type==='triangle') { pts = [{x:ox,y:r,type:'point'}, {x:ox+r*0.86,y:-r/2,type:'point'}, {x:ox-r*0.86,y:-r/2,type:'point'}, {x:ox,y:r,type:'point'}]; } 
+                    else if(type==='hexagon') { for(let i=0; i<=6; i++) { const a = (i/6)*Math.PI*2; pts.push({x: ox + Math.cos(a)*r, y: Math.sin(a)*r, type:'point'}); } } 
+                    else if(type==='pentagon') { for(let i=0; i<=5; i++) { const a = (i/5)*Math.PI*2 - Math.PI/2; pts.push({x: ox + Math.cos(a)*r, y: Math.sin(a)*r, type:'point'}); } } 
+                    else if(type==='star') { for(let i=0; i<=10; i++) { const a = (i/10)*Math.PI*2 + Math.PI/2; const rad = (i%2===0) ? r : r*0.4; pts.push({x: ox + Math.cos(a)*rad, y: Math.sin(a)*rad, type:'point'}); } }
+                    loopSourcePath = pts;
+                }
+                
+                // if they picked custom path but array is empty, trigger modal
+                if(document.getElementById('loopGuidePath').value === 'custom' && customPathPoints.length === 0) {
+                    openPathModal();
+                    return;
+                }
+
+                generateLoop();
+            }
+        }
+
+        function generateLoop() {
+            const iterations = parseInt(document.getElementById('loopIter').value);
+            const angleStepDeg = parseFloat(document.getElementById('loopAngle').value);
+            const spinStepDeg = parseFloat(document.getElementById('loopSpin').value);
+            const scaleFac = parseFloat(document.getElementById('loopScale').value);
+            const oscRate = parseFloat(document.getElementById('loopOsc').value);
+            const stretchMode = document.getElementById('loopStretchMode').checked;
+
+            let newPoints = [];
+            newPoints.push({type: 'break'});
+
+            const pointsOnly = loopSourcePath.filter(p => p.type === 'point');
+            const numPts = pointsOnly.length;
+            if(numPts === 0) return;
+            
+            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+            pointsOnly.forEach(p => { 
+                minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x); 
+                minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y); 
+            });
+            let cx = (minX+maxX)/2; let cy = (minY+maxY)/2;
+
+            for(let i=0; i<iterations; i++) {
+                let ptIdx = 0;
+                
+                loopSourcePath.forEach((p, idx) => {
+                    if(p.type === 'break' || p.type === 'cmd') {
+                        if (!stretchMode) {
+                            if (idx !== 0 && idx !== loopSourcePath.length - 1) {
+                                newPoints.push({...p});
+                            }
+                        }
+                    } else {
+                        let shapeProgress = stretchMode ? (numPts > 1 ? ptIdx / (numPts - 1) : 0) : 0;
+                        let effectiveIter = i + shapeProgress;
+                        
+                        const currentAngle = effectiveIter * angleStepDeg * (Math.PI / 180);
+                        const currentSpin = effectiveIter * spinStepDeg * (Math.PI / 180);
+                        
+                        let oscScale = 1.0;
+                        if (oscRate > 0) {
+                            const freq = oscRate * 0.1;
+                            oscScale = 1.0 + 0.4 * Math.sin(effectiveIter * freq);
+                        }
+                        const currentScale = scaleFac * oscScale;
+
+                        let dx = p.x - cx;
+                        let dy = p.y - cy;
+                        let spun_x = cx + dx * Math.cos(currentSpin) - dy * Math.sin(currentSpin);
+                        let spun_y = cy + dx * Math.sin(currentSpin) + dy * Math.cos(currentSpin);
+
+                        let sx = spun_x * currentScale;
+                        let sy = spun_y * currentScale;
+                        
+                        let rx = sx * Math.cos(currentAngle) - sy * Math.sin(currentAngle);
+                        let ry = sx * Math.sin(currentAngle) + sy * Math.cos(currentAngle);
+                        
+                        let pathT = effectiveIter / iterations;
+                        let pathPt = getLoopPathPoint(pathT);
+                        
+                        newPoints.push({x: rx + pathPt.x + loopPathOffset.x, y: ry + pathPt.y + loopPathOffset.y, type: 'point'});
+                        ptIdx++;
+                    }
+                });
+                
+                if (!stretchMode && i < iterations - 1) {
+                    newPoints.push({type: 'break'});
+                }
+            }
+            
+            newPoints.push({type: 'break'});
+            rawPoints = newPoints;
+            render();
+        }
+
+        // --- EXTRACTED TRACE LOGIC ---
+        function calculateSpiralTrace(imgData, thresh, density, ballSizeMm, tableR) {
+            const pixelBallSize = (ballSizeMm / (tableR * 2)) * 800;
+            const SIZE = 800; const CENTER = SIZE / 2;
+            let pixelGrid = new Uint8Array(SIZE*SIZE); 
+            for(let i=0; i<SIZE*SIZE; i++) { pixelGrid[i] = imgData.data[i*4] < thresh ? 1 : 0; }
+            
+            let contours = []; const traced = new Uint8Array(SIZE*SIZE).fill(0);
+            
+            const traceBoundary = (sx, sy) => {
+                const path = []; let cx = sx, cy = sy; let bx = sx-1, by = sy; let max = SIZE*10;
+                let lastAddedX = -10, lastAddedY = -10;
+
+                do {
+                    if (Math.hypot(cx - lastAddedX, cy - lastAddedY) > 1.5) {
+                        path.push({x:cx, y:cy});
+                        lastAddedX = cx; lastAddedY = cy;
+                    }
+                    traced[cy*SIZE+cx] = 1;
+                    const n = [{x:-1,y:0},{x:-1,y:-1},{x:0,y:-1},{x:1,y:-1},{x:1,y:0},{x:1,y:1},{x:0,y:1},{x:-1,y:1}];
+                    let startIdx = 0; for(let i=0; i<8; i++) if(bx===cx+n[i].x && by===cy+n[i].y) startIdx=(i+1)%8;
+                    let found = false;
+                    for(let i=0; i<8; i++) {
+                        const idx = (startIdx + i)%8; const nx = cx + n[idx].x; const ny = cy + n[idx].y;
+                        if(nx>=0 && nx<SIZE && ny>=0 && ny<SIZE && pixelGrid[ny*SIZE+nx]===1) { bx=cx; by=cy; cx=nx; cy=ny; found=true; break; } else { bx=nx; by=ny; }
+                    }
+                    if(!found) break; max--;
+                } while((cx!==sx || cy!==sy) && max>0);
+                return path;
+            };
+
+            for(let y=1; y<SIZE-1; y++) { 
+                for(let x=1; x<SIZE-1; x++) { 
+                    const idx = y*SIZE + x; 
+                    if(pixelGrid[idx] === 1 && pixelGrid[idx-1] === 0 && traced[idx] === 0) { 
+                        const pth = traceBoundary(x, y); 
+                        if(pth.length > 40) { 
+                            let maxDist = 0; let bestIdx = 0; 
+                            pth.forEach((p, i) => { const dist = Math.hypot(p.x - CENTER, p.y - CENTER); if(dist > maxDist) { maxDist = dist; bestIdx = i; } }); 
+                            const reordered = [...pth.slice(bestIdx), ...pth.slice(0, bestIdx)]; reordered.push(reordered[0]); 
+                            contours.push({ points: reordered, trigger: reordered[0], maxR: maxDist, merged: false }); 
+                        } 
+                    } 
+                } 
+            }
+
+            contours.sort((a, b) => a.maxR - b.maxR);
+
+            let spiral = []; const maxR = SIZE/2 - 5; spiral.push({x: CENTER, y: CENTER});
+            let angle = 0; let r = 0; const angleStep = 0.02; const spacingPx = density * 4.0; 
+            
+            while(r < maxR) { 
+                r = (spacingPx / (2*Math.PI)) * angle; 
+                let x = CENTER + Math.cos(angle)*r; let y = CENTER + Math.sin(angle)*r; 
+                
+                let wiggle = 0; const ix = Math.floor(x), iy = Math.floor(y); 
+                if(ix>=0 && ix<SIZE && iy>=0 && iy<SIZE) { if(pixelGrid[iy*SIZE+ix] === 1) wiggle = Math.sin(angle * 30) * (spacingPx * 0.2); } 
+                x += Math.cos(angle) * wiggle; y += Math.sin(angle) * wiggle; 
+                const sp = {x:x, y:y};
+                spiral.push(sp); 
+
+                const spiralRadius = Math.hypot(sp.x - CENTER, sp.y - CENTER);
+                for (let c of contours) {
+                    if(!c.merged) { 
+                        if (spiralRadius > (c.maxR + (pixelBallSize * 0.4))) {
+                            const contourAngle = Math.atan2(c.trigger.y - CENTER, c.trigger.x - CENTER);
+                            let normAngle = Math.atan2(Math.sin(angle), Math.cos(angle));
+                            
+                            if (Math.abs(normAngle - contourAngle) < 0.05) {
+                                spiral.push(c.trigger);
+                                c.points.forEach((p, i) => { if(i % 2 === 0) spiral.push(p); }); 
+                                spiral.push(c.trigger);
+                                spiral.push(sp);
+                                c.merged = true; 
+                            }
+                        } 
+                    } 
+                }
+                angle += angleStep; 
+            }
+
+            const scaleFac = (tableR * 2) / SIZE;
+            let finalPoints = [];
+            spiral.forEach(p => { let tx = (p.x - 400) * scaleFac; let ty = (400 - p.y) * scaleFac; finalPoints.push({ x: tx, y: ty, type: 'point' }); });
+            return finalPoints;
+        }
+
+        function rasterizeCanvasForTrace() {
+            const size = 800; 
+            const buff = document.getElementById('hiddenTraceBuffer'); 
+            const bCtx = buff.getContext('2d');
+            bCtx.fillStyle = "white"; 
+            bCtx.fillRect(0, 0, size, size); 
+            
+            bCtx.strokeStyle = "black";
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            const ballSizeMm = parseFloat(document.getElementById('cfgBallSize').value);
+            bCtx.lineWidth = (ballSizeMm / (tableR * 2)) * size;
+            bCtx.lineCap = "round";
+            bCtx.lineJoin = "round";
+
+            bCtx.save(); 
+            bCtx.translate(size/2, size/2);
+
+            const sym = parseInt(document.getElementById('symSlider').value);
+            const scaleFac = (size / 2) / tableR;
+
+            let shapes = []; let curShape = []; 
+            rawPoints.forEach(p => { 
+                if(p.type === 'break' || p.type === 'cmd') { 
+                    if(curShape.length > 0) shapes.push(curShape); 
+                    curShape = []; 
+                } else curShape.push(p); 
+            });
+            if(curShape.length > 0) shapes.push(curShape);
+
+            for(let s=0; s<sym; s++) { 
+                const ang = s * (Math.PI*2/sym); 
+                bCtx.save();
+                bCtx.rotate(ang);
+                bCtx.beginPath();
+                shapes.forEach(sh => {
+                    if (sh.length > 0) {
+                        bCtx.moveTo(sh[0].x * scaleFac, -sh[0].y * scaleFac);
+                        for(let i=1; i<sh.length; i++) {
+                            bCtx.lineTo(sh[i].x * scaleFac, -sh[i].y * scaleFac);
+                        }
+                    }
+                });
+                bCtx.stroke();
+                bCtx.restore();
+            }
+            bCtx.restore();
+            
+            return bCtx.getImageData(0,0,size,size);
+        }
+
+        // --- TEXT TOOL LOGIC ---
+        function renderTextToTrace() {
+            const text = document.getElementById('toolTextInput').value;
+            const size = parseInt(document.getElementById('toolTextSize').value);
+            const font = document.getElementById('toolTextFont').value;
+            const density = document.getElementById('textDensityInput').value;
+            document.getElementById('textDensityVal').innerText = density;
+            const buff = document.getElementById('hiddenTraceBuffer'); const bCtx = buff.getContext('2d'); const canvasSize = 800;
+            bCtx.fillStyle = "white"; bCtx.fillRect(0, 0, canvasSize, canvasSize);
+            bCtx.fillStyle = "black"; bCtx.font = `bold ${size}px ${font}`; bCtx.textAlign = "center"; bCtx.textBaseline = "middle";
+            
+            const lines = text.split('\n');
+            const lineHeight = size * 1.1;
+            const totalHeight = lineHeight * (lines.length - 1);
+            const startY = (canvasSize / 2) - (totalHeight / 2);
+
+            lines.forEach((line, i) => {
+                bCtx.fillText(line, canvasSize / 2, startY + (i * lineHeight));
+            });
+
+            traceImgData = bCtx.getImageData(0, 0, canvasSize, canvasSize);
+            const originalDensityInput = document.getElementById('traceDensityInput');
+            const oldVal = originalDensityInput.value;
+            originalDensityInput.value = density;
+            runHighPrecisionTrace();
+            originalDensityInput.value = oldVal;
+        }
+
+        // --- TRACE LOGIC ---
+        function handleTraceClick() {
+            if (traceState.active) {
+                setTool('trace_set');
+            } else {
+                document.getElementById('imgUpload').click();
+            }
+        }
+
+        function handleImageUpload(input) {
+            const file = input.files[0]; if(!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    traceState.active = true; traceState.img = img; traceState.x = 0; traceState.y = 0; traceState.rotation = 0;
+                    const size = 800; const scale = Math.min(size/img.width, size/img.height) * 0.9;
+                    traceState.baseScale = scale; traceState.scale = scale; commitTraceMove(); setTool('trace_set');
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file); input.value = '';
+        }
+
+        function drawTracePreview() {
+            const w = canvas.width / window.devicePixelRatio; const h = canvas.height / window.devicePixelRatio;
+            ctx.clearRect(0, 0, w, h); ctx.filter = 'none';
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            ctx.save(); ctx.translate(origin.x, origin.y); ctx.beginPath(); ctx.arc(0, 0, tableR*scale, 0, Math.PI*2);
+            ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.stroke();
+            const visualScale = (tableR * 2 / 800) * scale; ctx.save(); ctx.scale(visualScale, visualScale);
+            ctx.translate(traceState.x, traceState.y); ctx.rotate(traceState.rotation * Math.PI / 180);
+            const img = traceState.img; const drawW = img.width * traceState.scale; const drawH = img.height * traceState.scale;
+            ctx.filter = 'grayscale(100%) contrast(1000%) invert(1)'; ctx.drawImage(img, -drawW/2, -drawH/2, drawW, drawH);
+            ctx.restore(); ctx.restore(); ctx.filter = 'none';
+        }
+
+        function commitTraceMove() {
+            const size = 800; const buff = document.getElementById('hiddenTraceBuffer'); const bCtx = buff.getContext('2d');
+            bCtx.fillStyle = "white"; bCtx.fillRect(0, 0, size, size); bCtx.save(); bCtx.translate(size/2, size/2);
+            bCtx.translate(traceState.x, traceState.y); bCtx.rotate(traceState.rotation * Math.PI / 180);
+            const drawW = traceState.img.width * traceState.scale; const drawH = traceState.img.height * traceState.scale;
+            bCtx.drawImage(traceState.img, -drawW/2, -drawH/2, drawW, drawH); bCtx.restore();
+            traceImgData = bCtx.getImageData(0,0,size,size); runHighPrecisionTrace();
+        }
+
+        function runHighPrecisionTrace() {
+            if(!traceImgData) return;
+            const thresh = parseInt(document.getElementById('traceThreshInput').value); 
+            const density = parseFloat(document.getElementById('traceDensityInput').value); 
+            const ballSizeMm = parseFloat(document.getElementById('cfgBallSize').value);
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            
+            const generated = calculateSpiralTrace(traceImgData, thresh, density, ballSizeMm, tableR);
+            
+            rawPoints = []; 
+            if(generated.length > 0) rawPoints.push({type:'break'});
+            rawPoints = rawPoints.concat(generated);
+            if(generated.length > 0) rawPoints.push({type:'break'});
+            render();
+        }
+
+        // --- CORE UI & RENDER ---
+        function resizeCanvas() {
+            const container = document.getElementById('canvasContainer'); const size = container.getBoundingClientRect().width; const dpr = window.devicePixelRatio || 1;
+            canvas.width = size * dpr; canvas.height = size * dpr; ctx.scale(dpr, dpr); origin = { x: size/2, y: size/2 };
+            const tableR = parseFloat(document.getElementById('cfgRadius').value); scale = (size/2) / (tableR * 1.05); render();
+        }
+        function saveState() { if(historyStack.length>10) historyStack.shift(); historyStack.push(JSON.stringify(rawPoints)); }
+        function undo() { if(historyStack.length===0) return; rawPoints = JSON.parse(historyStack.pop()); render(); }
+        function clearCanvas() { saveState(); rawPoints = []; traceState.active=false; render(); }
+        
+        function setTool(t) {
+            currentTool = t;
+            const buttons = ['btnDraw', 'btnErase', 'btnSelect', 'btnSandify', 'btnLoop', 'btnTrace', 'btnText'];
+            buttons.forEach(b => {
+                const el = document.getElementById(b);
+                if(el) {
+                    if (t === 'trace_set' && b === 'btnTrace') {
+                        el.className = 'active';
+                    } else {
+                        el.className = (b.toLowerCase().includes(t)) ? 'active' : 'secondary';
+                    }
+                }
+            });
+            
+            if (t !== 'select' && t !== 'sandify' && t !== 'loop') {
+                activeEffectType = null;
+            }
+
+            updateToolSettings();
+            if(t === 'select' && traceState.active) document.getElementById('traceMoveMsg').style.display = 'block';
+            else document.getElementById('traceMoveMsg').style.display = 'none';
+            
+            if(t === 'sandify') { 
+                if(activeEffectType !== 'sandify') {
+                    activeEffectType = 'sandify';
+                    if (rawPoints.length === 0) addShape('random'); 
+                    vortexSourcePath = JSON.parse(JSON.stringify(rawPoints)); 
+                    document.getElementById('vortexShape').value = 'custom'; 
+                }
+                updateVortexParams(); 
+            }
+            if(t === 'loop') { 
+                if(activeEffectType !== 'loop') {
+                    activeEffectType = 'loop';
+                    loopPathOffset = {x: 0, y: 0}; 
+                    if (rawPoints.length === 0) addShape('circle'); 
+                    loopSourcePath = JSON.parse(JSON.stringify(rawPoints)); 
+                    document.getElementById('loopShape').value = 'custom'; 
+                }
+                updateLoopParams(); 
+            }
+            if(t === 'text') renderTextToTrace();
+        }
+
+        function updateToolSettings() {
+            const area = document.getElementById('toolSettingsArea'); const grps = document.querySelectorAll('.tool-setting-group'); grps.forEach(g => g.style.display = 'none');
+            let activeGrp = null;
+            if(currentTool === 'draw') activeGrp = document.getElementById('set-pen');
+            else if(currentTool === 'erase') activeGrp = document.getElementById('set-erase');
+            else if(currentTool === 'text') activeGrp = document.getElementById('set-text');
+            else if(currentTool === 'select') activeGrp = document.getElementById('set-select');
+            else if(currentTool === 'sandify') activeGrp = document.getElementById('set-sandify');
+            else if(currentTool === 'loop') activeGrp = document.getElementById('set-loop');
+            else if(currentTool === 'trace_set') activeGrp = document.getElementById('set-trace');
+            if(activeGrp) { area.style.display = 'block'; activeGrp.style.display = 'block'; } else area.style.display = 'none';
+            eraserRadius = parseInt(document.getElementById('eraserSizeSlider').value); document.getElementById('eraseSizeVal').innerText = eraserRadius + 'px';
+
+            const stylusWrapper = document.getElementById('stylusModeWrapper');
+            if (stylusWrapper) {
+                stylusWrapper.style.display = (currentTool === 'draw' || currentTool === 'erase') ? 'flex' : 'none';
+            }
+        }
+
+        function updateUI() { document.getElementById('symVal').textContent = document.getElementById('symSlider').value + 'x'; render(); }
+        function showToast(msg, type) { const t = document.getElementById('status-toast'); t.textContent = msg; t.className = type; t.style.opacity = 1; setTimeout(()=>t.style.opacity=0, 3000); }
+        function openNav() { document.getElementById("mySidebar").style.width = "250px"; }
+        function closeNav() { document.getElementById("mySidebar").style.width = "0"; }
+        function toggleTheme() { const b = document.body; b.setAttribute('data-theme', b.getAttribute('data-theme')==='dark'?'light':'dark'); render(); }
+        function resetStatus() { generatedGCode = null; processedPoints = []; document.getElementById('statusTxt').innerText = "Drawing Mode"; document.getElementById('progressSlider').value = 100; render(); }
+        
+        function render() {
+            const w = canvas.width / window.devicePixelRatio; const h = canvas.height / window.devicePixelRatio; ctx.clearRect(0, 0, w, h); ctx.filter = 'none';
+            const tableR = parseFloat(document.getElementById('cfgRadius').value); const sym = parseInt(document.getElementById('symSlider').value); const dark = document.body.getAttribute('data-theme') === 'dark'; const prog = parseInt(document.getElementById('progressSlider').value); document.getElementById('progVal').textContent = prog + '%';
+            ctx.save(); ctx.translate(origin.x, origin.y); ctx.beginPath(); ctx.arc(0, 0, tableR*scale, 0, Math.PI*2); ctx.strokeStyle = dark ? '#444' : '#ddd'; ctx.lineWidth = 2; ctx.stroke();
+            const showingFinal = (processedPoints.length > 0); const dataToShow = showingFinal ? processedPoints : rawPoints; const limit = Math.floor(dataToShow.length * (prog/100)); const color = showingFinal ? '#ff0000' : (dark ? 'cyan' : '#007bff'); ctx.lineWidth = 1.5; const loopCount = showingFinal ? 1 : sym;
+            for(let s=0; s<loopCount; s++) {
+                const ang = s * (Math.PI*2/sym); ctx.save(); if(!showingFinal) ctx.rotate(ang); ctx.beginPath(); ctx.strokeStyle = color; let isMove = true;
+                for(let i=0; i<limit; i++) { const p = dataToShow[i]; if(p.type === 'break' || p.type === 'cmd') { isMove = true; continue; } const px = p.x * scale; const py = -p.y * scale; if(isMove) { ctx.moveTo(px, py); isMove = false; } else ctx.lineTo(px, py); }
+                ctx.stroke(); ctx.restore();
+            }
+            if(currentTool === 'select' && rawPoints.length > 0 && !generatedGCode && !traceState.active) { let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity; rawPoints.forEach(p => { if(p.type === 'point') { if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x; if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y; } }); if(minX !== Infinity) { ctx.beginPath(); ctx.rect(minX*scale, -maxY*scale, (maxX-minX)*scale, (maxY-minY)*scale); ctx.strokeStyle = dark ? "white" : "black"; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]); } }
+            ctx.restore();
+        }
+
+        // --- GCODE GENERATION ---
+        async function sendToTable() { if(!generatedGCode) return showToast("Click Generate Path first", "error"); fetch(BASE_URL+'/send_gcode_block', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({gcode:generatedGCode}) }).then(r => r.json()).then(d => showToast(d.success ? "Sent!" : "Error", d.success ? "success" : "error")); }
+        async function saveToServer() { if(!generatedGCode) return showToast("Generate Path first!", "error"); let n = prompt("Enter filename:"); if(n) { if(!n.toLowerCase().endsWith('.txt')) n += ".txt"; fetch(BASE_URL+'/save_design', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({filename:n, gcode:generatedGCode}) }).then(r => r.json()).then(d => showToast(d.success ? "Saved!" : "Failed", d.success ? "success" : "error")); } }
+        function getShortestRotation(raw, last) { let diff = (raw - last) / (2 * Math.PI); let offset = Math.round(diff); return raw - (offset * 2 * Math.PI); }
+        
+        function prepareGCode() {
+            if(rawPoints.length === 0) return showToast("Draw something first!", "error");
+            const tableR = parseFloat(document.getElementById('cfgRadius').value); 
+            const sym = parseInt(document.getElementById('symSlider').value);
+            
+            let shapes = []; 
+            let curShape = []; 
+            let hasHandDrawnLines = false;
+            
+            rawPoints.forEach(p => { 
+                if(p.source === 'draw') hasHandDrawnLines = true;
+                if(p.type === 'break' || p.type === 'cmd') { 
+                    if(curShape.length > 0) shapes.push(curShape); 
+                    curShape = []; 
+                } else curShape.push(p); 
+            });
+            if(curShape.length > 0) shapes.push(curShape);
+
+            // The invisible switch check: use Spiral connect only if they hand-drew 
+            // lines and there are floating (disconnected) shapes detected.
+            const useSpiral = (hasHandDrawnLines && shapes.length > 1);
+
+            if (useSpiral) {
+                const imgData = rasterizeCanvasForTrace();
+                const density = parseFloat(document.getElementById('traceDensityInput').value) || 3.0;
+                const ballSizeMm = parseFloat(document.getElementById('cfgBallSize').value);
+                
+                const pts = calculateSpiralTrace(imgData, 150, density, ballSizeMm, tableR);
+                processedPoints = pts;
+
+                generatedGCode = generateGCodeStringFromProcessed();
+                document.getElementById('statusTxt').innerText = `Path Ready! (Spiral Connected)`;
+                document.getElementById('designPhaseControls').style.display = 'none'; 
+                document.getElementById('productionPhaseControls').style.display = 'block';
+                document.getElementById('simulationArea').style.display = 'block';
+                render();
+                return;
+            }
+
+            let pool = []; 
+            for(let s=0; s<sym; s++) { 
+                const ang = s * (Math.PI*2/sym); 
+                const c = Math.cos(ang), si = Math.sin(ang); 
+                shapes.forEach(sh => { 
+                    pool.push(sh.map(p => ({ x: p.x*c - p.y*si, y: p.x*si + p.y*c, type: 'point' }))); 
+                }); 
+            }
+
+            let sortedShapes = [];
+            if (pool.length > 0) {
+                // Find shape closest to center to start
+                let bestIdx = 0, minDist = Infinity;
+                for(let i=0; i<pool.length; i++) {
+                    let d1 = Math.hypot(pool[i][0].x, pool[i][0].y);
+                    let d2 = Math.hypot(pool[i][pool[i].length-1].x, pool[i][pool[i].length-1].y);
+                    if(d1 < minDist) { minDist = d1; bestIdx = i; }
+                    if(d2 < minDist) { minDist = d2; bestIdx = i; }
+                }
+
+                let startShape = pool[bestIdx];
+                pool.splice(bestIdx, 1);
+
+                // Ensure startShape starts towards inside
+                if(Math.hypot(startShape[0].x, startShape[0].y) > Math.hypot(startShape[startShape.length-1].x, startShape[startShape.length-1].y)) {
+                    startShape.reverse();
+                }
+                sortedShapes.push(startShape);
+
+                let curPos = startShape[startShape.length-1];
+                while(pool.length > 0) {
+                    let bIdx = -1, bDist = Infinity, bRev = false;
+                    for(let i=0; i<pool.length; i++) {
+                        let dS = Math.hypot(curPos.x - pool[i][0].x, curPos.y - pool[i][0].y);
+                        if(dS < bDist) { bDist=dS; bIdx=i; bRev=false; }
+                        let dE = Math.hypot(curPos.x - pool[i][pool[i].length-1].x, curPos.y - pool[i][pool[i].length-1].y);
+                        if(dE < bDist) { bDist=dE; bIdx=i; bRev=true; }
+                    }
+                    let winner = pool[bIdx];
+                    if(bRev) winner.reverse();
+                    sortedShapes.push(winner);
+                    curPos = winner[winner.length-1];
+                    pool.splice(bIdx, 1);
+                }
+            }
+
+            processedPoints = [];
+            if(sortedShapes.length > 0) {
+                for(let i=0; i<sortedShapes.length; i++) {
+                    if(i > 0) {
+                        let next = sortedShapes[i][0];
+                        processedPoints.push({x: next.x, y: next.y, type: 'point'});
+                    }
+                    sortedShapes[i].forEach(p => processedPoints.push(p));
+                }
+            }
+
+            generatedGCode = generateGCodeStringFromProcessed();
+            document.getElementById('statusTxt').innerText = `Path Ready! ${sortedShapes.length} shapes.`;
+            document.getElementById('designPhaseControls').style.display = 'none'; 
+            document.getElementById('productionPhaseControls').style.display = 'block';
+            document.getElementById('simulationArea').style.display = 'block';
+            render();
+        }
+        
+        function returnToEditing() { 
+            processedPoints = []; 
+            document.getElementById('designPhaseControls').style.display = 'block'; 
+            document.getElementById('productionPhaseControls').style.display = 'none'; 
+            document.getElementById('simulationArea').style.display = 'none';
+            resetStatus(); 
+        }
+
+        function generateGCodeStringFromProcessed() {
+            const tableRadius = parseFloat(document.getElementById('cfgRadius').value);
+            let cmds = [];
+            
+            for(let i=0; i<processedPoints.length; i++) {
+                let p = processedPoints[i];
+                if(p.type === 'cmd') continue;
+                
+                let theta = Math.atan2(p.y, p.x);
+                let rho = Math.hypot(p.x, p.y) / tableRadius;
+                
+                if (rho > 1.0) rho = 1.0;
+                
+                cmds.push(`${theta.toFixed(4)} ${rho.toFixed(4)}`);
+            }
+            return cmds.join('\n');
+        }
+
+        function copyGCode() { if(generatedGCode) navigator.clipboard.writeText(generatedGCode).then(() => showToast("Copied!", "success")); }
+        init();
     </script>
 </body>
 </html>
