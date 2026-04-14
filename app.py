@@ -418,21 +418,15 @@ def stop_tunnel():
 
 # === AUTO-START NGROK (RUNS IN THREAD) ===
 def auto_start_ngrok_thread():
-    log_message("Waiting for network connection to start Ngrok...")
+    # Wait 15 seconds in the background to let the main server and WiFi boot completely
+    time.sleep(15)
+    log_message("Checking network connection for Ngrok auto-start...")
     
-    # Wait up to 60 seconds for an active internet connection
-    internet_connected = False
-    for _ in range(30):
-        try:
-            # Check for actual internet access by testing a reliable external connection
-            socket.create_connection(("8.8.8.8", 53), timeout=2)
-            internet_connected = True
-            break
-        except OSError:
-            time.sleep(2)
-            
-    if not internet_connected:
-        log_message("No internet/WiFi detected. Skipping Ngrok auto-start.")
+    try:
+        # Try exactly once to reach an external server
+        socket.create_connection(("8.8.8.8", 53), timeout=3)
+    except OSError:
+        log_message("No internet/WiFi detected on first check. Skipping Ngrok auto-start.")
         return
 
     try:
