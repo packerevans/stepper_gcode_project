@@ -175,7 +175,6 @@
 
     <div id="sent-popup">SENT!</div>
 
-    <!-- Cooldown Modal -->
     <div id="cooldown-modal" class="overlay" style="display:none; justify-content: center; align-items: center; z-index: 3000;">
         <div style="background: var(--color-surface); padding: 30px; border-radius: var(--radius); box-shadow: var(--shadow-float); max-width: 400px; width: 90%; text-align: center;">
             <h2 style="margin-top: 0;">Table in Cooldown</h2>
@@ -272,6 +271,27 @@
         // SCARA Constants
         const L1=101.3, L2=101.3, R=9/8, S_RAD=(3200/360)*(180/Math.PI);
 
+        function getShortestRotation(raw, last) {
+            let diff = (raw - last) / (2 * Math.PI);
+            return raw - (Math.round(diff) * 2 * Math.PI);
+        }
+
+        function calculateIK(x, y, lastBaseSteps) {
+            let dist = Math.hypot(x, y);
+            const maxReach = L1 + L2;
+            if (dist > maxReach) { x = (x / dist) * maxReach; y = (y / dist) * maxReach; dist = maxReach; }
+            if (dist < 1.0) return { b: 0, e: -Math.PI * S_RAD };
+
+            const lastT1 = -lastBaseSteps / S_RAD; 
+            let cosBend = Math.max(-1, Math.min(1, (dist*dist - L1*L1 - L2*L2) / (2 * L1 * L2)));
+            const bend = Math.acos(cosBend);
+            const k1 = L1 + L2 * Math.cos(bend), k2 = L2 * Math.sin(bend);
+            let t1 = Math.atan2(y, x) - Math.atan2(k2, k1);
+            t1 = getShortestRotation(t1, lastT1);
+
+            return { b: -t1 * S_RAD, e: -(bend + R * t1) * S_RAD };
+        }
+
         function getXY(b, e) {
             let t1 = -b / S_RAD;
             let tb = -e / S_RAD - (R * t1); 
@@ -288,10 +308,8 @@
             
             const lines = txt.split('\n');
             let path = [];
-            let curTheta=0, curRho=0;
-            let tb=0, te=0; // Stepper positions for IK
+            let tb=0, te=0; 
             
-            // Initial position at center
             path.push(getXY(0,0));
 
             for(let i=0; i<lines.length; i++){
@@ -305,7 +323,6 @@
                     theta = parseFloat(parts[0]) || 0;
                     rho = parseFloat(parts[1]) || 0;
                 } else {
-                    // New "theta rho" format
                     let parts = l.split(/\s+/);
                     if(parts.length < 2) continue;
                     theta = parseFloat(parts[0]);
@@ -314,18 +331,19 @@
 
                 if(isNaN(theta) || isNaN(rho)) continue;
 
-                // For preview, we still use the IK math to show the SCARA arm path
-                // We need to convert Theta/Rho to the stepper steps the IK expects
-                // Or simplify: just show the polar plot. 
-                // Let's stick to the IK preview since it shows the actual 'sand' path.
+                // Step 1: Convert input to target Cartesian space
+                let x = rho * (L1 + L2) * Math.cos(theta);
+                let y = rho * (L1 + L2) * Math.sin(theta);
                 
-                // Approximate "steps" for the previewer's IK function
-                let next_b = -theta * S_RAD; 
-                let next_e = -rho * S_RAD; // This is a simplification for the preview
+                // Step 2: Run proper Single-Solution IK
+                let ik = calculateIK(x, y, tb);
+                let next_b = ik.b;
+                let next_e = ik.e;
 
                 let dist = Math.max(Math.abs(next_b - tb), Math.abs(next_e - te));
                 let stepCount = Math.max(2, Math.ceil(dist / 50)); 
 
+                // Step 3: Interpolate the motor steps to show true arm path
                 for(let k=1; k<=stepCount; k++){
                     let t = k/stepCount;
                     let interp_b = tb + (next_b - tb) * t;
