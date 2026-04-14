@@ -280,8 +280,34 @@
                         <input type="range" id="vortexScale" min="0.1" max="2.0" step="0.05" value="1.0" oninput="updateVortexParams()">
                         <span class="tool-label">Twist Angle: <span id="val-twist">5</span></span>
                         <input type="range" id="vortexTwist" min="-45" max="45" step="0.5" value="5" oninput="updateVortexParams()">
-                        <span class="tool-label">Shift Center (Left/Right): <span id="val-shift">0</span></span>
-                        <input type="range" id="vortexShift" min="-150" max="150" step="1" value="0" oninput="updateVortexParams()">
+                    </div>
+
+                    <div id="set-loop" class="tool-setting-group">
+                        <span class="tool-label" style="color:var(--accent); font-weight:bold;">Continuous Loop</span>
+                        <label class="tool-label">Shape Source</label>
+                        <select id="loopShape" class="full-width" onchange="updateLoopParams()">
+                            <option value="custom">Current Drawing</option>
+                            <option value="triangle">Triangle</option>
+                            <option value="square">Square</option>
+                            <option value="pentagon">Pentagon</option>
+                            <option value="hexagon">Hexagon</option>
+                            <option value="star">Star</option>
+                            <option value="text">Letter / Symbol</option>
+                        </select>
+                        <div id="loopTextContainer" style="display:none; margin-top:5px;">
+                             <input type="text" id="loopChar" maxlength="1" value="S" style="text-align:center; font-weight:bold; width:100%;" oninput="updateLoopParams()">
+                        </div>
+                        <span class="tool-label" style="margin-top:10px;">Iterations: <span id="val-loop-iter">50</span></span>
+                        <input type="range" id="loopIter" min="1" max="200" step="1" value="50" oninput="updateLoopParams()">
+                        
+                        <span class="tool-label">Rotation Step (°): <span id="val-loop-angle">5</span></span>
+                        <input type="range" id="loopAngle" min="0" max="180" step="1" value="5" oninput="updateLoopParams()">
+                        
+                        <span class="tool-label">Base Zoom: <span id="val-loop-scale">1.0</span></span>
+                        <input type="range" id="loopScale" min="0.1" max="2.0" step="0.05" value="1.0" oninput="updateLoopParams()">
+
+                        <span class="tool-label">Shrink/Grow Rate: <span id="val-loop-osc">0</span></span>
+                        <input type="range" id="loopOsc" min="0" max="20" step="1" value="0" oninput="updateLoopParams()">
                     </div>
                     
                     <div id="set-trace" class="tool-setting-group">
@@ -303,6 +329,7 @@
                 <div class="btn-group">
                     <button id="btnSelect" onclick="setTool('select')" class="secondary">✋ Move</button>
                     <button id="btnSandify" onclick="setTool('sandify')" class="secondary">🌀 Vortex</button>
+                    <button id="btnLoop" onclick="setTool('loop')" class="secondary">🔁 Loop</button>
                 </div>
 
                 <div class="btn-group">
@@ -391,8 +418,11 @@
         let lastRotVal = 0;
         let lastScaleVal = 100;
 
-        const vortexState = { radiusMap: new Float32Array(720) };
+        const vortexState = { radiusMap: new Float32Array(3600) };
         let vortexSourcePath = [];
+
+        const loopState = { radiusMap: new Float32Array(3600) };
+        let loopSourcePath = [];
 
         const canvas = document.getElementById('drawCanvas');
         const ctx = canvas.getContext('2d');
@@ -477,14 +507,14 @@
             e.preventDefault();
             if(generatedGCode) return;
             const smart = document.getElementById('stylusMode').checked;
-            if(smart && currentTool !== 'select' && currentTool !== 'sandify') {
+            if(smart && currentTool !== 'select' && currentTool !== 'sandify' && currentTool !== 'loop') {
                 if(e.pointerType === 'pen') setTool('draw');
                 else if(e.pointerType === 'touch') setTool('erase');
             }
             if(currentTool === 'select') {
                 isDrawing = true; dragStart = getPos(e); canvas.setPointerCapture(e.pointerId); return;
             }
-            if(currentTool === 'sandify' || currentTool === 'trace_set' || currentTool === 'text') return;
+            if(currentTool === 'sandify' || currentTool === 'loop' || currentTool === 'trace_set' || currentTool === 'text') return;
             saveState(); isDrawing = true; canvas.setPointerCapture(e.pointerId); processPointer(e); resetStatus();
         }
 
@@ -615,7 +645,6 @@
                 document.getElementById('val-swirl').innerText = document.getElementById('vortexSwirl').value;
                 document.getElementById('val-scale').innerText = document.getElementById('vortexScale').value;
                 document.getElementById('val-twist').innerText = document.getElementById('vortexTwist').value;
-                document.getElementById('val-shift').innerText = document.getElementById('vortexShift').value;
                 const type = document.getElementById('vortexShape').value;
                 document.getElementById('vortexTextContainer').style.display = type === 'text' ? 'block' : 'none';
                 scanVortexShape(); generateVortex();
@@ -626,35 +655,136 @@
             const scanCanvas = document.getElementById('vortexScanCanvas'); const scanCtx = scanCanvas.getContext('2d');
             const w = scanCanvas.width; const h = scanCanvas.height; const cx = w/2; const cy = h/2; const r = w/2 - 20;
             const type = document.getElementById('vortexShape').value; const txt = document.getElementById('vortexChar').value;
-            const shiftX = parseFloat(document.getElementById('vortexShift').value);
             scanCtx.fillStyle = '#000'; scanCtx.fillRect(0, 0, w, h); scanCtx.fillStyle = '#fff'; scanCtx.strokeStyle = '#fff';
             scanCtx.lineWidth = 15; scanCtx.textAlign = 'center'; scanCtx.textBaseline = 'middle';
-            scanCtx.save(); scanCtx.translate(-shiftX, 0); scanCtx.beginPath();
+            scanCtx.save(); scanCtx.beginPath();
             const drawPoly = (sides) => { const offset = -Math.PI / 2; scanCtx.moveTo(cx + r * Math.cos(offset), cy + r * Math.sin(offset)); for (let i = 1; i <= sides; i++) { scanCtx.lineTo(cx + r * Math.cos(offset + i * 2 * Math.PI / sides), cy + r * Math.sin(offset + i * 2 * Math.PI / sides)); } };
             const drawStar = (pts) => { let rot = Math.PI / 2 * 3; let step = Math.PI / pts; scanCtx.moveTo(cx, cy - r); for (let i = 0; i < pts; i++) { scanCtx.lineTo(cx + Math.cos(rot) * r, cy + Math.sin(rot) * r); rot += step; scanCtx.lineTo(cx + Math.cos(rot) * (r*0.4), cy + Math.sin(rot) * (r*0.4)); rot += step; } scanCtx.lineTo(cx, cy - r); };
             if (type === 'custom') { const tableR = parseFloat(document.getElementById('cfgRadius').value); const scaleToFit = r / tableR; scanCtx.beginPath(); vortexSourcePath.forEach((p, i) => { if(p.type === 'break' || p.type === 'cmd') return; const sx = cx + (p.x * scaleToFit); const sy = cy - (p.y * scaleToFit); if(i===0 || vortexSourcePath[i-1].type === 'break') scanCtx.moveTo(sx, sy); else scanCtx.lineTo(sx, sy); }); scanCtx.stroke(); }
             else if (type === 'text') { scanCtx.font = 'bold 450px Arial'; scanCtx.fillText(txt, cx, cy + 30); } 
             else if (type === 'triangle') drawPoly(3); else if (type === 'square') drawPoly(4); else if (type === 'pentagon') drawPoly(5); else if (type === 'hexagon') drawPoly(6); else if (type === 'star') drawStar(5);
             if (type !== 'custom') scanCtx.fill(); scanCtx.restore();
-            const pixels = scanCtx.getImageData(0, 0, w, h).data; const steps = 720;
+            const pixels = scanCtx.getImageData(0, 0, w, h).data; const steps = 3600;
             for (let i = 0; i < steps; i++) { let maxDist = 0; const angle = (i / steps) * Math.PI * 2; const cos = Math.cos(angle); const sin = Math.sin(angle); for (let dist = 0; dist < r; dist += 2) { const x = Math.floor(cx + cos * dist); const y = Math.floor(cy + sin * dist); const idx = (y * w + x) * 4; if (pixels[idx] > 100) maxDist = dist; } vortexState.radiusMap[i] = maxDist / r; }
         }
 
         function generateVortex() {
             const swirlCount = parseInt(document.getElementById('vortexSwirl').value); const scaleFac = parseFloat(document.getElementById('vortexScale').value);
             const twistDeg = parseFloat(document.getElementById('vortexTwist').value); const tableRadius = parseFloat(document.getElementById('cfgRadius').value);
-            const iterations = 10000; const centerGap = 4; const newPoints = []; newPoints.push({type:'break'});
+            const iterations = 20000; const centerGap = 4; const newPoints = []; newPoints.push({type:'break'});
             for (let i = 0; i <= iterations; i++) {
                 const t = (i / iterations) * 2 - 1; const progress = Math.abs(t); const spiralAngle = t * swirlCount * Math.PI * 2;
                 const twistRad = (twistDeg * (Math.PI/180)) * swirlCount * Math.abs(t);
                 let lookupAngle = spiralAngle + twistRad; let normAngle = lookupAngle % (Math.PI * 2); if (normAngle < 0) normAngle += Math.PI * 2;
-                const mapIdx = Math.floor((normAngle / (Math.PI * 2)) * 720) % 720;
+                const mapIdx = Math.floor((normAngle / (Math.PI * 2)) * 3600) % 3600;
                 let shapeFactor = vortexState.radiusMap[mapIdx]; if(shapeFactor < 0.05) shapeFactor = 0.05; 
                 const maxR = tableRadius * scaleFac; const spiralR = centerGap + (progress * (maxR - centerGap)); const r = spiralR * shapeFactor;
                 let x, y; if (t < 0) { x = r * Math.cos(spiralAngle); y = r * Math.sin(spiralAngle); } else { const flipOffset = Math.PI / 2; x = r * Math.cos(spiralAngle + flipOffset); y = r * Math.sin(spiralAngle + flipOffset); }
                 newPoints.push({x: x, y: y, type:'point'});
             }
             newPoints.push({type:'break'}); rawPoints = newPoints; render();
+        }
+
+        // --- LOOP LOGIC ---
+        function updateLoopParams() {
+            if(currentTool === 'loop') {
+                document.getElementById('val-loop-iter').innerText = document.getElementById('loopIter').value;
+                document.getElementById('val-loop-angle').innerText = document.getElementById('loopAngle').value;
+                document.getElementById('val-loop-scale').innerText = document.getElementById('loopScale').value;
+                document.getElementById('val-loop-osc').innerText = document.getElementById('loopOsc').value;
+                const type = document.getElementById('loopShape').value;
+                document.getElementById('loopTextContainer').style.display = type === 'text' ? 'block' : 'none';
+                scanLoopShape(); 
+                generateLoop();
+            }
+        }
+
+        function scanLoopShape() {
+            const scanCanvas = document.getElementById('vortexScanCanvas'); 
+            const scanCtx = scanCanvas.getContext('2d');
+            const w = scanCanvas.width; const h = scanCanvas.height; const cx = w/2; const cy = h/2; const r = w/2 - 20;
+            const type = document.getElementById('loopShape').value; const txt = document.getElementById('loopChar').value;
+            
+            scanCtx.fillStyle = '#000'; scanCtx.fillRect(0, 0, w, h); scanCtx.fillStyle = '#fff'; scanCtx.strokeStyle = '#fff';
+            scanCtx.lineWidth = 15; scanCtx.textAlign = 'center'; scanCtx.textBaseline = 'middle';
+            scanCtx.save(); scanCtx.beginPath();
+            
+            const drawPoly = (sides) => { const offset = -Math.PI / 2; scanCtx.moveTo(cx + r * Math.cos(offset), cy + r * Math.sin(offset)); for (let i = 1; i <= sides; i++) { scanCtx.lineTo(cx + r * Math.cos(offset + i * 2 * Math.PI / sides), cy + r * Math.sin(offset + i * 2 * Math.PI / sides)); } };
+            const drawStar = (pts) => { let rot = Math.PI / 2 * 3; let step = Math.PI / pts; scanCtx.moveTo(cx, cy - r); for (let i = 0; i < pts; i++) { scanCtx.lineTo(cx + Math.cos(rot) * r, cy + Math.sin(rot) * r); rot += step; scanCtx.lineTo(cx + Math.cos(rot) * (r*0.4), cy + Math.sin(rot) * (r*0.4)); rot += step; } scanCtx.lineTo(cx, cy - r); };
+            
+            if (type === 'custom') { 
+                const tableR = parseFloat(document.getElementById('cfgRadius').value); 
+                const scaleToFit = r / tableR; 
+                scanCtx.beginPath(); 
+                loopSourcePath.forEach((p, i) => { 
+                    if(p.type === 'break' || p.type === 'cmd') return; 
+                    const sx = cx + (p.x * scaleToFit); 
+                    const sy = cy - (p.y * scaleToFit); 
+                    if(i===0 || loopSourcePath[i-1].type === 'break') scanCtx.moveTo(sx, sy); 
+                    else scanCtx.lineTo(sx, sy); 
+                }); 
+                scanCtx.stroke(); 
+            }
+            else if (type === 'text') { scanCtx.font = 'bold 450px Arial'; scanCtx.fillText(txt, cx, cy + 30); } 
+            else if (type === 'triangle') drawPoly(3); else if (type === 'square') drawPoly(4); else if (type === 'pentagon') drawPoly(5); else if (type === 'hexagon') drawPoly(6); else if (type === 'star') drawStar(5);
+            
+            if (type !== 'custom') scanCtx.fill(); scanCtx.restore();
+            
+            const pixels = scanCtx.getImageData(0, 0, w, h).data; const steps = 3600;
+            for (let i = 0; i < steps; i++) { 
+                let maxDist = 0; const angle = (i / steps) * Math.PI * 2; const cos = Math.cos(angle); const sin = Math.sin(angle); 
+                for (let dist = 0; dist < r; dist += 2) { 
+                    const x = Math.floor(cx + cos * dist); const y = Math.floor(cy + sin * dist); 
+                    const idx = (y * w + x) * 4; 
+                    if (pixels[idx] > 100) maxDist = dist; 
+                } 
+                loopState.radiusMap[i] = maxDist / r; 
+            }
+        }
+
+        function generateLoop() {
+            const iterations = parseInt(document.getElementById('loopIter').value);
+            const angleStepDeg = parseFloat(document.getElementById('loopAngle').value);
+            const scaleFac = parseFloat(document.getElementById('loopScale').value);
+            const oscRate = parseFloat(document.getElementById('loopOsc').value);
+            const tableRadius = parseFloat(document.getElementById('cfgRadius').value);
+            
+            const newPoints = []; newPoints.push({type:'break'});
+            const pointsPerIter = 360; 
+            const totalPoints = iterations * pointsPerIter;
+            const angleStepRad = angleStepDeg * (Math.PI / 180);
+            
+            for(let i=0; i<=totalPoints; i++) {
+                const currentIteration = i / pointsPerIter;
+                const globalAngle = currentIteration * Math.PI * 2;
+                
+                const shapeRotation = currentIteration * angleStepRad;
+                let lookupAngle = globalAngle - shapeRotation;
+                
+                let normAngle = lookupAngle % (Math.PI * 2);
+                if(normAngle < 0) normAngle += Math.PI * 2;
+                
+                const mapIdx = Math.floor((normAngle / (Math.PI * 2)) * 3600) % 3600;
+                let shapeFactor = loopState.radiusMap[mapIdx]; 
+                if(shapeFactor < 0.05) shapeFactor = 0.05;
+                
+                let oscScale = 1.0;
+                if (oscRate > 0) {
+                    const freq = oscRate * 0.5;
+                    oscScale = 1.0 + 0.4 * Math.sin(currentIteration * freq);
+                }
+                
+                const baseRadius = tableRadius * 0.7 * scaleFac; 
+                const r = baseRadius * shapeFactor * oscScale;
+                
+                const x = r * Math.cos(globalAngle);
+                const y = r * Math.sin(globalAngle);
+                
+                newPoints.push({x: x, y: y, type: 'point'});
+            }
+            newPoints.push({type:'break'});
+            rawPoints = newPoints;
+            render();
         }
 
         // --- TEXT TOOL LOGIC ---
@@ -837,7 +967,7 @@
         
         function setTool(t) {
             currentTool = t;
-            const buttons = ['btnDraw', 'btnErase', 'btnSelect', 'btnSandify', 'btnTrace', 'btnText'];
+            const buttons = ['btnDraw', 'btnErase', 'btnSelect', 'btnSandify', 'btnTrace', 'btnText', 'btnLoop'];
             buttons.forEach(b => {
                 const el = document.getElementById(b);
                 if(el) {
@@ -852,6 +982,7 @@
             if(t === 'select' && traceState.active) document.getElementById('traceMoveMsg').style.display = 'block';
             else document.getElementById('traceMoveMsg').style.display = 'none';
             if(t === 'sandify') { if (rawPoints.length === 0) addShape('random'); vortexSourcePath = JSON.parse(JSON.stringify(rawPoints)); document.getElementById('vortexShape').value = 'custom'; updateVortexParams(); }
+            if(t === 'loop') { if (rawPoints.length === 0) addShape('random'); loopSourcePath = JSON.parse(JSON.stringify(rawPoints)); document.getElementById('loopShape').value = 'custom'; updateLoopParams(); }
             if(t === 'text') renderTextToTrace();
         }
 
@@ -863,6 +994,7 @@
             else if(currentTool === 'text') activeGrp = document.getElementById('set-text');
             else if(currentTool === 'select') activeGrp = document.getElementById('set-select');
             else if(currentTool === 'sandify') activeGrp = document.getElementById('set-sandify');
+            else if(currentTool === 'loop') activeGrp = document.getElementById('set-loop');
             else if(currentTool === 'trace_set') activeGrp = document.getElementById('set-trace');
             if(activeGrp) { area.style.display = 'block'; activeGrp.style.display = 'block'; } else area.style.display = 'none';
             eraserRadius = parseInt(document.getElementById('eraserSizeSlider').value); document.getElementById('eraseSizeVal').innerText = eraserRadius + 'px';
