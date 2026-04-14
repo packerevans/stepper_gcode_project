@@ -145,6 +145,18 @@
 
         #hiddenTraceBuffer, #vortexScanCanvas { display: none; }
         select.full-width { width: 100%; padding: 6px; border-radius: 4px; border: 1px solid #ccc; }
+        
+        #pathModal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); z-index: 4000; flex-direction: column;
+            align-items: center; justify-content: center; backdrop-filter: blur(4px);
+        }
+        .modal-canvas-wrap {
+            background: #fff; border-radius: 50%; width: 90vmin; height: 90vmin;
+            max-width: 500px; max-height: 500px; position: relative;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); overflow: hidden;
+            touch-action: none;
+        }
 
     </style>
 </head>
@@ -178,7 +190,7 @@
             <div id="designPhaseControls">
                 <h2>Tools</h2>
                 
-                <div class="toggle-row">
+                <div class="toggle-row" id="stylusModeWrapper">
                     <span style="font-weight:600; font-size:13px;">🖋️ Stylus Mode</span>
                     <label class="switch">
                         <input type="checkbox" id="stylusMode">
@@ -239,8 +251,8 @@
                                 </select>
                             </div>
                         </div>
-                        <span class="tool-label" style="margin-top:10px;">Spiral Spacing: <span id="textDensityVal">1.5</span></span>
-                        <input type="range" min="1" max="3" value="1.5" step="0.1" id="textDensityInput" oninput="renderTextToTrace()">
+                        <span class="tool-label" style="margin-top:10px;">Spiral Spacing: <span id="textDensityVal">3</span></span>
+                        <input type="range" min="1" max="5" value="3" step="0.1" id="textDensityInput" oninput="renderTextToTrace()">
                         <button class="action" style="margin-top:10px; width:100%;" onclick="setTool('draw')">Confirm Placement</button>
                     </div>
 
@@ -294,6 +306,19 @@
                             <option value="hexagon">Hexagon</option>
                             <option value="star">Star</option>
                         </select>
+
+                        <div class="toggle-row" style="margin-top:12px; margin-bottom:5px;">
+                            <span class="tool-label" style="margin-bottom:0;">Guide Path</span>
+                            <div style="display:flex; gap:5px;">
+                                <select id="loopGuidePath" onchange="updateLoopParams()" style="flex:2; padding:5px; border-radius:4px; font-size:12px;">
+                                    <option value="circle">Circle</option>
+                                    <option value="square">Square</option>
+                                    <option value="figure8">Figure 8</option>
+                                    <option value="custom">Custom Drawn</option>
+                                </select>
+                                <button class="secondary" style="flex:1; height:30px; font-size:12px; padding:0 5px;" onclick="openPathModal()">✎ Draw</button>
+                            </div>
+                        </div>
                         
                         <div class="toggle-row" style="margin-top:12px; margin-bottom:5px;">
                             <span class="tool-label" style="margin-bottom:0;">Stretch Connect</span>
@@ -308,6 +333,9 @@
                         
                         <span class="tool-label">Rotation Step (°): <span id="val-loop-angle">5</span></span>
                         <input type="range" id="loopAngle" min="0" max="180" step="1" value="5" oninput="updateLoopParams()">
+
+                        <span class="tool-label">Spin Step (°): <span id="val-loop-spin">0</span></span>
+                        <input type="range" id="loopSpin" min="0" max="30" step="1" value="0" oninput="updateLoopParams()">
                         
                         <span class="tool-label">Base Zoom: <span id="val-loop-scale">1.0</span></span>
                         <input type="range" id="loopScale" min="0.1" max="2.0" step="0.05" value="1.0" oninput="updateLoopParams()">
@@ -321,8 +349,8 @@
                          <span class="tool-label" style="color:#666; font-size:10px;">Tip: Use "Move" tool to reposition image</span>
                          <span class="tool-label">Contrast Threshold: <span id="traceThreshVal">150</span></span>
                          <input type="range" min="10" max="240" value="150" id="traceThreshInput" oninput="runHighPrecisionTrace()">
-                         <span class="tool-label">Spiral Spacing: <span id="traceDensityVal">1.5</span></span>
-                         <input type="range" min="1" max="3" value="1.5" step="0.1" id="traceDensityInput" oninput="runHighPrecisionTrace()">
+                         <span class="tool-label">Spiral Spacing: <span id="traceDensityVal">3</span></span>
+                         <input type="range" min="1" max="5" value="3" step="0.1" id="traceDensityInput" oninput="runHighPrecisionTrace()">
                          <button class="secondary" style="margin-top:10px; font-size:11px;" onclick="document.getElementById('imgUpload').click()">📂 Change Image</button>
                     </div>
                 </div>
@@ -341,19 +369,24 @@
                 <div class="btn-group">
                     <button id="btnTrace" class="secondary" onclick="handleTraceClick()">✨ Trace</button>
                     <input type="file" id="imgUpload" accept="image/*" style="display:none" onchange="handleImageUpload(this)">
-                </div>
-
-                <div class="btn-group">
                     <button id="btnText" onclick="setTool('text')" class="secondary">🔠 Text</button>
-                    <button onclick="undo()" class="secondary">↶ Undo</button>
                 </div>
 
                 <div class="btn-group">
                     <button onclick="clearCanvas()" class="secondary" style="color:var(--danger); border-color:var(--danger);">✖ Clear</button>
+                    <button onclick="undo()" class="secondary">↶ Undo</button>
                 </div>
 
                 <hr style="border:0; border-top:1px solid #ddd; margin: 15px 0;">
                 
+                <div class="toggle-row" style="background:rgba(0,0,0,0.03); padding:8px; border-radius:8px; margin-bottom:10px;">
+                    <span style="font-weight:600; font-size:13px;">🌀 Spiral Connect Drawing</span>
+                    <label class="switch">
+                        <input type="checkbox" id="spiralConnectMode" checked>
+                        <span class="slider-tog"></span>
+                    </label>
+                </div>
+
                 <button class="action" onclick="prepareGCode()" style="margin-bottom:15px; font-size:1.1em;">⚙️ Generate Path</button>
             </div>
             
@@ -374,14 +407,6 @@
                 Status: <span id="statusTxt" style="font-weight:bold; color:var(--primary);">Drawing Mode</span>
             </div>
 
-            <div class="toggle-row" style="background:rgba(0,0,0,0.03); padding:8px; border-radius:8px; margin-bottom:10px;">
-                <span style="font-weight:600; font-size:13px;">✨ Auto-Clear Before Run</span>
-                <label class="switch">
-                    <input type="checkbox" id="autoClearMode">
-                    <span class="slider-tog"></span>
-                </label>
-            </div>
-
             <div class="btn-group">
                 <button onclick="sendToTable()" class="active">🚀 Run</button>
                 <button onclick="saveToServer()" class="secondary">💾 Save to Pi</button>
@@ -400,6 +425,19 @@
                 </div>
                 <button class="secondary" onclick="copyGCode()" style="margin-top:10px; width:100%;">📋 Copy GCode</button>
             </details>
+        </div>
+    </div>
+
+    <div id="pathModal">
+        <h3 style="color:white; margin-top:0; font-size:1.4rem;">Draw Custom Guide Path</h3>
+        <p style="color:#ccc; font-size:12px; margin-bottom: 20px;">Draw the track for your loops to follow.</p>
+        <div class="modal-canvas-wrap">
+            <canvas id="pathCanvas" onpointerdown="startDrawPath(event)" onpointermove="moveDrawPath(event)" onpointerup="endDrawPath(event)" onpointerleave="endDrawPath(event)"></canvas>
+        </div>
+        <div style="margin-top:20px; display:flex; gap:10px; width:90vmin; max-width:500px;">
+            <button onclick="clearPathCanvas()" class="secondary" style="background:#fff; color:#333;">↶ Retry</button>
+            <button onclick="savePathCanvas()" class="action">Complete</button>
+            <button onclick="closePathModal()" class="secondary" style="background:#555; color:white; border:none;">Cancel</button>
         </div>
     </div>
 
@@ -427,7 +465,14 @@
         let activeEffectType = null; 
         const vortexState = { radiusMap: new Float32Array(3600) };
         let vortexSourcePath = [];
+        
         let loopSourcePath = [];
+        let loopPathOffset = {x: 0, y: 0};
+        
+        // Custom Path Variables
+        let isDrawingPath = false;
+        let pathRawPoints = [];
+        let customPathPoints = [];
 
         const canvas = document.getElementById('drawCanvas');
         const ctx = canvas.getContext('2d');
@@ -475,10 +520,11 @@
                 if(e.pointerType === 'pen') setTool('draw');
                 else if(e.pointerType === 'touch') setTool('erase');
             }
-            if(currentTool === 'select') {
+            
+            if(currentTool === 'select' || currentTool === 'loop') {
                 isDrawing = true; dragStart = getPos(e); canvas.setPointerCapture(e.pointerId); return;
             }
-            if(currentTool === 'sandify' || currentTool === 'loop' || currentTool === 'trace_set' || currentTool === 'text') return;
+            if(currentTool === 'sandify' || currentTool === 'trace_set' || currentTool === 'text') return;
             saveState(); isDrawing = true; canvas.setPointerCapture(e.pointerId); processPointer(e); resetStatus();
         }
 
@@ -494,11 +540,13 @@
                 dragStart = pos; drawTracePreview(); return;
             }
             if(!isDrawing) { render(); drawCursor(pos); return; }
-            if(currentTool === 'select' && dragStart) {
+            
+            if((currentTool === 'select' || currentTool === 'loop') && dragStart) {
                 const dx = pos.x - dragStart.x; const dy = pos.y - dragStart.y;
                 
-                if (activeEffectType === 'loop' && loopSourcePath) {
-                    loopSourcePath.forEach(p => { if(p.type === 'point') { p.x += dx; p.y += dy; } });
+                if (currentTool === 'loop' || (activeEffectType === 'loop' && currentTool === 'select')) {
+                    loopPathOffset.x += dx;
+                    loopPathOffset.y += dy;
                     generateLoop();
                 } else if (activeEffectType === 'sandify' && vortexSourcePath) {
                     vortexSourcePath.forEach(p => { if(p.type === 'point') { p.x += dx; p.y += dy; } });
@@ -514,7 +562,7 @@
         function endDraw(e) {
             if(!isDrawing) return;
             isDrawing = false; canvas.releasePointerCapture(e.pointerId);
-            if(currentTool === 'select') {
+            if(currentTool === 'select' || currentTool === 'loop') {
                 dragStart = null; if(traceState.active) commitTraceMove(); else saveState(); return;
             }
             if(currentTool === 'draw') {
@@ -682,25 +730,185 @@
             newPoints.push({type:'break'}); rawPoints = newPoints; render();
         }
 
-        // --- LOOP LOGIC ---
+        // --- LOOP LOGIC & CUSTOM PATH ---
+        function getPathPos(e) {
+            const pathCanvas = document.getElementById('pathCanvas');
+            const rect = pathCanvas.getBoundingClientRect();
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            const scaleP = (rect.width/2) / (tableR * 1.05);
+            
+            const px = e.clientX - rect.left;
+            const py = e.clientY - rect.top;
+            
+            return {
+                x: (px - rect.width/2) / scaleP,
+                y: -(py - rect.height/2) / scaleP
+            };
+        }
+        
+        function openPathModal() {
+            document.getElementById('pathModal').style.display = 'flex';
+            const pathCanvas = document.getElementById('pathCanvas');
+            const rect = pathCanvas.parentElement.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            pathCanvas.width = rect.width * dpr;
+            pathCanvas.height = rect.height * dpr;
+            const ctxP = pathCanvas.getContext('2d');
+            ctxP.scale(dpr, dpr);
+            renderPathCanvas();
+        }
+
+        function closePathModal() {
+            document.getElementById('pathModal').style.display = 'none';
+        }
+
+        function clearPathCanvas() {
+            pathRawPoints = [];
+            renderPathCanvas();
+        }
+
+        function startDrawPath(e) {
+            e.preventDefault();
+            isDrawingPath = true;
+            pathRawPoints = [];
+            document.getElementById('pathCanvas').setPointerCapture(e.pointerId);
+            pathRawPoints.push(getPathPos(e));
+            renderPathCanvas();
+        }
+
+        function moveDrawPath(e) {
+            e.preventDefault();
+            if(!isDrawingPath) return;
+            pathRawPoints.push(getPathPos(e));
+            renderPathCanvas();
+        }
+
+        function endDrawPath(e) {
+            if(!isDrawingPath) return;
+            isDrawingPath = false;
+            document.getElementById('pathCanvas').releasePointerCapture(e.pointerId);
+        }
+
+        function savePathCanvas() {
+            if(pathRawPoints.length > 1) {
+                let totalDist = 0;
+                let processed = [{...pathRawPoints[0], d: 0}];
+                for(let i=1; i<pathRawPoints.length; i++) {
+                    let d = Math.hypot(pathRawPoints[i].x - pathRawPoints[i-1].x, pathRawPoints[i].y - pathRawPoints[i-1].y);
+                    if(d > 0.1) {
+                        totalDist += d;
+                        processed.push({...pathRawPoints[i], d: totalDist});
+                    }
+                }
+                if (totalDist > 0) {
+                    processed.forEach(p => p.t = p.d / totalDist);
+                    customPathPoints = processed;
+                }
+            }
+            closePathModal();
+            document.getElementById('loopGuidePath').value = 'custom';
+            updateLoopParams();
+        }
+
+        function renderPathCanvas() {
+            const pathCanvas = document.getElementById('pathCanvas');
+            const ctxP = pathCanvas.getContext('2d');
+            const rect = pathCanvas.parentElement.getBoundingClientRect();
+            ctxP.clearRect(0, 0, rect.width, rect.height);
+            
+            // Draw background table edge guide
+            ctxP.beginPath();
+            ctxP.arc(rect.width/2, rect.height/2, rect.width/2 - 4, 0, Math.PI*2);
+            ctxP.lineWidth = 4;
+            ctxP.strokeStyle = "black";
+            ctxP.stroke();
+            
+            if(pathRawPoints.length > 0) {
+                const tableR = parseFloat(document.getElementById('cfgRadius').value);
+                const scaleP = (rect.width/2) / (tableR * 1.05);
+                
+                ctxP.beginPath();
+                ctxP.strokeStyle = "var(--accent)";
+                ctxP.lineWidth = 4;
+                ctxP.lineCap = "round";
+                ctxP.lineJoin = "round";
+                
+                pathRawPoints.forEach((p, i) => {
+                    let px = rect.width/2 + p.x * scaleP;
+                    let py = rect.height/2 - p.y * scaleP;
+                    if(i===0) ctxP.moveTo(px, py);
+                    else ctxP.lineTo(px, py);
+                });
+                ctxP.stroke();
+            }
+        }
+
+        function getLoopPathPoint(t) {
+            let pathType = document.getElementById('loopGuidePath').value;
+            if (pathType === 'circle') {
+                return { x: 75 * Math.cos(t * Math.PI * 2), y: 75 * Math.sin(t * Math.PI * 2) };
+            } else if (pathType === 'square') {
+                let d = (t % 1) * 4;
+                let side = Math.floor(d);
+                let frac = d - side;
+                let x, y;
+                if (side === 0) { x = -75 + 150 * frac; y = -75; }
+                else if (side === 1) { x = 75; y = -75 + 150 * frac; }
+                else if (side === 2) { x = 75 - 150 * frac; y = 75; }
+                else { x = -75; y = 75 - 150 * frac; }
+                return { x, y };
+            } else if (pathType === 'figure8') {
+                let ang = t * Math.PI * 2;
+                return { x: 100 * Math.sin(ang), y: 100 * Math.sin(ang) * Math.cos(ang) };
+            } else if (pathType === 'custom') {
+                if (customPathPoints.length === 0) {
+                    // Fallback if they pick custom but haven't drawn anything
+                    return { x: 75 * Math.cos(t * Math.PI * 2), y: 75 * Math.sin(t * Math.PI * 2) };
+                }
+                let normT = t % 1;
+                for (let i = 0; i < customPathPoints.length - 1; i++) {
+                    if (normT >= customPathPoints[i].t && normT <= customPathPoints[i+1].t) {
+                        let p1 = customPathPoints[i];
+                        let p2 = customPathPoints[i+1];
+                        let range = p2.t - p1.t;
+                        let frac = range === 0 ? 0 : (normT - p1.t) / range;
+                        return {
+                            x: p1.x + (p2.x - p1.x) * frac,
+                            y: p1.y + (p2.y - p1.y) * frac
+                        };
+                    }
+                }
+                return { x: customPathPoints[customPathPoints.length-1].x, y: customPathPoints[customPathPoints.length-1].y };
+            }
+            return {x:0, y:0};
+        }
+
         function updateLoopParams() {
             if(currentTool === 'loop') {
                 document.getElementById('val-loop-iter').innerText = document.getElementById('loopIter').value;
                 document.getElementById('val-loop-angle').innerText = document.getElementById('loopAngle').value;
+                document.getElementById('val-loop-spin').innerText = document.getElementById('loopSpin').value;
                 document.getElementById('val-loop-scale').innerText = document.getElementById('loopScale').value;
                 document.getElementById('val-loop-osc').innerText = document.getElementById('loopOsc').value;
 
                 const type = document.getElementById('loopShape').value;
                 
                 if (type !== 'custom') {
-                    let pts = []; const r = 50;
-                    if(type==='circle') { for(let i=0; i<=36; i++) { const a = (i/36)*Math.PI*2; pts.push({x: Math.cos(a)*r, y: Math.sin(a)*r, type:'point'}); } } 
-                    else if(type==='square') { pts = [{x:-r,y:-r,type:'point'}, {x:r,y:-r,type:'point'}, {x:r,y:r,type:'point'}, {x:-r,y:r,type:'point'}, {x:-r,y:-r,type:'point'}]; } 
-                    else if(type==='triangle') { pts = [{x:0,y:r,type:'point'}, {x:r*0.86,y:-r/2,type:'point'}, {x:-r*0.86,y:-r/2,type:'point'}, {x:0,y:r,type:'point'}]; } 
-                    else if(type==='hexagon') { for(let i=0; i<=6; i++) { const a = (i/6)*Math.PI*2; pts.push({x: Math.cos(a)*r, y: Math.sin(a)*r, type:'point'}); } } 
-                    else if(type==='pentagon') { for(let i=0; i<=5; i++) { const a = (i/5)*Math.PI*2 - Math.PI/2; pts.push({x: Math.cos(a)*r, y: Math.sin(a)*r, type:'point'}); } } 
-                    else if(type==='star') { for(let i=0; i<=10; i++) { const a = (i/10)*Math.PI*2 + Math.PI/2; const rad = (i%2===0) ? r : r*0.4; pts.push({x: Math.cos(a)*rad, y: Math.sin(a)*rad, type:'point'}); } }
+                    let pts = []; const r = 50; 
+                    const ox = 0; 
+                    if(type==='circle') { for(let i=0; i<=36; i++) { const a = (i/36)*Math.PI*2; pts.push({x: ox + Math.cos(a)*r, y: Math.sin(a)*r, type:'point'}); } } 
+                    else if(type==='square') { pts = [{x:ox-r,y:-r,type:'point'}, {x:ox+r,y:-r,type:'point'}, {x:ox+r,y:r,type:'point'}, {x:ox-r,y:r,type:'point'}, {x:ox-r,y:-r,type:'point'}]; } 
+                    else if(type==='triangle') { pts = [{x:ox,y:r,type:'point'}, {x:ox+r*0.86,y:-r/2,type:'point'}, {x:ox-r*0.86,y:-r/2,type:'point'}, {x:ox,y:r,type:'point'}]; } 
+                    else if(type==='hexagon') { for(let i=0; i<=6; i++) { const a = (i/6)*Math.PI*2; pts.push({x: ox + Math.cos(a)*r, y: Math.sin(a)*r, type:'point'}); } } 
+                    else if(type==='pentagon') { for(let i=0; i<=5; i++) { const a = (i/5)*Math.PI*2 - Math.PI/2; pts.push({x: ox + Math.cos(a)*r, y: Math.sin(a)*r, type:'point'}); } } 
+                    else if(type==='star') { for(let i=0; i<=10; i++) { const a = (i/10)*Math.PI*2 + Math.PI/2; const rad = (i%2===0) ? r : r*0.4; pts.push({x: ox + Math.cos(a)*rad, y: Math.sin(a)*rad, type:'point'}); } }
                     loopSourcePath = pts;
+                }
+                
+                // if they picked custom path but array is empty, trigger modal
+                if(document.getElementById('loopGuidePath').value === 'custom' && customPathPoints.length === 0) {
+                    openPathModal();
+                    return;
                 }
 
                 generateLoop();
@@ -710,6 +918,7 @@
         function generateLoop() {
             const iterations = parseInt(document.getElementById('loopIter').value);
             const angleStepDeg = parseFloat(document.getElementById('loopAngle').value);
+            const spinStepDeg = parseFloat(document.getElementById('loopSpin').value);
             const scaleFac = parseFloat(document.getElementById('loopScale').value);
             const oscRate = parseFloat(document.getElementById('loopOsc').value);
             const stretchMode = document.getElementById('loopStretchMode').checked;
@@ -719,6 +928,14 @@
 
             const pointsOnly = loopSourcePath.filter(p => p.type === 'point');
             const numPts = pointsOnly.length;
+            if(numPts === 0) return;
+            
+            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+            pointsOnly.forEach(p => { 
+                minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x); 
+                minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y); 
+            });
+            let cx = (minX+maxX)/2; let cy = (minY+maxY)/2;
 
             for(let i=0; i<iterations; i++) {
                 let ptIdx = 0;
@@ -735,6 +952,7 @@
                         let effectiveIter = i + shapeProgress;
                         
                         const currentAngle = effectiveIter * angleStepDeg * (Math.PI / 180);
+                        const currentSpin = effectiveIter * spinStepDeg * (Math.PI / 180);
                         
                         let oscScale = 1.0;
                         if (oscRate > 0) {
@@ -743,12 +961,21 @@
                         }
                         const currentScale = scaleFac * oscScale;
 
-                        let sx = p.x * currentScale;
-                        let sy = p.y * currentScale;
+                        let dx = p.x - cx;
+                        let dy = p.y - cy;
+                        let spun_x = cx + dx * Math.cos(currentSpin) - dy * Math.sin(currentSpin);
+                        let spun_y = cy + dx * Math.sin(currentSpin) + dy * Math.cos(currentSpin);
+
+                        let sx = spun_x * currentScale;
+                        let sy = spun_y * currentScale;
+                        
                         let rx = sx * Math.cos(currentAngle) - sy * Math.sin(currentAngle);
                         let ry = sx * Math.sin(currentAngle) + sy * Math.cos(currentAngle);
                         
-                        newPoints.push({x: rx, y: ry, type: 'point'});
+                        let pathT = effectiveIter / iterations;
+                        let pathPt = getLoopPathPoint(pathT);
+                        
+                        newPoints.push({x: rx + pathPt.x + loopPathOffset.x, y: ry + pathPt.y + loopPathOffset.y, type: 'point'});
                         ptIdx++;
                     }
                 });
@@ -1002,7 +1229,7 @@
         
         function setTool(t) {
             currentTool = t;
-            const buttons = ['btnDraw', 'btnErase', 'btnSelect', 'btnSandify', 'btnTrace', 'btnText', 'btnLoop'];
+            const buttons = ['btnDraw', 'btnErase', 'btnSelect', 'btnSandify', 'btnLoop', 'btnTrace', 'btnText'];
             buttons.forEach(b => {
                 const el = document.getElementById(b);
                 if(el) {
@@ -1034,6 +1261,7 @@
             if(t === 'loop') { 
                 if(activeEffectType !== 'loop') {
                     activeEffectType = 'loop';
+                    loopPathOffset = {x: 0, y: 0}; 
                     if (rawPoints.length === 0) addShape('circle'); 
                     loopSourcePath = JSON.parse(JSON.stringify(rawPoints)); 
                     document.getElementById('loopShape').value = 'custom'; 
@@ -1055,6 +1283,11 @@
             else if(currentTool === 'trace_set') activeGrp = document.getElementById('set-trace');
             if(activeGrp) { area.style.display = 'block'; activeGrp.style.display = 'block'; } else area.style.display = 'none';
             eraserRadius = parseInt(document.getElementById('eraserSizeSlider').value); document.getElementById('eraseSizeVal').innerText = eraserRadius + 'px';
+
+            const stylusWrapper = document.getElementById('stylusModeWrapper');
+            if (stylusWrapper) {
+                stylusWrapper.style.display = (currentTool === 'draw' || currentTool === 'erase') ? 'flex' : 'none';
+            }
         }
 
         function updateUI() { document.getElementById('symVal').textContent = document.getElementById('symSlider').value + 'x'; render(); }
@@ -1079,7 +1312,7 @@
         }
 
         // --- GCODE GENERATION ---
-        async function sendToTable() { if(!generatedGCode) return showToast("Click Generate Path first", "error"); let code = generatedGCode; if(document.getElementById('autoClearMode').checked) { try { let r = await fetch('./designs/clear.txt'); if(r.ok) code = (await r.text()) + "\n" + code; } catch(e) {} } fetch(BASE_URL+'/send_gcode_block', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({gcode:code}) }).then(r => r.json()).then(d => showToast(d.success ? "Sent!" : "Error", d.success ? "success" : "error")); }
+        async function sendToTable() { if(!generatedGCode) return showToast("Click Generate Path first", "error"); fetch(BASE_URL+'/send_gcode_block', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({gcode:generatedGCode}) }).then(r => r.json()).then(d => showToast(d.success ? "Sent!" : "Error", d.success ? "success" : "error")); }
         async function saveToServer() { if(!generatedGCode) return showToast("Generate Path first!", "error"); let n = prompt("Enter filename:"); if(n) { if(!n.toLowerCase().endsWith('.txt')) n += ".txt"; fetch(BASE_URL+'/save_design', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({filename:n, gcode:generatedGCode}) }).then(r => r.json()).then(d => showToast(d.success ? "Saved!" : "Failed", d.success ? "success" : "error")); } }
         function getShortestRotation(raw, last) { let diff = (raw - last) / (2 * Math.PI); let offset = Math.round(diff); return raw - (offset * 2 * Math.PI); }
         
@@ -1107,7 +1340,7 @@
 
             if (useSpiral) {
                 const imgData = rasterizeCanvasForTrace();
-                const density = parseFloat(document.getElementById('traceDensityInput').value) || 1.5;
+                const density = parseFloat(document.getElementById('traceDensityInput').value) || 3.0;
                 const ballSizeMm = parseFloat(document.getElementById('cfgBallSize').value);
                 
                 const pts = calculateSpiralTrace(imgData, 150, density, ballSizeMm, tableR);
