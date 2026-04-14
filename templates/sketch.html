@@ -532,13 +532,13 @@
             if(stroke.length < 3) return;
             let startP = stroke[0]; let endP = stroke[stroke.length-1];
             let d = Math.hypot(startP.x - endP.x, startP.y - endP.y);
-            if(d < 30.0) { stroke.push({x: startP.x, y: startP.y, type:'point'}); }
+            if(d < 30.0) { stroke.push({x: startP.x, y: startP.y, type:'point', source: startP.source}); }
             for(let pass=0; pass<2; pass++) {
                 let smooth = []; smooth.push(stroke[0]);
                 for(let i=0; i<stroke.length-1; i++) {
                     let p0 = stroke[i]; let p1 = stroke[i+1];
-                    smooth.push({ x: 0.75 * p0.x + 0.25 * p1.x, y: 0.75 * p0.y + 0.25 * p1.y, type: 'point' });
-                    smooth.push({ x: 0.25 * p0.x + 0.75 * p1.x, y: 0.25 * p0.y + 0.75 * p1.y, type: 'point' });
+                    smooth.push({ x: 0.75 * p0.x + 0.25 * p1.x, y: 0.75 * p0.y + 0.25 * p1.y, type: 'point', source: p0.source });
+                    smooth.push({ x: 0.25 * p0.x + 0.75 * p1.x, y: 0.25 * p0.y + 0.75 * p1.y, type: 'point', source: p0.source });
                 }
                 smooth.push(stroke[stroke.length-1]); stroke = smooth;
             }
@@ -569,7 +569,7 @@
 
         function processPointer(e) {
             const p = getPos(e);
-            if(currentTool === 'draw') { rawPoints.push({x: p.x, y: p.y, type: 'point'}); } 
+            if(currentTool === 'draw') { rawPoints.push({x: p.x, y: p.y, type: 'point', source: 'draw'}); } 
             else if (currentTool === 'erase') { const r = eraserRadius; rawPoints = rawPoints.filter(pt => { if(pt.type === 'break') return true; return Math.hypot(pt.x - p.x, pt.y - p.y) > r; }); }
             render(); if(currentTool==='erase') drawCursor(p);
         }
@@ -717,7 +717,6 @@
             let newPoints = [];
             newPoints.push({type: 'break'});
 
-            // Filter out breaks to just get points for calculating interpolation step
             const pointsOnly = loopSourcePath.filter(p => p.type === 'point');
             const numPts = pointsOnly.length;
 
@@ -726,14 +725,12 @@
                 
                 loopSourcePath.forEach((p, idx) => {
                     if(p.type === 'break' || p.type === 'cmd') {
-                        // If not stretching, keep internal breaks to separate loops
                         if (!stretchMode) {
                             if (idx !== 0 && idx !== loopSourcePath.length - 1) {
                                 newPoints.push({...p});
                             }
                         }
                     } else {
-                        // Apply stretching progressively across the points of the shape
                         let shapeProgress = stretchMode ? (numPts > 1 ? ptIdx / (numPts - 1) : 0) : 0;
                         let effectiveIter = i + shapeProgress;
                         
@@ -764,6 +761,143 @@
             newPoints.push({type: 'break'});
             rawPoints = newPoints;
             render();
+        }
+
+        // --- EXTRACTED TRACE LOGIC ---
+        function calculateSpiralTrace(imgData, thresh, density, ballSizeMm, tableR) {
+            const pixelBallSize = (ballSizeMm / (tableR * 2)) * 800;
+            const SIZE = 800; const CENTER = SIZE / 2;
+            let pixelGrid = new Uint8Array(SIZE*SIZE); 
+            for(let i=0; i<SIZE*SIZE; i++) { pixelGrid[i] = imgData.data[i*4] < thresh ? 1 : 0; }
+            
+            let contours = []; const traced = new Uint8Array(SIZE*SIZE).fill(0);
+            
+            const traceBoundary = (sx, sy) => {
+                const path = []; let cx = sx, cy = sy; let bx = sx-1, by = sy; let max = SIZE*10;
+                let lastAddedX = -10, lastAddedY = -10;
+
+                do {
+                    if (Math.hypot(cx - lastAddedX, cy - lastAddedY) > 1.5) {
+                        path.push({x:cx, y:cy});
+                        lastAddedX = cx; lastAddedY = cy;
+                    }
+                    traced[cy*SIZE+cx] = 1;
+                    const n = [{x:-1,y:0},{x:-1,y:-1},{x:0,y:-1},{x:1,y:-1},{x:1,y:0},{x:1,y:1},{x:0,y:1},{x:-1,y:1}];
+                    let startIdx = 0; for(let i=0; i<8; i++) if(bx===cx+n[i].x && by===cy+n[i].y) startIdx=(i+1)%8;
+                    let found = false;
+                    for(let i=0; i<8; i++) {
+                        const idx = (startIdx + i)%8; const nx = cx + n[idx].x; const ny = cy + n[idx].y;
+                        if(nx>=0 && nx<SIZE && ny>=0 && ny<SIZE && pixelGrid[ny*SIZE+nx]===1) { bx=cx; by=cy; cx=nx; cy=ny; found=true; break; } else { bx=nx; by=ny; }
+                    }
+                    if(!found) break; max--;
+                } while((cx!==sx || cy!==sy) && max>0);
+                return path;
+            };
+
+            for(let y=1; y<SIZE-1; y++) { 
+                for(let x=1; x<SIZE-1; x++) { 
+                    const idx = y*SIZE + x; 
+                    if(pixelGrid[idx] === 1 && pixelGrid[idx-1] === 0 && traced[idx] === 0) { 
+                        const pth = traceBoundary(x, y); 
+                        if(pth.length > 40) { 
+                            let maxDist = 0; let bestIdx = 0; 
+                            pth.forEach((p, i) => { const dist = Math.hypot(p.x - CENTER, p.y - CENTER); if(dist > maxDist) { maxDist = dist; bestIdx = i; } }); 
+                            const reordered = [...pth.slice(bestIdx), ...pth.slice(0, bestIdx)]; reordered.push(reordered[0]); 
+                            contours.push({ points: reordered, trigger: reordered[0], maxR: maxDist, merged: false }); 
+                        } 
+                    } 
+                } 
+            }
+
+            contours.sort((a, b) => a.maxR - b.maxR);
+
+            let spiral = []; const maxR = SIZE/2 - 5; spiral.push({x: CENTER, y: CENTER});
+            let angle = 0; let r = 0; const angleStep = 0.02; const spacingPx = density * 4.0; 
+            
+            while(r < maxR) { 
+                r = (spacingPx / (2*Math.PI)) * angle; 
+                let x = CENTER + Math.cos(angle)*r; let y = CENTER + Math.sin(angle)*r; 
+                
+                let wiggle = 0; const ix = Math.floor(x), iy = Math.floor(y); 
+                if(ix>=0 && ix<SIZE && iy>=0 && iy<SIZE) { if(pixelGrid[iy*SIZE+ix] === 1) wiggle = Math.sin(angle * 30) * (spacingPx * 0.2); } 
+                x += Math.cos(angle) * wiggle; y += Math.sin(angle) * wiggle; 
+                const sp = {x:x, y:y};
+                spiral.push(sp); 
+
+                const spiralRadius = Math.hypot(sp.x - CENTER, sp.y - CENTER);
+                for (let c of contours) {
+                    if(!c.merged) { 
+                        if (spiralRadius > (c.maxR + (pixelBallSize * 0.4))) {
+                            const contourAngle = Math.atan2(c.trigger.y - CENTER, c.trigger.x - CENTER);
+                            let normAngle = Math.atan2(Math.sin(angle), Math.cos(angle));
+                            
+                            if (Math.abs(normAngle - contourAngle) < 0.05) {
+                                spiral.push(c.trigger);
+                                c.points.forEach((p, i) => { if(i % 2 === 0) spiral.push(p); }); 
+                                spiral.push(c.trigger);
+                                spiral.push(sp);
+                                c.merged = true; 
+                            }
+                        } 
+                    } 
+                }
+                angle += angleStep; 
+            }
+
+            const scaleFac = (tableR * 2) / SIZE;
+            let finalPoints = [];
+            spiral.forEach(p => { let tx = (p.x - 400) * scaleFac; let ty = (400 - p.y) * scaleFac; finalPoints.push({ x: tx, y: ty, type: 'point' }); });
+            return finalPoints;
+        }
+
+        function rasterizeCanvasForTrace() {
+            const size = 800; 
+            const buff = document.getElementById('hiddenTraceBuffer'); 
+            const bCtx = buff.getContext('2d');
+            bCtx.fillStyle = "white"; 
+            bCtx.fillRect(0, 0, size, size); 
+            
+            bCtx.strokeStyle = "black";
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            const ballSizeMm = parseFloat(document.getElementById('cfgBallSize').value);
+            bCtx.lineWidth = (ballSizeMm / (tableR * 2)) * size;
+            bCtx.lineCap = "round";
+            bCtx.lineJoin = "round";
+
+            bCtx.save(); 
+            bCtx.translate(size/2, size/2);
+
+            const sym = parseInt(document.getElementById('symSlider').value);
+            const scaleFac = (size / 2) / tableR;
+
+            let shapes = []; let curShape = []; 
+            rawPoints.forEach(p => { 
+                if(p.type === 'break' || p.type === 'cmd') { 
+                    if(curShape.length > 0) shapes.push(curShape); 
+                    curShape = []; 
+                } else curShape.push(p); 
+            });
+            if(curShape.length > 0) shapes.push(curShape);
+
+            for(let s=0; s<sym; s++) { 
+                const ang = s * (Math.PI*2/sym); 
+                bCtx.save();
+                bCtx.rotate(ang);
+                bCtx.beginPath();
+                shapes.forEach(sh => {
+                    if (sh.length > 0) {
+                        bCtx.moveTo(sh[0].x * scaleFac, -sh[0].y * scaleFac);
+                        for(let i=1; i<sh.length; i++) {
+                            bCtx.lineTo(sh[i].x * scaleFac, -sh[i].y * scaleFac);
+                        }
+                    }
+                });
+                bCtx.stroke();
+                bCtx.restore();
+            }
+            bCtx.restore();
+            
+            return bCtx.getImageData(0,0,size,size);
         }
 
         // --- TEXT TOOL LOGIC ---
@@ -847,89 +981,12 @@
             const ballSizeMm = parseFloat(document.getElementById('cfgBallSize').value);
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
             
-            const pixelBallSize = (ballSizeMm / (tableR * 2)) * 800;
-            const SIZE = 800; const CENTER = SIZE / 2;
-            let pixelGrid = new Uint8Array(SIZE*SIZE); 
-            for(let i=0; i<SIZE*SIZE; i++) { pixelGrid[i] = traceImgData.data[i*4] < thresh ? 1 : 0; }
+            const generated = calculateSpiralTrace(traceImgData, thresh, density, ballSizeMm, tableR);
             
-            let contours = []; const traced = new Uint8Array(SIZE*SIZE).fill(0);
-            
-            const traceBoundary = (sx, sy) => {
-                const path = []; let cx = sx, cy = sy; let bx = sx-1, by = sy; let max = SIZE*10;
-                let lastAddedX = -10, lastAddedY = -10;
-
-                do {
-                    if (Math.hypot(cx - lastAddedX, cy - lastAddedY) > 1.5) {
-                        path.push({x:cx, y:cy});
-                        lastAddedX = cx; lastAddedY = cy;
-                    }
-                    traced[cy*SIZE+cx] = 1;
-                    const n = [{x:-1,y:0},{x:-1,y:-1},{x:0,y:-1},{x:1,y:-1},{x:1,y:0},{x:1,y:1},{x:0,y:1},{x:-1,y:1}];
-                    let startIdx = 0; for(let i=0; i<8; i++) if(bx===cx+n[i].x && by===cy+n[i].y) startIdx=(i+1)%8;
-                    let found = false;
-                    for(let i=0; i<8; i++) {
-                        const idx = (startIdx + i)%8; const nx = cx + n[idx].x; const ny = cy + n[idx].y;
-                        if(nx>=0 && nx<SIZE && ny>=0 && ny<SIZE && pixelGrid[ny*SIZE+nx]===1) { bx=cx; by=cy; cx=nx; cy=ny; found=true; break; } else { bx=nx; by=ny; }
-                    }
-                    if(!found) break; max--;
-                } while((cx!==sx || cy!==sy) && max>0);
-                return path;
-            };
-
-            for(let y=1; y<SIZE-1; y++) { 
-                for(let x=1; x<SIZE-1; x++) { 
-                    const idx = y*SIZE + x; 
-                    if(pixelGrid[idx] === 1 && pixelGrid[idx-1] === 0 && traced[idx] === 0) { 
-                        const pth = traceBoundary(x, y); 
-                        if(pth.length > 40) { 
-                            let maxDist = 0; let bestIdx = 0; 
-                            pth.forEach((p, i) => { const dist = Math.hypot(p.x - CENTER, p.y - CENTER); if(dist > maxDist) { maxDist = dist; bestIdx = i; } }); 
-                            const reordered = [...pth.slice(bestIdx), ...pth.slice(0, bestIdx)]; reordered.push(reordered[0]); 
-                            contours.push({ points: reordered, trigger: reordered[0], maxR: maxDist, merged: false }); 
-                        } 
-                    } 
-                } 
-            }
-
-            contours.sort((a, b) => a.maxR - b.maxR);
-
-            let spiral = []; const maxR = SIZE/2 - 5; spiral.push({x: CENTER, y: CENTER});
-            let angle = 0; let r = 0; const angleStep = 0.02; const spacingPx = density * 4.0; 
-            
-            while(r < maxR) { 
-                r = (spacingPx / (2*Math.PI)) * angle; 
-                let x = CENTER + Math.cos(angle)*r; let y = CENTER + Math.sin(angle)*r; 
-                
-                let wiggle = 0; const ix = Math.floor(x), iy = Math.floor(y); 
-                if(ix>=0 && ix<SIZE && iy>=0 && iy<SIZE) { if(pixelGrid[iy*SIZE+ix] === 1) wiggle = Math.sin(angle * 30) * (spacingPx * 0.2); } 
-                x += Math.cos(angle) * wiggle; y += Math.sin(angle) * wiggle; 
-                const sp = {x:x, y:y};
-                spiral.push(sp); 
-
-                const spiralRadius = Math.hypot(sp.x - CENTER, sp.y - CENTER);
-                for (let c of contours) {
-                    if(!c.merged) { 
-                        if (spiralRadius > (c.maxR + (pixelBallSize * 0.4))) {
-                            const contourAngle = Math.atan2(c.trigger.y - CENTER, c.trigger.x - CENTER);
-                            let normAngle = Math.atan2(Math.sin(angle), Math.cos(angle));
-                            
-                            if (Math.abs(normAngle - contourAngle) < 0.05) {
-                                spiral.push(c.trigger);
-                                c.points.forEach((p, i) => { if(i % 2 === 0) spiral.push(p); }); 
-                                spiral.push(c.trigger);
-                                spiral.push(sp);
-                                c.merged = true; 
-                            }
-                        } 
-                    } 
-                }
-                angle += angleStep; 
-            }
-
-            const scaleFac = (tableR * 2) / SIZE;
-            rawPoints = []; if(spiral.length > 0) rawPoints.push({type:'break'});
-            spiral.forEach(p => { let tx = (p.x - 400) * scaleFac; let ty = (400 - p.y) * scaleFac; rawPoints.push({ x: tx, y: ty, type: 'point' }); });
-            if(spiral.length > 0) rawPoints.push({type:'break'});
+            rawPoints = []; 
+            if(generated.length > 0) rawPoints.push({type:'break'});
+            rawPoints = rawPoints.concat(generated);
+            if(generated.length > 0) rawPoints.push({type:'break'});
             render();
         }
 
@@ -1030,16 +1087,40 @@
             if(rawPoints.length === 0) return showToast("Draw something first!", "error");
             const tableR = parseFloat(document.getElementById('cfgRadius').value); 
             const sym = parseInt(document.getElementById('symSlider').value);
-
+            
             let shapes = []; 
             let curShape = []; 
+            let hasHandDrawnLines = false;
+            
             rawPoints.forEach(p => { 
+                if(p.source === 'draw') hasHandDrawnLines = true;
                 if(p.type === 'break' || p.type === 'cmd') { 
                     if(curShape.length > 0) shapes.push(curShape); 
                     curShape = []; 
                 } else curShape.push(p); 
             });
             if(curShape.length > 0) shapes.push(curShape);
+
+            // The invisible switch check: use Spiral connect only if they hand-drew 
+            // lines and there are floating (disconnected) shapes detected.
+            const useSpiral = (hasHandDrawnLines && shapes.length > 1);
+
+            if (useSpiral) {
+                const imgData = rasterizeCanvasForTrace();
+                const density = parseFloat(document.getElementById('traceDensityInput').value) || 1.5;
+                const ballSizeMm = parseFloat(document.getElementById('cfgBallSize').value);
+                
+                const pts = calculateSpiralTrace(imgData, 150, density, ballSizeMm, tableR);
+                processedPoints = pts;
+
+                generatedGCode = generateGCodeStringFromProcessed();
+                document.getElementById('statusTxt').innerText = `Path Ready! (Spiral Connected)`;
+                document.getElementById('designPhaseControls').style.display = 'none'; 
+                document.getElementById('productionPhaseControls').style.display = 'block';
+                document.getElementById('simulationArea').style.display = 'block';
+                render();
+                return;
+            }
 
             let pool = []; 
             for(let s=0; s<sym; s++) { 
@@ -1103,6 +1184,7 @@
             document.getElementById('simulationArea').style.display = 'block';
             render();
         }
+        
         function returnToEditing() { 
             processedPoints = []; 
             document.getElementById('designPhaseControls').style.display = 'block'; 
