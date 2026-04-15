@@ -150,9 +150,9 @@
             display: flex; align-items: center; justify-content: center;
         }
         .theme-toggle svg { width: 100%; height: 100%; fill: currentColor; }
-        .theme-toggle .sun { display: none; }
-        body[data-theme='dark'] .theme-toggle .moon { display: none; }
-        body[data-theme='dark'] .theme-toggle .sun { display: block; }
+        .theme-toggle .moon { display: none; }
+        body[data-theme='dark'] .theme-toggle .sun { display: none; }
+        body[data-theme='dark'] .theme-toggle .moon { display: block; }
 
         /* --- Loop Indicator --- */
         #loop-indicator {
@@ -164,7 +164,7 @@
         .close-loop { background: none; border: 1px solid #004d00; border-radius: 0 !important; width:20px; height:20px; line-height:18px; cursor: pointer; font-size:12px; }
 
         /* --- Hero --- */
-        .hero-container { width: 100%; max-width: 1200px; margin: 0 auto; padding: 20px 15px 0; }
+        .hero-container { width: 100%; max-width: 1200px; margin: 0 auto; padding: 20px 0 0; }
         .hero-image { width: 100%; height: 200px; object-fit: cover; border-radius: var(--radius); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
 
         /* --- Controls --- */
@@ -281,7 +281,7 @@
     </nav>
 
     <header>
-        <div style="width: 40px;"></div> <!-- Spacer -->
+        <div style="width: 32px;"></div> <!-- Spacer to balance toggle -->
         <div class="header-center">
             <div id="playing-display" class="playing-text">Select a design</div>
             
