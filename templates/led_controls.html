@@ -53,14 +53,13 @@
             top: 0; left: 0; z-index: 1100; box-shadow: 0 2px 5px var(--color-shadow);
         }
         
-        /* UPDATED: Added min-width: 0 to override global button styles */
         #themeToggle {
             position: fixed; top: 15px; right: 15px; background: var(--color-surface);
             color: var(--color-text); border: 1px solid var(--color-text);
             padding: 0; 
             border-radius: 50%; z-index: 1200;
             width: 45px; height: 45px; 
-            min-width: 0; /* <--- THIS FIXES THE OVAL ISSUE */
+            min-width: 0;
             display: flex; align-items: center; justify-content: center;
             transition: background 0.3s;
             cursor: pointer;
@@ -69,13 +68,6 @@
         .main-content {
             margin-left: 0; transition: margin-left 0.3s; padding: 20px;
             max-width: 800px; margin: 0 auto; padding-top: 60px;
-        }
-
-        .header-image {
-            width: 100%; max-height: 250px; object-fit: cover;
-            border-radius: var(--border-radius); margin-bottom: 20px;
-            box-shadow: 0 4px 15px var(--color-shadow);
-            display: block;
         }
 
         h1 {
@@ -96,17 +88,12 @@
             display: flex; justify-content: center; align-items: center;
             gap: 15px; margin-bottom: 0;
         }
-        .indicator {
-            width: 12px; height: 12px; border-radius: 50%;
-            background-color: #555; display: inline-block;
-            border: 1px solid rgba(0,0,0,0.2);
-        }
         
         button {
             background-color: var(--color-primary); color: var(--color-text);
             border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer;
             font-size: 16px; transition: 0.2s ease-in-out; font-weight: 600;
-            min-width: 120px; /* This was causing the oval shape on the toggle */
+            min-width: 120px;
         }
         button:hover {
             background-color: var(--color-secondary); box-shadow: 0 2px 5px var(--color-shadow);
@@ -140,16 +127,6 @@
             box-shadow: 0 2px 5px var(--color-shadow);
         }
         .fav-circle:hover { transform: scale(1.1); border-color: var(--color-primary); }
-        
-        .terminal {
-            background: #ffffff; 
-            color: #000000;
-            font-family: 'Consolas', 'Courier New', monospace; padding: 15px;
-            border-radius: 8px; width: 100%; height: 150px; overflow-y: auto;
-            font-size: 13px; border: 1px solid #ccc;
-            text-align: left; box-sizing: border-box; white-space: pre-wrap;
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
-        }
 
         /* --- LOADING SCREEN STYLES --- */
         #loadingOverlay {
@@ -215,19 +192,10 @@
     </button>
 
     <div class="main-content">
-        <img src="{{ url_for('static', filename='led.png') }}" alt="LED Header" class="header-image">
-
         <h1>LED Controller</h1>
 
         <div class="control-section">
             <div class="status-row">
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <div class="indicator" id="connIndicator"></div>
-                    <span id="connStatusText" style="font-weight:bold; font-size: 1.1em;">Unknown</span>
-                </div>
-            </div>
-            <div class="status-row" style="margin-top: 15px;">
-                <button onclick="toggleConnection()" id="connBtn">Connect</button>
                 <button onclick="togglePower()" id="powerBtn">Power ON/OFF</button>
             </div>
         </div>
@@ -241,20 +209,14 @@
             </div>
 
             <div style="margin-top: 30px; border-top: 1px solid var(--color-shadow); padding-top: 20px;">
-                <h3>Your Favorite Whites</h3>
+                <h3>Your Favorite Colors</h3>
                 <div class="favorites-grid" id="favGrid"></div>
-                <button onclick="saveCurrentToFavorite()" style="margin-top:20px;">Save This White</button>
+                <button onclick="saveCurrentToFavorite()" style="margin-top:20px;">Save This Color</button>
             </div>
-        </div>
-
-        <div class="control-section" style="padding:15px;">
-            <h3 style="margin-top:0; font-size: 1em; opacity: 0.6;">System Log (Live)</h3>
-            <div class="terminal" id="terminal">Loading...</div>
         </div>
     </div>
 
     <script>
-        let isConnected = false;
         let debounceTimer;
         const MAX_FAVS = 3; 
         const DEFAULT_FAVS = ["#ffffff", "#f0f0f0", "#e0e0e0"]; 
@@ -343,90 +305,8 @@
             }
         }
 
-        async function toggleConnection() {
-            const btn = document.getElementById("connBtn");
-            const txt = document.getElementById("connStatusText");
-            
-            btn.disabled = true;
-            
-            if (!isConnected) {
-                txt.textContent = "Requesting Connection...";
-                txt.style.color = "#d4a017"; 
-                await sendCommand("CONNECT");
-                
-                let checks = 0;
-                const rapidPoll = setInterval(async () => {
-                    await pollStatus();
-                    checks++;
-                    if(isConnected || checks > 15) {
-                        clearInterval(rapidPoll);
-                        btn.disabled = false;
-                        if(!isConnected) {
-                             txt.textContent = "DISCONNECTED (Timeout)";
-                             txt.style.color = "#333";
-                        }
-                    }
-                }, 1000);
-            } else {
-                await sendCommand("DISCONNECT");
-                setTimeout(pollStatus, 1000);
-                setTimeout(() => btn.disabled = false, 2000);
-            }
-            fetchLogs(); 
-        }
-
         function togglePower() {
              sendCommand("POWER:ON");
-        }
-
-        async function pollStatus() {
-            try {
-                const res = await fetch("/status");
-                const data = await res.json();
-                if (isConnected !== data.connected) {
-                    isConnected = data.connected;
-                    updateStatusUI(isConnected);
-                }
-            } catch (e) {}
-        }
-
-        function updateStatusUI(connected) {
-            const ind = document.getElementById("connIndicator");
-            const txt = document.getElementById("connStatusText");
-            const btn = document.getElementById("connBtn");
-            
-            ind.style.backgroundColor = connected ? "#28a745" : "#dc3545"; 
-            txt.textContent = connected ? "CONNECTED" : "DISCONNECTED";
-            txt.style.color = "#333";
-            btn.textContent = connected ? "Disconnect" : "Connect";
-            btn.disabled = false;
-        }
-
-        async function fetchLogs() {
-            try {
-                const res = await fetch("/terminal/logs");
-                const logs = await res.json();
-                
-                const relevantKeywords = ["LED", "Power", "Connect", "Disconnect", "Error", "Serial"];
-                
-                const filteredLogs = logs.filter(line => {
-                    if (line.includes("GET /") || line.includes("POST /") || line.includes("HTTP/1.1")) {
-                        return false;
-                    }
-                    return relevantKeywords.some(keyword => line.toUpperCase().includes(keyword.toUpperCase()));
-                });
-
-                const term = document.getElementById("terminal");
-                
-                if(filteredLogs.length === 0) {
-                    term.innerHTML = "<span style='opacity:0.5; font-style:italic'>Waiting for commands...</span>";
-                } else {
-                    term.innerHTML = filteredLogs.join("\n");
-                }
-                term.scrollTop = term.scrollHeight;
-            } catch (e) {
-                console.log("Log fetch error", e);
-            }
         }
 
         function openNav() {
@@ -451,10 +331,6 @@
             document.getElementById('themeIcon').textContent = savedTheme === 'dark' ? '🌙' : '☀️';
 
             loadFavorites();
-            setInterval(pollStatus, 3000);
-            setInterval(fetchLogs, 2000);
-            pollStatus();
-            fetchLogs();
         });
     </script>
 </body>
