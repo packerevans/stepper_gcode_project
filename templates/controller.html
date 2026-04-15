@@ -111,8 +111,11 @@
                 right: 0;
                 border-top: 2px solid var(--color-border);
                 border-bottom: none;
+                padding: 10px 0;
             }
-            body { padding-bottom: 80px !important; } 
+            .main-nav a span:not(.icon) { display: none; }
+            .main-nav .icon { margin-bottom: 0; width: 28px; height: 28px; }
+            body { padding-bottom: 70px !important; } 
         }
 
         .main-content {
@@ -241,12 +244,12 @@
 </head>
 <body data-theme="light">
 
-    <div class="header-nav">
+    <div class="header-nav" style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-bottom: 2px solid var(--color-border); background: var(--color-background); position: relative;">
         <div style="width: 32px;"></div> <!-- Spacer to balance toggle -->
-        <h1 class="header-title">Sand Table Controller</h1>
-        <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Light/Dark Mode">
-            <svg class="moon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
-            <svg class="sun" viewBox="0 0 24 24"><path d="M12,7c-2.76,0-5,2.24-5,5s2.24,5,5,5s5-2.24,5-5S14.76,7,12,7z M2,13h2c0.55,0,1-0.45,1-1s-0.45-1-1-1H2c-0.55,0-1,0.45-1,1S1.45,13,2,13z M20,13h2c0.55,0,1-0.45,1-1s-0.45-1-1-1h-2c-0.55,0-1,0.45-1,1S19.45,13,20,13z M11,2v2c0,0.55,0.45,1,1,1s1-0.45,1-1V2c0-0.55-0.45-1-1-1S11,1.45,11,2z M11,20v2c0,0.55,0.45,1,1,1s1-0.45,1-1v-2c0-0.55-0.45-1-1-1S11,19.45,11,20z M5.99,4.58c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0s0.39-1.03,0-1.41L5.99,4.58z M18.36,16.95c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0c0.39-0.39,0.39-1.03,0-1.41L18.36,16.95z M19.42,5.99c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41s1.02,0.39,1.41,0L19.42,5.99z M7.05,18.36c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41s1.03,0.39,1.41,0L7.05,18.36z"/></svg>
+        <h1 class="header-title" style="position: absolute; left: 50%; transform: translateX(-50%); font-size: 1.2rem; font-weight: 800; margin: 0; white-space: nowrap;">Sand Table Controller</h1>
+        <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Light/Dark Mode" style="background: none; border: none; cursor: pointer; color: var(--color-text); width: 32px; height: 32px; padding: 4px; display: flex; align-items: center; justify-content: center; z-index: 2500;">
+            <svg class="moon" viewBox="0 0 24 24" style="width: 100%; height: 100%; fill: currentColor;"><circle cx="12" cy="12" r="8"/></svg>
+            <svg class="sun" viewBox="0 0 24 24" style="width: 100%; height: 100%; fill: currentColor;"><path d="M12,7c-2.76,0-5,2.24-5,5s2.24,5,5,5s5-2.24,5-5S14.76,7,12,7z M2,13h2c0.55,0,1-0.45,1-1s-0.45-1-1-1H2c-0.55,0-1,0.45-1,1S1.45,13,2,13z M20,13h2c0.55,0,1-0.45,1-1s-0.45-1-1-1h-2c-0.55,0-1,0.45-1,1S19.45,13,20,13z M11,2v2c0,0.55,0.45,1,1,1s1-0.45,1-1V2c0-0.55-0.45-1-1-1S11,1.45,11,2z M11,20v2c0,0.55,0.45,1,1,1s1-0.45,1-1v-2c0-0.55-0.45-1-1-1S11,19.45,11,20z M5.99,4.58c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0s0.39-1.03,0-1.41L5.99,4.58z M18.36,16.95c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0c0.39-0.39,0.39-1.03,0-1.41L18.36,16.95z M19.42,5.99c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41s1.02,0.39,1.41,0L19.42,5.99z M7.05,18.36c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41s1.03,0.39,1.41,0L7.05,18.36z"/></svg>
         </button>
     </div>
 
