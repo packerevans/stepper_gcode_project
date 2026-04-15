@@ -259,6 +259,7 @@ class GCodeRunner(threading.Thread):
 
     def send_line(self, line):
         try:
+            log_message(f"TX (Runner): {line}")
             with lock: arduino.write((line + "\n").encode())
             self.lines_sent += 1
             self.credits -= 1 
@@ -345,7 +346,7 @@ def read_from_serial():
             if arduino.in_waiting > 0:
                 line = arduino.readline().decode(errors="ignore").strip()
                 if line:
-                    if "ERROR" in line: log_message(f"Ard: {line}")
+                    log_message(f"Ard: {line}")
                     if "STATUS:CALIBRATING" in line:
                         is_calibrating = True
                         calibration_done = False
@@ -468,6 +469,7 @@ def manual_move():
     rho = data.get("rho")
     # Send as raw theta rho to the firmware
     cmd = f"{theta} {rho}\n"
+    log_message(f"TX (Manual): {cmd.strip()}")
     with lock: arduino.write(cmd.encode())
     return jsonify(success=True)
 
@@ -641,7 +643,9 @@ def send_command():
             send_led_persistent(255, 255, 255)
         return jsonify(success=True)
     
-    if arduino_connected: lock.acquire(); arduino.write((cmd+"\n").encode()); lock.release(); return jsonify(success=True)
+    if arduino_connected: 
+        log_message(f"TX (Raw): {cmd}")
+        lock.acquire(); arduino.write((cmd+"\n").encode()); lock.release(); return jsonify(success=True)
     return jsonify(success=False)
 
 @app.route("/wifi_setup")
