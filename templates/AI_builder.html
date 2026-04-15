@@ -329,7 +329,7 @@
             document.getElementById('recipeDisplay').innerHTML = `<div class="spinner"></div> <b>Dreaming up:</b><br>"${prompt}"<br><i>Waiting for AI Image Generation...</i>`;
             
             // Appending style hints to make the image easily traceable for the physical machine
-            const aiQuery = prompt + " simple high contrast black and white clip art continuous minimal";
+            const aiQuery = prompt + " simple black and white clip art";
             const imgUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(aiQuery)}?width=800&height=800&nologo=true&seed=${Math.floor(Math.random()*10000)}`;
             
             const img = new Image();
