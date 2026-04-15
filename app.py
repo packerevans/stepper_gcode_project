@@ -473,8 +473,6 @@ def manual_move():
 
 @app.route("/settings")
 def settings_page(): return render_template("settings.html")
-@app.route("/script")
-def script(): return render_template("script.html")
 
 # --- SETTINGS API ---
 @app.route("/api/settings", methods=["GET", "POST"])
