@@ -33,24 +33,62 @@
             transition: background 0.3s, color 0.3s;
         }
 
-        /* --- Sidebar & Layout --- */
-        .sidebar {
-            height: 100%; width: 0; position: fixed; top: 0; left: 0;
-            background-color: var(--color-primary); overflow-x: hidden;
-            transition: 0.3s; padding-top: 60px; z-index: 1000;
-            box-shadow: 2px 0 5px var(--color-shadow);
+        /* --- Global Navigation --- */
+        .main-nav {
+            z-index: 2000;
+            background: var(--color-surface, var(--panel, #ffffff));
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 10px 0;
+            transition: background 0.3s;
         }
-        .sidebar a {
-            padding: 15px 24px; text-decoration: none; font-size: 18px;
-            color: var(--color-text); display: block; transition: 0.2s; font-weight: 500;
-        }
-        .sidebar a:hover { background-color: var(--color-secondary); color: var(--color-surface); }
 
-        .openbtn {
-            font-size: 26px; cursor: pointer; background-color: var(--color-primary);
-            color: var(--color-text); padding: 10px 20px; border: none;
-            border-radius: 0 0 var(--border-radius) 0; position: fixed;
-            top: 0; left: 0; z-index: 1100; box-shadow: 0 2px 5px var(--color-shadow);
+        .main-nav a {
+            text-decoration: none;
+            color: var(--color-text, var(--text, #333));
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 0.7rem;
+            font-weight: 600;
+            opacity: 0.7;
+            transition: opacity 0.2s, color 0.2s;
+            flex: 1;
+        }
+
+        .main-nav a:hover, .main-nav a.active {
+            opacity: 1;
+            color: var(--color-accent, var(--color-primary, #d2b48c));
+        }
+
+        .main-nav .icon {
+            font-size: 1.4rem;
+            margin-bottom: 2px;
+        }
+
+        /* Mobile: Bottom Nav */
+        @media (max-width: 768px) {
+            .main-nav {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+                border-top: 1px solid rgba(0,0,0,0.1);
+            }
+            body { padding-bottom: 80px !important; } 
+        }
+
+        /* Desktop: Top Nav */
+        @media (min-width: 769px) {
+            .main-nav {
+                position: sticky;
+                top: 0;
+                border-bottom: 1px solid rgba(0,0,0,0.1);
+                padding: 10px 0;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            }
         }
         
         #themeToggle {
@@ -171,22 +209,22 @@
 </head>
 <body data-theme="light">
     
+    <nav class="main-nav">
+        <a href="/" id="nav-designs"><span class="icon">🎨</span><span>Designs</span></a>
+        <a href="/controller" id="nav-controller"><span class="icon">🕹️</span><span>Control</span></a>
+        <a href="/sketch" id="nav-sketch"><span class="icon">✏️</span><span>Sketch</span></a>
+        <a href="/AI_builder" id="nav-ai"><span class="icon">🤖</span><span>AI</span></a>
+        <a href="/led_controls" id="nav-leds"><span class="icon">💡</span><span>LEDs</span></a>
+        <a href="/script" id="nav-script"><span class="icon">📜</span><span>Bulk</span></a>
+        <a href="/terminal" id="nav-terminal"><span class="icon">🖥️</span><span>Console</span></a>
+        <a href="/settings" id="nav-settings"><span class="icon">⚙️</span><span>Settings</span></a>
+    </nav>
+
     <div id="loadingOverlay">
         <div class="loader-spinner"></div>
         <div class="loader-text">Connecting...</div>
     </div>
 
-    <div id="mySidebar" class="sidebar">
-        <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
-        <a href="/">Designs</a>
-        <a href="/controller">Controller</a>
-        <a href="/sketch">Sketch</a>
-        <a href="/led_controls">LED Controls</a>
-        <a href="/settings">Settings</a>
-        <a href="/terminal">Terminal</a>
-    </div>
-
-    <button class="openbtn" onclick="openNav()">☰</button>
     <button id="themeToggle" onclick="toggleDarkMode()">
         <span id="themeIcon">☀️</span>
     </button>
@@ -309,14 +347,6 @@
              sendCommand("POWER:ON");
         }
 
-        function openNav() {
-            document.getElementById("mySidebar").style.width = "200px";
-            if(window.innerWidth > 600) document.querySelector(".main-content").style.marginLeft = "200px";
-        }
-        function closeNav() {
-            document.getElementById("mySidebar").style.width = "0";
-            document.querySelector(".main-content").style.marginLeft = "0";
-        }
         function toggleDarkMode() {
             const body = document.body;
             const next = body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
@@ -329,6 +359,22 @@
             const savedTheme = localStorage.getItem('theme') || 'light';
             document.body.setAttribute('data-theme', savedTheme);
             document.getElementById('themeIcon').textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+
+            // Set active nav link
+            const path = window.location.pathname;
+            const navMap = {
+                '/': 'nav-designs',
+                '/controller': 'nav-controller',
+                '/sketch': 'nav-sketch',
+                '/AI_builder': 'nav-ai',
+                '/led_controls': 'nav-leds',
+                '/script': 'nav-script',
+                '/terminal': 'nav-terminal',
+                '/settings': 'nav-settings'
+            };
+            const activeId = navMap[path] || 'nav-designs';
+            const el = document.getElementById(activeId);
+            if (el) el.classList.add('active');
 
             loadFavorites();
         });

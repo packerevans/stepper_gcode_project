@@ -656,6 +656,8 @@ def check_password_route(): return jsonify(success=(request.json.get("password")
 # --- PAGES ---
 @app.route("/terminal")
 def terminal(): return render_template("terminal.html")
+@app.route("/AI_builder")
+def ai_builder(): return render_template("AI_builder.html")
 @app.route("/led_controls")
 def led_controls(): return render_template("led_controls.html")
 @app.route("/sketch")

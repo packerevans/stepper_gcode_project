@@ -32,6 +32,65 @@
             transition: background 0.3s, color 0.3s;
         }
 
+        /* --- Global Navigation --- */
+        .main-nav {
+            z-index: 2000;
+            background: var(--color-surface);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 10px 0;
+            transition: background 0.3s;
+        }
+
+        .main-nav a {
+            text-decoration: none;
+            color: var(--color-text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 0.7rem;
+            font-weight: 600;
+            opacity: 0.7;
+            transition: opacity 0.2s, color 0.2s;
+            flex: 1;
+        }
+
+        .main-nav a:hover, .main-nav a.active {
+            opacity: 1;
+            color: var(--color-accent);
+        }
+
+        .main-nav .icon {
+            font-size: 1.4rem;
+            margin-bottom: 2px;
+        }
+
+        /* Mobile: Bottom Nav */
+        @media (max-width: 768px) {
+            .main-nav {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+                border-top: 1px solid rgba(0,0,0,0.1);
+            }
+            body { padding-bottom: 80px; } /* Space for bottom nav */
+        }
+
+        /* Desktop: Top Nav */
+        @media (min-width: 769px) {
+            .main-nav {
+                position: sticky;
+                top: 0;
+                border-bottom: 1px solid rgba(0,0,0,0.1);
+                padding: 10px 0;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            }
+            header { top: 65px; } /* Push header down since nav is sticky */
+        }
+
         /* --- Header --- */
         header {
             position: sticky; top: 0; z-index: 100;
@@ -197,8 +256,19 @@
         <button class="close-loop" onclick="cancelLoop()">✕</button>
     </div>
 
+    <nav class="main-nav">
+        <a href="/" id="nav-designs"><span class="icon">🎨</span><span>Designs</span></a>
+        <a href="/controller" id="nav-controller"><span class="icon">🕹️</span><span>Control</span></a>
+        <a href="/sketch" id="nav-sketch"><span class="icon">✏️</span><span>Sketch</span></a>
+        <a href="/AI_builder" id="nav-ai"><span class="icon">🤖</span><span>AI</span></a>
+        <a href="/led_controls" id="nav-leds"><span class="icon">💡</span><span>LEDs</span></a>
+        <a href="/script" id="nav-script"><span class="icon">📜</span><span>Bulk</span></a>
+        <a href="/terminal" id="nav-terminal"><span class="icon">🖥️</span><span>Console</span></a>
+        <a href="/settings" id="nav-settings"><span class="icon">⚙️</span><span>Settings</span></a>
+    </nav>
+
     <header>
-        <button class="icon-btn" onclick="openNav()">☰</button>
+        <div style="width: 40px;"></div> <!-- Spacer -->
         <div class="header-center">
             <div id="playing-display" class="playing-text">Select a design</div>
             
@@ -214,17 +284,6 @@
         </div>
         <button class="icon-btn" onclick="toggleTheme()">◑</button>
     </header>
-
-    <div id="overlay" class="overlay" onclick="closeNav()"></div>
-    <div id="mySidebar" class="sidebar">
-        <div style="padding:0 25px; margin-bottom:20px; opacity:0.5;">MENU</div>
-        <a href="/">Designs</a>
-        <a href="/controller">Controller</a>
-        <a href="/sketch">Sketch</a>
-        <a href="/led_controls">LED Controls</a>
-        <a href="/settings">Settings</a>
-        <a href="/terminal">Terminal</a>
-    </div>
 
     <div class="hero-container">
         <img src="/static/sand.png" alt="Sand Table" class="hero-image">
@@ -709,10 +768,28 @@
             });
         }
 
-        function openNav() { document.getElementById('mySidebar').style.width="250px"; document.getElementById('overlay').style.display="block"; }
-        function closeNav() { document.getElementById('mySidebar').style.width="0"; document.getElementById('overlay').style.display="none"; }
-
-        loadLib(); updateQ(); setInterval(updateQ, 3000);
+        // Set active nav link
+        document.addEventListener('DOMContentLoaded', () => {
+            const path = window.location.pathname;
+            const navMap = {
+                '/': 'nav-designs',
+                '/designs': 'nav-designs',
+                '/controller': 'nav-controller',
+                '/sketch': 'nav-sketch',
+                '/AI_builder': 'nav-ai',
+                '/led_controls': 'nav-leds',
+                '/script': 'nav-script',
+                '/terminal': 'nav-terminal',
+                '/settings': 'nav-settings'
+            };
+            const activeId = navMap[path] || 'nav-designs';
+            const el = document.getElementById(activeId);
+            if (el) el.classList.add('active');
+            
+            loadLib(); 
+            updateQ(); 
+            setInterval(updateQ, 3000);
+        });
     </script>
 </body>
 </html>

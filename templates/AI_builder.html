@@ -30,20 +30,62 @@
             display: flex; flex-direction: column; overflow: hidden;
         }
 
-        .nav-bar {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 10px 15px; background: var(--panel);
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 100;
+        /* --- Global Navigation --- */
+        .main-nav {
+            z-index: 2000;
+            background: var(--color-surface, var(--panel, #ffffff));
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 10px 0;
+            transition: background 0.3s;
         }
-        .sidebar {
-            height: 100%; width: 0; position: fixed; top: 0; left: 0;
-            background-color: var(--primary); overflow-x: hidden;
-            transition: 0.3s; padding-top: 60px; z-index: 2000;
-            box-shadow: 4px 0 10px rgba(0,0,0,0.3);
+
+        .main-nav a {
+            text-decoration: none;
+            color: var(--color-text, var(--text, #333));
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 0.7rem;
+            font-weight: 600;
+            opacity: 0.7;
+            transition: opacity 0.2s, color 0.2s;
+            flex: 1;
         }
-        .sidebar a {
-            padding: 15px 24px; text-decoration: none; font-size: 18px;
-            color: #fff; display: block; font-weight: 500;
+
+        .main-nav a:hover, .main-nav a.active {
+            opacity: 1;
+            color: var(--color-accent, var(--primary, #d2b48c));
+        }
+
+        .main-nav .icon {
+            font-size: 1.4rem;
+            margin-bottom: 2px;
+        }
+
+        /* Mobile: Bottom Nav */
+        @media (max-width: 768px) {
+            .main-nav {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+                border-top: 1px solid rgba(0,0,0,0.1);
+            }
+            body { padding-bottom: 80px !important; } 
+        }
+
+        /* Desktop: Top Nav */
+        @media (min-width: 769px) {
+            .main-nav {
+                position: sticky;
+                top: 0;
+                border-bottom: 1px solid rgba(0,0,0,0.1);
+                padding: 10px 0;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            }
         }
 
         .app-container {
@@ -126,21 +168,16 @@
 </head>
 <body data-theme="light">
 
-    <div id="mySidebar" class="sidebar">
-        <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
-        <a href="/">Designs</a>
-        <a href="/controller">Controller</a>
-        <a href="/sketch">AI Builder</a>
-        <a href="/led_controls">LED Controls</a>
-        <a href="/settings">Settings</a>
-        <a href="/terminal">Terminal</a>
-    </div>
-
-    <div class="nav-bar">
-        <button style="flex:0; background:none; font-size:24px; color:var(--text); padding:0; height:auto;" onclick="openNav()">☰</button>
-        <h1 style="margin:0; font-size:1.2rem;">AI Builder</h1>
-        <button style="flex:0; background:none; font-size:20px; height:auto;" onclick="toggleTheme()">☀️</button>
-    </div>
+    <nav class="main-nav">
+        <a href="/" id="nav-designs"><span class="icon">🎨</span><span>Designs</span></a>
+        <a href="/controller" id="nav-controller"><span class="icon">🕹️</span><span>Control</span></a>
+        <a href="/sketch" id="nav-sketch"><span class="icon">✏️</span><span>Sketch</span></a>
+        <a href="/AI_builder" id="nav-ai"><span class="icon">🤖</span><span>AI</span></a>
+        <a href="/led_controls" id="nav-leds"><span class="icon">💡</span><span>LEDs</span></a>
+        <a href="/script" id="nav-script"><span class="icon">📜</span><span>Bulk</span></a>
+        <a href="/terminal" id="nav-terminal"><span class="icon">🖥️</span><span>Console</span></a>
+        <a href="/settings" id="nav-settings"><span class="icon">⚙️</span><span>Settings</span></a>
+    </nav>
 
     <div class="app-container">
         <div class="drawing-panel">
@@ -801,11 +838,27 @@
         
         function updateUI() { document.getElementById('symVal').textContent = document.getElementById('symSlider').value + 'x'; render(); }
         function showToast(msg, type) { const t = document.getElementById('status-toast'); t.textContent = msg; t.className = type; t.style.opacity = 1; setTimeout(()=>t.style.opacity=0, 3000); }
-        function openNav() { document.getElementById("mySidebar").style.width = "250px"; }
-        function closeNav() { document.getElementById("mySidebar").style.width = "0"; }
         function toggleTheme() { const b = document.body; b.setAttribute('data-theme', b.getAttribute('data-theme')==='dark'?'light':'dark'); render(); }
         function resetStatus() { generatedGCode = null; processedPoints = []; document.getElementById('statusTxt').innerText = "Ready to Build"; document.getElementById('progressSlider').value = 100; render(); }
         
+        // Set active nav link
+        document.addEventListener('DOMContentLoaded', () => {
+            const path = window.location.pathname;
+            const navMap = {
+                '/': 'nav-designs',
+                '/controller': 'nav-controller',
+                '/sketch': 'nav-sketch',
+                '/AI_builder': 'nav-ai',
+                '/led_controls': 'nav-leds',
+                '/script': 'nav-script',
+                '/terminal': 'nav-terminal',
+                '/settings': 'nav-settings'
+            };
+            const activeId = navMap[path] || 'nav-designs';
+            const el = document.getElementById(activeId);
+            if (el) el.classList.add('active');
+        });
+
         function render() {
             const w = canvas.width / window.devicePixelRatio; const h = canvas.height / window.devicePixelRatio; ctx.clearRect(0, 0, w, h); ctx.filter = 'none';
             const tableR = parseFloat(document.getElementById('cfgRadius').value); const sym = parseInt(document.getElementById('symSlider').value); const dark = document.body.getAttribute('data-theme') === 'dark'; const prog = parseInt(document.getElementById('progressSlider').value); document.getElementById('progVal').textContent = prog + '%';

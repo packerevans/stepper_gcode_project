@@ -6,112 +6,140 @@
     <title>Pi System Console</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* * --- CONSOLIDATED STYLES BASED ON USER PREFERENCE --- 
-         * Khaki/Tan Colors, Modern/Simplistic Vibe, No Emojis in CSS
+        /* * --- HIGH-TECH MODERN TERMINAL STYLES --- 
+         * Square edges, high contrast, minimalist vibe
          */
 
-        /* --- Root Variables (Light Mode) --- */
+        /* --- Root Variables (Light Mode: Black & White) --- */
         :root {
-            --color-primary: #d2b48c; /* Khaki/Tan */
-            --color-secondary: #b08d5c; /* Darker Tan (Accent Hover) */
-            --color-background: #f0f0f0; /* Light Gray/Off-White */
-            --color-surface: #ffffff; /* White Card/Container Background */
-            --color-text: #333333; /* Dark Text */
-            --color-shadow: rgba(0, 0, 0, 0.08);
+            --color-primary: #000000;
+            --color-secondary: #333333;
+            --color-background: #ffffff; 
+            --color-surface: #ffffff; 
+            --color-text: #000000;
+            --color-accent: #000000;
+            --color-border: #000000;
+            --color-shadow: rgba(0, 0, 0, 0.1);
 
             /* Terminal Colors (Light) */
-            --color-terminal-bg: #e9e9e9;
-            --color-terminal-text: #333333;
-            --color-terminal-prompt: #008080; /* Teal/Cyan */
+            --color-terminal-bg: #f5f5f5;
+            --color-terminal-text: #000000;
+            --color-terminal-prompt: #000000;
 
-            --border-radius: 12px;
+            --border-radius: 0px; /* Force Square */
         }
 
-        /* --- Dark Mode Variables --- */
+        /* --- Dark Mode Variables (Black & Green) --- */
         body[data-theme='dark'] {
-            --color-background: #1e1e1e;
-            --color-surface: #2c2c2c;
-            --color-text: #e0e0e0;
-            --color-shadow: rgba(255, 255, 255, 0.08);
+            --color-background: #000000;
+            --color-surface: #0a0a0a;
+            --color-text: #00ff00;
+            --color-accent: #00ff00;
+            --color-secondary: #008800;
+            --color-border: #00ff00;
+            --color-shadow: rgba(0, 255, 0, 0.1);
 
             /* Terminal Colors (Dark) */
-            --color-terminal-bg: #1a1a1a;
-            --color-terminal-text: #cccccc;
-            --color-terminal-prompt: #98fb98; /* Pale Green */
+            --color-terminal-bg: #000000;
+            --color-terminal-text: #00ff00;
+            --color-terminal-prompt: #00ff00;
         }
 
         /* --- Base Styles --- */
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
             background: var(--color-background);
             color: var(--color-text);
             transition: background 0.3s, color 0.3s;
             min-height: 100vh;
+            margin: 0;
+            text-transform: uppercase; /* Tech vibe */
+            letter-spacing: 1px;
         }
 
-        /* --- Sidebar & Header --- */
-        .sidebar {
-            height: 100%; width: 0; position: fixed; top: 0; left: 0;
-            background-color: var(--color-surface); /* Sidebar matches the card surface */
-            overflow-x: hidden; transition: 0.3s; padding-top: 60px;
-            z-index: 1000; box-shadow: 2px 0 5px var(--color-shadow);
-            border-right: 1px solid var(--color-primary); /* Use primary color for a subtle border */
+        /* --- Global Navigation --- */
+        .main-nav {
+            z-index: 2000;
+            background: var(--color-background);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 2px solid var(--color-border);
         }
 
-        .sidebar a {
-            padding: 15px 24px; text-decoration: none; font-size: 18px;
-            color: var(--color-text); display: block; transition: 0.2s;
-            font-weight: 500;
+        .main-nav a {
+            text-decoration: none;
+            color: var(--color-text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 0.65rem;
+            font-weight: 700;
+            opacity: 0.6;
+            transition: opacity 0.2s, background 0.2s;
+            flex: 1;
+            padding: 5px 0;
         }
 
-        .sidebar a:hover {
-            background-color: var(--color-primary);
-            color: var(--color-surface); /* Text becomes white/surface color for contrast */
+        .main-nav a:hover, .main-nav a.active {
+            opacity: 1;
+            background: var(--color-text);
+            color: var(--color-background);
         }
 
-        .openbtn {
-            font-size: 26px; cursor: pointer; background-color: var(--color-primary);
-            color: var(--color-text); /* Matches text color for a sleek look */
-            padding: 10px 20px; border: none;
-            border-radius: 0 0 var(--border-radius) 0; position: fixed;
-            top: 0; left: 0; z-index: 1100; box-shadow: 0 2px 5px var(--color-shadow);
-            transition: background 0.2s, color 0.2s;
+        .main-nav .icon {
+            font-size: 1.2rem;
+            margin-bottom: 4px;
+        }
+
+        /* Mobile: Bottom Nav */
+        @media (max-width: 768px) {
+            .main-nav {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                border-top: 2px solid var(--color-border);
+                border-bottom: none;
+            }
+            body { padding-bottom: 80px !important; } 
         }
 
         .main-content {
-            margin-left: 0; transition: margin-left 0.3s; padding: 20px;
-            max-width: 900px; margin: 0 auto;
+            padding: 20px;
+            max-width: 1000px;
+            margin: 0 auto;
         }
 
-        /* --- Custom Button Styles (Applying modern look) --- */
+        /* --- Custom Button Styles --- */
         .btn-action {
-            background-color: var(--color-primary);
+            background-color: transparent;
             color: var(--color-text);
-            border: none; padding: 10px 20px; border-radius: 8px;
-            font-size: 16px; cursor: pointer;
-            transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
-            font-weight: 600;
-            box-shadow: 0 2px 5px var(--color-shadow);
+            border: 2px solid var(--color-border);
+            padding: 12px 24px;
+            border-radius: 0; /* Square */
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 700;
+            text-transform: uppercase;
         }
 
         .btn-action:hover {
-            background-color: var(--color-secondary);
-            color: var(--color-surface); /* Text becomes white/surface color on hover */
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px var(--color-shadow);
-        }
-        .btn-action:active {
-            transform: translateY(0);
-            box-shadow: 0 2px 5px var(--color-shadow);
+            background-color: var(--color-text);
+            color: var(--color-background);
         }
 
-        /* Special button color for destructive action */
+        /* Destructive actions just get a slightly thicker border or distinct hover */
         .btn-danger {
-            background-color: #e74c3c; /* Red */
-            color: white;
+            border-width: 3px;
         }
-        .btn-danger:hover {
-            background-color: #c0392b; /* Darker Red */
+        
+        body[data-theme='dark'] .btn-danger:hover {
+            background-color: #ff0000;
+            border-color: #ff0000;
+            color: #000;
         }
 
         /* --- Terminal Log Styling --- */
@@ -119,127 +147,115 @@
             background: var(--color-terminal-bg);
             color: var(--color-terminal-text);
             padding: 20px;
-            border-radius: var(--border-radius);
-            height: 70vh;
+            border: 2px solid var(--color-border);
+            height: 60vh;
             overflow-y: scroll;
             white-space: pre-wrap;
-            font-family: 'Consolas', 'Courier New', monospace;
-            font-size: 14px;
-            border: 1px solid var(--color-secondary);
-            box-shadow: 0 4px 10px var(--color-shadow);
+            font-family: inherit;
+            font-size: 13px;
             margin-top: 20px;
+            scrollbar-width: thin;
+            scrollbar-color: var(--color-border) var(--color-background);
         }
 
-        /* --- Password Screen Modernization (Styled with Khaki/Tan) --- */
+        /* --- Password Screen --- */
         #loginScreen {
-            position: absolute; /* Changed from fixed to absolute for better flow */
+            position: fixed;
             top: 0; left: 0;
-            width: 100%; 
-            min-height: 100%; /* Use min-height to cover the whole content area */
-            background: var(--color-background); /* Matches main background */
+            width: 100%; height: 100%;
+            background: var(--color-background);
             display: flex; flex-direction: column;
             justify-content: center; align-items: center;
-            z-index: 1500; /* Below sidebar, above content */
-            padding-top: 100px; /* Leave space for the header */
+            z-index: 3000;
         }
         
         #loginScreen.hidden {
             display: none !important;
         }
 
-
         #loginBox {
-            background: var(--color-surface);
             padding: 40px;
-            border-radius: var(--border-radius);
-            box-shadow: 0 10px 30px var(--color-shadow);
+            border: 2px solid var(--color-border);
             text-align: center;
-            max-width: 350px;
+            max-width: 400px;
             width: 90%;
-            border: 2px solid var(--color-primary);
-            transition: background 0.3s, border-color 0.3s;
         }
 
         #loginBox h2 {
-            margin-bottom: 25px;
-            font-size: 1.8rem;
-            color: var(--color-secondary);
+            margin-bottom: 30px;
+            font-size: 1.5rem;
+            letter-spacing: 4px;
         }
 
         #passwordInput {
-            padding: 12px;
-            border: 2px solid #ccc;
-            border-radius: 8px;
+            padding: 15px;
+            border: 2px solid var(--color-border);
+            border-radius: 0;
             width: 100%;
             margin-bottom: 20px;
-            font-size: 18px;
-            background: var(--color-background);
+            font-size: 20px;
+            background: transparent;
             color: var(--color-text);
-            transition: border-color 0.2s, box-shadow 0.2s;
+            text-align: center;
+            font-family: inherit;
         }
 
         #passwordInput:focus {
             outline: none;
-            border-color: var(--color-primary);
-            box-shadow: 0 0 0 3px rgba(210, 180, 140, 0.5); /* Khaki shadow glow */
+            background: var(--color-text);
+            color: var(--color-background);
         }
 
         #errorMsg {
-            color: #e74c3c;
-            margin-top: 15px;
-            font-weight: 600;
+            color: #ff0000;
+            margin-top: 20px;
+            font-size: 0.8rem;
         }
 
-        /* Theme Toggle Styling */
+        /* Theme Toggle */
         #themeToggle {
-            position: fixed; top: 15px; right: 15px; background: var(--color-surface);
-            color: var(--color-text); border: 1px solid var(--color-text);
-            padding: 8px 15px; border-radius: 50%; z-index: 1200;
-            width: 40px; height: 40px; line-height: 20px;
+            position: fixed; top: 15px; right: 15px; background: transparent;
+            color: var(--color-text); border: 2px solid var(--color-border);
+            padding: 0; z-index: 2500;
+            width: 45px; height: 45px;
             display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 2px 5px var(--color-shadow);
             cursor: pointer;
             font-size: 1.2rem;
         }
         
-        /* Utility styles for the content visibility */
-        .content-hidden {
-            opacity: 0.2;
-            pointer-events: none;
-            filter: blur(2px);
-            transition: opacity 0.5s, filter 0.5s;
-        }
-        .content-visible {
-            opacity: 1;
-            pointer-events: auto;
-            filter: blur(0);
-            transition: opacity 0.5s, filter 0.5s;
+        #themeToggle:hover {
+            background: var(--color-text);
+            color: var(--color-background);
         }
 
-        /* Responsive Adjustments */
+        .header-row h2 {
+            border-left: 10px solid var(--color-border);
+            padding-left: 20px;
+        }
+
+        #terminalInput {
+            border-radius: 0;
+            border: 2px solid var(--color-border);
+            background: transparent;
+            color: var(--color-text);
+            padding: 15px;
+            font-family: inherit;
+        }
+
+        #terminalInput:focus {
+            outline: none;
+            border-style: dashed;
+        }
+
+        /* Responsive */
         @media (max-width: 600px) {
-            .main-content {
-                padding: 10px;
-            }
-            .header-row {
-                flex-direction: column;
+            .system-actions {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                width: 100%;
                 gap: 10px;
             }
-            .system-actions button {
-                width: 100%;
-            }
-            .system-actions {
-                flex-wrap: wrap;
-                justify-content: center;
-            }
-            #log {
-                height: 50vh;
-            }
-            /* Adjust login screen padding for mobile */
-            #loginScreen {
-                padding-top: 60px; 
-                justify-content: flex-start;
-            }
+            .btn-action { padding: 10px 5px; font-size: 12px; }
         }
     </style>
 </head>
@@ -249,20 +265,18 @@
         <span id="themeIcon">☀️</span>
     </button>
 
-    <div id="mySidebar" class="sidebar">
-        <a href="javascript:void(0)" onclick="closeNav()">✖ Close</a>
-        <a href="/">Designs</a>
-        <a href="/controller">Controller</a>
-        <a href="/sketch">Sketch</a>
-        <a href="{{ url_for('led_controls') }}">LED Controls</a>
-        <a href="{{ url_for('script') }}">Bulk Commands</a>
-        <a href="/terminal">Terminal</a>
-        <a href="/settings">Settings</a>
-    </div>
-
-    <button class="openbtn" onclick="openNav()">☰</button>
-
     <div class="main-content content-hidden" id="mainContent">
+        <nav class="main-nav">
+            <a href="/" id="nav-designs"><span class="icon">🎨</span><span>Designs</span></a>
+            <a href="/controller" id="nav-controller"><span class="icon">🕹️</span><span>Control</span></a>
+            <a href="/sketch" id="nav-sketch"><span class="icon">✏️</span><span>Sketch</span></a>
+            <a href="/AI_builder" id="nav-ai"><span class="icon">🤖</span><span>AI</span></a>
+            <a href="/led_controls" id="nav-leds"><span class="icon">💡</span><span>LEDs</span></a>
+            <a href="/script" id="nav-script"><span class="icon">📜</span><span>Bulk</span></a>
+            <a href="/terminal" id="nav-terminal"><span class="icon">🖥️</span><span>Console</span></a>
+            <a href="/settings" id="nav-settings"><span class="icon">⚙️</span><span>Settings</span></a>
+        </nav>
+        
         <div class="header-row flex flex-col md:flex-row items-center justify-between mb-5">
             <h2 class="text-3xl font-light text-center mb-4 md:mb-0 text-secondary">System Console</h2>
 
@@ -328,6 +342,24 @@
         document.addEventListener('DOMContentLoaded', () => {
             initTheme();
             checkAuthStatus(); // Now only controls content visibility
+            
+            // Set active nav link
+            const path = window.location.pathname;
+            const navMap = {
+                '/': 'nav-designs',
+                '/designs': 'nav-designs',
+                '/controller': 'nav-controller',
+                '/sketch': 'nav-sketch',
+                '/AI_builder': 'nav-ai',
+                '/led_controls': 'nav-leds',
+                '/script': 'nav-script',
+                '/terminal': 'nav-terminal',
+                '/settings': 'nav-settings'
+            };
+            const activeId = navMap[path] || 'nav-designs';
+            const el = document.getElementById(activeId);
+            if (el) el.classList.add('active');
+
             setInterval(fetchLogs, 2000);
             fetchLogs();
         });
@@ -382,18 +414,6 @@
                 document.getElementById("passwordInput").value = '';
                 document.getElementById("passwordInput").focus();
             }
-        }
-
-        function openNav() {
-            document.getElementById("mySidebar").style.width = "200px";
-            if (window.innerWidth > 600) {
-                 document.querySelector(".main-content").style.marginLeft = "200px";
-            }
-        }
-
-        function closeNav() {
-            document.getElementById("mySidebar").style.width = "0";
-            document.querySelector(".main-content").style.marginLeft = "0";
         }
 
         async function flashMessage(message, category = 'info') {
