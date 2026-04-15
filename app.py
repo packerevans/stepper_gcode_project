@@ -676,8 +676,9 @@ def get_logs():
 def restart_app():
     log_message("Restarting Application...")
     def restart():
-        time.sleep(2)
-        os.execv(sys.executable, ['python3'] + sys.argv)
+        time.sleep(1)
+        # Simply exit, the run_stepper.sh script loop will restart it
+        os._exit(0) 
     threading.Thread(target=restart).start()
     return jsonify(success=True, message="Application is restarting...")
 
