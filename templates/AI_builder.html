@@ -195,7 +195,7 @@
                 </div>
 
                 <div class="recipe-box" id="recipeDisplay">
-                    <i>Type a prompt for an AI generated drawing, or leave blank to randomize procedural shapes and filters!</i><br><br>
+                    <i>Type a prompt for AI generated clip art, or leave blank to randomize procedural shapes and filters!</i><br><br>
                     <span style="font-size:11px; color:#666;">(Tip: You can still click and drag the canvas to reposition generated designs!)</span>
                 </div>
 
@@ -329,7 +329,7 @@
             document.getElementById('recipeDisplay').innerHTML = `<div class="spinner"></div> <b>Dreaming up:</b><br>"${prompt}"<br><i>Waiting for AI Image Generation...</i>`;
             
             // Appending style hints to make the image easily traceable for the physical machine
-            const aiQuery = prompt + " simple high contrast black and white line art continuous minimal";
+            const aiQuery = prompt + " simple high contrast black and white clip art continuous minimal";
             const imgUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(aiQuery)}?width=800&height=800&nologo=true&seed=${Math.floor(Math.random()*10000)}`;
             
             const img = new Image();
