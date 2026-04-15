@@ -100,16 +100,15 @@
 
         /* --- Header --- */
         header {
-            position: sticky; top: 0; z-index: 100;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
+            position: relative; top: 0; z-index: 100;
+            background: var(--color-surface);
             border-bottom: 1px solid rgba(0,0,0,0.05);
             display: grid; 
             grid-template-columns: 40px 1fr 40px;
             align-items: center;
             padding: 0 15px; height: 60px;
         }
-        body[data-theme='dark'] header { background: rgba(30, 30, 30, 0.95); border-bottom: 1px solid rgba(255,255,255,0.05); }
+        body[data-theme='dark'] header { background: var(--color-surface); border-bottom: 1px solid rgba(255,255,255,0.05); }
 
         .header-center { text-align: center; overflow: visible; display: flex; flex-direction: column; align-items: center; position: relative; }
         .playing-text { font-weight: 700; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
@@ -145,7 +144,15 @@
         .btn-remove:hover { background: rgba(239, 68, 68, 0.1); }
         .queue-empty-msg { padding: 15px; text-align: center; color: #888; font-style: italic; }
 
-        .icon-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--color-text); }
+        .theme-toggle {
+            background: none; border: none; cursor: pointer; color: var(--color-text);
+            width: 32px; height: 32px; padding: 4px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .theme-toggle svg { width: 100%; height: 100%; fill: currentColor; }
+        .theme-toggle .sun { display: none; }
+        body[data-theme='dark'] .theme-toggle .moon { display: none; }
+        body[data-theme='dark'] .theme-toggle .sun { display: block; }
 
         /* --- Loop Indicator --- */
         #loop-indicator {
@@ -287,7 +294,10 @@
             </div>
 
         </div>
-        <button class="icon-btn" onclick="toggleTheme()">◑</button>
+        <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Light/Dark Mode">
+            <svg class="moon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
+            <svg class="sun" viewBox="0 0 24 24"><path d="M12,7c-2.76,0-5,2.24-5,5s2.24,5,5,5s5-2.24,5-5S14.76,7,12,7z M2,13h2c0.55,0,1-0.45,1-1s-0.45-1-1-1H2c-0.55,0-1,0.45-1,1S1.45,13,2,13z M20,13h2c0.55,0,1-0.45,1-1s-0.45-1-1-1h-2c-0.55,0-1,0.45-1,1S19.45,13,20,13z M11,2v2c0,0.55,0.45,1,1,1s1-0.45,1-1V2c0-0.55-0.45-1-1-1S11,1.45,11,2z M11,20v2c0,0.55,0.45,1,1,1s1-0.45,1-1v-2c0-0.55-0.45-1-1-1S11,19.45,11,20z M5.99,4.58c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0s0.39-1.03,0-1.41L5.99,4.58z M18.36,16.95c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0c0.39-0.39,0.39-1.03,0-1.41L18.36,16.95z M19.42,5.99c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41s1.02,0.39,1.41,0L19.42,5.99z M7.05,18.36c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41s1.03,0.39,1.41,0L7.05,18.36z"/></svg>
+        </button>
     </header>
 
     <div class="hero-container">
