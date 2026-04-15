@@ -118,7 +118,7 @@
             color: var(--color-text);
             border: 2px solid var(--color-border);
             padding: 12px 24px;
-            border-radius: 0; /* Square */
+            border-radius: 0 !important; /* Square */
             font-size: 14px;
             cursor: pointer;
             transition: all 0.2s;
@@ -418,7 +418,7 @@
             const colorClass = category === 'info' ? 'text-green-700 bg-green-100 border-green-300' : 'text-red-700 bg-red-100 border-red-300';
             
             // Create a styled alert box
-            msgDiv.innerHTML = `<p class="${colorClass} font-semibold p-3 rounded-lg shadow-md border">${message}</p>`;
+            msgDiv.innerHTML = `<p class="${colorClass} font-semibold p-3 rounded-none shadow-md border">${message}</p>`;
             
             // Clear message after 5 seconds
             setTimeout(() => { msgDiv.innerHTML = ''; }, 5000);

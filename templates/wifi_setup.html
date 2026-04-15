@@ -26,7 +26,7 @@
         }
 
         .card {
-            background-color: var(--card-bg); padding: 25px; border-radius: 16px;
+            background-color: var(--card-bg); padding: 25px; border-radius: 0 !important;
             width: 100%; max-width: 450px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); box-sizing: border-box;
         }
 
@@ -36,12 +36,12 @@
         /* --- WARNING BOX --- */
         .screenshot-warning {
             border: 2px dashed var(--accent-color); background-color: var(--warning-bg);
-            color: var(--warning-text); padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center;
+            color: var(--warning-text); padding: 15px; border-radius: 0 !important; margin-bottom: 20px; text-align: center;
         }
         .address-link { font-family: monospace; font-size: 1.1rem; color: var(--text-color); font-weight: bold; }
 
         /* --- LISTS --- */
-        .network-list { max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 10px; }
+        .network-list { max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 0 !important; margin-bottom: 10px; }
         .network-item {
             padding: 12px; border-bottom: 1px solid var(--border-color); cursor: pointer;
             display: flex; justify-content: space-between; align-items: center; transition: background 0.2s;
@@ -56,13 +56,13 @@
         }
         .forget-btn {
             background: transparent; border: 1px solid var(--danger-color); color: var(--danger-color);
-            padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;
+            padding: 5px 10px; border-radius: 0 !important; cursor: pointer; font-size: 0.8rem;
         }
         .forget-btn:hover { background: var(--danger-color); color: white; }
 
         /* --- INPUTS --- */
-        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-color); box-sizing: border-box; }
-        button.action-btn { width: 100%; padding: 14px; border-radius: 8px; border: none; background-color: var(--accent-color); color: #fff; font-weight: bold; font-size: 1rem; cursor: pointer; margin-top: 10px; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 0 !important; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-color); box-sizing: border-box; }
+        button.action-btn { width: 100%; padding: 14px; border-radius: 0 !important; border: none; background-color: var(--accent-color); color: #fff; font-weight: bold; font-size: 1rem; cursor: pointer; margin-top: 10px; }
         button.cancel { background-color: var(--secondary-text); }
         .theme-toggle { position: absolute; top: 10px; right: 10px; background: none; border: none; font-size: 1.5rem; cursor: pointer; }
     </style>
