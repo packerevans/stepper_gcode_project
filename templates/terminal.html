@@ -366,6 +366,11 @@
         const LOGIN_SCREEN = document.getElementById("loginScreen");
         const THEME_TOGGLE = document.getElementById('themeToggle');
         const THEME_ICON_WRAP = document.getElementById('themeIcon');
+        const TERMINAL_INPUT = document.getElementById('terminalInput');
+
+        // Command History
+        let commandHistory = JSON.parse(localStorage.getItem('terminal_history') || '[]');
+        let historyIndex = commandHistory.length;
 
         const DARK_ICON = `<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>`;
         const LIGHT_ICON = `<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/></svg>`;
@@ -391,6 +396,26 @@
 
             setInterval(fetchLogs, 2000);
             fetchLogs();
+
+            // History Navigation Listener
+            TERMINAL_INPUT.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    if (historyIndex > 0) {
+                        historyIndex--;
+                        TERMINAL_INPUT.value = commandHistory[historyIndex];
+                    }
+                } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    if (historyIndex < commandHistory.length - 1) {
+                        historyIndex++;
+                        TERMINAL_INPUT.value = commandHistory[historyIndex];
+                    } else {
+                        historyIndex = commandHistory.length;
+                        TERMINAL_INPUT.value = '';
+                    }
+                }
+            });
         });
 
         function initTheme() {
@@ -509,6 +534,13 @@
                 });
                 const data = await res.json();
                 if (data.success) {
+                    // Add to history if not same as last
+                    if (commandHistory[commandHistory.length - 1] !== cmd) {
+                        commandHistory.push(cmd);
+                        if (commandHistory.length > 50) commandHistory.shift();
+                        localStorage.setItem('terminal_history', JSON.stringify(commandHistory));
+                    }
+                    historyIndex = commandHistory.length;
                     input.value = '';
                 } else {
                     flashMessage("Failed to send command.", "error");
