@@ -312,6 +312,54 @@
         }
 
         // --- AI BUILDER ORCHESTRATION ---
+        function autoCenterAndScale(img, targetSize = 800) {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = img.width;
+            tempCanvas.height = img.height;
+            const tCtx = tempCanvas.getContext('2d');
+            tCtx.drawImage(img, 0, 0);
+            const data = tCtx.getImageData(0, 0, img.width, img.height).data;
+
+            let minX = img.width, minY = img.height, maxX = 0, maxY = 0;
+            let found = false;
+            const threshold = 220; // content threshold
+
+            for (let y = 0; y < img.height; y++) {
+                for (let x = 0; x < img.width; x++) {
+                    const idx = (y * img.width + x) * 4;
+                    const brightness = (data[idx] + data[idx+1] + data[idx+2]) / 3;
+                    if (brightness < threshold) {
+                        if (x < minX) minX = x;
+                        if (x > maxX) maxX = x;
+                        if (y < minY) minY = y;
+                        if (y > maxY) maxY = y;
+                        found = true;
+                    }
+                }
+            }
+
+            if (!found) {
+                return { x: 0, y: 0, scale: Math.min(targetSize/img.width, targetSize/img.height) * 0.9 };
+            }
+
+            const contentW = maxX - minX + 1;
+            const contentH = maxY - minY + 1;
+            const contentCX = minX + contentW / 2;
+            const contentCY = minY + contentH / 2;
+
+            const offsetX = (img.width / 2) - contentCX;
+            const offsetY = (img.height / 2) - contentCY;
+
+            // Scale to fit targetSize with 2% margin for robustness
+            const scale = Math.min(targetSize / contentW, targetSize / contentH) * 0.98;
+
+            return {
+                x: offsetX * scale,
+                y: offsetY * scale,
+                scale: scale
+            };
+        }
+
         function triggerAIGeneration() {
             const prompt = document.getElementById('aiPrompt').value.trim();
             document.getElementById('designPhaseControls').style.pointerEvents = 'none';
@@ -340,14 +388,15 @@
                 
                 // Allow UI to update before heavy math locks the thread
                 setTimeout(() => {
+                    const transform = autoCenterAndScale(img, 800);
+                    
                     traceState.active = true;
                     traceState.img = img;
-                    traceState.x = 0; traceState.y = 0;
+                    traceState.x = transform.x; 
+                    traceState.y = transform.y;
                     traceState.rotation = 0;
-                    
-                    const size = 800; 
-                    const imgScale = Math.min(size/img.width, size/img.height) * 0.9;
-                    traceState.baseScale = imgScale; traceState.scale = imgScale;
+                    traceState.baseScale = transform.scale; 
+                    traceState.scale = transform.scale;
                     
                     // Randomize trace density slightly for texture variance (2.0 to 4.5)
                     const randomDensity = (Math.random() * 2.5 + 2.0).toFixed(1);
