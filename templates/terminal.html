@@ -117,7 +117,7 @@
 
         .main-content {
             padding: 20px;
-            max-width: 1000px;
+            max-width: 1200px; /* Increased for grid layout */
             margin: 0 auto;
         }
 
@@ -157,7 +157,7 @@
             color: var(--color-terminal-text);
             padding: 20px;
             border: 2px solid var(--color-border);
-            height: 60vh;
+            height: 55vh;
             overflow-y: scroll;
             white-space: pre-wrap;
             font-family: inherit;
@@ -256,22 +256,48 @@
             border-style: dashed;
         }
 
-        /* Responsive */
-        @media (max-width: 600px) {
+        /* --- GRID LAYOUT FOR ACTIONS --- */
+        .system-actions {
+            display: grid;
+            gap: 15px;
+            width: 100%;
+        }
+
+        /* Desktop: 3 columns, 2 rows */
+        @media (min-width: 769px) {
             .system-actions {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                width: 100%;
-                gap: 10px;
+                grid-template-columns: repeat(3, 1fr);
+                grid-template-rows: repeat(2, auto);
+                width: auto;
+                min-width: 600px;
             }
-            .btn-action { padding: 10px 5px; font-size: 12px; }
+            /* Adjust shutdown button to not span all columns on desktop if desired, 
+               or keep it spanning if requested. User said 3 columns 2 rows. 
+               We have 5 buttons. So 3 on top, 2 on bottom. */
+            #shutdownBtn {
+                grid-column: span 1; /* Normal size */
+            }
+        }
+
+        /* Mobile: 2 columns */
+        @media (max-width: 768px) {
+            .system-actions {
+                grid-template-columns: 1fr 1fr;
+            }
+            .btn-action { padding: 12px 10px; font-size: 12px; }
+            #shutdownBtn {
+                grid-column: span 2; /* Spans full width on mobile */
+            }
         }
     </style>
 </head>
 <body data-theme="light">
     
      <button id="themeToggle" onclick="toggleTheme()">
-        <span id="themeIcon">☀️</span>
+        <span id="themeIcon">
+            <!-- Initial icon (replaced by JS) -->
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+        </span>
     </button>
 
     <div class="main-content content-hidden" id="mainContent">
@@ -285,10 +311,10 @@
             <a href="/settings" id="nav-settings"><span class="icon"><svg viewBox="0 0 24 24"><path d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.35 19.43,11.03L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.97 19.05,5.05L16.56,6.05C16.04,5.66 15.47,5.34 14.86,5.08L14.48,2.42C14.44,2.18 14.24,2 14,2H10C9.76,2 9.56,2.18 9.52,2.42L9.14,5.08C8.53,5.34 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.97 4.46,5.05 4.34,5.27L2.34,8.73C2.22,8.95 2.27,9.22 2.46,9.37L4.57,11.03C4.53,11.35 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.22,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.95C7.96,18.34 8.53,18.66 9.14,18.92L9.52,21.58C9.56,21.82 9.76,22 10,22H14C14.24,22 14.44,21.82 14.48,21.58L14.86,18.92C15.47,18.66 16.04,18.34 16.56,17.95L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z"/></svg></span><span>Settings</span></a>
         </nav>
         
-        <div class="header-row flex flex-col md:flex-row items-center justify-between mb-10">
-            <h2 class="text-3xl font-light text-center mb-6 md:mb-0 text-secondary">System Console</h2>
+        <div class="header-row flex flex-col xl:flex-row items-center justify-between mb-10 mt-10">
+            <h2 class="text-3xl font-light text-center mb-6 xl:mb-0 text-secondary">System Console</h2>
 
-            <div class="system-actions grid grid-cols-2 gap-2 w-full md:w-auto">
+            <div class="system-actions">
                 <button id="updateBtn" class="btn-action" onclick="sendCommand('/update_firmware', 'Update Firmware')">
                     Update FW
                 </button>
@@ -305,14 +331,13 @@
                     Reboot
                 </button>
                 
-                <button id="shutdownBtn" class="btn-action col-span-2" style="background: rgba(255, 0, 0, 0.1); border-color: #ff0000; color: #ff0000;" onclick="sendCommand('/shutdown', 'Shutdown')">
+                <button id="shutdownBtn" class="btn-action" style="background: rgba(255, 0, 0, 0.1); border-color: #ff0000; color: #ff0000;" onclick="sendCommand('/shutdown', 'Shutdown')">
                     Shutdown
                 </button>
             </div>
         </div>
 
-        <div id="flashMessages" class="min-h-10">
-            </div>
+        <div id="flashMessages" class="min-h-10"></div>
 
         <div id="log">Awaiting command line output...</div>
 
@@ -325,10 +350,8 @@
 
     <div id="loginScreen" class="absolute">
         <div id="loginBox">
-    <h2>System Access Required</h2>
-        <img src="{{ url_for('static', filename='terminal.png') }}" class="mx-auto mb-5" width="400" height="400">
-
-
+            <h2>System Access Required</h2>
+            <img src="{{ url_for('static', filename='terminal.png') }}" class="mx-auto mb-5" width="400" height="400">
             <input type="password" id="passwordInput" placeholder="Access Code" onkeydown="handleKey(event)">
             <button class="btn-action w-full" onclick="checkPassword()">Unlock</button>
             <p id="errorMsg"></p>
@@ -336,19 +359,21 @@
     </div>
 
     <script>
-        // Constants for localStorage keys
         const AUTH_KEY = 'pi_console_authenticated';
         const THEME_KEY = 'pi_console_theme';
         const CORRECT_PASSWORD = "2025";
         const MAIN_CONTENT = document.getElementById("mainContent");
         const LOGIN_SCREEN = document.getElementById("loginScreen");
         const THEME_TOGGLE = document.getElementById('themeToggle');
+        const THEME_ICON_WRAP = document.getElementById('themeIcon');
+
+        const DARK_ICON = `<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>`;
+        const LIGHT_ICON = `<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/></svg>`;
 
         document.addEventListener('DOMContentLoaded', () => {
             initTheme();
-            checkAuthStatus(); // Now only controls content visibility
+            checkAuthStatus();
             
-            // Set active nav link
             const path = window.location.pathname;
             const navMap = {
                 '/': 'nav-designs',
@@ -371,8 +396,7 @@
         function initTheme() {
             const savedTheme = localStorage.getItem(THEME_KEY) || 'light';
             document.body.setAttribute('data-theme', savedTheme);
-            // FIX: Use emojis instead of words
-            THEME_TOGGLE.textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+            THEME_ICON_WRAP.innerHTML = savedTheme === 'dark' ? DARK_ICON : LIGHT_ICON;
         }
 
         function toggleTheme() {
@@ -380,8 +404,7 @@
             const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
             document.body.setAttribute('data-theme', newTheme);
             localStorage.setItem(THEME_KEY, newTheme);
-            // FIX: Use emojis instead of words
-            THEME_TOGGLE.textContent = newTheme === 'dark' ? '🌙' : '☀️';
+            THEME_ICON_WRAP.innerHTML = newTheme === 'dark' ? DARK_ICON : LIGHT_ICON;
         }
 
         function checkAuthStatus() {
@@ -422,17 +445,11 @@
 
         async function flashMessage(message, category = 'info') {
             const msgDiv = document.getElementById("flashMessages");
-            // Adjusted color classes to be consistent with the khaki/tan theme
             const colorClass = category === 'info' ? 'text-green-700 bg-green-100 border-green-300' : 'text-red-700 bg-red-100 border-red-300';
-            
-            // Create a styled alert box
             msgDiv.innerHTML = `<p class="${colorClass} font-semibold p-3 rounded-none shadow-md border">${message}</p>`;
-            
-            // Clear message after 5 seconds
             setTimeout(() => { msgDiv.innerHTML = ''; }, 5000);
         }
 
-        // --- Improved Command Sender for Robust Error Handling ---
         async function sendCommand(url, commandName) {
             if (localStorage.getItem(AUTH_KEY) !== 'true') {
                 LOGIN_SCREEN.classList.remove("hidden");
@@ -454,7 +471,6 @@
                 });
                 
                 let data = { success: false, message: 'Server error: Could not parse response.' };
-                
                 const contentType = res.headers.get("content-type");
                 
                 if (contentType && contentType.includes("application/json")) {
@@ -462,7 +478,6 @@
                 } else {
                     const text = await res.text();
                     data.message = `Command failed: Server returned an unexpected response (Status ${res.status}). Check Flask logs.`;
-                    console.error("Non-JSON Server Response for command:", commandName, "\nResponse Text:", text);
                 }
 
                 if (res.ok && data.success) {
@@ -472,7 +487,6 @@
                 }
             } catch (error) {
                 flashMessage(`Network connection error for ${commandName}: ${error.message}`, 'error');
-                console.error(`Fetch error for ${commandName}:`, error);
             }
         }
 
@@ -496,7 +510,6 @@
                 const data = await res.json();
                 if (data.success) {
                     input.value = '';
-                    // No need to flash success, it'll show up in logs anyway
                 } else {
                     flashMessage("Failed to send command.", "error");
                 }
@@ -527,7 +540,6 @@
                 }
             }
         }
-
     </script>
 </body>
 </html>

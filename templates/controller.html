@@ -4,103 +4,88 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sand Table - Controller</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* --- Modern Variables --- */
+        /* * --- HIGH-TECH MODERN TERMINAL STYLES --- 
+         * Square edges, high contrast, minimalist vibe
+         */
+
+        /* --- Root Variables (Light Mode: Black & White) --- */
         :root {
-            --color-accent: #d2b48c; 
-            --color-selected: #4ade80; 
-            --color-bg: #f8f9fa;
-            --color-surface: #ffffff;
-            --color-text: #222222;
-            --radius: 0 !important;
-            --shadow-float: 0 10px 15px -3px rgba(0,0,0,0.1);
+            --color-primary: #000000;
+            --color-secondary: #333333;
+            --color-background: #ffffff; 
+            --color-surface: #ffffff; 
+            --color-text: #000000;
+            --color-accent: #000000;
+            --color-border: #000000;
+            --color-shadow: rgba(0, 0, 0, 0.1);
+
+            /* Terminal Colors (Light) */
+            --color-terminal-bg: #f5f5f5;
+            --color-terminal-text: #000000;
+            --color-terminal-prompt: #000000;
+
+            --border-radius: 0px; /* Force Square */
         }
 
+        /* --- Dark Mode Variables (Black & Green) --- */
         body[data-theme='dark'] {
-            --color-bg: #121212;
-            --color-surface: #1e1e1e;
-            --color-text: #e0e0e0;
+            --color-background: #000000;
+            --color-surface: #0a0a0a;
+            --color-text: #00ff00;
+            --color-accent: #00ff00;
+            --color-secondary: #008800;
+            --color-border: #00ff00;
+            --color-shadow: rgba(0, 255, 0, 0.1);
+
+            /* Terminal Colors (Dark) */
+            --color-terminal-bg: #000000;
+            --color-terminal-text: #00ff00;
+            --color-terminal-prompt: #00ff00;
         }
 
+        /* --- Base Styles --- */
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background: var(--color-bg);
+            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+            background: var(--color-background);
             color: var(--color-text);
-            margin: 0; padding-bottom: 50px;
             transition: background 0.3s, color 0.3s;
-            overflow-x: hidden;
+            min-height: 100vh;
+            margin: 0;
+            text-transform: uppercase; /* Tech vibe */
+            letter-spacing: 1px;
         }
-
-        header {
-            position: sticky; top: 0; z-index: 100;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(0,0,0,0.05);
-            display: flex; align-items: center; justify-content: center;
-            padding: 0 15px; height: 60px;
-        }
-        body[data-theme='dark'] header { background: rgba(30, 30, 30, 0.95); border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .icon-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--color-text); }
-
-        .container { max-width: 600px; margin: 20px auto; padding: 0 15px; text-align: center; }
-
-        /* --- Live View --- */
-        .live-view-card {
-            background: var(--color-surface); border-radius: var(--radius);
-            padding: 20px; box-shadow: var(--shadow-float); margin-bottom: 30px;
-        }
-        canvas {
-            width: 100%; aspect-ratio: 1/1; background: #eee; border-radius: 0 !important;
-            border: 2px solid var(--color-accent);
-        }
-        body[data-theme='dark'] canvas { background: #333; }
-
-        /* --- Joystick --- */
-        .joystick-container {
-            position: relative; width: 250px; height: 250px; margin: 0 auto;
-            background: #8b4513; /* Brown ring */
-            border-radius: 0 !important; display: flex; align-items: center; justify-content: center;
-            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
-            touch-action: none;
-        }
-        .joystick-stick {
-            position: absolute; width: 80px; height: 80px;
-            background: #000; /* Black circle */
-            border-radius: 0 !important; cursor: pointer;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
-            transition: transform 0.1s;
-        }
-
-        /* --- Controls --- */
-        .controls { margin-top: 30px; display: flex; flex-direction: column; gap: 15px; }
 
         /* --- Global Navigation --- */
         .main-nav {
             z-index: 2000;
-            background: var(--color-surface, var(--panel, #ffffff));
+            background: var(--color-background);
             display: flex;
             justify-content: space-around;
             align-items: center;
-            padding: 10px 0;
-            transition: background 0.3s;
+            padding: 15px 0;
+            border-bottom: 2px solid var(--color-border);
         }
 
         .main-nav a {
             text-decoration: none;
-            color: var(--color-text, var(--text, #333));
+            color: var(--color-text);
             display: flex;
             flex-direction: column;
             align-items: center;
-            font-size: 0.7rem;
-            font-weight: 600;
-            opacity: 0.7;
-            transition: opacity 0.2s, color 0.2s;
+            font-size: 0.65rem;
+            font-weight: 700;
+            opacity: 0.6;
+            transition: opacity 0.2s, background 0.2s;
             flex: 1;
+            padding: 5px 0;
         }
 
         .main-nav a:hover, .main-nav a.active {
             opacity: 1;
-            color: var(--color-accent, var(--primary, #d2b48c));
+            background: var(--color-text);
+            color: var(--color-background);
         }
 
         .main-nav .icon {
@@ -124,70 +109,161 @@
                 bottom: 0;
                 left: 0;
                 right: 0;
-                box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-                border-top: 1px solid rgba(0,0,0,0.1);
+                border-top: 2px solid var(--color-border);
+                border-bottom: none;
             }
             body { padding-bottom: 80px !important; } 
         }
 
-        /* Desktop: Top Nav */
-        @media (min-width: 769px) {
-            .main-nav {
-                position: sticky;
-                top: 0;
-                border-bottom: 1px solid rgba(0,0,0,0.1);
-                padding: 10px 0;
-                box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            }
+        .main-content {
+            padding: 20px;
+            max-width: 1000px;
+            margin: 0 auto;
         }
 
+        /* --- Custom Button Styles --- */
+        .btn-action {
+            background-color: transparent;
+            color: var(--color-text);
+            border: 2px solid var(--color-border);
+            padding: 12px 24px;
+            border-radius: 0 !important; /* Square */
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .btn-action:hover {
+            background-color: var(--color-text);
+            color: var(--color-background);
+        }
+
+        /* Destructive actions */
+        .btn-danger {
+            border-width: 3px;
+        }
+        
+        body[data-theme='dark'] .btn-danger:hover {
+            background-color: #ff0000;
+            border-color: #ff0000;
+            color: #000;
+        }
+
+        /* --- Live View --- */
+        .live-view-card {
+            background: var(--color-surface);
+            padding: 20px;
+            border: 2px solid var(--color-border);
+            margin-bottom: 30px;
+        }
+        canvas {
+            width: 100%; aspect-ratio: 1/1; 
+            background: var(--color-terminal-bg);
+            border: 2px solid var(--color-border);
+        }
+
+        /* --- Joystick --- */
+        .joystick-container {
+            position: relative; width: 250px; height: 250px; margin: 0 auto;
+            background: transparent;
+            border: 4px solid var(--color-border);
+            display: flex; align-items: center; justify-content: center;
+            touch-action: none;
+        }
+        .joystick-stick {
+            position: absolute; width: 80px; height: 80px;
+            background: var(--color-text);
+            cursor: pointer;
+            box-shadow: 0 5px 15px var(--color-shadow);
+            transition: transform 0.1s;
+        }
+
+        /* --- Controls --- */
+        .controls { margin-top: 30px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .controls button { width: 100%; }
+
+        /* --- Notification Popup --- */
         #sent-popup {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9);
-            background: rgba(74, 222, 128, 0.9);
-            backdrop-filter: blur(8px); color: #004d00;
-            padding: 25px 50px; border-radius: 0 !important;
-            font-size: 2rem; font-weight: 800; opacity: 0; pointer-events: none; z-index: 2000;
+            background: var(--color-text);
+            color: var(--color-background);
+            padding: 25px 50px; border: 4px solid var(--color-border);
+            font-size: 2rem; font-weight: 800; opacity: 0; pointer-events: none; z-index: 3000;
             transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
             text-transform: uppercase;
         }
         #sent-popup.active { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+        /* Theme Toggle */
+        #themeToggle {
+            position: fixed; top: 15px; right: 15px; background: transparent;
+            color: var(--color-text); border: 2px solid var(--color-border);
+            padding: 0; z-index: 2500;
+            width: 45px; height: 45px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+        
+        #themeToggle:hover {
+            background: var(--color-text);
+            color: var(--color-background);
+        }
+
+        .header-row h2 {
+            border-left: 10px solid var(--color-border);
+            padding-left: 20px;
+        }
+
+        @media (max-width: 600px) {
+            .controls { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
 <body data-theme="light">
 
-    <nav class="main-nav">
-        <a href="/" id="nav-designs"><span class="icon"><svg viewBox="0 0 24 24"><path d="M12 2L4.5 20.29L5.21 21L12 18L18.79 21L19.5 20.29L12 2Z"/></svg></span><span>Designs</span></a>
-        <a href="/controller" id="nav-controller"><span class="icon"><svg viewBox="0 0 24 24"><path d="M13 13V11H11V13H13M15 9V5H13V7H11V5H9V9H7V11H5V13H7V15H9V19H11V17H13V19H15V15H17V13H19V11H17V9H15Z"/></svg></span><span>Control</span></a>
-        <a href="/sketch" id="nav-sketch"><span class="icon"><svg viewBox="0 0 24 24"><path d="M14.06,9L15,9.94L5.92,19H5V18.08L14.06,9M17.66,3C17.41,3 17.15,3.1 16.96,3.29L15.13,5.12L18.88,8.87L20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18.17,3.09 17.92,3 17.66,3M14.06,6.19L3,17.25V21H6.75L17.81,9.94L14.06,6.19Z"/></svg></span><span>Sketch</span></a>
-        <a href="/AI_builder" id="nav-ai"><span class="icon"><svg viewBox="0 0 24 24"><path d="M13 3H11V5H13V3M4.5 14H6.5V16H4.5V14M4.5 10H6.5V12H4.5V10M17.5 10H19.5V12H17.5V10M17.5 14H19.5V16H17.5V14M11 19H13V21H11V19M19 19H21V21H19V19M3 19H5V21H3V19M21 3V17H3V3H21M19 5H5V15H19V5Z"/></svg></span><span>AI</span></a>
-        <a href="/led_controls" id="nav-leds"><span class="icon"><svg viewBox="0 0 24 24"><path d="M12,2A7,7 0 0,0 5,9C5,11.38 6.19,13.47 8,14.74V17A1,1 0 0,0 9,18H15A1,1 0 0,0 16,17V14.74C17.81,13.47 19,11.38 19,9A7,7 0 0,0 12,2M9,21A1,1 0 0,0 10,22H14A1,1 0 0,0 15,21V20H9V21Z"/></svg></span><span>LEDs</span></a>
-        <a href="/terminal" id="nav-terminal"><span class="icon"><svg viewBox="0 0 24 24"><path d="M20,19V7H4V19H20M20,3A2,2 0 0,1 22,5V19A2,2 0 0,1 20,21H4A2,2 0 0,1 2,19V5C2,3.89 2.89,3 4,3H20M13,17V15H18V17H13M9.58,13L5.57,9L6.92,7.59L12.33,13L6.92,18.41L5.57,17L9.58,13Z"/></svg></span><span>Console</span></a>
-        <a href="/settings" id="nav-settings"><span class="icon"><svg viewBox="0 0 24 24"><path d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.35 19.43,11.03L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.97 19.05,5.05L16.56,6.05C16.04,5.66 15.47,5.34 14.86,5.08L14.48,2.42C14.44,2.18 14.24,2 14,2H10C9.76,2 9.56,2.18 9.52,2.42L9.14,5.08C8.53,5.34 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.97 4.46,5.05 4.34,5.27L2.34,8.73C2.22,8.95 2.27,9.22 2.46,9.37L4.57,11.03C4.53,11.35 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.22,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.95C7.96,18.34 8.53,18.66 9.14,18.92L9.52,21.58C9.56,21.82 9.76,22 10,22H14C14.24,22 14.44,21.82 14.48,21.58L14.86,18.92C15.47,18.66 16.04,18.34 16.56,17.95L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z"/></svg></span><span>Settings</span></a>
-    </nav>
+    <button id="themeToggle" onclick="toggleTheme()">
+        <span id="themeIcon">☀️</span>
+    </button>
 
-    <div id="sent-popup">SENT!</div>
+    <div class="main-content" id="mainContent">
+        <nav class="main-nav">
+            <a href="/" id="nav-designs"><span class="icon"><svg viewBox="0 0 24 24"><path d="M12 2L4.5 20.29L5.21 21L12 18L18.79 21L19.5 20.29L12 2Z"/></svg></span><span>Designs</span></a>
+            <a href="/controller" id="nav-controller"><span class="icon"><svg viewBox="0 0 24 24"><path d="M13 13V11H11V13H13M15 9V5H13V7H11V5H9V9H7V11H5V13H7V15H9V19H11V17H13V19H15V15H17V13H19V11H17V9H15Z"/></svg></span><span>Control</span></a>
+            <a href="/sketch" id="nav-sketch"><span class="icon"><svg viewBox="0 0 24 24"><path d="M14.06,9L15,9.94L5.92,19H5V18.08L14.06,9M17.66,3C17.41,3 17.15,3.1 16.96,3.29L15.13,5.12L18.88,8.87L20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18.17,3.09 17.92,3 17.66,3M14.06,6.19L3,17.25V21H6.75L17.81,9.94L14.06,6.19Z"/></svg></span><span>Sketch</span></a>
+            <a href="/AI_builder" id="nav-ai"><span class="icon"><svg viewBox="0 0 24 24"><path d="M13 3H11V5H13V3M4.5 14H6.5V16H4.5V14M4.5 10H6.5V12H4.5V10M17.5 10H19.5V12H17.5V10M17.5 14H19.5V16H17.5V14M11 19H13V21H11V19M19 19H21V21H19V19M3 19H5V21H3V19M21 3V17H3V3H21M19 5H5V15H19V5Z"/></svg></span><span>AI</span></a>
+            <a href="/led_controls" id="nav-leds"><span class="icon"><svg viewBox="0 0 24 24"><path d="M12,2A7,7 0 0,0 5,9C5,11.38 6.19,13.47 8,14.74V17A1,1 0 0,0 9,18H15A1,1 0 0,0 16,17V14.74C17.81,13.47 19,11.38 19,9A7,7 0 0,0 12,2M9,21A1,1 0 0,0 10,22H14A1,1 0 0,0 15,21V20H9V21Z"/></svg></span><span>LEDs</span></a>
+            <a href="/terminal" id="nav-terminal"><span class="icon"><svg viewBox="0 0 24 24"><path d="M20,19V7H4V19H20M20,3A2,2 0 0,1 22,5V19A2,2 0 0,1 20,21H4A2,2 0 0,1 2,19V5C2,3.89 2.89,3 4,3H20M13,17V15H18V17H13M9.58,13L5.57,9L6.92,7.59L12.33,13L6.92,18.41L5.57,17L9.58,13Z"/></svg></span><span>Console</span></a>
+            <a href="/settings" id="nav-settings"><span class="icon"><svg viewBox="0 0 24 24"><path d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.35 19.43,11.03L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.97 19.05,5.05L16.56,6.05C16.04,5.66 15.47,5.34 14.86,5.08L14.48,2.42C14.44,2.18 14.24,2 14,2H10C9.76,2 9.56,2.18 9.52,2.42L9.14,5.08C8.53,5.34 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.97 4.46,5.05 4.34,5.27L2.34,8.73C2.22,8.95 2.27,9.22 2.46,9.37L4.57,11.03C4.53,11.35 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.22,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.95C7.96,18.34 8.53,18.66 9.14,18.92L9.52,21.58C9.56,21.82 9.76,22 10,22H14C14.24,22 14.44,21.82 14.48,21.58L14.86,18.92C15.47,18.66 16.04,18.34 16.56,17.95L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z"/></svg></span><span>Settings</span></a>
+        </nav>
 
-    <header>
-        <div style="font-weight: 700;">Manual Controller</div>
-        <button class="icon-btn" onclick="toggleTheme()" style="position: absolute; right: 15px;">◑</button>
-    </header>
+        <div id="sent-popup">SENT!</div>
 
-    <div class="container">
-        <div class="live-view-card">
-            <h3>Live View</h3>
-            <canvas id="viewCanvas" width="400" height="400"></canvas>
-            <div style="margin-top: 10px; font-size: 0.9rem; opacity: 0.7;">
-                Theta: <span id="val-theta">0.00</span> | Rho: <span id="val-rho">0.00</span>
+        <div class="header-row flex flex-col md:flex-row items-center justify-between mb-10 mt-10">
+            <h2 class="text-3xl font-light text-center mb-6 md:mb-0 text-secondary">Manual Controller</h2>
+        </div>
+
+        <div class="container mx-auto">
+            <div class="live-view-card">
+                <h3 class="mb-4 font-bold">Live View</h3>
+                <canvas id="viewCanvas" width="400" height="400"></canvas>
+                <div style="margin-top: 15px; font-size: 0.8rem; letter-spacing: 2px; opacity: 0.8;">
+                    THETA: <span id="val-theta">0.00</span> | RHO: <span id="val-rho">0.00</span>
+                </div>
             </div>
-        </div>
 
-        <div class="joystick-container" id="joyContainer">
-            <div class="joystick-stick" id="joyStick"></div>
-        </div>
+            <div class="joystick-container" id="joyContainer">
+                <div class="joystick-stick" id="joyStick"></div>
+            </div>
 
-        <div class="controls">
-            <button class="icon-btn" onclick="resetToCenter()" style="background: var(--color-accent); color: white; padding: 10px; border-radius: 0 !important; width: 100%; font-weight: 600;">Return to Center</button>
+            <div class="controls mb-10">
+                <button class="btn-action" onclick="resetToCenter()">Center</button>
+                <button class="btn-action" onclick="sendCommand('PAUSE')">Pause</button>
+                <button class="btn-action" onclick="sendCommand('RESUME')">Resume</button>
+                <button class="btn-action btn-danger" onclick="sendCommand('CLEAR')">Clear</button>
+            </div>
         </div>
     </div>
 
@@ -207,7 +283,7 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
             // Grid lines
-            ctx.strokeStyle = 'rgba(210, 180, 140, 0.2)';
+            ctx.strokeStyle = 'rgba(128, 128, 128, 0.2)';
             ctx.beginPath();
             for(let r=0.2; r<=1.0; r+=0.2) {
                 ctx.arc(200, 200, r * 180, 0, Math.PI * 2);
@@ -215,7 +291,6 @@
             ctx.stroke();
 
             // Ball position calculation
-            // r = rho * 180 (scale to canvas)
             const r = ballPos.rho * 180;
             const x = 200 + r * Math.cos(ballPos.theta);
             const y = 200 + r * Math.sin(ballPos.theta);
@@ -227,8 +302,8 @@
             ctx.fill();
 
             // Draw Ball
-            ctx.fillStyle = '#d2b48c';
-            ctx.strokeStyle = '#000';
+            ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--color-text');
+            ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--color-background');
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.arc(x, y, 8, 0, Math.PI * 2);
@@ -268,26 +343,21 @@
 
         function startMoveLoop() {
             if (moveInterval) return;
-            // Send location every 0.5 seconds (500ms) as requested
+            // Send location every 0.25 seconds (250ms) as requested
             moveInterval = setInterval(() => {
                 if (Math.abs(joyPos.x) < 5 && Math.abs(joyPos.y) < 5) return;
 
-                // Fixed speed for movement loop increment to keep smooth simulation
                 const stepScale = 0.05; 
                 
-                // Convert joystick XY to ball movement in Polar
                 let curX = ballPos.rho * Math.cos(ballPos.theta);
                 let curY = ballPos.rho * Math.sin(ballPos.theta);
 
-                // Add joystick offset (normalized)
                 curX += (joyPos.x / 80) * stepScale;
                 curY += (joyPos.y / 80) * stepScale;
 
-                // Back to Polar
                 let newRho = Math.sqrt(curX*curX + curY*curY);
                 let newTheta = Math.atan2(curY, curX);
 
-                // Edge Constraint
                 if (newRho > 1.0) newRho = 1.0;
 
                 ballPos.rho = newRho;
@@ -295,7 +365,7 @@
 
                 drawBall();
                 sendMove();
-            }, 500); 
+            }, 250); 
         }
 
         function stopMoveLoop() {
@@ -313,6 +383,22 @@
                     body: JSON.stringify({ theta: ballPos.theta, rho: ballPos.rho })
                 });
             } catch(e) {}
+        }
+
+        async function sendCommand(cmd) {
+            try {
+                const res = await fetch('/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ command: cmd })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showPopup(cmd);
+                }
+            } catch(e) {
+                console.error(e);
+            }
         }
 
         function resetToCenter() {
@@ -333,9 +419,14 @@
 
         // --- NAVIGATION ---
         function toggleTheme() {
-            let b = document.body, n = b.getAttribute('data-theme')==='dark'?'light':'dark';
-            b.setAttribute('data-theme', n);
+            const currentTheme = document.body.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            document.body.setAttribute('data-theme', newTheme);
+            localStorage.setItem('pi_console_theme', newTheme);
+            document.getElementById('themeIcon').textContent = newTheme === 'dark' ? '🌙' : '☀️';
+            drawBall(); // Update colors on canvas
         }
+
         function showPopup(text) {
             let p = document.getElementById('sent-popup');
             p.textContent = text; p.classList.add('active');
@@ -344,6 +435,10 @@
 
         // Set active nav link
         document.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = localStorage.getItem('pi_console_theme') || 'light';
+            document.body.setAttribute('data-theme', savedTheme);
+            document.getElementById('themeIcon').textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+
             const path = window.location.pathname;
             const navMap = {
                 '/': 'nav-designs',
@@ -354,13 +449,11 @@
                 '/terminal': 'nav-terminal',
                 '/settings': 'nav-settings'
             };
-            const activeId = navMap[path] || 'nav-designs';
+            const activeId = navMap[path] || 'nav-controller';
             const el = document.getElementById(activeId);
             if (el) el.classList.add('active');
+            drawBall();
         });
-
-        // Init
-        drawBall();
     </script>
 </body>
 </html>
