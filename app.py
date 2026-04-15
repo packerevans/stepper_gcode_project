@@ -420,7 +420,7 @@ def stop_tunnel():
 # === AUTO-START NGROK (RUNS IN THREAD) ===
 def auto_start_ngrok_thread():
     # Wait 70 seconds to match the successful manual connection timestamp
-    time.sleep(70)
+    time.sleep(90)
     log_message("Checking network connection for Ngrok auto-start...")
     
     try:
