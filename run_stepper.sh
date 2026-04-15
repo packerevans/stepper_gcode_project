@@ -1,7 +1,10 @@
 #!/bin/bash
 
-pkill -f app.py
-cd stepper_gcode_project/
+cd /home/packer/Videos/stepper_gcode_project/
 source venv/bin/activate
-
-python3 app.py
+pkill -f app.py
+while true; do
+    python3 app.py
+    echo "App crashed or was told to exit. Restarting in 1 second..."
+    sleep 1
+done

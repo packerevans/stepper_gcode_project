@@ -241,12 +241,6 @@
         <h1>LED Controller</h1>
 
         <div class="control-section">
-            <div class="status-row">
-                <button onclick="togglePower()" id="powerBtn">Power ON/OFF</button>
-            </div>
-        </div>
-
-        <div class="control-section">
             <h2>Select Color</h2>
             
             <div class="color-wrapper">
@@ -265,7 +259,7 @@
     <script>
         let debounceTimer;
         const MAX_FAVS = 3; 
-        const DEFAULT_FAVS = ["#ffffff", "#f0f0f0", "#e0e0e0"]; 
+        const DEFAULT_FAVS = ["#000000", "#ffffff", "#ffcc00"]; 
         
         // --- COLOR CALIBRATION ---
         const CALIBRATION = {
@@ -349,10 +343,6 @@
             } catch (e) {
                 console.error("Network Error", e);
             }
-        }
-
-        function togglePower() {
-             sendCommand("POWER:ON");
         }
 
         function toggleDarkMode() {
