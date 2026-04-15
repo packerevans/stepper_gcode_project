@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, jsonify, Response, url_for, send_from_directory, redirect
-import serial, threading, time, subprocess
+import serial, threading, time, subprocess, sys
 import os
 import re
 import socket
@@ -418,8 +418,8 @@ def stop_tunnel():
 
 # === AUTO-START NGROK (RUNS IN THREAD) ===
 def auto_start_ngrok_thread():
-    # Wait 90 seconds to match the successful manual connection timestamp
-    time.sleep(90)
+    # Wait 70 seconds to match the successful manual connection timestamp
+    time.sleep(70)
     log_message("Checking network connection for Ngrok auto-start...")
     
     try:
@@ -671,6 +671,15 @@ def list_designs():
 @app.route("/terminal/logs")
 def get_logs():
     with lock: return jsonify(list(serial_log))
+
+@app.route("/restart_app", methods=["POST"])
+def restart_app():
+    log_message("Restarting Application...")
+    def restart():
+        time.sleep(2)
+        os.execv(sys.executable, ['python3'] + sys.argv)
+    threading.Thread(target=restart).start()
+    return jsonify(success=True, message="Application is restarting...")
 
 if __name__ == "__main__":
     # 1. Determine Port First (5000 -> 6000)

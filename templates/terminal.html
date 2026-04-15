@@ -285,6 +285,10 @@
                     <span class="md:hidden">Shutdown</span>
                     <span class="hidden md:inline">Shutdown</span>
                 </button>
+                <button id="resetAppBtn" class="btn-action btn-danger" onclick="sendCommand('/restart_app', 'Reset App')">
+                    <span class="md:hidden">Reset App</span>
+                    <span class="hidden md:inline">Reset App</span>
+                </button>
             </div>
         </div>
 
@@ -292,6 +296,12 @@
             </div>
 
         <div id="log">Awaiting command line output...</div>
+
+        <!-- Terminal Input Box -->
+        <div class="mt-4 flex gap-2">
+            <input type="text" id="terminalInput" class="flex-grow p-3 rounded-lg bg-gray-100 border-2 border-tan-400 focus:outline-none focus:border-khaki-600 dark:bg-gray-800 dark:border-gray-700 dark:text-white" placeholder="Enter command (e.g., CALIBRATE, SPEED 1.5, 0,255,0)" onkeydown="if(event.key==='Enter') sendManualCommand()">
+            <button class="btn-action" onclick="sendManualCommand()">Send</button>
+        </div>
     </div>
 
     <div id="loginScreen" class="absolute">
@@ -439,6 +449,35 @@
             } catch (error) {
                 flashMessage(`Network connection error for ${commandName}: ${error.message}`, 'error');
                 console.error(`Fetch error for ${commandName}:`, error);
+            }
+        }
+
+        async function sendManualCommand() {
+            const input = document.getElementById("terminalInput");
+            const cmd = input.value.trim();
+            if (!cmd) return;
+
+            if (localStorage.getItem(AUTH_KEY) !== 'true') {
+                LOGIN_SCREEN.classList.remove("hidden");
+                flashMessage("Authentication required to send commands.", "error");
+                return;
+            }
+
+            try {
+                const res = await fetch('/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ command: cmd })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    input.value = '';
+                    // No need to flash success, it'll show up in logs anyway
+                } else {
+                    flashMessage("Failed to send command.", "error");
+                }
+            } catch (error) {
+                flashMessage("Network error: " + error.message, "error");
             }
         }
 
