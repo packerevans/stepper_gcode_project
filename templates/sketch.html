@@ -10,8 +10,8 @@
 
     <style>
         :root {
-            --primary: #d2b48c; 
-            --secondary: #b08d5c; 
+            --primary: #a1c4fd; 
+            --secondary: #7fb2f0; 
             --bg: #f4f4f4; 
             --panel: #ffffff; 
             --text: #333;
@@ -33,17 +33,18 @@
         /* --- Global Navigation --- */
         .main-nav {
             z-index: 2000;
-            background: var(--color-surface, var(--panel, #ffffff));
+            background: #ffffff;
             display: flex;
             justify-content: space-around;
             align-items: center;
             padding: 10px 0;
-            transition: background 0.3s;
+            border-bottom: 2px solid #000000;
         }
+        body[data-theme='dark'] .main-nav { background: #000000; border-top: 2px solid #ffffff; }
 
         .main-nav a {
             text-decoration: none;
-            color: var(--color-text, var(--text, #333));
+            color: #000000;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -53,10 +54,16 @@
             transition: opacity 0.2s, color 0.2s;
             flex: 1;
         }
+        body[data-theme='dark'] .main-nav a { color: #ffffff; }
 
         .main-nav a:hover, .main-nav a.active {
             opacity: 1;
-            color: var(--color-accent, var(--primary, #d2b48c));
+            background: #000000;
+            color: #ffffff;
+        }
+        body[data-theme='dark'] .main-nav a:hover, body[data-theme='dark'] .main-nav a.active {
+            background: #ffffff;
+            color: #000000;
         }
 
         .main-nav .icon {
@@ -81,12 +88,12 @@
                 left: 0;
                 right: 0;
                 box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-                border-top: 1px solid rgba(0,0,0,0.1);
-                padding: 10px 0;
+                border-top: 2px solid #000000;
+                padding: 5px 0;
             }
             .main-nav a span:not(.icon) { display: none; }
             .main-nav .icon { margin-bottom: 0; width: 28px; height: 28px; }
-            body { padding-bottom: 70px !important; } 
+            body { padding-bottom: 60px !important; } 
         }
 
         /* Desktop: Top Nav */
@@ -94,17 +101,42 @@
             .main-nav {
                 position: sticky;
                 top: 0;
-                border-bottom: 1px solid rgba(0,0,0,0.1);
+                border-bottom: 1px solid rgba(0,0,0,0.05);
                 padding: 10px 0;
                 box-shadow: 0 2px 5px rgba(0,0,0,0.05);
             }
         }
 
+        /* --- Header / Navigation Bar --- */
+        .header-nav {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            padding: 10px 20px;
+            background: #ffffff;
+            color: #000000;
+            border-bottom: 2px solid #000000;
+            position: relative;
+        }
+
+        .header-title {
+            grid-column: 2;
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: 800;
+            margin: 0;
+            white-space: nowrap;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
         .theme-toggle {
-            background: none; border: none; cursor: pointer; color: var(--text);
+            grid-column: 3;
+            justify-self: end;
+            background: none; border: none; cursor: pointer; color: #000000;
             width: 32px; height: 32px; padding: 4px;
             display: flex; align-items: center; justify-content: center;
-            position: absolute; top: 10px; right: 10px; z-index: 2500;
+            z-index: 2500;
         }
         .theme-toggle svg { width: 100%; height: 100%; fill: currentColor; }
         .theme-toggle .moon { display: none; }
@@ -134,32 +166,40 @@
             aspect-ratio: 1 / 1; 
             margin: auto;
             border-radius: 0 !important;
-            border: 4px solid var(--primary); 
+            border: 4px solid #000000; 
             background: #fff;
             touch-action: none; cursor: crosshair; overflow: hidden;
         }
-        body[data-theme='dark'] .canvas-wrapper { background: #222; border-color: var(--secondary); }
+        body[data-theme='dark'] .canvas-wrapper { background: #222; border-color: #ffffff; }
         canvas { display: block; width: 100%; height: 100%; border-radius: 0 !important; }
 
-        h2 { margin: 0 0 15px 0; font-size: 1.2rem; color: var(--secondary); text-align: center; }
+        h2 { margin: 0 0 15px 0; font-size: 1.2rem; color: #000000; text-align: center; text-transform: uppercase; letter-spacing: 1px; }
+        body[data-theme='dark'] h2 { color: #ffffff; }
         .btn-group { display: flex; gap: 8px; margin-bottom: 12px; }
         
         button {
-            background: var(--primary); color: var(--btn-text); border: none;
-            padding: 0 12px; 
-            height: 48px; 
-            border-radius: 0 !important; font-weight: 600; cursor: pointer;
-            flex: 1; transition: 0.2s; display: flex; align-items: center; justify-content: center;
-            font-size: 14px; 
+            background-color: #ffffff; color: #000000;
+            border: 2px solid #000000; padding: 12px 24px; border-radius: 0 !important; cursor: pointer;
+            font-size: 14px; transition: 0.2s ease-in-out; font-weight: 600;
+            display: flex; align-items: center; justify-content: center;
+            text-transform: uppercase; flex: 1;
         }
-        button:hover { filter: brightness(1.1); transform: translateY(-1px); }
-        button.secondary { background: transparent; border: 1px solid var(--text); color: var(--text); }
-        button.active { background: var(--secondary); border: 2px solid var(--text); }
-        button.action { background: var(--accent); color: #000; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        body[data-theme='dark'] button { background-color: #000000; color: #ffffff; border-color: #ffffff; }
+        
+        button:hover { background-color: #000000; color: #ffffff; }
+        body[data-theme='dark'] button:hover { background-color: #ffffff; color: #000000; }
+        
+        button.active { background-color: #000000; color: #ffffff; }
+        body[data-theme='dark'] button.active { background-color: #ffffff; color: #000000; }
+
+        button.action { background-color: #000000; color: #ffffff; border-width: 3px; }
+        body[data-theme='dark'] button.action { background-color: #ffffff; color: #000000; }
+
+        button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
         
         .slider-row { margin-bottom: 15px; background: rgba(0,0,0,0.05); padding: 8px; border-radius: 0 !important; }
         .slider-header { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; font-weight: bold; }
-        input[type="range"] { width: 100%; accent-color: var(--secondary); }
+        input[type="range"] { width: 100%; accent-color: var(--primary); }
         
         #progressSlider {
             -webkit-appearance: none; width: 100%; height: 8px; border-radius: 0 !important; background: #d3d3d3; outline: none;
@@ -181,7 +221,7 @@
         .success { background: var(--accent) !important; color: #000 !important; }
         .error { background: var(--danger) !important; color: #fff !important; }
 
-        .toggle-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 0 5px; }
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 8px; border: 1px solid #000; border-radius: 0 !important; }
         .switch { position: relative; display: inline-block; width: 40px; height: 22px; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider-tog { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 0 !important; }
@@ -227,12 +267,12 @@
 </head>
 <body data-theme="light">
 
-    <div class="header-nav" style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-bottom: 1px solid rgba(0,0,0,0.1); background: var(--panel); position: relative;">
-        <div style="width: 32px;"></div> <!-- Spacer to balance toggle -->
-        <h1 class="header-title" style="position: absolute; left: 50%; transform: translateX(-50%); font-size: 1.2rem; font-weight: 800; margin: 0; white-space: nowrap;">Sand Sketch Pro</h1>
-        <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Light/Dark Mode" style="background: none; border: none; cursor: pointer; color: var(--text); width: 32px; height: 32px; padding: 4px; display: flex; align-items: center; justify-content: center; z-index: 2500;">
-            <svg class="moon" viewBox="0 0 24 24" style="width: 100%; height: 100%; fill: currentColor;"><circle cx="12" cy="12" r="8"/></svg>
-            <svg class="sun" viewBox="0 0 24 24" style="width: 100%; height: 100%; fill: currentColor;"><path d="M12,7c-2.76,0-5,2.24-5,5s2.24,5,5,5s5-2.24,5-5S14.76,7,12,7z M2,13h2c0.55,0,1-0.45,1-1s-0.45-1-1-1H2c-0.55,0-1,0.45-1,1S1.45,13,2,13z M20,13h2c0.55,0,1-0.45,1-1s-0.45-1-1-1h-2c-0.55,0-1,0.45-1,1S19.45,13,20,13z M11,2v2c0,0.55,0.45,1,1,1s1-0.45,1-1V2c0-0.55-0.45-1-1-1S11,1.45,11,2z M11,20v2c0,0.55,0.45,1,1,1s1-0.45,1-1v-2c0-0.55-0.45-1-1-1S11,19.45,11,20z M5.99,4.58c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0s0.39-1.03,0-1.41L5.99,4.58z M18.36,16.95c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0c0.39-0.39,0.39-1.03,0-1.41L18.36,16.95z M19.42,5.99c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41s1.02,0.39,1.41,0L19.42,5.99z M7.05,18.36c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41s1.03,0.39,1.41,0L7.05,18.36z"/></svg>
+    <div class="header-nav">
+        <div style="width: 32px;"></div> <!-- Left spacer -->
+        <h1 class="header-title">Sand Sketch Pro</h1>
+        <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Light/Dark Mode">
+            <svg class="moon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
+            <svg class="sun" viewBox="0 0 24 24"><path d="M12,7c-2.76,0-5,2.24-5,5s2.24,5,5,5s5-2.24,5-5S14.76,7,12,7z M2,13h2c0.55,0,1-0.45,1-1s-0.45-1-1-1H2c-0.55,0-1,0.45-1,1S1.45,13,2,13z M20,13h2c0.55,0,1-0.45,1-1s-0.45-1-1-1h-2c-0.55,0-1,0.45-1,1S19.45,13,20,13z M11,2v2c0,0.55,0.45,1,1,1s1-0.45,1-1V2c0-0.55-0.45-1-1-1S11,1.45,11,2z M11,20v2c0,0.55,0.45,1,1,1s1-0.45,1-1v-2c0-0.55-0.45-1-1-1S11,19.45,11,20z M5.99,4.58c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0s0.39-1.03,0-1.41L5.99,4.58z M18.36,16.95c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0c0.39-0.39,0.39-1.03,0-1.41L18.36,16.95z M19.42,5.99c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41s1.02,0.39,1.41,0L19.42,5.99z M7.05,18.36c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41s1.03,0.39,1.41,0L7.05,18.36z"/></svg>
         </button>
     </div>
 
@@ -251,15 +291,14 @@
             <div class="canvas-wrapper" id="canvasContainer">
                 <canvas id="drawCanvas"></canvas>
             </div>
-            <div id="coordDisplay" style="position:absolute; bottom:10px; left:10px; background:rgba(0,0,0,0.5); color:white; padding:4px 8px; border-radius:4px; font-size:11px; pointer-events:none;">X:0 Y:0</div>
+            <div id="coordDisplay" style="position:absolute; bottom:10px; left:10px; background:rgba(0,0,0,0.5); color:white; padding:4px 8px; border-radius:0 !important; font-size:11px; pointer-events:none;">X:0 Y:0</div>
         </div>
 
         <div class="controls-panel">
             <div id="designPhaseControls">
-                <h2>Tools</h2>
                 
-                <div class="toggle-row" id="stylusModeWrapper">
-                    <span style="font-weight:600; font-size:13px;">🖋️ Stylus Mode</span>
+                <div class="toggle-row" id="stylusModeWrapper" style="border: 1px solid #000; padding: 8px;">
+                    <span style="font-weight:600; font-size:13px;"><svg viewBox="0 0 24 24" style="width:16px; height:16px; fill:currentColor; vertical-align:middle; margin-right:4px;"><path d="M14.06,9L15,9.94L5.92,19H5V18.08L14.06,9M17.66,3C17.41,3 17.15,3.1 16.96,3.29L15.13,5.12L18.88,8.87L20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18.17,3.09 17.92,3 17.66,3M14.06,6.19L3,17.25V21H6.75L17.81,9.94L14.06,6.19Z"/></svg> Stylus Mode</span>
                     <label class="switch">
                         <input type="checkbox" id="stylusMode">
                         <span class="slider-tog"></span>
@@ -268,24 +307,24 @@
 
                 <div id="toolSettingsArea">
                     <div id="set-pen" class="tool-setting-group">
-                        <div class="toggle-row" style="margin:0;">
-                            <span style="font-size:13px;">🔗 Shape Connector</span>
+                        <div class="toggle-row" style="margin:0; border: 1px solid #000; padding: 8px;">
+                            <span style="font-size:13px;"><svg viewBox="0 0 24 24" style="width:16px; height:16px; fill:currentColor; vertical-align:middle; margin-right:4px;"><path d="M3.9,12C3.9,10.29 5.29,8.9 7,8.9H11V7H7A5,5 0 0,0 2,12A5,5 0 0,0 7,17H11V15.1H7C5.29,15.1 3.9,13.71 3.9,12M8,13H16V11H8V13M17,7H13V8.9H17C18.71,8.9 20.1,10.29 20.1,12C20.1,13.71 18.71,15.1 17,15.1H13V17H17A5,5 0 0,0 22,12A5,5 0 0,0 17,7Z"/></svg> Shape Connector</span>
                             <label class="switch">
                                 <input type="checkbox" id="shapeConnectMode" checked>
                                 <span class="slider-tog"></span>
                             </label>
                         </div>
                         <div style="margin-top:10px;">
-                            <span class="tool-label">Add Stamps</span>
+                            <span class="tool-label">Add Shapes</span>
                             <div class="stamp-grid">
-                                <button class="stamp-btn" onclick="addShape('circle')">⭕</button>
-                                <button class="stamp-btn" onclick="addShape('square')">⬜</button>
-                                <button class="stamp-btn" onclick="addShape('triangle')">🔺</button>
-                                <button class="stamp-btn" onclick="addShape('hexagon')">⬡</button>
-                                <button class="stamp-btn" onclick="addShape('pentagon')">⬠</button>
-                                <button class="stamp-btn" onclick="addShape('star')">⭐</button>
-                                <button class="stamp-btn" onclick="addShape('spiral')">🌀</button>
-                                <button class="stamp-btn" onclick="addShape('random')">🎲</button>
+                                <button class="stamp-btn" onclick="addShape('circle')"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor;"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/></svg></button>
+                                <button class="stamp-btn" onclick="addShape('square')"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor;"><rect x="3" y="3" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"/></svg></button>
+                                <button class="stamp-btn" onclick="addShape('triangle')"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor;"><path d="M1,21L12,2L23,21H1Z" stroke="currentColor" stroke-width="2" fill="none"/></svg></button>
+                                <button class="stamp-btn" onclick="addShape('hexagon')"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor;"><path d="M21,16.5C21,16.88 20.79,17.21 20.47,17.38L12.57,21.82C12.41,21.94 12.21,22 12,22C11.79,22 11.59,21.94 11.43,21.82L3.53,17.38C3.21,17.21 3,16.88 3,16.5V7.5C3,7.12 3.21,6.79 3.53,6.62L11.43,2.18C11.59,2.06 11.79,2 12,2C12.21,2 12.41,2.06 12.57,2.18L20.47,6.62C20.79,6.79 21,7.12 21,7.5V16.5Z" stroke="currentColor" stroke-width="2" fill="none"/></svg></button>
+                                <button class="stamp-btn" onclick="addShape('pentagon')"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor;"><path d="M12,2.5L2,9.8L5.8,21.5H18.2L22,9.8L12,2.5Z" stroke="currentColor" stroke-width="2" fill="none"/></svg></button>
+                                <button class="stamp-btn" onclick="addShape('star')"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor;"><path d="M12,17.27L18.18,21L16.54,13.97L22,9.24L14.81,8.62L12,2L9.19,8.62L2,9.24L7.45,13.97L5.82,21L12,17.27Z" stroke="currentColor" stroke-width="2" fill="none"/></svg></button>
+                                <button class="stamp-btn" onclick="addShape('spiral')"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor;"><path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M15.1,15.1C14.3,15.9 13.2,16.4 12,16.4C9.6,16.4 7.6,14.4 7.6,12C7.6,10.8 8.1,9.7 8.9,8.9C9.7,8.1 10.8,7.6 12,7.6C14.4,7.6 16.4,9.6 16.4,12C16.4,12.6 16.2,13.1 15.9,13.6L14.5,12.2C14.5,12.1 14.5,12.1 14.5,12C14.5,10.6 13.4,9.5 12,9.5C11.3,9.5 10.7,9.8 10.3,10.3C9.8,10.7 9.5,11.3 9.5,12C9.5,13.4 10.6,14.5 12,14.5C12.7,14.5 13.3,14.2 13.7,13.7L15.1,15.1Z"/></svg></button>
+                                <button class="stamp-btn" onclick="addShape('random')"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor;"><path d="M19,3H5C3.9,3 3,3.9 3,5V19C3,20.1 3.9,21 5,21H19C20.1,21 21,20.1 21,19V5C21,3.9 20.1,3 19,3M7,7A1,1 0 0,1 8,8A1,1 0 0,1 7,9A1,1 0 0,1 6,8A1,1 0 0,1 7,7M7,15A1,1 0 0,1 8,16A1,1 0 0,1 7,17A1,1 0 0,1 6,16A1,1 0 0,1 7,15M12,11A1,1 0 0,1 13,12A1,1 0 0,1 12,13A1,1 0 0,1 11,12A1,1 0 0,1 12,11M17,7A1,1 0 0,1 18,8A1,1 0 0,1 17,9A1,1 0 0,1 16,8A1,1 0 0,1 17,7M17,15A1,1 0 0,1 18,16A1,1 0 0,1 17,17A1,1 0 0,1 16,16A1,1 0 0,1 17,15Z"/></svg></button>
                             </div>
                         </div>
                         
@@ -301,7 +340,7 @@
                     </div>
 
                     <div id="set-text" class="tool-setting-group">
-                        <span class="tool-label" style="color:var(--accent); font-weight:bold;">Text to Path</span>
+                        <span class="tool-label" style="font-weight:bold;">Text to Path</span>
                         <label class="tool-label">Your Text (Multi-line ok)</label>
                         <textarea id="toolTextInput" class="full-width" style="margin-bottom:10px; padding:8px; height:80px; resize:vertical; font-family: inherit;" oninput="renderTextToTrace()">Sketch</textarea>
                         <div class="settings-grid">
@@ -321,13 +360,13 @@
                         </div>
                         <span class="tool-label" style="margin-top:10px;">Spiral Spacing: <span id="textDensityVal">3</span></span>
                         <input type="range" min="1" max="5" value="3" step="0.1" id="textDensityInput" oninput="renderTextToTrace()">
-                        <button class="action" style="margin-top:10px; width:100%;" onclick="setTool('draw')">Confirm Placement</button>
+                        <button class="action" style="margin-top:10px; width:100%;" onclick="commitTextMove()"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor; margin-right:8px;"><path d="M9,16.17L4.83,12L3.41,13.41L9,19L21,7L19.59,5.59L9,16.17Z"/></svg> Confirm Placement</button>
                     </div>
 
                     <div id="set-select" class="tool-setting-group">
                         <span class="tool-label">Transform Selection</span>
                         <div id="traceMoveMsg" style="display:none; color:var(--accent); font-size:11px; margin-bottom:8px;">
-                            ✨ Trace Active: Drag/Rotate/Resize image
+                            <svg viewBox="0 0 24 24" style="width:12px; height:12px; fill:currentColor; vertical-align:middle; margin-right:4px;"><path d="M12,15.41L12.58,15L12,14.59L11.41,15L12,15.41M12,21L13.1,18.9L15.2,17.8L13.1,16.7L12,14.6L10.9,16.7L8.8,17.8L10.9,18.9L12,21M18,13L19.1,10.9L21.2,9.8L19.1,8.7L18,6.6L16.9,8.7L14.8,9.8L16.9,10.9L18,13M9,13L10.1,10.9L12.2,9.8L10.1,8.7L9,6.6L7.9,8.7L5.8,9.8L7.9,10.9L9,13Z"/></svg> Trace Active: Drag/Rotate/Resize image
                         </div>
                         <span class="tool-label">Rotate Live</span>
                         <input type="range" min="-180" max="180" value="0" step="1" id="liveRotSlider" 
@@ -340,7 +379,7 @@
                     </div>
 
                     <div id="set-sandify" class="tool-setting-group">
-                        <span class="tool-label" style="color:var(--accent); font-weight:bold;">Vortex Generator</span>
+                        <span class="tool-label" style="font-weight:bold;"><svg viewBox="0 0 24 24" style="width:16px; height:16px; fill:currentColor; vertical-align:middle; margin-right:4px;"><path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M15.1,15.1C14.3,15.9 13.2,16.4 12,16.4C9.6,16.4 7.6,14.4 7.6,12C7.6,10.8 8.1,9.7 8.9,8.9C9.7,8.1 10.8,7.6 12,7.6C14.4,7.6 16.4,9.6 16.4,12C16.4,12.6 16.2,13.1 15.9,13.6L14.5,12.2C14.5,12.1 14.5,12.1 14.5,12C14.5,10.6 13.4,9.5 12,9.5C11.3,9.5 10.7,9.8 10.3,10.3C9.8,10.7 9.5,11.3 9.5,12C9.5,13.4 10.6,14.5 12,14.5C12.7,14.5 13.3,14.2 13.7,13.7L15.1,15.1Z"/></svg> Vortex Generator</span>
                         <label class="tool-label">Shape Source</label>
                         <select id="vortexShape" class="full-width" onchange="updateVortexParams()">
                             <option value="custom">Current Drawing</option>
@@ -363,7 +402,7 @@
                     </div>
 
                     <div id="set-loop" class="tool-setting-group">
-                        <span class="tool-label" style="color:var(--accent); font-weight:bold;">Continuous Loop</span>
+                        <span class="tool-label" style="font-weight:bold;"><svg viewBox="0 0 24 24" style="width:16px; height:16px; fill:currentColor; vertical-align:middle; margin-right:4px;"><path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M15.1,15.1C14.3,15.9 13.2,16.4 12,16.4C9.6,16.4 7.6,14.4 7.6,12C7.6,10.8 8.1,9.7 8.9,8.9C9.7,8.1 10.8,7.6 12,7.6C14.4,7.6 16.4,9.6 16.4,12C16.4,12.6 16.2,13.1 15.9,13.6L14.5,12.2C14.5,12.1 14.5,12.1 14.5,12C14.5,10.6 13.4,9.5 12,9.5C11.3,9.5 10.7,9.8 10.3,10.3C9.8,10.7 9.5,11.3 9.5,12C9.5,13.4 10.6,14.5 12,14.5C12.7,14.5 13.3,14.2 13.7,13.7L15.1,15.1Z"/></svg> Continuous Loop</span>
                         <label class="tool-label">Shape Source</label>
                         <select id="loopShape" class="full-width" onchange="updateLoopParams()">
                             <option value="custom">Current Drawing</option>
@@ -375,20 +414,20 @@
                             <option value="star">Star</option>
                         </select>
 
-                        <div class="toggle-row" style="margin-top:12px; margin-bottom:5px;">
+                        <div class="toggle-row" style="margin-top:12px; margin-bottom:5px; border: 1px solid #000; padding: 8px;">
                             <span class="tool-label" style="margin-bottom:0;">Guide Path</span>
                             <div style="display:flex; gap:5px;">
-                                <select id="loopGuidePath" onchange="updateLoopParams()" style="flex:2; padding:5px; border-radius:4px; font-size:12px;">
+                                <select id="loopGuidePath" onchange="updateLoopParams()" style="flex:2; padding:5px; border-radius:0 !important; font-size:12px;">
                                     <option value="circle">Circle</option>
                                     <option value="square">Square</option>
                                     <option value="figure8">Figure 8</option>
                                     <option value="custom">Custom Drawn</option>
                                 </select>
-                                <button class="secondary" style="flex:1; height:30px; font-size:12px; padding:0 5px;" onclick="openPathModal()">✎ Draw</button>
+                                <button class="secondary" style="flex:1; height:30px; font-size:12px; padding:0 5px;" onclick="openPathModal()"><svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:currentColor; vertical-align:middle; margin-right:2px;"><path d="M14.06,9L15,9.94L5.92,19H5V18.08L14.06,9M17.66,3C17.41,3 17.15,3.1 16.96,3.29L15.13,5.12L18.88,8.87L20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18.17,3.09 17.92,3 17.66,3M14.06,6.19L3,17.25V21H6.75L17.81,9.94L14.06,6.19Z"/></svg> Draw</button>
                             </div>
                         </div>
                         
-                        <div class="toggle-row" style="margin-top:12px; margin-bottom:5px;">
+                        <div class="toggle-row" style="margin-top:12px; margin-bottom:5px; border: 1px solid #000; padding: 8px;">
                             <span class="tool-label" style="margin-bottom:0;">Stretch Connect</span>
                             <label class="switch">
                                 <input type="checkbox" id="loopStretchMode" checked onchange="updateLoopParams()">
@@ -413,54 +452,54 @@
                     </div>
                     
                     <div id="set-trace" class="tool-setting-group">
-                         <span class="tool-label" style="color:var(--accent); font-weight:bold;">High Precision Trace</span>
+                         <span class="tool-label" style="font-weight:bold;">High Precision Trace</span>
                          <span class="tool-label" style="color:#666; font-size:10px;">Tip: Use "Move" tool to reposition image</span>
                          <span class="tool-label">Contrast Threshold: <span id="traceThreshVal">150</span></span>
                          <input type="range" min="10" max="240" value="150" id="traceThreshInput" oninput="runHighPrecisionTrace()">
                          <span class="tool-label">Spiral Spacing: <span id="traceDensityVal">3</span></span>
                          <input type="range" min="1" max="5" value="3" step="0.1" id="traceDensityInput" oninput="runHighPrecisionTrace()">
-                         <button class="secondary" style="margin-top:10px; font-size:11px;" onclick="document.getElementById('imgUpload').click()">📂 Change Image</button>
+                         <button class="secondary" style="margin-top:10px; font-size:11px;" onclick="document.getElementById('imgUpload').click()"><svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:currentColor; vertical-align:middle; margin-right:4px;"><path d="M19,20H5V18H19V20M19,10H15V4H9V10H5L12,17L19,10Z"/></svg> Change Image</button>
                     </div>
                 </div>
 
                 <div class="btn-group">
-                    <button id="btnDraw" onclick="setTool('draw')" class="active">✏️ Draw</button>
-                    <button id="btnErase" onclick="setTool('erase')" class="secondary">🧼 Erase</button>
+                    <button id="btnDraw" onclick="setTool('draw')" class="active"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor; margin-right:8px;"><path d="M14.06,9L15,9.94L5.92,19H5V18.08L14.06,9M17.66,3C17.41,3 17.15,3.1 16.96,3.29L15.13,5.12L18.88,8.87L20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18.17,3.09 17.92,3 17.66,3M14.06,6.19L3,17.25V21H6.75L17.81,9.94L14.06,6.19Z"/></svg> Draw</button>
+                    <button id="btnErase" onclick="setTool('erase')" class="secondary"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor; margin-right:8px;"><path d="M16.24,3.56L21.19,8.44C21.97,9.22 21.97,10.48 21.19,11.26L11.78,20.67C11,21.45 9.74,21.45 8.96,20.67L4.01,15.79C3.23,15.01 3.23,13.75 4.01,12.97L13.42,3.56C14.2,2.78 15.46,2.78 16.24,3.56M13.56,10.08L6.83,16.81L10.37,20.35L17.1,13.62L13.56,10.08Z"/></svg> Erase</button>
                 </div>
 
                 <div class="btn-group">
-                    <button id="btnSelect" onclick="setTool('select')" class="secondary">✋ Move</button>
-                    <button id="btnSandify" onclick="setTool('sandify')" class="secondary">🌀 Vortex</button>
-                    <button id="btnLoop" onclick="setTool('loop')" class="secondary">🔁 Loop</button>
+                    <button id="btnSelect" onclick="setTool('select')" class="secondary"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor; margin-right:8px;"><path d="M13,6V1H11V6H13M11,23V18H13V23H11M6,13H1V11H6V13M23,11V13H18V11H23M5.6,5.6L2.1,2.1L3.5,0.7L7,4.2L5.6,5.6M18.4,5.6L17,4.2L20.5,0.7L21.9,2.1L18.4,5.6M5.6,18.4L7,17L3.5,13.5L2.1,14.9L5.6,18.4M18.4,18.4L21.9,14.9L20.5,13.5L17,17L18.4,18.4Z"/></svg> Move</button>
+                    <button id="btnSandify" onclick="setTool('sandify')" class="secondary"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor; margin-right:8px;"><path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M15.1,15.1C14.3,15.9 13.2,16.4 12,16.4C9.6,16.4 7.6,14.4 7.6,12C7.6,10.8 8.1,9.7 8.9,8.9C9.7,8.1 10.8,7.6 12,7.6C14.4,7.6 16.4,9.6 16.4,12C16.4,12.6 16.2,13.1 15.9,13.6L14.5,12.2C14.5,12.1 14.5,12.1 14.5,12C14.5,10.6 13.4,9.5 12,9.5C11.3,9.5 10.7,9.8 10.3,10.3C9.8,10.7 9.5,11.3 9.5,12C9.5,13.4 10.6,14.5 12,14.5C12.7,14.5 13.3,14.2 13.7,13.7L15.1,15.1Z"/></svg> Vortex</button>
+                    <button id="btnLoop" onclick="setTool('loop')" class="secondary"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor; margin-right:8px;"><path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M15.1,15.1C14.3,15.9 13.2,16.4 12,16.4C9.6,16.4 7.6,14.4 7.6,12C7.6,10.8 8.1,9.7 8.9,8.9C9.7,8.1 10.8,7.6 12,7.6C14.4,7.6 16.4,9.6 16.4,12C16.4,12.6 16.2,13.1 15.9,13.6L14.5,12.2C14.5,12.1 14.5,12.1 14.5,12C14.5,10.6 13.4,9.5 12,9.5C11.3,9.5 10.7,9.8 10.3,10.3C9.8,10.7 9.5,11.3 9.5,12C9.5,13.4 10.6,14.5 12,14.5C12.7,14.5 13.3,14.2 13.7,13.7L15.1,15.1Z"/></svg> Loop</button>
                 </div>
 
                 <div class="btn-group">
-                    <button id="btnTrace" class="secondary" onclick="handleTraceClick()">✨ Trace</button>
+                    <button id="btnTrace" class="secondary" onclick="handleTraceClick()"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor; margin-right:8px;"><path d="M12,15.41L12.58,15L12,14.59L11.41,15L12,15.41M12,21L13.1,18.9L15.2,17.8L13.1,16.7L12,14.6L10.9,16.7L8.8,17.8L10.9,18.9L12,21M18,13L19.1,10.9L21.2,9.8L19.1,8.7L18,6.6L16.9,8.7L14.8,9.8L16.9,10.9L18,13M9,13L10.1,10.9L12.2,9.8L10.1,8.7L9,6.6L7.9,8.7L5.8,9.8L7.9,10.9L9,13Z"/></svg> Trace</button>
                     <input type="file" id="imgUpload" accept="image/*" style="display:none" onchange="handleImageUpload(this)">
-                    <button id="btnText" onclick="setTool('text')" class="secondary">🔠 Text</button>
+                    <button id="btnText" onclick="setTool('text')" class="secondary"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor; margin-right:8px;"><path d="M18.5,4L19.66,8.35L18.7,8.61C18.25,7.74 17.79,6.87 17.26,6.43C16.73,6 16.11,5.7 15.32,5.7C13.82,5.7 12.25,6.27 12.25,9.5V17H13.5V18H6.5V17H7.75V9.5C7.75,6.27 6.18,5.7 4.68,5.7C3.89,5.7 3.27,6 2.74,6.43C2.21,6.87 1.75,7.74 1.3,8.61L0.34,8.35L1.5,4H18.5Z"/></svg> Text</button>
                 </div>
 
                 <div class="btn-group">
-                    <button onclick="clearCanvas()" class="secondary" style="color:var(--danger); border-color:var(--danger);">✖ Clear</button>
-                    <button onclick="undo()" class="secondary">↶ Undo</button>
+                    <button onclick="clearCanvas()" class="secondary" style="color:var(--danger); border-color:var(--danger);"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor; margin-right:8px;"><path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"/></svg> Clear</button>
+                    <button onclick="undo()" class="secondary"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor; margin-right:8px;"><path d="M12.5,8C9.85,8 7.45,9 5.6,10.6L2,7V16H11L7.38,12.38C8.77,11.22 10.54,10.5 12.5,10.5C16.04,10.5 19.05,12.81 20.1,16L22.47,15.22C21.08,11.03 17.15,8 12.5,8Z"/></svg> Undo</button>
                 </div>
 
                 <hr style="border:0; border-top:1px solid #ddd; margin: 15px 0;">
                 
-                <div class="toggle-row" style="background:rgba(0,0,0,0.03); padding:8px; border-radius:8px; margin-bottom:10px;">
-                    <span style="font-weight:600; font-size:13px;">🌀 Spiral Connect Drawing</span>
+                <div class="toggle-row" style="background:rgba(0,0,0,0.03); padding:8px; border-radius:0 !important; margin-bottom:10px; border: 1px solid #000;">
+                    <span style="font-weight:600; font-size:13px;"><svg viewBox="0 0 24 24" style="width:16px; height:16px; fill:currentColor; vertical-align:middle; margin-right:4px;"><path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M15.1,15.1C14.3,15.9 13.2,16.4 12,16.4C9.6,16.4 7.6,14.4 7.6,12C7.6,10.8 8.1,9.7 8.9,8.9C9.7,8.1 10.8,7.6 12,7.6C14.4,7.6 16.4,9.6 16.4,12C16.4,12.6 16.2,13.1 15.9,13.6L14.5,12.2C14.5,12.1 14.5,12.1 14.5,12C14.5,10.6 13.4,9.5 12,9.5C11.3,9.5 10.7,9.8 10.3,10.3C9.8,10.7 9.5,11.3 9.5,12C9.5,13.4 10.6,14.5 12,14.5C12.7,14.5 13.3,14.2 13.7,13.7L15.1,15.1Z"/></svg> Spiral Connect Drawing</span>
                     <label class="switch">
                         <input type="checkbox" id="spiralConnectMode" checked>
                         <span class="slider-tog"></span>
                     </label>
                 </div>
 
-                <button class="action" onclick="prepareGCode()" style="margin-bottom:15px; font-size:1.1em;">⚙️ Generate Path</button>
+                <button class="action" onclick="prepareGCode()" style="margin-bottom:15px; font-size:1.1em;"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor; margin-right:8px;"><path d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.35 19.43,11.03L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.97 19.05,5.05L16.56,6.05C16.04,5.66 15.47,5.34 14.86,5.08L14.48,2.42C14.44,2.18 14.24,2 14,2H10C9.76,2 9.56,2.18 9.52,2.42L9.14,5.08C8.53,5.34 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.97 4.46,5.05 4.34,5.27L2.34,8.73C2.22,8.95 2.27,9.22 2.46,9.37L4.57,11.03C4.53,11.35 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.22,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.95C7.96,18.34 8.53,18.66 9.14,18.92L9.52,21.58C9.56,21.82 9.76,22 10,22H14C14.24,22 14.44,21.82 14.48,21.58L14.86,18.92C15.47,18.66 16.04,18.34 16.56,17.95L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z"/></svg> Generate Path</button>
             </div>
             
             <div id="productionPhaseControls" style="display:none; margin-bottom:15px;">
                 <button class="secondary" onclick="returnToEditing()" style="width:100%; border:2px dashed #999; color:#444; background: rgba(0,0,0,0.05);">
-                    ✏️ Back to Edit
+                    <svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor; margin-right:8px;"><path d="M20,11V13H8L13.5,18.5L12.08,19.92L4.16,12L12.08,4.08L13.5,5.5L8,11H20Z"/></svg> Back to Edit
                 </button>
             </div>
 
@@ -476,12 +515,12 @@
             </div>
 
             <div class="btn-group">
-                <button onclick="sendToTable()" class="active">🚀 Run</button>
-                <button onclick="saveToServer()" class="secondary">💾 Save to Pi</button>
+                <button onclick="sendToTable()" class="active"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor; margin-right:8px;"><path d="M8,5.14V19.14L19,12.14L8,5.14Z"/></svg> Run</button>
+                <button onclick="saveToServer()" class="secondary"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor; margin-right:8px;"><path d="M15,9H5V5H15M12,19A3,3 0 0,1 9,16A3,3 0 0,1 12,13A3,3 0 0,1 15,16A3,3 0 0,1 12,19M17,3H5C3.89,3 3,3.9 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V7L17,3Z"/></svg> Save to Pi</button>
             </div>
 
             <details>
-                <summary>⚙️ Machine Settings</summary>
+                <summary><svg viewBox="0 0 24 24" style="width:16px; height:16px; fill:currentColor; margin-right:4px; vertical-align:middle;"><path d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.35 19.43,11.03L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.97 19.05,5.05L16.56,6.05C16.04,5.66 15.47,5.34 14.86,5.08L14.48,2.42C14.44,2.18 14.24,2 14,2H10C9.76,2 9.56,2.18 9.52,2.42L9.14,5.08C8.53,5.34 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.97 4.46,5.05 4.34,5.27L2.34,8.73C2.22,8.95 2.27,9.22 2.46,9.37L4.57,11.03C4.53,11.35 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.22,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.95C7.96,18.34 8.53,18.66 9.14,18.92L9.52,21.58C9.56,21.82 9.76,22 10,22H14C14.24,22 14.44,21.82 14.48,21.58L14.86,18.92C15.47,18.66 16.04,18.34 16.56,17.95L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z"/></svg> Machine Settings</summary>
                 <div class="settings-grid">
                     <div><label>Radius</label><input type="number" id="cfgRadius" value="202.6" onchange="resizeCanvas()"></div>
                     <div><label>Ball Size (mm)</label><input type="number" id="cfgBallSize" value="13" onchange="runHighPrecisionTrace()"></div>
@@ -491,7 +530,7 @@
                     <div><label>Arm 1</label><input type="number" id="cfgL1" value="101.3"></div>
                     <div><label>Arm 2</label><input type="number" id="cfgL2" value="101.3"></div>
                 </div>
-                <button class="secondary" onclick="copyGCode()" style="margin-top:10px; width:100%;">📋 Copy GCode</button>
+                <button class="secondary" onclick="copyGCode()" style="margin-top:10px; width:100%;"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor; margin-right:8px;"><path d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"/></svg> Copy GCode</button>
             </details>
         </div>
     </div>
@@ -503,44 +542,36 @@
             <canvas id="pathCanvas" onpointerdown="startDrawPath(event)" onpointermove="moveDrawPath(event)" onpointerup="endDrawPath(event)" onpointerleave="endDrawPath(event)"></canvas>
         </div>
         <div style="margin-top:20px; display:flex; gap:10px; width:90vmin; max-width:500px;">
-            <button onclick="clearPathCanvas()" class="secondary" style="background:#fff; color:#333;">↶ Retry</button>
-            <button onclick="savePathCanvas()" class="action">Complete</button>
+            <button onclick="clearPathCanvas()" class="secondary" style="background:#fff; color:#333;"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor; margin-right:8px;"><path d="M12.5,8C9.85,8 7.45,9 5.6,10.6L2,7V16H11L7.38,12.38C8.77,11.22 10.54,10.5 12.5,10.5C16.04,10.5 19.05,12.81 20.1,16L22.47,15.22C21.08,11.03 17.15,8 12.5,8Z"/></svg> Retry</button>
+            <button onclick="savePathCanvas()" class="action"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor; margin-right:8px;"><path d="M9,16.17L4.83,12L3.41,13.41L9,19L21,7L19.59,5.59L9,16.17Z"/></svg> Complete</button>
             <button onclick="closePathModal()" class="secondary" style="background:#555; color:white; border:none;">Cancel</button>
         </div>
     </div>
 
     <div id="status-toast"></div>
-    <canvas id="hiddenTraceBuffer" width="800" height="800"></canvas>
-    <canvas id="vortexScanCanvas" width="600" height="600"></canvas>
 
     <script>
         let rawPoints = []; 
         let processedPoints = []; 
         let historyStack = [];
         let isDrawing = false;
-        let currentTool = 'draw';
+        let currentTool = 'select'; // Default to move mode for user tweaking
         let origin = {x:0, y:0};
         let scale = 1;
         let generatedGCode = null;
 
-        let eraserRadius = 10;
         let traceImgData = null;
         let traceState = { active: false, img: null, x: 0, y: 0, scale: 1.0, baseScale: 1.0, rotation: 0 }; 
 
-        let lastRotVal = 0;
-        let lastScaleVal = 100;
-        
         let activeEffectType = null; 
         const vortexState = { radiusMap: new Float32Array(3600) };
         let vortexSourcePath = [];
         
         let loopSourcePath = [];
         let loopPathOffset = {x: 0, y: 0};
-        
-        // Custom Path Variables
-        let isDrawingPath = false;
+        let customPathPoints = []; // Kept empty for AI mode
         let pathRawPoints = [];
-        let customPathPoints = [];
+        let isDrawingPath = false;
 
         const canvas = document.getElementById('drawCanvas');
         const ctx = canvas.getContext('2d');
@@ -549,22 +580,7 @@
         // --- MATH HELPERS ---
         function distSq(p1, p2) { return (p1.x-p2.x)**2 + (p1.y-p2.y)**2; }
         function dist(p1, p2) { return Math.sqrt(distSq(p1, p2)); }
-        function getBounds(shape) {
-            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
-            shape.forEach(p => { if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y; });
-            return { minX, maxX, minY, maxY, area: (maxX-minX)*(maxY-minY), w: maxX-minX, h: maxY-minY, cx: (minX+maxX)/2, cy: (minY+maxY)/2 };
-        }
-        function getIntersection(A, B, C, D) {
-            const det = (B.x - A.x) * (D.y - C.y) - (D.x - C.x) * (B.y - A.y);
-            if (det === 0) return null; 
-            const lambda = ((D.y - C.y) * (D.x - A.x) + (C.x - D.x) * (D.y - A.y)) / det;
-            const gamma = ((A.y - B.y) * (D.x - A.x) + (B.x - A.x) * (D.y - A.y)) / det;
-            if (lambda > 0.001 && lambda < 0.999 && gamma > 0.001 && gamma < 0.999) {
-                return { x: A.x + lambda * (B.x - A.x), y: A.y + lambda * (B.y - A.y) };
-            }
-            return null;
-        }
-
+        
         function init() {
             resizeCanvas();
             window.addEventListener('resize', resizeCanvas);
@@ -574,45 +590,45 @@
             canvas.addEventListener('pointerleave', endDraw);
             canvas.style.touchAction = "none";
             updateUI();
-            updateToolSettings();
         }
 
+        // --- DRAWING & DRAGGING INTERACTION ---
         let dragStart = null;
 
-        // --- DRAWING LOGIC ---
         function startDraw(e) {
             e.preventDefault();
             if(generatedGCode) return;
-            const smart = document.getElementById('stylusMode').checked;
-            if(smart && currentTool !== 'select' && currentTool !== 'sandify' && currentTool !== 'loop') {
-                if(e.pointerType === 'pen') setTool('draw');
-                else if(e.pointerType === 'touch') setTool('erase');
-            }
             
-            if(currentTool === 'select' || currentTool === 'loop') {
-                isDrawing = true; dragStart = getPos(e); canvas.setPointerCapture(e.pointerId); return;
+            const pos = getPos(e);
+            if (currentTool === 'erase') {
+               doErase(pos);
+               isDrawing = true;
+            } else if (currentTool === 'draw') {
+               rawPoints.push({x: pos.x, y: pos.y, type:'point', source: 'draw'});
+               isDrawing = true;
+            } else {
+               // select/move
+               dragStart = pos;
             }
-            if(currentTool === 'sandify' || currentTool === 'trace_set' || currentTool === 'text') return;
-            saveState(); isDrawing = true; canvas.setPointerCapture(e.pointerId); processPointer(e); resetStatus();
+            canvas.setPointerCapture(e.pointerId);
         }
 
         function moveDraw(e) {
             e.preventDefault();
             const pos = getPos(e);
             document.getElementById('coordDisplay').textContent = `X:${pos.x.toFixed(0)} Y:${pos.y.toFixed(0)}`;
-            if(currentTool === 'select' && traceState.active && isDrawing && dragStart) {
-                const dx = pos.x - dragStart.x; const dy = pos.y - dragStart.y;
-                const tableR = parseFloat(document.getElementById('cfgRadius').value);
-                const mmToTraceFactor = 800 / (tableR * 2);
-                traceState.x += dx * mmToTraceFactor; traceState.y -= dy * mmToTraceFactor; 
-                dragStart = pos; drawTracePreview(); return;
-            }
-            if(!isDrawing) { render(); drawCursor(pos); return; }
             
-            if((currentTool === 'select' || currentTool === 'loop') && dragStart) {
+            if(!isDrawing && !dragStart) return;
+
+            if(isDrawing) {
+                if(currentTool === 'erase') {
+                    doErase(pos);
+                } else if(currentTool === 'draw') {
+                    rawPoints.push({x: pos.x, y: pos.y, type:'point', source: 'draw'});
+                }
+            } else if(dragStart) {
                 const dx = pos.x - dragStart.x; const dy = pos.y - dragStart.y;
-                
-                if (currentTool === 'loop' || (activeEffectType === 'loop' && currentTool === 'select')) {
+                if (activeEffectType === 'loop' && loopSourcePath) {
                     loopPathOffset.x += dx;
                     loopPathOffset.y += dy;
                     generateLoop();
@@ -622,48 +638,33 @@
                 } else {
                     rawPoints.forEach(p => { if(p.type === 'point') { p.x += dx; p.y += dy; } });
                 }
-                dragStart = pos; render(); return;
-            }
-            processPointer(e);
-        }
-
-        function endDraw(e) {
-            if(!isDrawing) return;
-            isDrawing = false; canvas.releasePointerCapture(e.pointerId);
-            if(currentTool === 'select' || currentTool === 'loop') {
-                dragStart = null; if(traceState.active) commitTraceMove(); else saveState(); return;
-            }
-            if(currentTool === 'draw') {
-                if(document.getElementById('shapeConnectMode').checked) autoConnectAndSmooth();
-                rawPoints.push({type:'break'});
+                dragStart = pos;
             }
             render();
         }
 
-        function autoConnectAndSmooth() {
-            let lastBreak = -1;
-            for(let i=rawPoints.length-1; i>=0; i--) { if(rawPoints[i].type === 'break' || rawPoints[i].type === 'cmd') { lastBreak = i; break; } }
-            let stroke = []; let startIndex = lastBreak + 1;
-            for(let i=startIndex; i<rawPoints.length; i++) stroke.push(rawPoints[i]);
-            if(stroke.length < 3) return;
-            let startP = stroke[0]; let endP = stroke[stroke.length-1];
-            let d = Math.hypot(startP.x - endP.x, startP.y - endP.y);
-            if(d < 30.0) { stroke.push({x: startP.x, y: startP.y, type:'point', source: startP.source}); }
-            for(let pass=0; pass<2; pass++) {
-                let smooth = []; smooth.push(stroke[0]);
-                for(let i=0; i<stroke.length-1; i++) {
-                    let p0 = stroke[i]; let p1 = stroke[i+1];
-                    smooth.push({ x: 0.75 * p0.x + 0.25 * p1.x, y: 0.75 * p0.y + 0.25 * p1.y, type: 'point', source: p0.source });
-                    smooth.push({ x: 0.25 * p0.x + 0.75 * p1.x, y: 0.25 * p0.y + 0.75 * p1.y, type: 'point', source: p0.source });
-                }
-                smooth.push(stroke[stroke.length-1]); stroke = smooth;
-            }
-            rawPoints.splice(startIndex, rawPoints.length - startIndex, ...stroke);
+        function endDraw(e) {
+            if(!isDrawing && !dragStart) return;
+            if(isDrawing && currentTool === 'draw') rawPoints.push({type:'break'});
+            isDrawing = false; 
+            dragStart = null;
+            canvas.releasePointerCapture(e.pointerId);
+            saveState();
+        }
+
+        function doErase(pos) {
+            const size = parseInt(document.getElementById('eraserSizeSlider').value);
+            const sizeSq = size * size;
+            rawPoints = rawPoints.filter(p => {
+                if (p.type !== 'point') return true;
+                return distSq(p, pos) > sizeSq;
+            });
         }
 
         // --- SHAPE STAMPS ---
         function addShape(type) {
-            saveState(); const r = 50; let pts = [];
+            saveState();
+            const r = 50; let pts = [];
             if(type==='circle') { for(let i=0; i<=36; i++) { const a = (i/36)*Math.PI*2; pts.push({x: Math.cos(a)*r, y: Math.sin(a)*r}); } } 
             else if(type==='square') { pts = [{x:-r,y:-r}, {x:r,y:-r}, {x:r,y:r}, {x:-r,y:r}, {x:-r,y:-r}]; } 
             else if(type==='triangle') { pts = [{x:0,y:r}, {x:r*0.86,y:-r/2}, {x:-r*0.86,y:-r/2}, {x:0,y:r}]; } 
@@ -671,143 +672,21 @@
             else if(type==='pentagon') { for(let i=0; i<=5; i++) { const a = (i/5)*Math.PI*2 - Math.PI/2; pts.push({x: Math.cos(a)*r, y: Math.sin(a)*r}); } } 
             else if(type==='star') { for(let i=0; i<=10; i++) { const a = (i/10)*Math.PI*2 + Math.PI/2; const rad = (i%2===0) ? r : r*0.4; pts.push({x: Math.cos(a)*rad, y: Math.sin(a)*rad}); } } 
             else if(type==='spiral') { for(let i=0; i<100; i++) { const a = i * 0.3; const rad = (i/100)*r; pts.push({x: Math.cos(a)*rad, y: Math.sin(a)*rad}); } } 
-            else if (type === 'random') {
-                const numPoints = Math.floor(Math.random() * 15) + 1;
-                if(numPoints === 1) { const rx = r * (0.5 + Math.random()); const ry = r * (0.5 + Math.random()); for(let i=0; i<=36; i++) { const a = (i/36)*Math.PI*2; pts.push({x: Math.cos(a)*rx, y: Math.sin(a)*ry}); } } 
-                else if(numPoints === 2) { const angle = Math.random() * Math.PI * 2; const len = r * (0.8 + Math.random() * 0.4); pts.push({x: Math.cos(angle)*len, y: Math.sin(angle)*len}); pts.push({x: Math.cos(angle + Math.PI)*len, y: Math.sin(angle + Math.PI)*len}); } 
-                else { let angles = []; for(let i=0; i<numPoints; i++) angles.push(Math.random() * Math.PI * 2); angles.sort((a,b) => a-b); for(let i=0; i<angles.length; i++) { const rad = r * (0.5 + Math.random() * 0.8); pts.push({x: Math.cos(angles[i])*rad, y: Math.sin(angles[i])*rad}); } pts.push(pts[0]); }
-            }
-            if(rawPoints.length > 0 && rawPoints[rawPoints.length-1].type !== 'break') rawPoints.push({type:'break'});
-            pts.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'})); rawPoints.push({type:'break'}); render();
+            else if(type==='random') { return doRandomDesign(); }
+
+            pts.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point', source: 'draw'})); 
+            rawPoints.push({type:'break'}); 
+            render();
         }
 
         function getPos(e) { return { x: (e.offsetX - origin.x) / scale, y: -(e.offsetY - origin.y) / scale }; }
 
-        function processPointer(e) {
-            const p = getPos(e);
-            if(currentTool === 'draw') { rawPoints.push({x: p.x, y: p.y, type: 'point', source: 'draw'}); } 
-            else if (currentTool === 'erase') { const r = eraserRadius; rawPoints = rawPoints.filter(pt => { if(pt.type === 'break') return true; return Math.hypot(pt.x - p.x, pt.y - p.y) > r; }); }
-            render(); if(currentTool==='erase') drawCursor(p);
-        }
-
-        function drawCursor(p) {
-            if(generatedGCode) return;
-            const r = (currentTool === 'erase' ? eraserRadius : 10) * scale;
-            const px = origin.x + p.x * scale; const py = origin.y - p.y * scale;
-            if(currentTool === 'erase') { ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI*2); ctx.strokeStyle = "#999"; ctx.fillStyle = "rgba(200,200,200,0.3)"; ctx.stroke(); ctx.fill(); } 
-            else if (currentTool === 'select') { ctx.font = "20px Arial"; ctx.fillStyle = "black"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("✋", px, py); } 
-        }
-
-        function liveRotate(val) {
-            if(traceState.active) { traceState.rotation = parseFloat(val); drawTracePreview(); return; }
-            
-            let targetPoints = rawPoints;
-            if (activeEffectType === 'loop') targetPoints = loopSourcePath;
-            else if (activeEffectType === 'sandify') targetPoints = vortexSourcePath;
-
-            if(targetPoints.length === 0) return;
-            const diff = val - lastRotVal; if(diff === 0) return;
-            const rad = (diff * Math.PI) / 180; const cos = Math.cos(rad); const sin = Math.sin(rad);
-            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity; let hasPoints = false;
-            
-            targetPoints.forEach(p => { if(p.type === 'point') { if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y; hasPoints = true; } });
-            if(!hasPoints) return; const cx = (minX + maxX)/2; const cy = (minY + maxY)/2;
-            
-            targetPoints.forEach(p => { if(p.type === 'point') { let tx = p.x - cx; let ty = p.y - cy; p.x = cx + (tx * cos - ty * sin); p.y = cy + (tx * sin + ty * cos); } });
-            
-            lastRotVal = val; document.getElementById('liveRotVal').innerText = val + "°"; 
-            
-            if (activeEffectType === 'loop') generateLoop();
-            else if (activeEffectType === 'sandify') { scanVortexShape(); generateVortex(); }
-            else render();
-        }
-
-        function liveScale(val) {
-             if(traceState.active) { const factor = val / 100.0; traceState.scale = traceState.baseScale * factor; drawTracePreview(); return; }
-             
-             let targetPoints = rawPoints;
-             if (activeEffectType === 'loop') targetPoints = loopSourcePath;
-             else if (activeEffectType === 'sandify') targetPoints = vortexSourcePath;
-
-             if(targetPoints.length === 0) return;
-             const factor = val / lastScaleVal; if(factor === 1) return;
-             let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity; let hasPoints = false;
-             
-             targetPoints.forEach(p => { if(p.type === 'point') { if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y; hasPoints = true; } });
-             if(!hasPoints) return; const cx = (minX + maxX)/2; const cy = (minY + maxY)/2;
-             
-             targetPoints.forEach(p => { if(p.type === 'point') { p.x = cx + (p.x - cx) * factor; p.y = cy + (p.y - cy) * factor; } });
-             
-             lastScaleVal = val; document.getElementById('liveScaleVal').innerText = val + "%"; 
-             
-             if (activeEffectType === 'loop') generateLoop();
-             else if (activeEffectType === 'sandify') { scanVortexShape(); generateVortex(); }
-             else render();
-        }
-
-        function endLiveTransform(slider) {
-            if(traceState.active) { commitTraceMove(); if(slider.id === 'liveScaleSlider') slider.value = 100; if(slider.id === 'liveRotSlider') { slider.value = 0; traceState.rotation = 0; } return; }
-            saveState(); 
-            if(slider.id === 'liveRotSlider') { slider.value = 0; lastRotVal = 0; document.getElementById('liveRotVal').innerText = "0°"; }
-            if(slider.id === 'liveScaleSlider') { slider.value = 100; lastScaleVal = 100; document.getElementById('liveScaleVal').innerText = "100%"; }
-        }
-
-        // --- VORTEX LOGIC ---
-        function updateVortexParams() {
-            if(currentTool === 'sandify') {
-                document.getElementById('val-swirl').innerText = document.getElementById('vortexSwirl').value;
-                document.getElementById('val-scale').innerText = document.getElementById('vortexScale').value;
-                document.getElementById('val-twist').innerText = document.getElementById('vortexTwist').value;
-                const type = document.getElementById('vortexShape').value;
-                document.getElementById('vortexTextContainer').style.display = type === 'text' ? 'block' : 'none';
-                scanVortexShape(); generateVortex();
-            }
-        }
-
-        function scanVortexShape() {
-            const scanCanvas = document.getElementById('vortexScanCanvas'); const scanCtx = scanCanvas.getContext('2d');
-            const w = scanCanvas.width; const h = scanCanvas.height; const cx = w/2; const cy = h/2; const r = w/2 - 20;
-            const type = document.getElementById('vortexShape').value; const txt = document.getElementById('vortexChar').value;
-            scanCtx.fillStyle = '#000'; scanCtx.fillRect(0, 0, w, h); scanCtx.fillStyle = '#fff'; scanCtx.strokeStyle = '#fff';
-            scanCtx.lineWidth = 15; scanCtx.textAlign = 'center'; scanCtx.textBaseline = 'middle';
-            scanCtx.save(); scanCtx.beginPath();
-            const drawPoly = (sides) => { const offset = -Math.PI / 2; scanCtx.moveTo(cx + r * Math.cos(offset), cy + r * Math.sin(offset)); for (let i = 1; i <= sides; i++) { scanCtx.lineTo(cx + r * Math.cos(offset + i * 2 * Math.PI / sides), cy + r * Math.sin(offset + i * 2 * Math.PI / sides)); } };
-            const drawStar = (pts) => { let rot = Math.PI / 2 * 3; let step = Math.PI / pts; scanCtx.moveTo(cx, cy - r); for (let i = 0; i < pts; i++) { scanCtx.lineTo(cx + Math.cos(rot) * r, cy + Math.sin(rot) * r); rot += step; scanCtx.lineTo(cx + Math.cos(rot) * (r*0.4), cy + Math.sin(rot) * (r*0.4)); rot += step; } scanCtx.lineTo(cx, cy - r); };
-            if (type === 'custom') { const tableR = parseFloat(document.getElementById('cfgRadius').value); const scaleToFit = r / tableR; scanCtx.beginPath(); vortexSourcePath.forEach((p, i) => { if(p.type === 'break' || p.type === 'cmd') return; const sx = cx + (p.x * scaleToFit); const sy = cy - (p.y * scaleToFit); if(i===0 || vortexSourcePath[i-1].type === 'break') scanCtx.moveTo(sx, sy); else scanCtx.lineTo(sx, sy); }); scanCtx.stroke(); }
-            else if (type === 'text') { scanCtx.font = 'bold 450px Arial'; scanCtx.fillText(txt, cx, cy + 30); } 
-            else if (type === 'triangle') drawPoly(3); else if (type === 'square') drawPoly(4); else if (type === 'pentagon') drawPoly(5); else if (type === 'hexagon') drawPoly(6); else if (type === 'star') drawStar(5);
-            if (type !== 'custom') scanCtx.fill(); scanCtx.restore();
-            const pixels = scanCtx.getImageData(0, 0, w, h).data; const steps = 3600;
-            for (let i = 0; i < steps; i++) { let maxDist = 0; const angle = (i / steps) * Math.PI * 2; const cos = Math.cos(angle); const sin = Math.sin(angle); for (let dist = 0; dist < r; dist += 2) { const x = Math.floor(cx + cos * dist); const y = Math.floor(cy + sin * dist); const idx = (y * w + x) * 4; if (pixels[idx] > 100) maxDist = dist; } vortexState.radiusMap[i] = maxDist / r; }
-        }
-
-        function generateVortex() {
-            const swirlCount = parseInt(document.getElementById('vortexSwirl').value); const scaleFac = parseFloat(document.getElementById('vortexScale').value);
-            const twistDeg = parseFloat(document.getElementById('vortexTwist').value); const tableRadius = parseFloat(document.getElementById('cfgRadius').value);
-            const iterations = 20000; const centerGap = 4; const newPoints = []; newPoints.push({type:'break'});
-            for (let i = 0; i <= iterations; i++) {
-                const t = (i / iterations) * 2 - 1; const progress = Math.abs(t); const spiralAngle = t * swirlCount * Math.PI * 2;
-                const twistRad = (twistDeg * (Math.PI/180)) * swirlCount * Math.abs(t);
-                let lookupAngle = spiralAngle + twistRad; let normAngle = lookupAngle % (Math.PI * 2); if (normAngle < 0) normAngle += Math.PI * 2;
-                const mapIdx = Math.floor((normAngle / (Math.PI * 2)) * 3600) % 3600;
-                let shapeFactor = vortexState.radiusMap[mapIdx]; if(shapeFactor < 0.05) shapeFactor = 0.05; 
-                const maxR = tableRadius * scaleFac; const spiralR = centerGap + (progress * (maxR - centerGap)); const r = spiralR * shapeFactor;
-                let x, y; if (t < 0) { x = r * Math.cos(spiralAngle); y = r * Math.sin(spiralAngle); } else { const flipOffset = Math.PI / 2; x = r * Math.cos(spiralAngle + flipOffset); y = r * Math.sin(spiralAngle + flipOffset); }
-                newPoints.push({x: x, y: y, type:'point'});
-            }
-            newPoints.push({type:'break'}); rawPoints = newPoints; render();
-        }
-
-        // --- LOOP LOGIC & CUSTOM PATH ---
         function getPathPos(e) {
-            const pathCanvas = document.getElementById('pathCanvas');
-            const rect = pathCanvas.getBoundingClientRect();
-            const tableR = parseFloat(document.getElementById('cfgRadius').value);
-            const scaleP = (rect.width/2) / (tableR * 1.05);
-            
+            const rect = document.getElementById('pathCanvas').getBoundingClientRect();
             const px = e.clientX - rect.left;
             const py = e.clientY - rect.top;
-            
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            const scaleP = (rect.width/2) / (tableR * 1.05);
             return {
                 x: (px - rect.width/2) / scaleP,
                 y: -(py - rect.height/2) / scaleP
@@ -969,7 +848,7 @@
                     else if(type==='triangle') { pts = [{x:ox,y:r,type:'point'}, {x:ox+r*0.86,y:-r/2,type:'point'}, {x:ox-r*0.86,y:-r/2,type:'point'}, {x:ox,y:r,type:'point'}]; } 
                     else if(type==='hexagon') { for(let i=0; i<=6; i++) { const a = (i/6)*Math.PI*2; pts.push({x: ox + Math.cos(a)*r, y: Math.sin(a)*r, type:'point'}); } } 
                     else if(type==='pentagon') { for(let i=0; i<=5; i++) { const a = (i/5)*Math.PI*2 - Math.PI/2; pts.push({x: ox + Math.cos(a)*r, y: Math.sin(a)*r, type:'point'}); } } 
-                    else if(type==='star') { for(let i=0; i<=10; i++) { const a = (i/10)*Math.PI*2 + Math.PI/2; const rad = (i%2===0) ? r : r*0.4; pts.push({x: ox + Math.cos(a)*rad, y: Math.sin(a)*rad, type:'point'}); } }
+                    else if(type==='star') { for(let i=0; i<=10; i++) { const a = (i/10)*Math.PI*2 + Math.PI/2; const rad = (i%2===0) ? r : r*0.4; pts.push({x: Math.cos(a)*rad, y: Math.sin(a)*rad, type:'point'}); } }
                     loopSourcePath = pts;
                 }
                 
@@ -1056,6 +935,98 @@
             newPoints.push({type: 'break'});
             rawPoints = newPoints;
             render();
+        }
+
+        // --- VORTEX LOGIC ---
+        function scanVortexShape() {
+            const scanCanvas = document.getElementById('vortexScanCanvas'); const scanCtx = scanCanvas.getContext('2d');
+            const w = scanCanvas.width; const h = scanCanvas.height; const cx = w/2; const cy = h/2; const r = w/2 - 20;
+            
+            scanCtx.fillStyle = '#000'; scanCtx.fillRect(0, 0, w, h); scanCtx.fillStyle = '#fff'; scanCtx.strokeStyle = '#fff';
+            scanCtx.lineWidth = 15; scanCtx.textAlign = 'center'; scanCtx.textBaseline = 'middle';
+            scanCtx.save(); scanCtx.beginPath();
+            
+            const tableR = parseFloat(document.getElementById('cfgRadius').value); 
+            const scaleToFit = r / tableR; 
+            scanCtx.beginPath(); 
+            vortexSourcePath.forEach((p, i) => { 
+                if(p.type === 'break' || p.type === 'cmd') return; 
+                const sx = cx + (p.x * scaleToFit); const sy = cy - (p.y * scaleToFit); 
+                if(i===0 || vortexSourcePath[i-1].type === 'break') scanCtx.moveTo(sx, sy); else scanCtx.lineTo(sx, sy); 
+            }); 
+            scanCtx.stroke(); 
+            
+            scanCtx.fill(); scanCtx.restore();
+            const pixels = scanCtx.getImageData(0, 0, w, h).data; const steps = 3600;
+            for (let i = 0; i < steps; i++) { let maxDist = 0; const angle = (i / steps) * Math.PI * 2; const cos = Math.cos(angle); const sin = Math.sin(angle); for (let dist = 0; dist < r; dist += 2) { const x = Math.floor(cx + cos * dist); const y = Math.floor(cy + sin * dist); const idx = (y * w + x) * 4; if (pixels[idx] > 100) maxDist = dist; } vortexState.radiusMap[i] = maxDist / r; }
+        }
+
+        function generateVortex() {
+            const swirlCount = parseInt(document.getElementById('vortexSwirl').value); 
+            const scaleFac = parseFloat(document.getElementById('vortexScale').value);
+            const twistDeg = parseFloat(document.getElementById('vortexTwist').value); 
+            const tableRadius = parseFloat(document.getElementById('cfgRadius').value);
+            
+            const iterations = 20000; const centerGap = 4; const newPoints = []; newPoints.push({type:'break'});
+            
+            for (let i = 0; i <= iterations; i++) {
+                const t = (i / iterations) * 2 - 1; const progress = Math.abs(t); const spiralAngle = t * swirlCount * Math.PI * 2;
+                const twistRad = (twistDeg * (Math.PI/180)) * swirlCount * Math.abs(t);
+                let lookupAngle = spiralAngle + twistRad; let normAngle = lookupAngle % (Math.PI * 2); if (normAngle < 0) normAngle += Math.PI * 2;
+                const mapIdx = Math.floor((normAngle / (Math.PI * 2)) * 3600) % 3600;
+                let shapeFactor = vortexState.radiusMap[mapIdx]; if(shapeFactor < 0.05) shapeFactor = 0.05; 
+                const maxR = tableRadius * scaleFac; const spiralR = centerGap + (progress * (maxR - centerGap)); const r = spiralR * shapeFactor;
+                let x, y; if (t < 0) { x = r * Math.cos(spiralAngle); y = r * Math.sin(spiralAngle); } else { const flipOffset = Math.PI / 2; x = r * Math.cos(spiralAngle + flipOffset); y = r * Math.sin(spiralAngle + flipOffset); }
+                newPoints.push({x: x, y: y, type:'point'});
+            }
+            newPoints.push({type:'break'}); rawPoints = newPoints; render();
+        }
+
+        function updateVortexParams() {
+            if(currentTool === 'sandify') {
+                document.getElementById('val-swirl').innerText = document.getElementById('vortexSwirl').value;
+                document.getElementById('val-scale').innerText = document.getElementById('vortexScale').value;
+                document.getElementById('val-twist').innerText = document.getElementById('vortexTwist').value;
+                
+                const type = document.getElementById('vortexShape').value;
+                if (type === 'text') {
+                    document.getElementById('vortexTextContainer').style.display = 'block';
+                    vortexSourcePath = generateTextPath(document.getElementById('vortexChar').value);
+                } else {
+                    document.getElementById('vortexTextContainer').style.display = 'none';
+                    if (type !== 'custom') {
+                        let pts = []; const r = 50; 
+                        if(type==='triangle') { pts = [{x:0,y:r}, {x:r*0.86,y:-r/2}, {x:-r*0.86,y:-r/2}, {x:0,y:r}]; } 
+                        else if(type==='square') { pts = [{x:-r,y:-r}, {x:r,y:-r}, {x:r,y:r}, {x:-r,y:r}, {x:-r,y:-r}]; } 
+                        else if(type==='pentagon') { for(let i=0; i<=5; i++) { const a = (i/5)*Math.PI*2 - Math.PI/2; pts.push({x: Math.cos(a)*r, y: Math.sin(a)*r}); } } 
+                        else if(type==='hexagon') { for(let i=0; i<=6; i++) { const a = (i/6)*Math.PI*2; pts.push({x: Math.cos(a)*r, y: Math.sin(a)*r}); } } 
+                        else if(type==='star') { for(let i=0; i<=10; i++) { const a = (i/10)*Math.PI*2 + Math.PI/2; const rad = (i%2===0) ? r : r*0.4; pts.push({x: Math.cos(a)*rad, y: Math.sin(a)*rad}); } }
+                        vortexSourcePath = pts.map(p => ({...p, type:'point'}));
+                    }
+                }
+                scanVortexShape(); generateVortex();
+            }
+        }
+
+        function generateTextPath(char) {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = 200; tempCanvas.height = 200;
+            const tCtx = tempCanvas.getContext('2d');
+            tCtx.fillStyle = 'white'; tCtx.fillRect(0,0,200,200);
+            tCtx.fillStyle = 'black'; tCtx.font = 'bold 160px Arial';
+            tCtx.textAlign = 'center'; tCtx.textBaseline = 'middle';
+            tCtx.fillText(char, 100, 105);
+            
+            const data = tCtx.getImageData(0,0,200,200).data;
+            const pts = [];
+            for(let y=0; y<200; y+=4) {
+                for(let x=0; x<200; x+=4) {
+                    if(data[(y*200+x)*4] < 128) {
+                        pts.push({x: (x-100)*0.8, y: -(y-100)*0.8, type:'point'});
+                    }
+                }
+            }
+            return pts;
         }
 
         // --- EXTRACTED TRACE LOGIC ---
@@ -1195,6 +1166,119 @@
             return bCtx.getImageData(0,0,size,size);
         }
 
+        function handleTraceClick() {
+            document.getElementById('imgUpload').click();
+        }
+
+        function handleImageUpload(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.onload = function() {
+                        traceState.img = img;
+                        traceState.active = true;
+                        traceState.x = 0; traceState.y = 0; traceState.rotation = 0;
+                        
+                        const tableR = parseFloat(document.getElementById('cfgRadius').value);
+                        const fitScale = (400 / Math.max(img.width, img.height)) * 0.8;
+                        traceState.baseScale = fitScale;
+                        traceState.scale = fitScale;
+                        
+                        setTool('trace');
+                        runHighPrecisionTrace();
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function runHighPrecisionTrace() {
+            if(!traceState.active || !traceState.img) return;
+            
+            const thresh = parseInt(document.getElementById('traceThreshInput').value);
+            document.getElementById('traceThreshVal').innerText = thresh;
+            const density = document.getElementById('traceDensityInput').value;
+            document.getElementById('traceDensityVal').innerText = density;
+            
+            commitTraceMove();
+        }
+
+        function commitTraceMove() {
+            const size = 800; const buff = document.getElementById('hiddenTraceBuffer'); const bCtx = buff.getContext('2d');
+            bCtx.fillStyle = "white"; bCtx.fillRect(0, 0, size, size); bCtx.save(); bCtx.translate(size/2, size/2);
+            bCtx.translate(traceState.x, traceState.y); bCtx.rotate(traceState.rotation * Math.PI / 180);
+            const drawW = traceState.img.width * traceState.scale; const drawH = traceState.img.height * traceState.scale;
+            bCtx.drawImage(traceState.img, -drawW/2, -drawH/2, drawW, drawH); bCtx.restore();
+            traceImgData = bCtx.getImageData(0,0,size,size); 
+            
+            const thresh = parseInt(document.getElementById('traceThreshInput').value); 
+            const density = parseFloat(document.getElementById('traceDensityInput').value); 
+            const ballSizeMm = parseFloat(document.getElementById('cfgBallSize').value);
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            
+            const generated = calculateSpiralTrace(traceImgData, thresh, density, ballSizeMm, tableR);
+            rawPoints = []; 
+            if(generated.length > 0) rawPoints.push({type:'break'});
+            rawPoints = rawPoints.concat(generated);
+            if(generated.length > 0) rawPoints.push({type:'break'});
+            render();
+        }
+
+        function liveRotate(val) {
+            traceState.rotation = parseFloat(val);
+            document.getElementById('liveRotVal').innerText = val + '°';
+            runHighPrecisionTrace();
+        }
+
+        function liveScale(val) {
+            const factor = parseFloat(val) / 100;
+            traceState.scale = traceState.baseScale * factor;
+            document.getElementById('liveScaleVal').innerText = val + '%';
+            runHighPrecisionTrace();
+        }
+
+        function endLiveTransform(el) {
+            // Placeholder if we want to do something specific after slider release
+        }
+
+        // --- CORE UI & RENDER ---
+        function resizeCanvas() {
+            const container = document.getElementById('canvasContainer'); const size = container.getBoundingClientRect().width; const dpr = window.devicePixelRatio || 1;
+            canvas.width = size * dpr; canvas.height = size * dpr; ctx.scale(dpr, dpr); origin = { x: size/2, y: size/2 };
+            const tableR = parseFloat(document.getElementById('cfgRadius').value); scale = (size/2) / (tableR * 1.05); render();
+        }
+        function saveState() { if(historyStack.length>15) historyStack.shift(); historyStack.push(JSON.stringify(rawPoints)); }
+        function undo() { if(historyStack.length===0) return; rawPoints = JSON.parse(historyStack.pop()); render(); }
+        function clearCanvas() { saveState(); rawPoints = []; traceState.active=false; processedPoints=[]; resetStatus(); render(); }
+        
+        function updateUI() { document.getElementById('symVal').textContent = document.getElementById('symSlider').value + 'x'; render(); }
+        function showToast(msg, type) { const t = document.getElementById('status-toast'); t.textContent = msg; t.className = type; t.style.opacity = 1; setTimeout(()=>t.style.opacity=0, 3000); }
+        function toggleTheme() { const b = document.body; b.setAttribute('data-theme', b.getAttribute('data-theme')==='dark'?'light':'dark'); render(); }
+        function resetStatus() { generatedGCode = null; processedPoints = []; document.getElementById('statusTxt').innerText = "Drawing Mode"; document.getElementById('progressSlider').value = 100; render(); }
+        
+        // Set active nav link
+        document.addEventListener('DOMContentLoaded', () => {
+            const path = window.location.pathname;
+            const navMap = {
+                '/': 'nav-designs',
+                '/controller': 'nav-controller',
+                '/sketch': 'nav-sketch',
+                '/AI_builder': 'nav-ai',
+                '/led_controls': 'nav-leds',
+                '/terminal': 'nav-terminal',
+                '/settings': 'nav-settings'
+            };
+            const activeId = navMap[path] || 'nav-designs';
+            const el = document.getElementById(activeId);
+            if (el) el.classList.add('active');
+            
+            // Initialization
+            init();
+            setTool('draw');
+        });
+
         // --- TEXT TOOL LOGIC ---
         function renderTextToTrace() {
             const text = document.getElementById('toolTextInput').value;
@@ -1215,190 +1299,57 @@
                 bCtx.fillText(line, canvasSize / 2, startY + (i * lineHeight));
             });
 
-            traceImgData = bCtx.getImageData(0, 0, canvasSize, canvasSize);
-            const originalDensityInput = document.getElementById('traceDensityInput');
-            const oldVal = originalDensityInput.value;
-            originalDensityInput.value = density;
-            runHighPrecisionTrace();
-            originalDensityInput.value = oldVal;
-        }
-
-        // --- TRACE LOGIC ---
-        function handleTraceClick() {
-            if (traceState.active) {
-                setTool('trace_set');
-            } else {
-                document.getElementById('imgUpload').click();
-            }
-        }
-
-        function handleImageUpload(input) {
-            const file = input.files[0]; if(!file) return;
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const img = new Image();
-                img.onload = function() {
-                    traceState.active = true; traceState.img = img; traceState.x = 0; traceState.y = 0; traceState.rotation = 0;
-                    const size = 800; const scale = Math.min(size/img.width, size/img.height) * 0.9;
-                    traceState.baseScale = scale; traceState.scale = scale; commitTraceMove(); setTool('trace_set');
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file); input.value = '';
-        }
-
-        function drawTracePreview() {
-            const w = canvas.width / window.devicePixelRatio; const h = canvas.height / window.devicePixelRatio;
-            ctx.clearRect(0, 0, w, h); ctx.filter = 'none';
+            const imgData = bCtx.getImageData(0,0,canvasSize,canvasSize);
             const tableR = parseFloat(document.getElementById('cfgRadius').value);
-            ctx.save(); ctx.translate(origin.x, origin.y); ctx.beginPath(); ctx.arc(0, 0, tableR*scale, 0, Math.PI*2);
-            ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.stroke();
-            const visualScale = (tableR * 2 / 800) * scale; ctx.save(); ctx.scale(visualScale, visualScale);
-            ctx.translate(traceState.x, traceState.y); ctx.rotate(traceState.rotation * Math.PI / 180);
-            const img = traceState.img; const drawW = img.width * traceState.scale; const drawH = img.height * traceState.scale;
-            ctx.filter = 'grayscale(100%) contrast(1000%) invert(1)'; ctx.drawImage(img, -drawW/2, -drawH/2, drawW, drawH);
-            ctx.restore(); ctx.restore(); ctx.filter = 'none';
-        }
-
-        function commitTraceMove() {
-            const size = 800; const buff = document.getElementById('hiddenTraceBuffer'); const bCtx = buff.getContext('2d');
-            bCtx.fillStyle = "white"; bCtx.fillRect(0, 0, size, size); bCtx.save(); bCtx.translate(size/2, size/2);
-            bCtx.translate(traceState.x, traceState.y); bCtx.rotate(traceState.rotation * Math.PI / 180);
-            const drawW = traceState.img.width * traceState.scale; const drawH = traceState.img.height * traceState.scale;
-            bCtx.drawImage(traceState.img, -drawW/2, -drawH/2, drawW, drawH); bCtx.restore();
-            traceImgData = bCtx.getImageData(0,0,size,size); runHighPrecisionTrace();
-        }
-
-        function runHighPrecisionTrace() {
-            if(!traceImgData) return;
-            const thresh = parseInt(document.getElementById('traceThreshInput').value); 
-            const density = parseFloat(document.getElementById('traceDensityInput').value); 
             const ballSizeMm = parseFloat(document.getElementById('cfgBallSize').value);
-            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            const pts = calculateSpiralTrace(imgData, 150, parseFloat(density), ballSizeMm, tableR);
             
-            const generated = calculateSpiralTrace(traceImgData, thresh, density, ballSizeMm, tableR);
-            
-            rawPoints = []; 
-            if(generated.length > 0) rawPoints.push({type:'break'});
-            rawPoints = rawPoints.concat(generated);
-            if(generated.length > 0) rawPoints.push({type:'break'});
+            customPathPoints = []; 
+            if(pts.length > 0) {
+                pts.forEach(p => customPathPoints.push(p));
+            }
             render();
         }
 
-        // --- CORE UI & RENDER ---
-        function resizeCanvas() {
-            const container = document.getElementById('canvasContainer'); const size = container.getBoundingClientRect().width; const dpr = window.devicePixelRatio || 1;
-            canvas.width = size * dpr; canvas.height = size * dpr; ctx.scale(dpr, dpr); origin = { x: size/2, y: size/2 };
-            const tableR = parseFloat(document.getElementById('cfgRadius').value); scale = (size/2) / (tableR * 1.05); render();
-        }
-        function saveState() { if(historyStack.length>10) historyStack.shift(); historyStack.push(JSON.stringify(rawPoints)); }
-        function undo() { if(historyStack.length===0) return; rawPoints = JSON.parse(historyStack.pop()); render(); }
-        function clearCanvas() { saveState(); rawPoints = []; traceState.active=false; render(); }
-        
-        function setTool(t) {
-            currentTool = t;
-            const buttons = ['btnDraw', 'btnErase', 'btnSelect', 'btnSandify', 'btnLoop', 'btnTrace', 'btnText'];
-            buttons.forEach(b => {
-                const el = document.getElementById(b);
-                if(el) {
-                    if (t === 'trace_set' && b === 'btnTrace') {
-                        el.className = 'active';
-                    } else {
-                        el.className = (b.toLowerCase().includes(t)) ? 'active' : 'secondary';
-                    }
-                }
-            });
-            
-            if (t !== 'select' && t !== 'sandify' && t !== 'loop') {
-                activeEffectType = null;
-            }
-
-            updateToolSettings();
-            if(t === 'select' && traceState.active) document.getElementById('traceMoveMsg').style.display = 'block';
-            else document.getElementById('traceMoveMsg').style.display = 'none';
-            
-            if(t === 'sandify') { 
-                if(activeEffectType !== 'sandify') {
-                    activeEffectType = 'sandify';
-                    if (rawPoints.length === 0) addShape('random'); 
-                    vortexSourcePath = JSON.parse(JSON.stringify(rawPoints)); 
-                    document.getElementById('vortexShape').value = 'custom'; 
-                }
-                updateVortexParams(); 
-            }
-            if(t === 'loop') { 
-                if(activeEffectType !== 'loop') {
-                    activeEffectType = 'loop';
-                    loopPathOffset = {x: 0, y: 0}; 
-                    if (rawPoints.length === 0) addShape('circle'); 
-                    loopSourcePath = JSON.parse(JSON.stringify(rawPoints)); 
-                    document.getElementById('loopShape').value = 'custom'; 
-                }
-                updateLoopParams(); 
-            }
-            if(t === 'text') renderTextToTrace();
-        }
-
-        function updateToolSettings() {
-            const area = document.getElementById('toolSettingsArea'); const grps = document.querySelectorAll('.tool-setting-group'); grps.forEach(g => g.style.display = 'none');
-            let activeGrp = null;
-            if(currentTool === 'draw') activeGrp = document.getElementById('set-pen');
-            else if(currentTool === 'erase') activeGrp = document.getElementById('set-erase');
-            else if(currentTool === 'text') activeGrp = document.getElementById('set-text');
-            else if(currentTool === 'select') activeGrp = document.getElementById('set-select');
-            else if(currentTool === 'sandify') activeGrp = document.getElementById('set-sandify');
-            else if(currentTool === 'loop') activeGrp = document.getElementById('set-loop');
-            else if(currentTool === 'trace_set') activeGrp = document.getElementById('set-trace');
-            if(activeGrp) { area.style.display = 'block'; activeGrp.style.display = 'block'; } else area.style.display = 'none';
-            eraserRadius = parseInt(document.getElementById('eraserSizeSlider').value); document.getElementById('eraseSizeVal').innerText = eraserRadius + 'px';
-
-            const stylusWrapper = document.getElementById('stylusModeWrapper');
-            if (stylusWrapper) {
-                stylusWrapper.style.display = (currentTool === 'draw' || currentTool === 'erase') ? 'flex' : 'none';
+        function commitTextMove() {
+            if(customPathPoints.length > 0) {
+                rawPoints = [];
+                rawPoints.push({type:'break'});
+                customPathPoints.forEach(p => rawPoints.push({...p, source:'draw'}));
+                rawPoints.push({type:'break'});
+                customPathPoints = [];
+                setTool('draw');
+                render();
             }
         }
-
-        function updateUI() { document.getElementById('symVal').textContent = document.getElementById('symSlider').value + 'x'; render(); }
-        function showToast(msg, type) { const t = document.getElementById('status-toast'); t.textContent = msg; t.className = type; t.style.opacity = 1; setTimeout(()=>t.style.opacity=0, 3000); }
-        function toggleTheme() { const b = document.body; b.setAttribute('data-theme', b.getAttribute('data-theme')==='dark'?'light':'dark'); render(); }
-        function resetStatus() { generatedGCode = null; processedPoints = []; document.getElementById('statusTxt').innerText = "Drawing Mode"; document.getElementById('progressSlider').value = 100; render(); }
-        
-        // Set active nav link
-        document.addEventListener('DOMContentLoaded', () => {
-            const path = window.location.pathname;
-            const navMap = {
-                '/': 'nav-designs',
-                '/controller': 'nav-controller',
-                '/sketch': 'nav-sketch',
-                '/AI_builder': 'nav-ai',
-                '/led_controls': 'nav-leds',
-                '/script': 'nav-script',
-                '/terminal': 'nav-terminal',
-                '/settings': 'nav-settings'
-            };
-            const activeId = navMap[path] || 'nav-designs';
-            const el = document.getElementById(activeId);
-            if (el) el.classList.add('active');
-        });
 
         function render() {
             const w = canvas.width / window.devicePixelRatio; const h = canvas.height / window.devicePixelRatio; ctx.clearRect(0, 0, w, h); ctx.filter = 'none';
             const tableR = parseFloat(document.getElementById('cfgRadius').value); const sym = parseInt(document.getElementById('symSlider').value); const dark = document.body.getAttribute('data-theme') === 'dark'; const prog = parseInt(document.getElementById('progressSlider').value); document.getElementById('progVal').textContent = prog + '%';
             ctx.save(); ctx.translate(origin.x, origin.y); ctx.beginPath(); ctx.arc(0, 0, tableR*scale, 0, Math.PI*2); ctx.strokeStyle = dark ? '#444' : '#ddd'; ctx.lineWidth = 2; ctx.stroke();
-            const showingFinal = (processedPoints.length > 0); const dataToShow = showingFinal ? processedPoints : rawPoints; const limit = Math.floor(dataToShow.length * (prog/100)); const color = showingFinal ? '#ff0000' : (dark ? 'cyan' : '#007bff'); ctx.lineWidth = 1.5; const loopCount = showingFinal ? 1 : sym;
+            const showingFinal = (processedPoints.length > 0); const dataToShow = showingFinal ? processedPoints : rawPoints; const limit = Math.floor(dataToShow.length * (prog/100)); const color = showingFinal ? '#ff0000' : (dark ? '#a1c4fd' : '#007bff'); ctx.lineWidth = 1.5; const loopCount = showingFinal ? 1 : sym;
             for(let s=0; s<loopCount; s++) {
                 const ang = s * (Math.PI*2/sym); ctx.save(); if(!showingFinal) ctx.rotate(ang); ctx.beginPath(); ctx.strokeStyle = color; let isMove = true;
                 for(let i=0; i<limit; i++) { const p = dataToShow[i]; if(p.type === 'break' || p.type === 'cmd') { isMove = true; continue; } const px = p.x * scale; const py = -p.y * scale; if(isMove) { ctx.moveTo(px, py); isMove = false; } else ctx.lineTo(px, py); }
                 ctx.stroke(); ctx.restore();
             }
-            if(currentTool === 'select' && rawPoints.length > 0 && !generatedGCode && !traceState.active) { let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity; rawPoints.forEach(p => { if(p.type === 'point') { if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x; if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y; } }); if(minX !== Infinity) { ctx.beginPath(); ctx.rect(minX*scale, -maxY*scale, (maxX-minX)*scale, (maxY-minY)*scale); ctx.strokeStyle = dark ? "white" : "black"; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]); } }
             ctx.restore();
+            
+            // Preview text to be committed
+            if(customPathPoints.length > 0) {
+                ctx.save(); ctx.translate(origin.x, origin.y); ctx.beginPath(); ctx.strokeStyle = 'rgba(161, 196, 253, 0.5)'; ctx.lineWidth = 1;
+                let isMove = true;
+                customPathPoints.forEach(p => {
+                    const px = p.x * scale; const py = -p.y * scale;
+                    if(isMove) { ctx.moveTo(px, py); isMove = false; } else ctx.lineTo(px, py);
+                });
+                ctx.stroke(); ctx.restore();
+            }
         }
 
         // --- GCODE GENERATION ---
-        async function sendToTable() { if(!generatedGCode) return showToast("Click Generate Path first", "error"); fetch(BASE_URL+'/send_gcode_block', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({gcode:generatedGCode}) }).then(r => r.json()).then(d => showToast(d.success ? "Sent!" : "Error", d.success ? "success" : "error")); }
+        async function sendToTable() { if(!generatedGCode) return showToast("Click Generate Path first", "error"); fetch(BASE_URL+'/send_gcode_block', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({gcode:generatedGCode, filename:'sketch_export.txt'}) }).then(r => r.json()).then(d => showToast(d.success ? "Sent!" : "Error", d.success ? "success" : "error")); }
         async function saveToServer() { if(!generatedGCode) return showToast("Generate Path first!", "error"); let n = prompt("Enter filename:"); if(n) { if(!n.toLowerCase().endsWith('.txt')) n += ".txt"; fetch(BASE_URL+'/save_design', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({filename:n, gcode:generatedGCode}) }).then(r => r.json()).then(d => showToast(d.success ? "Saved!" : "Failed", d.success ? "success" : "error")); } }
-        function getShortestRotation(raw, last) { let diff = (raw - last) / (2 * Math.PI); let offset = Math.round(diff); return raw - (offset * 2 * Math.PI); }
         
         function prepareGCode() {
             if(rawPoints.length === 0) return showToast("Draw something first!", "error");
@@ -1407,10 +1358,8 @@
             
             let shapes = []; 
             let curShape = []; 
-            let hasHandDrawnLines = false;
             
             rawPoints.forEach(p => { 
-                if(p.source === 'draw') hasHandDrawnLines = true;
                 if(p.type === 'break' || p.type === 'cmd') { 
                     if(curShape.length > 0) shapes.push(curShape); 
                     curShape = []; 
@@ -1418,86 +1367,32 @@
             });
             if(curShape.length > 0) shapes.push(curShape);
 
-            // The invisible switch check: use Spiral connect only if they hand-drew 
-            // lines and there are floating (disconnected) shapes detected.
-            const useSpiral = (hasHandDrawnLines && shapes.length > 1);
-
-            if (useSpiral) {
+            if (document.getElementById('spiralConnectMode').checked) {
                 const imgData = rasterizeCanvasForTrace();
-                const density = parseFloat(document.getElementById('traceDensityInput').value) || 3.0;
-                const ballSizeMm = parseFloat(document.getElementById('cfgBallSize').value);
+                const density = 3.0;
+                const ballSizeMm = 13.0;
                 
                 const pts = calculateSpiralTrace(imgData, 150, density, ballSizeMm, tableR);
                 processedPoints = pts;
-
-                generatedGCode = generateGCodeStringFromProcessed();
-                document.getElementById('statusTxt').innerText = `Path Ready! (Spiral Connected)`;
-                document.getElementById('designPhaseControls').style.display = 'none'; 
-                document.getElementById('productionPhaseControls').style.display = 'block';
-                document.getElementById('simulationArea').style.display = 'block';
-                render();
-                return;
-            }
-
-            let pool = []; 
-            for(let s=0; s<sym; s++) { 
-                const ang = s * (Math.PI*2/sym); 
-                const c = Math.cos(ang), si = Math.sin(ang); 
-                shapes.forEach(sh => { 
-                    pool.push(sh.map(p => ({ x: p.x*c - p.y*si, y: p.x*si + p.y*c, type: 'point' }))); 
-                }); 
-            }
-
-            let sortedShapes = [];
-            if (pool.length > 0) {
-                // Find shape closest to center to start
-                let bestIdx = 0, minDist = Infinity;
-                for(let i=0; i<pool.length; i++) {
-                    let d1 = Math.hypot(pool[i][0].x, pool[i][0].y);
-                    let d2 = Math.hypot(pool[i][pool[i].length-1].x, pool[i][pool[i].length-1].y);
-                    if(d1 < minDist) { minDist = d1; bestIdx = i; }
-                    if(d2 < minDist) { minDist = d2; bestIdx = i; }
+            } else {
+                let pool = []; 
+                for(let s=0; s<sym; s++) { 
+                    const ang = s * (Math.PI*2/sym); 
+                    const c = Math.cos(ang), si = Math.sin(ang); 
+                    shapes.forEach(sh => { 
+                        pool.push(sh.map(p => ({ x: p.x*c - p.y*si, y: p.x*si + p.y*c, type: 'point' }))); 
+                    }); 
                 }
-
-                let startShape = pool[bestIdx];
-                pool.splice(bestIdx, 1);
-
-                // Ensure startShape starts towards inside
-                if(Math.hypot(startShape[0].x, startShape[0].y) > Math.hypot(startShape[startShape.length-1].x, startShape[startShape.length-1].y)) {
-                    startShape.reverse();
-                }
-                sortedShapes.push(startShape);
-
-                let curPos = startShape[startShape.length-1];
-                while(pool.length > 0) {
-                    let bIdx = -1, bDist = Infinity, bRev = false;
-                    for(let i=0; i<pool.length; i++) {
-                        let dS = Math.hypot(curPos.x - pool[i][0].x, curPos.y - pool[i][0].y);
-                        if(dS < bDist) { bDist=dS; bIdx=i; bRev=false; }
-                        let dE = Math.hypot(curPos.x - pool[i][pool[i].length-1].x, curPos.y - pool[i][pool[i].length-1].y);
-                        if(dE < bDist) { bDist=dE; bIdx=i; bRev=true; }
-                    }
-                    let winner = pool[bIdx];
-                    if(bRev) winner.reverse();
-                    sortedShapes.push(winner);
-                    curPos = winner[winner.length-1];
-                    pool.splice(bIdx, 1);
-                }
-            }
-
-            processedPoints = [];
-            if(sortedShapes.length > 0) {
-                for(let i=0; i<sortedShapes.length; i++) {
-                    if(i > 0) {
-                        let next = sortedShapes[i][0];
-                        processedPoints.push({x: next.x, y: next.y, type: 'point'});
-                    }
-                    sortedShapes[i].forEach(p => processedPoints.push(p));
-                }
+                
+                processedPoints = [];
+                pool.forEach((sh, i) => {
+                   if(i > 0) processedPoints.push({x: sh[0].x, y: sh[0].y, type:'point'});
+                   sh.forEach(p => processedPoints.push(p));
+                });
             }
 
             generatedGCode = generateGCodeStringFromProcessed();
-            document.getElementById('statusTxt').innerText = `Path Ready! ${sortedShapes.length} shapes.`;
+            document.getElementById('statusTxt').innerText = `Path Ready!`;
             document.getElementById('designPhaseControls').style.display = 'none'; 
             document.getElementById('productionPhaseControls').style.display = 'block';
             document.getElementById('simulationArea').style.display = 'block';
@@ -1515,23 +1410,18 @@
         function generateGCodeStringFromProcessed() {
             const tableRadius = parseFloat(document.getElementById('cfgRadius').value);
             let cmds = [];
-            
             for(let i=0; i<processedPoints.length; i++) {
                 let p = processedPoints[i];
                 if(p.type === 'cmd') continue;
-                
                 let theta = Math.atan2(p.y, p.x);
                 let rho = Math.hypot(p.x, p.y) / tableRadius;
-                
                 if (rho > 1.0) rho = 1.0;
-                
                 cmds.push(`${theta.toFixed(4)} ${rho.toFixed(4)}`);
             }
             return cmds.join('\n');
         }
 
         function copyGCode() { if(generatedGCode) navigator.clipboard.writeText(generatedGCode).then(() => showToast("Copied!", "success")); }
-        init();
     </script>
 </body>
 </html>

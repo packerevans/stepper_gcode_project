@@ -42,6 +42,14 @@ int centerDelay = 500;
 int perimeterDelay = 3000; 
 float SPEED_MULTIPLIER = 1.0;
 
+// --- LED MODE STATE ---
+int ledMode = 0; // 0: Static, 1: Flash, 2: Fade, 3: Jump
+unsigned long ledInterval = 1000;
+unsigned long lastLedUpdate = 0;
+int currentModeStep = 0;
+int numModeColors = 0;
+struct { byte r, g, b; } modeColors[12];
+
 // --- STATE VARIABLES ---
 float curTheta = 0;
 float curRho = 0;
@@ -62,6 +70,7 @@ void handleCommand(char* cmd);
 void calibrate();
 void processRgbLine(char* line);
 bool processThrLine(char* line);
+void processModeCommand(char* data);
 void moveToPolar(float theta, float rho);
 IKResult calculateIK(float x, float y);
 void moveBresenham(long da, long db, int delayUs);
@@ -91,6 +100,48 @@ void setup() {
 
 void loop() {
   processSerialQueue();
+  updateLedMode();
+}
+
+void updateLedMode() {
+  if (ledMode == 0 || numModeColors == 0) return;
+  
+  unsigned long now = millis();
+  if (ledMode == 1) { // Flash
+    if (now - lastLedUpdate >= ledInterval) {
+      lastLedUpdate = now;
+      currentModeStep = (currentModeStep + 1) % (numModeColors * 2);
+      if (currentModeStep % 2 == 0) {
+        int idx = currentModeStep / 2;
+        analogWrite(redPin, modeColors[idx].r);
+        analogWrite(greenPin, modeColors[idx].g);
+        analogWrite(bluePin, modeColors[idx].b);
+      } else {
+        analogWrite(redPin, 0); analogWrite(greenPin, 0); analogWrite(bluePin, 0);
+      }
+    }
+  }
+  else if (ledMode == 2) { // Fade
+    float t = (float)((now - lastLedUpdate) % ledInterval) / ledInterval;
+    if (now - lastLedUpdate >= ledInterval) {
+      lastLedUpdate = now;
+      currentModeStep = (currentModeStep + 1) % numModeColors;
+    }
+    int nextStep = (currentModeStep + 1) % numModeColors;
+    int r = modeColors[currentModeStep].r + (modeColors[nextStep].r - modeColors[currentModeStep].r) * t;
+    int g = modeColors[currentModeStep].g + (modeColors[nextStep].g - modeColors[currentModeStep].g) * t;
+    int b = modeColors[currentModeStep].b + (modeColors[nextStep].b - modeColors[currentModeStep].b) * t;
+    analogWrite(redPin, r); analogWrite(greenPin, g); analogWrite(bluePin, b);
+  }
+  else if (ledMode == 3) { // Jump
+    if (now - lastLedUpdate >= ledInterval) {
+      lastLedUpdate = now;
+      currentModeStep = (currentModeStep + 1) % numModeColors;
+      analogWrite(redPin, modeColors[currentModeStep].r);
+      analogWrite(greenPin, modeColors[currentModeStep].g);
+      analogWrite(bluePin, modeColors[currentModeStep].b);
+    }
+  }
 }
 
 void processSerialQueue() {
@@ -143,7 +194,12 @@ void handleCommand(char* cmd) {
       Serial.print(F("SPEED_SET:")); Serial.println(SPEED_MULTIPLIER);
     }
   }
+  else if (strncasecmp(start, "C", 1) == 0) {
+    processModeCommand(start + 1);
+    Serial.println(F("MODE_OK"));
+  }
   else if (strchr(start, ',') != NULL) {
+    ledMode = 0; // Stop any animation on manual color change
     processRgbLine(start);
     Serial.println(F("RGB_OK"));
   }
@@ -328,4 +384,27 @@ void moveBresenham(long da, long db, int delayUs) {
     
     delayMicroseconds(max(1, delayUs));
   }
+}
+
+void processModeCommand(char* data) {
+  // Format: <mode>,<duration>,<r1>,<g1>,<b1>,...
+  char* ptr = data;
+  ledMode = atoi(ptr);
+  ptr = strchr(ptr, ','); if (!ptr) return; ptr++;
+  ledInterval = atol(ptr);
+  ptr = strchr(ptr, ','); if (!ptr) return; ptr++;
+  
+  numModeColors = 0;
+  while (ptr && numModeColors < 12) {
+    modeColors[numModeColors].r = atoi(ptr);
+    ptr = strchr(ptr, ','); if (!ptr) { numModeColors++; break; } ptr++;
+    modeColors[numModeColors].g = atoi(ptr);
+    ptr = strchr(ptr, ','); if (!ptr) { numModeColors++; break; } ptr++;
+    modeColors[numModeColors].b = atoi(ptr);
+    numModeColors++;
+    ptr = strchr(ptr, ',');
+    if (ptr) ptr++;
+  }
+  lastLedUpdate = millis();
+  currentModeStep = 0;
 }
