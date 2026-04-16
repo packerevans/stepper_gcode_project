@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sand Controller Pro</title>
+    <title>Sand Table - Sketch</title>
     
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
@@ -12,15 +12,15 @@
         :root {
             --primary: #a1c4fd; 
             --secondary: #7fb2f0; 
-            --bg: #f4f4f4; 
+            --bg: #ffffff; 
             --panel: #ffffff; 
-            --text: #333;
-            --accent: #2ecc71;
-            --danger: #e74c3c;
-            --btn-text: #fff;
+            --text: #000000;
+            --accent: #000000;
+            --danger: #ef4444;
+            --btn-text: #000;
         }
         body[data-theme='dark'] {
-            --bg: #121212; --panel: #1e1e1e; --text: #e0e0e0; --btn-text: #000;
+            --bg: #000000; --panel: #0a0a0a; --text: #ffffff; --btn-text: #fff;
         }
 
         body {
@@ -28,6 +28,8 @@
             background: var(--bg); color: var(--text);
             margin: 0; padding: 0; height: 100vh;
             display: flex; flex-direction: column; overflow: hidden;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         /* --- Global Navigation --- */
@@ -40,7 +42,7 @@
             padding: 10px 0;
             border-bottom: 2px solid #000000;
         }
-        body[data-theme='dark'] .main-nav { background: #000000; border-top: 2px solid #ffffff; }
+        body[data-theme='dark'] .main-nav { background: #000000; border-top: none; border-bottom: 2px solid #ffffff; }
 
         .main-nav a {
             text-decoration: none;
@@ -53,17 +55,22 @@
             opacity: 0.7;
             transition: opacity 0.2s, color 0.2s;
             flex: 1;
+            border: 2px solid transparent;
+            box-sizing: border-box;
         }
         body[data-theme='dark'] .main-nav a { color: #ffffff; }
 
         .main-nav a:hover, .main-nav a.active {
             opacity: 1;
-            background: #000000;
-            color: #ffffff;
+            background: #ffffff !important;
+            color: #000000 !important;
+            border: 2px solid #000000;
+            box-sizing: border-box;
         }
         body[data-theme='dark'] .main-nav a:hover, body[data-theme='dark'] .main-nav a.active {
-            background: #ffffff;
-            color: #000000;
+            background: #000000 !important;
+            color: #ffffff !important;
+            border: 2px solid #ffffff;
         }
 
         .main-nav .icon {
@@ -74,26 +81,13 @@
             align-items: center;
             justify-content: center;
         }
-        .main-nav svg {
-            width: 100%;
-            height: 100%;
-            fill: currentColor;
-        }
+        .main-nav svg { width: 100%; height: 100%; fill: currentColor; }
 
-        /* Mobile: Bottom Nav */
+        /* Mobile: Top Nav */
         @media (max-width: 768px) {
-            .main-nav {
-                position: fixed;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-                border-top: 2px solid #000000;
-                padding: 5px 0;
-            }
             .main-nav a span:not(.icon) { display: none; }
             .main-nav .icon { margin-bottom: 0; width: 28px; height: 28px; }
-            body { padding-bottom: 60px !important; } 
+            body { padding-bottom: 0 !important; } 
         }
 
         /* Desktop: Top Nav */
@@ -118,6 +112,7 @@
             border-bottom: 2px solid #000000;
             position: relative;
         }
+        body[data-theme='dark'] .header-nav { background: #000000; color: #ffffff; border-bottom-color: #ffffff; }
 
         .header-title {
             grid-column: 2;
@@ -138,6 +133,7 @@
             display: flex; align-items: center; justify-content: center;
             z-index: 2500;
         }
+        body[data-theme='dark'] .theme-toggle { color: #ffffff; }
         .theme-toggle svg { width: 100%; height: 100%; fill: currentColor; }
         .theme-toggle .moon { display: none; }
         body[data-theme='dark'] .theme-toggle .sun { display: none; }
@@ -165,13 +161,13 @@
             max-height: 95%; 
             aspect-ratio: 1 / 1; 
             margin: auto;
-            border-radius: 0 !important;
+            border-radius: 50% !important;
             border: 4px solid #000000; 
             background: #fff;
             touch-action: none; cursor: crosshair; overflow: hidden;
         }
         body[data-theme='dark'] .canvas-wrapper { background: #222; border-color: #ffffff; }
-        canvas { display: block; width: 100%; height: 100%; border-radius: 0 !important; }
+        canvas { display: block; width: 100%; height: 100%; border-radius: 50% !important; }
 
         h2 { margin: 0 0 15px 0; font-size: 1.2rem; color: #000000; text-align: center; text-transform: uppercase; letter-spacing: 1px; }
         body[data-theme='dark'] h2 { color: #ffffff; }
@@ -180,20 +176,20 @@
         button {
             background-color: #ffffff; color: #000000;
             border: 2px solid #000000; padding: 12px 24px; border-radius: 0 !important; cursor: pointer;
-            font-size: 14px; transition: 0.2s ease-in-out; font-weight: 600;
+            font-size: 14px; transition: 0.2s ease-in-out; font-weight: 700;
             display: flex; align-items: center; justify-content: center;
             text-transform: uppercase; flex: 1;
         }
         body[data-theme='dark'] button { background-color: #000000; color: #ffffff; border-color: #ffffff; }
         
-        button:hover { background-color: #000000; color: #ffffff; }
-        body[data-theme='dark'] button:hover { background-color: #ffffff; color: #000000; }
+        button:hover { background-color: #f0f0f0; color: #000000; }
+        body[data-theme='dark'] button:hover { background-color: #1a1a1a; color: #ffffff; }
         
-        button.active { background-color: #000000; color: #ffffff; }
-        body[data-theme='dark'] button.active { background-color: #ffffff; color: #000000; }
+        button.active { background-color: #ffffff; color: #000000; border: 2px solid #000000; }
+        body[data-theme='dark'] button.active { background-color: #000000; color: #ffffff; border-color: #ffffff; }
 
-        button.action { background-color: #000000; color: #ffffff; border-width: 3px; }
-        body[data-theme='dark'] button.action { background-color: #ffffff; color: #000000; }
+        button.action { background-color: #ffffff; color: #000000; border: 2px solid #000000; }
+        body[data-theme='dark'] button.action { background-color: #000000; color: #ffffff; border-color: #ffffff; }
 
         button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
         
@@ -218,8 +214,8 @@
             background: #333; color: white; padding: 10px 20px; border-radius: 0 !important;
             font-size: 13px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 3000;
         }
-        .success { background: var(--accent) !important; color: #000 !important; }
-        .error { background: var(--danger) !important; color: #fff !important; }
+        .success { background: #2ecc71 !important; color: #000 !important; }
+        .error { background: #e74c3c !important; color: #fff !important; }
 
         .toggle-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 8px; border: 1px solid #000; border-radius: 0 !important; }
         .switch { position: relative; display: inline-block; width: 40px; height: 22px; }
@@ -257,7 +253,7 @@
             align-items: center; justify-content: center; backdrop-filter: blur(4px);
         }
         .modal-canvas-wrap {
-            background: #fff; border-radius: 0 !important; width: 90vmin; height: 90vmin;
+            background: #fff; border-radius: 50% !important; width: 90vmin; height: 90vmin;
             max-width: 500px; max-height: 500px; position: relative;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5); overflow: hidden;
             touch-action: none;
@@ -269,7 +265,7 @@
 
     <div class="header-nav">
         <div style="width: 32px;"></div> <!-- Left spacer -->
-        <h1 class="header-title">Sand Sketch Pro</h1>
+        <h1 class="header-title">Sand Table Sketch</h1>
         <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Light/Dark Mode">
             <svg class="moon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
             <svg class="sun" viewBox="0 0 24 24"><path d="M12,7c-2.76,0-5,2.24-5,5s2.24,5,5,5s5-2.24,5-5S14.76,7,12,7z M2,13h2c0.55,0,1-0.45,1-1s-0.45-1-1-1H2c-0.55,0-1,0.45-1,1S1.45,13,2,13z M20,13h2c0.55,0,1-0.45,1-1s-0.45-1-1-1h-2c-0.55,0-1,0.45-1,1S19.45,13,20,13z M11,2v2c0,0.55,0.45,1,1,1s1-0.45,1-1V2c0-0.55-0.45-1-1-1S11,1.45,11,2z M11,20v2c0,0.55,0.45,1,1,1s1-0.45,1-1v-2c0-0.55-0.45-1-1-1S11,19.45,11,20z M5.99,4.58c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0s0.39-1.03,0-1.41L5.99,4.58z M18.36,16.95c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0c0.39-0.39,0.39-1.03,0-1.41L18.36,16.95z M19.42,5.99c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41s1.02,0.39,1.41,0L19.42,5.99z M7.05,18.36c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41s1.03,0.39,1.41,0L7.05,18.36z"/></svg>
@@ -279,7 +275,7 @@
     <nav class="main-nav">
         <a href="/" id="nav-designs"><span class="icon"><svg viewBox="0 0 24 24"><path d="M12 2L4.5 20.29L5.21 21L12 18L18.79 21L19.5 20.29L12 2Z"/></svg></span><span>Designs</span></a>
         <a href="/controller" id="nav-controller"><span class="icon"><svg viewBox="0 0 24 24"><path d="M13 13V11H11V13H13M15 9V5H13V7H11V5H9V9H7V11H5V13H7V15H9V19H11V17H13V19H15V15H17V13H19V11H17V9H15Z"/></svg></span><span>Control</span></a>
-        <a href="/sketch" id="nav-sketch"><span class="icon"><svg viewBox="0 0 24 24"><path d="M14.06,9L15,9.94L5.92,19H5V18.08L14.06,9M17.66,3C17.41,3 17.15,3.1 16.96,3.29L15.13,5.12L18.88,8.87L20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18.17,3.09 17.92,3 17.66,3M14.06,6.19L3,17.25V21H6.75L17.81,9.94L14.06,6.19Z"/></svg></span><span>Sketch</span></a>
+        <a href="/sketch" id="nav-sketch" class="active"><span class="icon"><svg viewBox="0 0 24 24"><path d="M14.06,9L15,9.94L5.92,19H5V18.08L14.06,9M17.66,3C17.41,3 17.15,3.1 16.96,3.29L15.13,5.12L18.88,8.87L20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18.17,3.09 17.92,3 17.66,3M14.06,6.19L3,17.25V21H6.75L17.81,9.94L14.06,6.19Z"/></svg></span><span>Sketch</span></a>
         <a href="/AI_builder" id="nav-ai"><span class="icon"><svg viewBox="0 0 24 24"><path d="M13 3H11V5H13V3M4.5 14H6.5V16H4.5V14M4.5 10H6.5V12H4.5V10M17.5 10H19.5V12H17.5V10M17.5 14H19.5V16H17.5V14M11 19H13V21H11V19M19 19H21V21H19V19M3 19H5V21H3V19M21 3V17H3V3H21M19 5H5V15H19V5Z"/></svg></span><span>AI</span></a>
         <a href="/led_controls" id="nav-leds"><span class="icon"><svg viewBox="0 0 24 24"><path d="M12,2A7,7 0 0,0 5,9C5,11.38 6.19,13.47 8,14.74V17A1,1 0 0,0 9,18H15A1,1 0 0,0 16,17V14.74C17.81,13.47 19,11.38 19,9A7,7 0 0,0 12,2M9,21A1,1 0 0,0 10,22H14A1,1 0 0,0 15,21V20H9V21Z"/></svg></span><span>LEDs</span></a>
         <a href="/terminal" id="nav-terminal"><span class="icon"><svg viewBox="0 0 24 24"><path d="M20,19V7H4V19H20M20,3A2,2 0 0,1 22,5V19A2,2 0 0,1 20,21H4A2,2 0 0,1 2,19V5C2,3.89 2.89,3 4,3H20M13,17V15H18V17H13M9.58,13L5.57,9L6.92,7.59L12.33,13L6.92,18.41L5.57,17L9.58,13Z"/></svg></span><span>Console</span></a>
@@ -549,38 +545,41 @@
     </div>
 
     <div id="status-toast"></div>
+    <canvas id="hiddenTraceBuffer" width="800" height="800"></canvas>
+    <canvas id="vortexScanCanvas" width="600" height="600"></canvas>
 
     <script>
         let rawPoints = []; 
         let processedPoints = []; 
         let historyStack = [];
         let isDrawing = false;
-        let currentTool = 'select'; // Default to move mode for user tweaking
+        let currentTool = 'draw';
         let origin = {x:0, y:0};
         let scale = 1;
         let generatedGCode = null;
 
+        let eraserRadius = 10;
         let traceImgData = null;
         let traceState = { active: false, img: null, x: 0, y: 0, scale: 1.0, baseScale: 1.0, rotation: 0 }; 
 
+        let lastRotVal = 0;
+        let lastScaleVal = 100;
+        
         let activeEffectType = null; 
         const vortexState = { radiusMap: new Float32Array(3600) };
         let vortexSourcePath = [];
         
         let loopSourcePath = [];
         let loopPathOffset = {x: 0, y: 0};
-        let customPathPoints = []; // Kept empty for AI mode
-        let pathRawPoints = [];
+        
         let isDrawingPath = false;
+        let pathRawPoints = [];
+        let customPathPoints = [];
 
         const canvas = document.getElementById('drawCanvas');
         const ctx = canvas.getContext('2d');
         const BASE_URL = window.location.origin;
 
-        // --- MATH HELPERS ---
-        function distSq(p1, p2) { return (p1.x-p2.x)**2 + (p1.y-p2.y)**2; }
-        function dist(p1, p2) { return Math.sqrt(distSq(p1, p2)); }
-        
         function init() {
             resizeCanvas();
             window.addEventListener('resize', resizeCanvas);
@@ -590,81 +589,85 @@
             canvas.addEventListener('pointerleave', endDraw);
             canvas.style.touchAction = "none";
             updateUI();
+            updateToolSettings();
         }
 
-        // --- DRAWING & DRAGGING INTERACTION ---
         let dragStart = null;
 
         function startDraw(e) {
             e.preventDefault();
             if(generatedGCode) return;
-            
-            const pos = getPos(e);
-            if (currentTool === 'erase') {
-               doErase(pos);
-               isDrawing = true;
-            } else if (currentTool === 'draw') {
-               rawPoints.push({x: pos.x, y: pos.y, type:'point', source: 'draw'});
-               isDrawing = true;
-            } else {
-               // select/move
-               dragStart = pos;
+            const smart = document.getElementById('stylusMode').checked;
+            if(smart && currentTool !== 'select' && currentTool !== 'sandify' && currentTool !== 'loop') {
+                if(e.pointerType === 'pen') setTool('draw');
+                else if(e.pointerType === 'touch') setTool('erase');
             }
-            canvas.setPointerCapture(e.pointerId);
+            
+            if(currentTool === 'select' || currentTool === 'loop') {
+                isDrawing = true; dragStart = getPos(e); canvas.setPointerCapture(e.pointerId); return;
+            }
+            if(currentTool === 'sandify' || currentTool === 'trace_set' || currentTool === 'text') return;
+            saveState(); isDrawing = true; canvas.setPointerCapture(e.pointerId); processPointer(e); resetStatus();
         }
 
         function moveDraw(e) {
             e.preventDefault();
             const pos = getPos(e);
             document.getElementById('coordDisplay').textContent = `X:${pos.x.toFixed(0)} Y:${pos.y.toFixed(0)}`;
-            
-            if(!isDrawing && !dragStart) return;
-
-            if(isDrawing) {
-                if(currentTool === 'erase') {
-                    doErase(pos);
-                } else if(currentTool === 'draw') {
-                    rawPoints.push({x: pos.x, y: pos.y, type:'point', source: 'draw'});
-                }
-            } else if(dragStart) {
+            if(currentTool === 'select' && traceState.active && isDrawing && dragStart) {
                 const dx = pos.x - dragStart.x; const dy = pos.y - dragStart.y;
-                if (activeEffectType === 'loop' && loopSourcePath) {
-                    loopPathOffset.x += dx;
-                    loopPathOffset.y += dy;
-                    generateLoop();
+                const tableR = parseFloat(document.getElementById('cfgRadius').value);
+                const mmToTraceFactor = 800 / (tableR * 2);
+                traceState.x += dx * mmToTraceFactor; traceState.y -= dy * mmToTraceFactor; 
+                dragStart = pos; drawTracePreview(); return;
+            }
+            if(!isDrawing) { render(); drawCursor(pos); return; }
+            
+            if((currentTool === 'select' || currentTool === 'loop') && dragStart) {
+                const dx = pos.x - dragStart.x; const dy = pos.y - dragStart.y;
+                if (currentTool === 'loop' || (activeEffectType === 'loop' && currentTool === 'select')) {
+                    loopPathOffset.x += dx; loopPathOffset.y += dy; generateLoop();
                 } else if (activeEffectType === 'sandify' && vortexSourcePath) {
                     vortexSourcePath.forEach(p => { if(p.type === 'point') { p.x += dx; p.y += dy; } });
                     scanVortexShape(); generateVortex();
                 } else {
                     rawPoints.forEach(p => { if(p.type === 'point') { p.x += dx; p.y += dy; } });
                 }
-                dragStart = pos;
+                dragStart = pos; render(); return;
             }
-            render();
+            processPointer(e);
         }
 
         function endDraw(e) {
-            if(!isDrawing && !dragStart) return;
-            if(isDrawing && currentTool === 'draw') rawPoints.push({type:'break'});
-            isDrawing = false; 
-            dragStart = null;
-            canvas.releasePointerCapture(e.pointerId);
-            saveState();
+            if(!isDrawing) return;
+            isDrawing = false; canvas.releasePointerCapture(e.pointerId);
+            if(currentTool === 'select' || currentTool === 'loop') { dragStart = null; if(traceState.active) commitTraceMove(); else saveState(); return; }
+            if(currentTool === 'draw') { if(document.getElementById('shapeConnectMode').checked) autoConnectAndSmooth(); rawPoints.push({type:'break'}); }
+            render();
         }
 
-        function doErase(pos) {
-            const size = parseInt(document.getElementById('eraserSizeSlider').value);
-            const sizeSq = size * size;
-            rawPoints = rawPoints.filter(p => {
-                if (p.type !== 'point') return true;
-                return distSq(p, pos) > sizeSq;
-            });
+        function autoConnectAndSmooth() {
+            let lastBreak = -1;
+            for(let i=rawPoints.length-1; i>=0; i--) { if(rawPoints[i].type === 'break' || rawPoints[i].type === 'cmd') { lastBreak = i; break; } }
+            let stroke = []; let startIndex = lastBreak + 1;
+            for(let i=startIndex; i<rawPoints.length; i++) stroke.push(rawPoints[i]);
+            if(stroke.length < 3) return;
+            let startP = stroke[0]; let endP = stroke[stroke.length-1];
+            if(Math.hypot(startP.x - endP.x, startP.y - endP.y) < 30.0) { stroke.push({x: startP.x, y: startP.y, type:'point', source: startP.source}); }
+            for(let pass=0; pass<2; pass++) {
+                let smooth = []; smooth.push(stroke[0]);
+                for(let i=0; i<stroke.length-1; i++) {
+                    let p0 = stroke[i], p1 = stroke[i+1];
+                    smooth.push({ x: 0.75 * p0.x + 0.25 * p1.x, y: 0.75 * p0.y + 0.25 * p1.y, type: 'point', source: p0.source });
+                    smooth.push({ x: 0.25 * p0.x + 0.75 * p1.x, y: 0.25 * p0.y + 0.75 * p1.y, type: 'point', source: p0.source });
+                }
+                smooth.push(stroke[stroke.length-1]); stroke = smooth;
+            }
+            rawPoints.splice(startIndex, rawPoints.length - startIndex, ...stroke);
         }
 
-        // --- SHAPE STAMPS ---
         function addShape(type) {
-            saveState();
-            const r = 50; let pts = [];
+            saveState(); const r = 50; let pts = [];
             if(type==='circle') { for(let i=0; i<=36; i++) { const a = (i/36)*Math.PI*2; pts.push({x: Math.cos(a)*r, y: Math.sin(a)*r}); } } 
             else if(type==='square') { pts = [{x:-r,y:-r}, {x:r,y:-r}, {x:r,y:r}, {x:-r,y:r}, {x:-r,y:-r}]; } 
             else if(type==='triangle') { pts = [{x:0,y:r}, {x:r*0.86,y:-r/2}, {x:-r*0.86,y:-r/2}, {x:0,y:r}]; } 
@@ -672,303 +675,84 @@
             else if(type==='pentagon') { for(let i=0; i<=5; i++) { const a = (i/5)*Math.PI*2 - Math.PI/2; pts.push({x: Math.cos(a)*r, y: Math.sin(a)*r}); } } 
             else if(type==='star') { for(let i=0; i<=10; i++) { const a = (i/10)*Math.PI*2 + Math.PI/2; const rad = (i%2===0) ? r : r*0.4; pts.push({x: Math.cos(a)*rad, y: Math.sin(a)*rad}); } } 
             else if(type==='spiral') { for(let i=0; i<100; i++) { const a = i * 0.3; const rad = (i/100)*r; pts.push({x: Math.cos(a)*rad, y: Math.sin(a)*rad}); } } 
-            else if(type==='random') { return doRandomDesign(); }
-
-            pts.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point', source: 'draw'})); 
-            rawPoints.push({type:'break'}); 
-            render();
+            else if (type === 'random') {
+                const numPoints = Math.floor(Math.random() * 15) + 1;
+                if(numPoints === 1) { const rx = r * (0.5 + Math.random()); const ry = r * (0.5 + Math.random()); for(let i=0; i<=36; i++) { const a = (i/36)*Math.PI*2; pts.push({x: Math.cos(a)*rx, y: Math.sin(a)*ry}); } } 
+                else if(numPoints === 2) { const angle = Math.random() * Math.PI * 2; const len = r * (0.8 + Math.random() * 0.4); pts.push({x: Math.cos(angle)*len, y: Math.sin(angle)*len}); pts.push({x: Math.cos(angle + Math.PI)*len, y: Math.sin(angle + Math.PI)*len}); } 
+                else { let angles = []; for(let i=0; i<numPoints; i++) angles.push(Math.random() * Math.PI * 2); angles.sort((a,b) => a-b); for(let i=0; i<angles.length; i++) { const rad = r * (0.5 + Math.random() * 0.8); pts.push({x: Math.cos(angles[i])*rad, y: Math.sin(angles[i])*rad}); } pts.push(pts[0]); }
+            }
+            if(rawPoints.length > 0 && rawPoints[rawPoints.length-1].type !== 'break') rawPoints.push({type:'break'});
+            pts.forEach(p => rawPoints.push({x:p.x, y:p.y, type:'point'})); rawPoints.push({type:'break'}); render();
         }
 
         function getPos(e) { return { x: (e.offsetX - origin.x) / scale, y: -(e.offsetY - origin.y) / scale }; }
 
-        function getPathPos(e) {
-            const rect = document.getElementById('pathCanvas').getBoundingClientRect();
-            const px = e.clientX - rect.left;
-            const py = e.clientY - rect.top;
-            const tableR = parseFloat(document.getElementById('cfgRadius').value);
-            const scaleP = (rect.width/2) / (tableR * 1.05);
-            return {
-                x: (px - rect.width/2) / scaleP,
-                y: -(py - rect.height/2) / scaleP
-            };
-        }
-        
-        function openPathModal() {
-            document.getElementById('pathModal').style.display = 'flex';
-            const pathCanvas = document.getElementById('pathCanvas');
-            const rect = pathCanvas.parentElement.getBoundingClientRect();
-            const dpr = window.devicePixelRatio || 1;
-            pathCanvas.width = rect.width * dpr;
-            pathCanvas.height = rect.height * dpr;
-            const ctxP = pathCanvas.getContext('2d');
-            ctxP.scale(dpr, dpr);
-            renderPathCanvas();
+        function processPointer(e) {
+            const p = getPos(e);
+            if(currentTool === 'draw') { rawPoints.push({x: p.x, y: p.y, type: 'point', source: 'draw'}); } 
+            else if (currentTool === 'erase') { const r = eraserRadius; rawPoints = rawPoints.filter(pt => { if(pt.type === 'break') return true; return Math.hypot(pt.x - p.x, pt.y - p.y) > r; }); }
+            render(); if(currentTool==='erase') drawCursor(p);
         }
 
-        function closePathModal() {
-            document.getElementById('pathModal').style.display = 'none';
+        function drawCursor(p) {
+            if(generatedGCode) return;
+            const r = (currentTool === 'erase' ? eraserRadius : 10) * scale;
+            const px = origin.x + p.x * scale; const py = origin.y - p.y * scale;
+            if(currentTool === 'erase') { ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI*2); ctx.strokeStyle = "#999"; ctx.fillStyle = "rgba(200,200,200,0.3)"; ctx.stroke(); ctx.fill(); } 
         }
 
-        function clearPathCanvas() {
-            pathRawPoints = [];
-            renderPathCanvas();
+        function liveRotate(val) {
+            if(traceState.active) { traceState.rotation = parseFloat(val); drawTracePreview(); return; }
+            let targetPoints = rawPoints;
+            if (activeEffectType === 'loop') targetPoints = loopSourcePath; else if (activeEffectType === 'sandify') targetPoints = vortexSourcePath;
+            if(targetPoints.length === 0) return;
+            const diff = val - lastRotVal; if(diff === 0) return;
+            const rad = (diff * Math.PI) / 180; const cos = Math.cos(rad); const sin = Math.sin(rad);
+            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity; let hasPoints = false;
+            targetPoints.forEach(p => { if(p.type === 'point') { if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y; hasPoints = true; } });
+            if(!hasPoints) return; const cx = (minX + maxX)/2; const cy = (minY + maxY)/2;
+            targetPoints.forEach(p => { if(p.type === 'point') { let tx = p.x - cx; let ty = p.y - cy; p.x = cx + (tx * cos - ty * sin); p.y = cy + (tx * sin + ty * cos); } });
+            lastRotVal = val; document.getElementById('liveRotVal').innerText = val + "°"; 
+            if (activeEffectType === 'loop') generateLoop(); else if (activeEffectType === 'sandify') { scanVortexShape(); generateVortex(); } else render();
         }
 
-        function startDrawPath(e) {
-            e.preventDefault();
-            isDrawingPath = true;
-            pathRawPoints = [];
-            document.getElementById('pathCanvas').setPointerCapture(e.pointerId);
-            pathRawPoints.push(getPathPos(e));
-            renderPathCanvas();
+        function liveScale(val) {
+             if(traceState.active) { const factor = val / 100.0; traceState.scale = traceState.baseScale * factor; drawTracePreview(); return; }
+             let targetPoints = rawPoints;
+             if (activeEffectType === 'loop') targetPoints = loopSourcePath; else if (activeEffectType === 'sandify') targetPoints = vortexSourcePath;
+             if(targetPoints.length === 0) return;
+             const factor = val / lastScaleVal; if(factor === 1) return;
+             let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity; let hasPoints = false;
+             targetPoints.forEach(p => { if(p.type === 'point') { if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y; hasPoints = true; } });
+             if(!hasPoints) return; const cx = (minX + maxX)/2; const cy = (minY + maxY)/2;
+             targetPoints.forEach(p => { if(p.type === 'point') { p.x = cx + (p.x - cx) * factor; p.y = cy + (p.y - cy) * factor; } });
+             lastScaleVal = val; document.getElementById('liveScaleVal').innerText = val + "%"; 
+             if (activeEffectType === 'loop') generateLoop(); else if (activeEffectType === 'sandify') { scanVortexShape(); generateVortex(); } else render();
         }
 
-        function moveDrawPath(e) {
-            e.preventDefault();
-            if(!isDrawingPath) return;
-            pathRawPoints.push(getPathPos(e));
-            renderPathCanvas();
+        function endLiveTransform(slider) {
+            if(traceState.active) { commitTraceMove(); if(slider.id === 'liveScaleSlider') slider.value = 100; if(slider.id === 'liveRotSlider') { slider.value = 0; traceState.rotation = 0; } return; }
+            saveState(); if(slider.id === 'liveRotSlider') { slider.value = 0; lastRotVal = 0; document.getElementById('liveRotVal').innerText = "0°"; }
+            if(slider.id === 'liveScaleSlider') { slider.value = 100; lastScaleVal = 100; document.getElementById('liveScaleVal').innerText = "100%"; }
         }
 
-        function endDrawPath(e) {
-            if(!isDrawingPath) return;
-            isDrawingPath = false;
-            document.getElementById('pathCanvas').releasePointerCapture(e.pointerId);
-        }
-
-        function savePathCanvas() {
-            if(pathRawPoints.length > 1) {
-                let totalDist = 0;
-                let processed = [{...pathRawPoints[0], d: 0}];
-                for(let i=1; i<pathRawPoints.length; i++) {
-                    let d = Math.hypot(pathRawPoints[i].x - pathRawPoints[i-1].x, pathRawPoints[i].y - pathRawPoints[i-1].y);
-                    if(d > 0.1) {
-                        totalDist += d;
-                        processed.push({...pathRawPoints[i], d: totalDist});
-                    }
-                }
-                if (totalDist > 0) {
-                    processed.forEach(p => p.t = p.d / totalDist);
-                    customPathPoints = processed;
-                }
-            }
-            closePathModal();
-            document.getElementById('loopGuidePath').value = 'custom';
-            updateLoopParams();
-        }
-
-        function renderPathCanvas() {
-            const pathCanvas = document.getElementById('pathCanvas');
-            const ctxP = pathCanvas.getContext('2d');
-            const rect = pathCanvas.parentElement.getBoundingClientRect();
-            ctxP.clearRect(0, 0, rect.width, rect.height);
-            
-            // Draw background table edge guide
-            ctxP.beginPath();
-            ctxP.arc(rect.width/2, rect.height/2, rect.width/2 - 4, 0, Math.PI*2);
-            ctxP.lineWidth = 4;
-            ctxP.strokeStyle = "black";
-            ctxP.stroke();
-            
-            if(pathRawPoints.length > 0) {
-                const tableR = parseFloat(document.getElementById('cfgRadius').value);
-                const scaleP = (rect.width/2) / (tableR * 1.05);
-                
-                ctxP.beginPath();
-                ctxP.strokeStyle = "var(--accent)";
-                ctxP.lineWidth = 4;
-                ctxP.lineCap = "round";
-                ctxP.lineJoin = "round";
-                
-                pathRawPoints.forEach((p, i) => {
-                    let px = rect.width/2 + p.x * scaleP;
-                    let py = rect.height/2 - p.y * scaleP;
-                    if(i===0) ctxP.moveTo(px, py);
-                    else ctxP.lineTo(px, py);
-                });
-                ctxP.stroke();
-            }
-        }
-
-        function getLoopPathPoint(t) {
-            let pathType = document.getElementById('loopGuidePath').value;
-            if (pathType === 'circle') {
-                return { x: 75 * Math.cos(t * Math.PI * 2), y: 75 * Math.sin(t * Math.PI * 2) };
-            } else if (pathType === 'square') {
-                let d = (t % 1) * 4;
-                let side = Math.floor(d);
-                let frac = d - side;
-                let x, y;
-                if (side === 0) { x = -75 + 150 * frac; y = -75; }
-                else if (side === 1) { x = 75; y = -75 + 150 * frac; }
-                else if (side === 2) { x = 75 - 150 * frac; y = 75; }
-                else { x = -75; y = 75 - 150 * frac; }
-                return { x, y };
-            } else if (pathType === 'figure8') {
-                let ang = t * Math.PI * 2;
-                return { x: 100 * Math.sin(ang), y: 100 * Math.sin(ang) * Math.cos(ang) };
-            } else if (pathType === 'custom') {
-                if (customPathPoints.length === 0) {
-                    // Fallback if they pick custom but haven't drawn anything
-                    return { x: 75 * Math.cos(t * Math.PI * 2), y: 75 * Math.sin(t * Math.PI * 2) };
-                }
-                let normT = t % 1;
-                for (let i = 0; i < customPathPoints.length - 1; i++) {
-                    if (normT >= customPathPoints[i].t && normT <= customPathPoints[i+1].t) {
-                        let p1 = customPathPoints[i];
-                        let p2 = customPathPoints[i+1];
-                        let range = p2.t - p1.t;
-                        let frac = range === 0 ? 0 : (normT - p1.t) / range;
-                        return {
-                            x: p1.x + (p2.x - p1.x) * frac,
-                            y: p1.y + (p2.y - p1.y) * frac
-                        };
-                    }
-                }
-                return { x: customPathPoints[customPathPoints.length-1].x, y: customPathPoints[customPathPoints.length-1].y };
-            }
-            return {x:0, y:0};
-        }
-
-        function updateLoopParams() {
-            if(currentTool === 'loop') {
-                document.getElementById('val-loop-iter').innerText = document.getElementById('loopIter').value;
-                document.getElementById('val-loop-angle').innerText = document.getElementById('loopAngle').value;
-                document.getElementById('val-loop-spin').innerText = document.getElementById('loopSpin').value;
-                document.getElementById('val-loop-scale').innerText = document.getElementById('loopScale').value;
-                document.getElementById('val-loop-osc').innerText = document.getElementById('loopOsc').value;
-
-                const type = document.getElementById('loopShape').value;
-                
-                if (type !== 'custom') {
-                    let pts = []; const r = 50; 
-                    const ox = 0; 
-                    if(type==='circle') { for(let i=0; i<=36; i++) { const a = (i/36)*Math.PI*2; pts.push({x: ox + Math.cos(a)*r, y: Math.sin(a)*r, type:'point'}); } } 
-                    else if(type==='square') { pts = [{x:ox-r,y:-r,type:'point'}, {x:ox+r,y:-r,type:'point'}, {x:ox+r,y:r,type:'point'}, {x:ox-r,y:r,type:'point'}, {x:ox-r,y:-r,type:'point'}]; } 
-                    else if(type==='triangle') { pts = [{x:ox,y:r,type:'point'}, {x:ox+r*0.86,y:-r/2,type:'point'}, {x:ox-r*0.86,y:-r/2,type:'point'}, {x:ox,y:r,type:'point'}]; } 
-                    else if(type==='hexagon') { for(let i=0; i<=6; i++) { const a = (i/6)*Math.PI*2; pts.push({x: ox + Math.cos(a)*r, y: Math.sin(a)*r, type:'point'}); } } 
-                    else if(type==='pentagon') { for(let i=0; i<=5; i++) { const a = (i/5)*Math.PI*2 - Math.PI/2; pts.push({x: ox + Math.cos(a)*r, y: Math.sin(a)*r, type:'point'}); } } 
-                    else if(type==='star') { for(let i=0; i<=10; i++) { const a = (i/10)*Math.PI*2 + Math.PI/2; const rad = (i%2===0) ? r : r*0.4; pts.push({x: Math.cos(a)*rad, y: Math.sin(a)*rad, type:'point'}); } }
-                    loopSourcePath = pts;
-                }
-                
-                // if they picked custom path but array is empty, trigger modal
-                if(document.getElementById('loopGuidePath').value === 'custom' && customPathPoints.length === 0) {
-                    openPathModal();
-                    return;
-                }
-
-                generateLoop();
-            }
-        }
-
-        function generateLoop() {
-            const iterations = parseInt(document.getElementById('loopIter').value);
-            const angleStepDeg = parseFloat(document.getElementById('loopAngle').value);
-            const spinStepDeg = parseFloat(document.getElementById('loopSpin').value);
-            const scaleFac = parseFloat(document.getElementById('loopScale').value);
-            const oscRate = parseFloat(document.getElementById('loopOsc').value);
-            const stretchMode = document.getElementById('loopStretchMode').checked;
-
-            let newPoints = [];
-            newPoints.push({type: 'break'});
-
-            const pointsOnly = loopSourcePath.filter(p => p.type === 'point');
-            const numPts = pointsOnly.length;
-            if(numPts === 0) return;
-            
-            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
-            pointsOnly.forEach(p => { 
-                minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x); 
-                minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y); 
-            });
-            let cx = (minX+maxX)/2; let cy = (minY+maxY)/2;
-
-            for(let i=0; i<iterations; i++) {
-                let ptIdx = 0;
-                
-                loopSourcePath.forEach((p, idx) => {
-                    if(p.type === 'break' || p.type === 'cmd') {
-                        if (!stretchMode) {
-                            if (idx !== 0 && idx !== loopSourcePath.length - 1) {
-                                newPoints.push({...p});
-                            }
-                        }
-                    } else {
-                        let shapeProgress = stretchMode ? (numPts > 1 ? ptIdx / (numPts - 1) : 0) : 0;
-                        let effectiveIter = i + shapeProgress;
-                        
-                        const currentAngle = effectiveIter * angleStepDeg * (Math.PI / 180);
-                        const currentSpin = effectiveIter * spinStepDeg * (Math.PI / 180);
-                        
-                        let oscScale = 1.0;
-                        if (oscRate > 0) {
-                            const freq = oscRate * 0.1;
-                            oscScale = 1.0 + 0.4 * Math.sin(effectiveIter * freq);
-                        }
-                        const currentScale = scaleFac * oscScale;
-
-                        let dx = p.x - cx;
-                        let dy = p.y - cy;
-                        let spun_x = cx + dx * Math.cos(currentSpin) - dy * Math.sin(currentSpin);
-                        let spun_y = cy + dx * Math.sin(currentSpin) + dy * Math.cos(currentSpin);
-
-                        let sx = spun_x * currentScale;
-                        let sy = spun_y * currentScale;
-                        
-                        let rx = sx * Math.cos(currentAngle) - sy * Math.sin(currentAngle);
-                        let ry = sx * Math.sin(currentAngle) + sy * Math.cos(currentAngle);
-                        
-                        let pathT = effectiveIter / iterations;
-                        let pathPt = getLoopPathPoint(pathT);
-                        
-                        newPoints.push({x: rx + pathPt.x + loopPathOffset.x, y: ry + pathPt.y + loopPathOffset.y, type: 'point'});
-                        ptIdx++;
-                    }
-                });
-                
-                if (!stretchMode && i < iterations - 1) {
-                    newPoints.push({type: 'break'});
-                }
-            }
-            
-            newPoints.push({type: 'break'});
-            rawPoints = newPoints;
-            render();
-        }
-
-        // --- VORTEX LOGIC ---
         function scanVortexShape() {
             const scanCanvas = document.getElementById('vortexScanCanvas'); const scanCtx = scanCanvas.getContext('2d');
             const w = scanCanvas.width; const h = scanCanvas.height; const cx = w/2; const cy = h/2; const r = w/2 - 20;
-            
             scanCtx.fillStyle = '#000'; scanCtx.fillRect(0, 0, w, h); scanCtx.fillStyle = '#fff'; scanCtx.strokeStyle = '#fff';
             scanCtx.lineWidth = 15; scanCtx.textAlign = 'center'; scanCtx.textBaseline = 'middle';
             scanCtx.save(); scanCtx.beginPath();
-            
-            const tableR = parseFloat(document.getElementById('cfgRadius').value); 
-            const scaleToFit = r / tableR; 
-            scanCtx.beginPath(); 
-            vortexSourcePath.forEach((p, i) => { 
-                if(p.type === 'break' || p.type === 'cmd') return; 
-                const sx = cx + (p.x * scaleToFit); const sy = cy - (p.y * scaleToFit); 
-                if(i===0 || vortexSourcePath[i-1].type === 'break') scanCtx.moveTo(sx, sy); else scanCtx.lineTo(sx, sy); 
-            }); 
-            scanCtx.stroke(); 
-            
+            const tableR = parseFloat(document.getElementById('cfgRadius').value); const scaleToFit = r / tableR; 
+            scanCtx.beginPath(); vortexSourcePath.forEach((p, i) => { if(p.type === 'break' || p.type === 'cmd') return; const sx = cx + (p.x * scaleToFit); const sy = cy - (p.y * scaleToFit); if(i===0 || vortexSourcePath[i-1].type === 'break') scanCtx.moveTo(sx, sy); else scanCtx.lineTo(sx, sy); }); scanCtx.stroke(); 
             scanCtx.fill(); scanCtx.restore();
             const pixels = scanCtx.getImageData(0, 0, w, h).data; const steps = 3600;
             for (let i = 0; i < steps; i++) { let maxDist = 0; const angle = (i / steps) * Math.PI * 2; const cos = Math.cos(angle); const sin = Math.sin(angle); for (let dist = 0; dist < r; dist += 2) { const x = Math.floor(cx + cos * dist); const y = Math.floor(cy + sin * dist); const idx = (y * w + x) * 4; if (pixels[idx] > 100) maxDist = dist; } vortexState.radiusMap[i] = maxDist / r; }
         }
 
         function generateVortex() {
-            const swirlCount = parseInt(document.getElementById('vortexSwirl').value); 
-            const scaleFac = parseFloat(document.getElementById('vortexScale').value);
-            const twistDeg = parseFloat(document.getElementById('vortexTwist').value); 
-            const tableRadius = parseFloat(document.getElementById('cfgRadius').value);
-            
+            const swirlCount = parseInt(document.getElementById('vortexSwirl').value); const scaleFac = parseFloat(document.getElementById('vortexScale').value);
+            const twistDeg = parseFloat(document.getElementById('vortexTwist').value); const tableRadius = parseFloat(document.getElementById('cfgRadius').value);
             const iterations = 20000; const centerGap = 4; const newPoints = []; newPoints.push({type:'break'});
-            
             for (let i = 0; i <= iterations; i++) {
                 const t = (i / iterations) * 2 - 1; const progress = Math.abs(t); const spiralAngle = t * swirlCount * Math.PI * 2;
                 const twistRad = (twistDeg * (Math.PI/180)) * swirlCount * Math.abs(t);
@@ -987,441 +771,274 @@
                 document.getElementById('val-swirl').innerText = document.getElementById('vortexSwirl').value;
                 document.getElementById('val-scale').innerText = document.getElementById('vortexScale').value;
                 document.getElementById('val-twist').innerText = document.getElementById('vortexTwist').value;
-                
-                const type = document.getElementById('vortexShape').value;
-                if (type === 'text') {
-                    document.getElementById('vortexTextContainer').style.display = 'block';
-                    vortexSourcePath = generateTextPath(document.getElementById('vortexChar').value);
-                } else {
-                    document.getElementById('vortexTextContainer').style.display = 'none';
-                    if (type !== 'custom') {
-                        let pts = []; const r = 50; 
-                        if(type==='triangle') { pts = [{x:0,y:r}, {x:r*0.86,y:-r/2}, {x:-r*0.86,y:-r/2}, {x:0,y:r}]; } 
-                        else if(type==='square') { pts = [{x:-r,y:-r}, {x:r,y:-r}, {x:r,y:r}, {x:-r,y:r}, {x:-r,y:-r}]; } 
-                        else if(type==='pentagon') { for(let i=0; i<=5; i++) { const a = (i/5)*Math.PI*2 - Math.PI/2; pts.push({x: Math.cos(a)*r, y: Math.sin(a)*r}); } } 
-                        else if(type==='hexagon') { for(let i=0; i<=6; i++) { const a = (i/6)*Math.PI*2; pts.push({x: Math.cos(a)*r, y: Math.sin(a)*r}); } } 
-                        else if(type==='star') { for(let i=0; i<=10; i++) { const a = (i/10)*Math.PI*2 + Math.PI/2; const rad = (i%2===0) ? r : r*0.4; pts.push({x: Math.cos(a)*rad, y: Math.sin(a)*rad}); } }
-                        vortexSourcePath = pts.map(p => ({...p, type:'point'}));
-                    }
-                }
                 scanVortexShape(); generateVortex();
             }
         }
 
-        function generateTextPath(char) {
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = 200; tempCanvas.height = 200;
-            const tCtx = tempCanvas.getContext('2d');
-            tCtx.fillStyle = 'white'; tCtx.fillRect(0,0,200,200);
-            tCtx.fillStyle = 'black'; tCtx.font = 'bold 160px Arial';
-            tCtx.textAlign = 'center'; tCtx.textBaseline = 'middle';
-            tCtx.fillText(char, 100, 105);
-            
-            const data = tCtx.getImageData(0,0,200,200).data;
-            const pts = [];
-            for(let y=0; y<200; y+=4) {
-                for(let x=0; x<200; x+=4) {
-                    if(data[(y*200+x)*4] < 128) {
-                        pts.push({x: (x-100)*0.8, y: -(y-100)*0.8, type:'point'});
-                    }
-                }
-            }
-            return pts;
+        function getPathPos(e) {
+            const rect = document.getElementById('pathCanvas').getBoundingClientRect();
+            const px = e.clientX - rect.left; const py = e.clientY - rect.top;
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            const scaleP = (rect.width/2) / (tableR * 1.05);
+            return { x: (px - rect.width/2) / scaleP, y: -(py - rect.height/2) / scaleP };
+        }
+        
+        function openPathModal() {
+            document.getElementById('pathModal').style.display = 'flex';
+            const pathCanvas = document.getElementById('pathCanvas');
+            const rect = pathCanvas.parentElement.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            pathCanvas.width = rect.width * dpr; pathCanvas.height = rect.height * dpr;
+            const ctxP = pathCanvas.getContext('2d'); ctxP.scale(dpr, dpr);
+            renderPathCanvas();
         }
 
-        // --- EXTRACTED TRACE LOGIC ---
-        function calculateSpiralTrace(imgData, thresh, density, ballSizeMm, tableR) {
-            const pixelBallSize = (ballSizeMm / (tableR * 2)) * 800;
-            const SIZE = 800; const CENTER = SIZE / 2;
-            let pixelGrid = new Uint8Array(SIZE*SIZE); 
-            for(let i=0; i<SIZE*SIZE; i++) { pixelGrid[i] = imgData.data[i*4] < thresh ? 1 : 0; }
-            
-            let contours = []; const traced = new Uint8Array(SIZE*SIZE).fill(0);
-            
-            const traceBoundary = (sx, sy) => {
-                const path = []; let cx = sx, cy = sy; let bx = sx-1, by = sy; let max = SIZE*10;
-                let lastAddedX = -10, lastAddedY = -10;
+        function closePathModal() { document.getElementById('pathModal').style.display = 'none'; }
+        function clearPathCanvas() { pathRawPoints = []; renderPathCanvas(); }
+        function startDrawPath(e) { e.preventDefault(); isDrawingPath = true; pathRawPoints = []; document.getElementById('pathCanvas').setPointerCapture(e.pointerId); pathRawPoints.push(getPathPos(e)); renderPathCanvas(); }
+        function moveDrawPath(e) { e.preventDefault(); if(!isDrawingPath) return; pathRawPoints.push(getPathPos(e)); renderPathCanvas(); }
+        function endDrawPath(e) { if(!isDrawingPath) return; isDrawingPath = false; document.getElementById('pathCanvas').releasePointerCapture(e.pointerId); }
 
-                do {
-                    if (Math.hypot(cx - lastAddedX, cy - lastAddedY) > 1.5) {
-                        path.push({x:cx, y:cy});
-                        lastAddedX = cx; lastAddedY = cy;
+        function savePathCanvas() {
+            if(pathRawPoints.length > 1) {
+                let totalDist = 0; let processed = [{...pathRawPoints[0], d: 0}];
+                for(let i=1; i<pathRawPoints.length; i++) {
+                    let d = Math.hypot(pathRawPoints[i].x - pathRawPoints[i-1].x, pathRawPoints[i].y - pathRawPoints[i-1].y);
+                    if(d > 0.1) { totalDist += d; processed.push({...pathRawPoints[i], d: totalDist}); }
+                }
+                if (totalDist > 0) { processed.forEach(p => p.t = p.d / totalDist); customPathPoints = processed; }
+            }
+            closePathModal(); document.getElementById('loopGuidePath').value = 'custom'; updateLoopParams();
+        }
+
+        function renderPathCanvas() {
+            const pathCanvas = document.getElementById('pathCanvas'); const ctxP = pathCanvas.getContext('2d');
+            const rect = pathCanvas.parentElement.getBoundingClientRect();
+            ctxP.clearRect(0, 0, rect.width, rect.height);
+            ctxP.beginPath(); ctxP.arc(rect.width/2, rect.height/2, rect.width/2 - 4, 0, Math.PI*2); ctxP.lineWidth = 4; ctxP.strokeStyle = "black"; ctxP.stroke();
+            if(pathRawPoints.length > 0) {
+                const tableR = parseFloat(document.getElementById('cfgRadius').value); const scaleP = (rect.width/2) / (tableR * 1.05);
+                ctxP.beginPath(); ctxP.strokeStyle = "var(--secondary)"; ctxP.lineWidth = 4; ctxP.lineCap = "round"; ctxP.lineJoin = "round";
+                pathRawPoints.forEach((p, i) => { let px = rect.width/2 + p.x * scaleP; let py = rect.height/2 - p.y * scaleP; if(i===0) ctxP.moveTo(px, py); else ctxP.lineTo(px, py); });
+                ctxP.stroke();
+            }
+        }
+
+        function getLoopPathPoint(t) {
+            let pathType = document.getElementById('loopGuidePath').value;
+            if (pathType === 'circle') return { x: 75 * Math.cos(t * Math.PI * 2), y: 75 * Math.sin(t * Math.PI * 2) };
+            if (pathType === 'square') { let d = (t % 1) * 4; let side = Math.floor(d), frac = d - side, x, y; if (side === 0) { x = -75 + 150 * frac; y = -75; } else if (side === 1) { x = 75; y = -75 + 150 * frac; } else if (side === 2) { x = 75 - 150 * frac; y = 75; } else { x = -75; y = 75 - 150 * frac; } return { x, y }; }
+            if (pathType === 'figure8') { let ang = t * Math.PI * 2; return { x: 100 * Math.sin(ang), y: 100 * Math.sin(ang) * Math.cos(ang) }; }
+            if (pathType === 'custom' && customPathPoints.length > 0) { let normT = t % 1; for (let i = 0; i < customPathPoints.length - 1; i++) { if (normT >= customPathPoints[i].t && normT <= customPathPoints[i+1].t) { let p1 = customPathPoints[i], p2 = customPathPoints[i+1]; let range = p2.t - p1.t, frac = range === 0 ? 0 : (normT - p1.t) / range; return { x: p1.x + (p2.x - p1.x) * frac, y: p1.y + (p2.y - p1.y) * frac }; } } return { x: customPathPoints[customPathPoints.length-1].x, y: customPathPoints[customPathPoints.length-1].y }; }
+            return {x:0, y:0};
+        }
+
+        function updateLoopParams() {
+            if(currentTool === 'loop') {
+                document.getElementById('val-loop-iter').innerText = document.getElementById('loopIter').value;
+                document.getElementById('val-loop-angle').innerText = document.getElementById('loopAngle').value;
+                document.getElementById('val-loop-spin').innerText = document.getElementById('loopSpin').value;
+                document.getElementById('val-loop-scale').innerText = document.getElementById('loopScale').value;
+                document.getElementById('val-loop-osc').innerText = document.getElementById('loopOsc').value;
+                generateLoop();
+            }
+        }
+
+        function generateLoop() {
+            const iterations = parseInt(document.getElementById('loopIter').value), angleStepDeg = parseFloat(document.getElementById('loopAngle').value);
+            const spinStepDeg = parseFloat(document.getElementById('loopSpin').value), scaleFac = parseFloat(document.getElementById('loopScale').value), oscRate = parseFloat(document.getElementById('loopOsc').value), stretchMode = document.getElementById('loopStretchMode').checked;
+            let newPoints = []; newPoints.push({type: 'break'});
+            const pointsOnly = loopSourcePath.filter(p => p.type === 'point'), numPts = pointsOnly.length; if(numPts === 0) return;
+            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity; pointsOnly.forEach(p => { minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x); minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y); });
+            let cx = (minX+maxX)/2, cy = (minY+maxY)/2;
+            for(let i=0; i<iterations; i++) {
+                let ptIdx = 0;
+                loopSourcePath.forEach((p, idx) => {
+                    if(p.type === 'break' || p.type === 'cmd') { if (!stretchMode) if (idx !== 0 && idx !== loopSourcePath.length - 1) newPoints.push({...p}); } 
+                    else {
+                        let shapeProgress = stretchMode ? (numPts > 1 ? ptIdx / (numPts - 1) : 0) : 0, effectiveIter = i + shapeProgress;
+                        const currentAngle = effectiveIter * angleStepDeg * (Math.PI / 180), currentSpin = effectiveIter * spinStepDeg * (Math.PI / 180);
+                        let oscScale = 1.0; if (oscRate > 0) oscScale = 1.0 + 0.4 * Math.sin(effectiveIter * oscRate * 0.1);
+                        const currentScale = scaleFac * oscScale;
+                        let dx = p.x - cx, dy = p.y - cy;
+                        let spun_x = cx + dx * Math.cos(currentSpin) - dy * Math.sin(currentSpin), spun_y = cy + dx * Math.sin(currentSpin) + dy * Math.cos(currentSpin);
+                        let sx = spun_x * currentScale, sy = spun_y * currentScale;
+                        let rx = sx * Math.cos(currentAngle) - sy * Math.sin(currentAngle), ry = sx * Math.sin(currentAngle) + sy * Math.cos(currentAngle);
+                        let pathPt = getLoopPathPoint(effectiveIter / iterations);
+                        newPoints.push({x: rx + pathPt.x + loopPathOffset.x, y: ry + pathPt.y + loopPathOffset.y, type: 'point'}); ptIdx++;
                     }
+                });
+                if (!stretchMode && i < iterations - 1) newPoints.push({type: 'break'});
+            }
+            newPoints.push({type: 'break'}); rawPoints = newPoints; render();
+        }
+
+        function calculateSpiralTrace(imgData, thresh, density, ballSizeMm, tableR) {
+            const pixelBallSize = (ballSizeMm / (tableR * 2)) * 800, SIZE = 800, CENTER = SIZE / 2;
+            let pixelGrid = new Uint8Array(SIZE*SIZE); for(let i=0; i<SIZE*SIZE; i++) pixelGrid[i] = imgData.data[i*4] < thresh ? 1 : 0;
+            let contours = []; const traced = new Uint8Array(SIZE*SIZE).fill(0);
+            const traceBoundary = (sx, sy) => {
+                const path = []; let cx = sx, cy = sy, bx = sx-1, by = sy, max = SIZE*10, lastAddedX = -10, lastAddedY = -10;
+                do {
+                    if (Math.hypot(cx - lastAddedX, cy - lastAddedY) > 1.5) { path.push({x:cx, y:cy}); lastAddedX = cx; lastAddedY = cy; }
                     traced[cy*SIZE+cx] = 1;
                     const n = [{x:-1,y:0},{x:-1,y:-1},{x:0,y:-1},{x:1,y:-1},{x:1,y:0},{x:1,y:1},{x:0,y:1},{x:-1,y:1}];
                     let startIdx = 0; for(let i=0; i<8; i++) if(bx===cx+n[i].x && by===cy+n[i].y) startIdx=(i+1)%8;
-                    let found = false;
-                    for(let i=0; i<8; i++) {
-                        const idx = (startIdx + i)%8; const nx = cx + n[idx].x; const ny = cy + n[idx].y;
-                        if(nx>=0 && nx<SIZE && ny>=0 && ny<SIZE && pixelGrid[ny*SIZE+nx]===1) { bx=cx; by=cy; cx=nx; cy=ny; found=true; break; } else { bx=nx; by=ny; }
-                    }
+                    let found = false; for(let i=0; i<8; i++) { const idx = (startIdx + i)%8, nx = cx + n[idx].x, ny = cy + n[idx].y; if(nx>=0 && nx<SIZE && ny>=0 && ny<SIZE && pixelGrid[ny*SIZE+nx]===1) { bx=cx; by=cy; cx=nx; cy=ny; found=true; break; } else { bx=nx; by=ny; } }
                     if(!found) break; max--;
                 } while((cx!==sx || cy!==sy) && max>0);
                 return path;
             };
-
-            for(let y=1; y<SIZE-1; y++) { 
-                for(let x=1; x<SIZE-1; x++) { 
-                    const idx = y*SIZE + x; 
-                    if(pixelGrid[idx] === 1 && pixelGrid[idx-1] === 0 && traced[idx] === 0) { 
-                        const pth = traceBoundary(x, y); 
-                        if(pth.length > 40) { 
-                            let maxDist = 0; let bestIdx = 0; 
-                            pth.forEach((p, i) => { const dist = Math.hypot(p.x - CENTER, p.y - CENTER); if(dist > maxDist) { maxDist = dist; bestIdx = i; } }); 
-                            const reordered = [...pth.slice(bestIdx), ...pth.slice(0, bestIdx)]; reordered.push(reordered[0]); 
-                            contours.push({ points: reordered, trigger: reordered[0], maxR: maxDist, merged: false }); 
-                        } 
-                    } 
-                } 
-            }
-
+            for(let y=1; y<SIZE-1; y++) for(let x=1; x<SIZE-1; x++) if(pixelGrid[y*SIZE+x] === 1 && pixelGrid[y*SIZE+x-1] === 0 && traced[y*SIZE+x] === 0) { const pth = traceBoundary(x, y); if(pth.length > 40) { let maxDist = 0, bestIdx = 0; pth.forEach((p, i) => { const dist = Math.hypot(p.x - CENTER, p.y - CENTER); if(dist > maxDist) { maxDist = dist; bestIdx = i; } }); const reordered = [...pth.slice(bestIdx), ...pth.slice(0, bestIdx)]; reordered.push(reordered[0]); contours.push({ points: reordered, trigger: reordered[0], maxR: maxDist, merged: false }); } }
             contours.sort((a, b) => a.maxR - b.maxR);
-
-            let spiral = []; const maxR = SIZE/2 - 5; spiral.push({x: CENTER, y: CENTER});
-            let angle = 0; let r = 0; const angleStep = 0.02; const spacingPx = density * 4.0; 
-            
+            let spiral = []; const maxR = SIZE/2 - 5; let angle = 0, r = 0; const angleStep = 0.02, spacingPx = density * 4.0; 
             while(r < maxR) { 
-                r = (spacingPx / (2*Math.PI)) * angle; 
-                let x = CENTER + Math.cos(angle)*r; let y = CENTER + Math.sin(angle)*r; 
-                
-                let wiggle = 0; const ix = Math.floor(x), iy = Math.floor(y); 
-                if(ix>=0 && ix<SIZE && iy>=0 && iy<SIZE) { if(pixelGrid[iy*SIZE+ix] === 1) wiggle = Math.sin(angle * 30) * (spacingPx * 0.2); } 
-                x += Math.cos(angle) * wiggle; y += Math.sin(angle) * wiggle; 
-                const sp = {x:x, y:y};
-                spiral.push(sp); 
-
+                r = (spacingPx / (2*Math.PI)) * angle; let x = CENTER + Math.cos(angle)*r, y = CENTER + Math.sin(angle)*r; 
+                let wiggle = 0; const ix = Math.floor(x), iy = Math.floor(y); if(ix>=0 && ix<SIZE && iy>=0 && iy<SIZE) if(pixelGrid[iy*SIZE+ix] === 1) wiggle = Math.sin(angle * 30) * (spacingPx * 0.2); 
+                x += Math.cos(angle) * wiggle; y += Math.sin(angle) * wiggle; const sp = {x:x, y:y}; spiral.push(sp); 
                 const spiralRadius = Math.hypot(sp.x - CENTER, sp.y - CENTER);
-                for (let c of contours) {
-                    if(!c.merged) { 
-                        if (spiralRadius > (c.maxR + (pixelBallSize * 0.4))) {
-                            const contourAngle = Math.atan2(c.trigger.y - CENTER, c.trigger.x - CENTER);
-                            let normAngle = Math.atan2(Math.sin(angle), Math.cos(angle));
-                            
-                            if (Math.abs(normAngle - contourAngle) < 0.05) {
-                                spiral.push(c.trigger);
-                                c.points.forEach((p, i) => { if(i % 2 === 0) spiral.push(p); }); 
-                                spiral.push(c.trigger);
-                                spiral.push(sp);
-                                c.merged = true; 
-                            }
-                        } 
-                    } 
-                }
+                for (let c of contours) if(!c.merged && spiralRadius > (c.maxR + (pixelBallSize * 0.4))) { const contourAngle = Math.atan2(c.trigger.y - CENTER, c.trigger.x - CENTER); if (Math.abs(Math.atan2(Math.sin(angle), Math.cos(angle)) - contourAngle) < 0.05) { spiral.push(c.trigger); c.points.forEach((p, i) => { if(i % 2 === 0) spiral.push(p); }); spiral.push(c.trigger); spiral.push(sp); c.merged = true; } }
                 angle += angleStep; 
             }
-
-            const scaleFac = (tableR * 2) / SIZE;
-            let finalPoints = [];
-            spiral.forEach(p => { let tx = (p.x - 400) * scaleFac; let ty = (400 - p.y) * scaleFac; finalPoints.push({ x: tx, y: ty, type: 'point' }); });
-            return finalPoints;
+            const scaleFac = (tableR * 2) / SIZE; let finalPoints = []; spiral.forEach(p => finalPoints.push({ x: (p.x - 400) * scaleFac, y: (400 - p.y) * scaleFac, type: 'point' })); return finalPoints;
         }
 
         function rasterizeCanvasForTrace() {
-            const size = 800; 
-            const buff = document.getElementById('hiddenTraceBuffer'); 
-            const bCtx = buff.getContext('2d');
-            bCtx.fillStyle = "white"; 
-            bCtx.fillRect(0, 0, size, size); 
-            
-            bCtx.strokeStyle = "black";
-            const tableR = parseFloat(document.getElementById('cfgRadius').value);
-            const ballSizeMm = parseFloat(document.getElementById('cfgBallSize').value);
-            bCtx.lineWidth = (ballSizeMm / (tableR * 2)) * size;
-            bCtx.lineCap = "round";
-            bCtx.lineJoin = "round";
-
-            bCtx.save(); 
-            bCtx.translate(size/2, size/2);
-
-            const sym = parseInt(document.getElementById('symSlider').value);
-            const scaleFac = (size / 2) / tableR;
-
-            let shapes = []; let curShape = []; 
-            rawPoints.forEach(p => { 
-                if(p.type === 'break' || p.type === 'cmd') { 
-                    if(curShape.length > 0) shapes.push(curShape); 
-                    curShape = []; 
-                } else curShape.push(p); 
-            });
+            const size = 800; const buff = document.getElementById('hiddenTraceBuffer'); const bCtx = buff.getContext('2d');
+            bCtx.fillStyle = "white"; bCtx.fillRect(0, 0, size, size); bCtx.strokeStyle = "black";
+            const tableR = parseFloat(document.getElementById('cfgRadius').value), ballSizeMm = parseFloat(document.getElementById('cfgBallSize').value);
+            bCtx.lineWidth = (ballSizeMm / (tableR * 2)) * size; bCtx.lineCap = "round"; bCtx.lineJoin = "round";
+            bCtx.save(); bCtx.translate(size/2, size/2);
+            const sym = parseInt(document.getElementById('symSlider').value), scaleFac = (size / 2) / tableR;
+            let shapes = []; let curShape = []; rawPoints.forEach(p => { if(p.type === 'break' || p.type === 'cmd') { if(curShape.length > 0) shapes.push(curShape); curShape = []; } else curShape.push(p); });
             if(curShape.length > 0) shapes.push(curShape);
-
-            for(let s=0; s<sym; s++) { 
-                const ang = s * (Math.PI*2/sym); 
-                bCtx.save();
-                bCtx.rotate(ang);
-                bCtx.beginPath();
-                shapes.forEach(sh => {
-                    if (sh.length > 0) {
-                        bCtx.moveTo(sh[0].x * scaleFac, -sh[0].y * scaleFac);
-                        for(let i=1; i<sh.length; i++) {
-                            bCtx.lineTo(sh[i].x * scaleFac, -sh[i].y * scaleFac);
-                        }
-                    }
-                });
-                bCtx.stroke();
-                bCtx.restore();
-            }
-            bCtx.restore();
-            
-            return bCtx.getImageData(0,0,size,size);
+            for(let s=0; s<sym; s++) { const ang = s * (Math.PI*2/sym); bCtx.save(); bCtx.rotate(ang); bCtx.beginPath(); shapes.forEach(sh => { if (sh.length > 0) { bCtx.moveTo(sh[0].x * scaleFac, -sh[0].y * scaleFac); for(let i=1; i<sh.length; i++) bCtx.lineTo(sh[i].x * scaleFac, -sh[i].y * scaleFac); } }); bCtx.stroke(); bCtx.restore(); }
+            bCtx.restore(); return bCtx.getImageData(0,0,size,size);
         }
 
-        function handleTraceClick() {
-            document.getElementById('imgUpload').click();
-        }
-
+        function handleTraceClick() { document.getElementById('imgUpload').click(); }
         function handleImageUpload(input) {
-            if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const img = new Image();
-                    img.onload = function() {
-                        traceState.img = img;
-                        traceState.active = true;
-                        traceState.x = 0; traceState.y = 0; traceState.rotation = 0;
-                        
-                        const tableR = parseFloat(document.getElementById('cfgRadius').value);
-                        const fitScale = (400 / Math.max(img.width, img.height)) * 0.8;
-                        traceState.baseScale = fitScale;
-                        traceState.scale = fitScale;
-                        
-                        setTool('trace');
-                        runHighPrecisionTrace();
-                    };
-                    img.src = e.target.result;
+            const file = input.files[0]; if(!file) return;
+            const reader = new FileReader(); reader.onload = function(e) {
+                const img = new Image(); img.onload = function() {
+                    traceState.active = true; traceState.img = img; traceState.x = 0; traceState.y = 0; traceState.rotation = 0;
+                    const scale = Math.min(800/img.width, 800/img.height) * 0.9; traceState.baseScale = scale; traceState.scale = scale; commitTraceMove(); setTool('trace_set');
                 };
-                reader.readAsDataURL(input.files[0]);
-            }
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file); input.value = '';
         }
 
-        function runHighPrecisionTrace() {
-            if(!traceState.active || !traceState.img) return;
-            
-            const thresh = parseInt(document.getElementById('traceThreshInput').value);
-            document.getElementById('traceThreshVal').innerText = thresh;
-            const density = document.getElementById('traceDensityInput').value;
-            document.getElementById('traceDensityVal').innerText = density;
-            
-            commitTraceMove();
+        function drawTracePreview() {
+            const w = canvas.width / window.devicePixelRatio, h = canvas.height / window.devicePixelRatio; ctx.clearRect(0, 0, w, h);
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            ctx.save(); ctx.translate(origin.x, origin.y); ctx.beginPath(); ctx.arc(0, 0, tableR*scale, 0, Math.PI*2); ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.stroke();
+            const visualScale = (tableR * 2 / 800) * scale; ctx.save(); ctx.scale(visualScale, visualScale); ctx.translate(traceState.x, traceState.y); ctx.rotate(traceState.rotation * Math.PI / 180);
+            const drawW = traceState.img.width * traceState.scale, drawH = traceState.img.height * traceState.scale;
+            ctx.filter = 'grayscale(100%) contrast(1000%) invert(1)'; ctx.drawImage(traceState.img, -drawW/2, -drawH/2, drawW, drawH); ctx.restore(); ctx.restore();
         }
 
         function commitTraceMove() {
-            const size = 800; const buff = document.getElementById('hiddenTraceBuffer'); const bCtx = buff.getContext('2d');
-            bCtx.fillStyle = "white"; bCtx.fillRect(0, 0, size, size); bCtx.save(); bCtx.translate(size/2, size/2);
-            bCtx.translate(traceState.x, traceState.y); bCtx.rotate(traceState.rotation * Math.PI / 180);
-            const drawW = traceState.img.width * traceState.scale; const drawH = traceState.img.height * traceState.scale;
+            const size = 800, buff = document.getElementById('hiddenTraceBuffer'), bCtx = buff.getContext('2d');
+            bCtx.fillStyle = "white"; bCtx.fillRect(0, 0, size, size); bCtx.save(); bCtx.translate(size/2, size/2); bCtx.translate(traceState.x, traceState.y); bCtx.rotate(traceState.rotation * Math.PI / 180);
+            const drawW = traceState.img.width * traceState.scale, drawH = traceState.img.height * traceState.scale;
             bCtx.drawImage(traceState.img, -drawW/2, -drawH/2, drawW, drawH); bCtx.restore();
-            traceImgData = bCtx.getImageData(0,0,size,size); 
-            
-            const thresh = parseInt(document.getElementById('traceThreshInput').value); 
-            const density = parseFloat(document.getElementById('traceDensityInput').value); 
-            const ballSizeMm = parseFloat(document.getElementById('cfgBallSize').value);
-            const tableR = parseFloat(document.getElementById('cfgRadius').value);
-            
+            traceImgData = bCtx.getImageData(0,0,size,size); runHighPrecisionTrace();
+        }
+
+        function runHighPrecisionTrace() {
+            if(!traceImgData) return;
+            const thresh = parseInt(document.getElementById('traceThreshInput').value), density = parseFloat(document.getElementById('traceDensityInput').value);
+            const ballSizeMm = parseFloat(document.getElementById('cfgBallSize').value), tableR = parseFloat(document.getElementById('cfgRadius').value);
             const generated = calculateSpiralTrace(traceImgData, thresh, density, ballSizeMm, tableR);
-            rawPoints = []; 
-            if(generated.length > 0) rawPoints.push({type:'break'});
-            rawPoints = rawPoints.concat(generated);
-            if(generated.length > 0) rawPoints.push({type:'break'});
-            render();
+            rawPoints = []; if(generated.length > 0) rawPoints.push({type:'break'}); rawPoints = rawPoints.concat(generated); if(generated.length > 0) rawPoints.push({type:'break'}); render();
         }
 
-        function liveRotate(val) {
-            traceState.rotation = parseFloat(val);
-            document.getElementById('liveRotVal').innerText = val + '°';
-            runHighPrecisionTrace();
-        }
-
-        function liveScale(val) {
-            const factor = parseFloat(val) / 100;
-            traceState.scale = traceState.baseScale * factor;
-            document.getElementById('liveScaleVal').innerText = val + '%';
-            runHighPrecisionTrace();
-        }
-
-        function endLiveTransform(el) {
-            // Placeholder if we want to do something specific after slider release
-        }
-
-        // --- CORE UI & RENDER ---
         function resizeCanvas() {
-            const container = document.getElementById('canvasContainer'); const size = container.getBoundingClientRect().width; const dpr = window.devicePixelRatio || 1;
+            const container = document.getElementById('canvasContainer'), size = container.getBoundingClientRect().width, dpr = window.devicePixelRatio || 1;
             canvas.width = size * dpr; canvas.height = size * dpr; ctx.scale(dpr, dpr); origin = { x: size/2, y: size/2 };
             const tableR = parseFloat(document.getElementById('cfgRadius').value); scale = (size/2) / (tableR * 1.05); render();
         }
         function saveState() { if(historyStack.length>15) historyStack.shift(); historyStack.push(JSON.stringify(rawPoints)); }
         function undo() { if(historyStack.length===0) return; rawPoints = JSON.parse(historyStack.pop()); render(); }
-        function clearCanvas() { saveState(); rawPoints = []; traceState.active=false; processedPoints=[]; resetStatus(); render(); }
+        function clearCanvas() { saveState(); rawPoints = []; traceState.active=false; render(); }
         
+        function setTool(t) {
+            currentTool = t; const buttons = ['btnDraw', 'btnErase', 'btnSelect', 'btnSandify', 'btnLoop', 'btnTrace', 'btnText'];
+            buttons.forEach(b => { const el = document.getElementById(b); if(el) el.className = (b.toLowerCase().includes(t) || (t==='trace_set' && b==='btnTrace')) ? 'active' : 'secondary'; });
+            updateToolSettings();
+            if(t === 'select' && traceState.active) document.getElementById('traceMoveMsg').style.display = 'block'; else document.getElementById('traceMoveMsg').style.display = 'none';
+            if(t === 'sandify') { activeEffectType = 'sandify'; if (rawPoints.length === 0) addShape('random'); vortexSourcePath = JSON.parse(JSON.stringify(rawPoints)); document.getElementById('vortexShape').value = 'custom'; updateVortexParams(); }
+            if(t === 'loop') { activeEffectType = 'loop'; loopPathOffset = {x: 0, y: 0}; if (rawPoints.length === 0) addShape('circle'); loopSourcePath = JSON.parse(JSON.stringify(rawPoints)); document.getElementById('loopShape').value = 'custom'; updateLoopParams(); }
+            if(t === 'text') renderTextToTrace();
+        }
+
+        function updateToolSettings() {
+            const area = document.getElementById('toolSettingsArea'), grps = document.querySelectorAll('.tool-setting-group'); grps.forEach(g => g.style.display = 'none');
+            let activeGrp = null;
+            if(currentTool === 'draw') activeGrp = document.getElementById('set-pen');
+            else if(currentTool === 'erase') activeGrp = document.getElementById('set-erase');
+            else if(currentTool === 'text') activeGrp = document.getElementById('set-text');
+            else if(currentTool === 'select') activeGrp = document.getElementById('set-select');
+            else if(currentTool === 'sandify') activeGrp = document.getElementById('set-sandify');
+            else if(currentTool === 'loop') activeGrp = document.getElementById('set-loop');
+            else if(currentTool === 'trace_set') activeGrp = document.getElementById('set-trace');
+            if(activeGrp) { area.style.display = 'block'; activeGrp.style.display = 'block'; } else area.style.display = 'none';
+            eraserRadius = parseInt(document.getElementById('eraserSizeSlider').value); document.getElementById('eraseSizeVal').innerText = eraserRadius + 'px';
+            const stylusWrapper = document.getElementById('stylusModeWrapper'); if (stylusWrapper) stylusWrapper.style.display = (currentTool === 'draw' || currentTool === 'erase') ? 'flex' : 'none';
+        }
+
+        function renderTextToTrace() {
+            const text = document.getElementById('toolTextInput').value, size = parseInt(document.getElementById('toolTextSize').value), font = document.getElementById('toolTextFont').value, density = document.getElementById('textDensityInput').value;
+            document.getElementById('textDensityVal').innerText = density; const buff = document.getElementById('hiddenTraceBuffer'), bCtx = buff.getContext('2d'), canvasSize = 800;
+            bCtx.fillStyle = "white"; bCtx.fillRect(0, 0, canvasSize, canvasSize); bCtx.fillStyle = "black"; bCtx.font = `bold ${size}px ${font}`; bCtx.textAlign = "center"; bCtx.textBaseline = "middle";
+            const lines = text.split('\n'), lineHeight = size * 1.1, totalHeight = lineHeight * (lines.length - 1), startY = (canvasSize / 2) - (totalHeight / 2);
+            lines.forEach((line, i) => bCtx.fillText(line, canvasSize / 2, startY + (i * lineHeight)));
+            traceImgData = bCtx.getImageData(0, 0, canvasSize, canvasSize); runHighPrecisionTrace();
+        }
+
+        function commitTextMove() { setTool('draw'); }
         function updateUI() { document.getElementById('symVal').textContent = document.getElementById('symSlider').value + 'x'; render(); }
         function showToast(msg, type) { const t = document.getElementById('status-toast'); t.textContent = msg; t.className = type; t.style.opacity = 1; setTimeout(()=>t.style.opacity=0, 3000); }
-        function toggleTheme() { const b = document.body; b.setAttribute('data-theme', b.getAttribute('data-theme')==='dark'?'light':'dark'); render(); }
+        function toggleTheme() { const b = document.body, n = b.getAttribute('data-theme')==='dark'?'light':'dark'; b.setAttribute('data-theme', n); localStorage.setItem('theme', n); render(); }
         function resetStatus() { generatedGCode = null; processedPoints = []; document.getElementById('statusTxt').innerText = "Drawing Mode"; document.getElementById('progressSlider').value = 100; render(); }
         
-        // Set active nav link
-        document.addEventListener('DOMContentLoaded', () => {
-            const path = window.location.pathname;
-            const navMap = {
-                '/': 'nav-designs',
-                '/controller': 'nav-controller',
-                '/sketch': 'nav-sketch',
-                '/AI_builder': 'nav-ai',
-                '/led_controls': 'nav-leds',
-                '/terminal': 'nav-terminal',
-                '/settings': 'nav-settings'
-            };
-            const activeId = navMap[path] || 'nav-designs';
-            const el = document.getElementById(activeId);
-            if (el) el.classList.add('active');
-            
-            // Initialization
-            init();
-            setTool('draw');
-        });
-
-        // --- TEXT TOOL LOGIC ---
-        function renderTextToTrace() {
-            const text = document.getElementById('toolTextInput').value;
-            const size = parseInt(document.getElementById('toolTextSize').value);
-            const font = document.getElementById('toolTextFont').value;
-            const density = document.getElementById('textDensityInput').value;
-            document.getElementById('textDensityVal').innerText = density;
-            const buff = document.getElementById('hiddenTraceBuffer'); const bCtx = buff.getContext('2d'); const canvasSize = 800;
-            bCtx.fillStyle = "white"; bCtx.fillRect(0, 0, canvasSize, canvasSize);
-            bCtx.fillStyle = "black"; bCtx.font = `bold ${size}px ${font}`; bCtx.textAlign = "center"; bCtx.textBaseline = "middle";
-            
-            const lines = text.split('\n');
-            const lineHeight = size * 1.1;
-            const totalHeight = lineHeight * (lines.length - 1);
-            const startY = (canvasSize / 2) - (totalHeight / 2);
-
-            lines.forEach((line, i) => {
-                bCtx.fillText(line, canvasSize / 2, startY + (i * lineHeight));
-            });
-
-            const imgData = bCtx.getImageData(0,0,canvasSize,canvasSize);
-            const tableR = parseFloat(document.getElementById('cfgRadius').value);
-            const ballSizeMm = parseFloat(document.getElementById('cfgBallSize').value);
-            const pts = calculateSpiralTrace(imgData, 150, parseFloat(density), ballSizeMm, tableR);
-            
-            customPathPoints = []; 
-            if(pts.length > 0) {
-                pts.forEach(p => customPathPoints.push(p));
-            }
-            render();
-        }
-
-        function commitTextMove() {
-            if(customPathPoints.length > 0) {
-                rawPoints = [];
-                rawPoints.push({type:'break'});
-                customPathPoints.forEach(p => rawPoints.push({...p, source:'draw'}));
-                rawPoints.push({type:'break'});
-                customPathPoints = [];
-                setTool('draw');
-                render();
-            }
-        }
-
         function render() {
-            const w = canvas.width / window.devicePixelRatio; const h = canvas.height / window.devicePixelRatio; ctx.clearRect(0, 0, w, h); ctx.filter = 'none';
-            const tableR = parseFloat(document.getElementById('cfgRadius').value); const sym = parseInt(document.getElementById('symSlider').value); const dark = document.body.getAttribute('data-theme') === 'dark'; const prog = parseInt(document.getElementById('progressSlider').value); document.getElementById('progVal').textContent = prog + '%';
-            ctx.save(); ctx.translate(origin.x, origin.y); ctx.beginPath(); ctx.arc(0, 0, tableR*scale, 0, Math.PI*2); ctx.strokeStyle = dark ? '#444' : '#ddd'; ctx.lineWidth = 2; ctx.stroke();
-            const showingFinal = (processedPoints.length > 0); const dataToShow = showingFinal ? processedPoints : rawPoints; const limit = Math.floor(dataToShow.length * (prog/100)); const color = showingFinal ? '#ff0000' : (dark ? '#a1c4fd' : '#007bff'); ctx.lineWidth = 1.5; const loopCount = showingFinal ? 1 : sym;
-            for(let s=0; s<loopCount; s++) {
-                const ang = s * (Math.PI*2/sym); ctx.save(); if(!showingFinal) ctx.rotate(ang); ctx.beginPath(); ctx.strokeStyle = color; let isMove = true;
-                for(let i=0; i<limit; i++) { const p = dataToShow[i]; if(p.type === 'break' || p.type === 'cmd') { isMove = true; continue; } const px = p.x * scale; const py = -p.y * scale; if(isMove) { ctx.moveTo(px, py); isMove = false; } else ctx.lineTo(px, py); }
-                ctx.stroke(); ctx.restore();
-            }
+            const w = canvas.width / window.devicePixelRatio, h = canvas.height / window.devicePixelRatio; ctx.clearRect(0, 0, w, h);
+            const tableR = parseFloat(document.getElementById('cfgRadius').value), sym = parseInt(document.getElementById('symSlider').value), dark = document.body.getAttribute('data-theme') === 'dark', prog = parseInt(document.getElementById('progressSlider').value); document.getElementById('progVal').textContent = prog + '%';
+            ctx.save(); ctx.translate(origin.x, origin.y); ctx.beginPath(); ctx.arc(0, 0, tableR*scale, 0, Math.PI*2); ctx.strokeStyle = dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'; ctx.lineWidth = 2; ctx.stroke();
+            const showingFinal = (processedPoints.length > 0), dataToShow = showingFinal ? processedPoints : rawPoints, limit = Math.floor(dataToShow.length * (prog/100)), color = showingFinal ? '#ff0000' : (dark ? '#a1c4fd' : '#007bff'); ctx.lineWidth = 1.5; const loopCount = showingFinal ? 1 : sym;
+            for(let s=0; s<loopCount; s++) { const ang = s * (Math.PI*2/sym); ctx.save(); if(!showingFinal) ctx.rotate(ang); ctx.beginPath(); ctx.strokeStyle = color; let isMove = true; for(let i=0; i<limit; i++) { const p = dataToShow[i]; if(p.type === 'break' || p.type === 'cmd') { isMove = true; continue; } const px = p.x * scale, py = -p.y * scale; if(isMove) { ctx.moveTo(px, py); isMove = false; } else ctx.lineTo(px, py); } ctx.stroke(); ctx.restore(); }
+            if(currentTool === 'select' && rawPoints.length > 0 && !generatedGCode && !traceState.active) { let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity; rawPoints.forEach(p => { if(p.type === 'point') { minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x); minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y); } }); if(minX !== Infinity) { ctx.beginPath(); ctx.rect(minX*scale, -maxY*scale, (maxX-minX)*scale, (maxY-minY)*scale); ctx.strokeStyle = dark ? "white" : "black"; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]); } }
             ctx.restore();
-            
-            // Preview text to be committed
-            if(customPathPoints.length > 0) {
-                ctx.save(); ctx.translate(origin.x, origin.y); ctx.beginPath(); ctx.strokeStyle = 'rgba(161, 196, 253, 0.5)'; ctx.lineWidth = 1;
-                let isMove = true;
-                customPathPoints.forEach(p => {
-                    const px = p.x * scale; const py = -p.y * scale;
-                    if(isMove) { ctx.moveTo(px, py); isMove = false; } else ctx.lineTo(px, py);
-                });
-                ctx.stroke(); ctx.restore();
-            }
         }
 
-        // --- GCODE GENERATION ---
         async function sendToTable() { if(!generatedGCode) return showToast("Click Generate Path first", "error"); fetch(BASE_URL+'/send_gcode_block', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({gcode:generatedGCode, filename:'sketch_export.txt'}) }).then(r => r.json()).then(d => showToast(d.success ? "Sent!" : "Error", d.success ? "success" : "error")); }
         async function saveToServer() { if(!generatedGCode) return showToast("Generate Path first!", "error"); let n = prompt("Enter filename:"); if(n) { if(!n.toLowerCase().endsWith('.txt')) n += ".txt"; fetch(BASE_URL+'/save_design', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({filename:n, gcode:generatedGCode}) }).then(r => r.json()).then(d => showToast(d.success ? "Saved!" : "Failed", d.success ? "success" : "error")); } }
         
         function prepareGCode() {
             if(rawPoints.length === 0) return showToast("Draw something first!", "error");
-            const tableR = parseFloat(document.getElementById('cfgRadius').value); 
-            const sym = parseInt(document.getElementById('symSlider').value);
-            
-            let shapes = []; 
-            let curShape = []; 
-            
-            rawPoints.forEach(p => { 
-                if(p.type === 'break' || p.type === 'cmd') { 
-                    if(curShape.length > 0) shapes.push(curShape); 
-                    curShape = []; 
-                } else curShape.push(p); 
-            });
-            if(curShape.length > 0) shapes.push(curShape);
-
+            const tableR = parseFloat(document.getElementById('cfgRadius').value), sym = parseInt(document.getElementById('symSlider').value);
+            let shapes = [], curShape = []; rawPoints.forEach(p => { if(p.type === 'break' || p.type === 'cmd') { if(curShape.length > 0) shapes.push(curShape); curShape = []; } else curShape.push(p); }); if(curShape.length > 0) shapes.push(curShape);
             if (document.getElementById('spiralConnectMode').checked) {
-                const imgData = rasterizeCanvasForTrace();
-                const density = 3.0;
-                const ballSizeMm = 13.0;
-                
-                const pts = calculateSpiralTrace(imgData, 150, density, ballSizeMm, tableR);
-                processedPoints = pts;
+                const imgData = rasterizeCanvasForTrace(); processedPoints = calculateSpiralTrace(imgData, 150, 3.0, 13.0, tableR);
             } else {
-                let pool = []; 
-                for(let s=0; s<sym; s++) { 
-                    const ang = s * (Math.PI*2/sym); 
-                    const c = Math.cos(ang), si = Math.sin(ang); 
-                    shapes.forEach(sh => { 
-                        pool.push(sh.map(p => ({ x: p.x*c - p.y*si, y: p.x*si + p.y*c, type: 'point' }))); 
-                    }); 
-                }
-                
-                processedPoints = [];
-                pool.forEach((sh, i) => {
-                   if(i > 0) processedPoints.push({x: sh[0].x, y: sh[0].y, type:'point'});
-                   sh.forEach(p => processedPoints.push(p));
-                });
+                let pool = []; for(let s=0; s<sym; s++) { const ang = s * (Math.PI*2/sym), c = Math.cos(ang), si = Math.sin(ang); shapes.forEach(sh => pool.push(sh.map(p => ({ x: p.x*c - p.y*si, y: p.x*si + p.y*c, type: 'point' })))); }
+                processedPoints = []; pool.forEach((sh, i) => { if(i > 0) processedPoints.push({x: sh[0].x, y: sh[0].y, type:'point'}); sh.forEach(p => processedPoints.push(p)); });
             }
-
-            generatedGCode = generateGCodeStringFromProcessed();
-            document.getElementById('statusTxt').innerText = `Path Ready!`;
-            document.getElementById('designPhaseControls').style.display = 'none'; 
-            document.getElementById('productionPhaseControls').style.display = 'block';
-            document.getElementById('simulationArea').style.display = 'block';
-            render();
+            generatedGCode = processedPoints.map(p => p.type === 'cmd' ? "" : `${Math.atan2(p.y, p.x).toFixed(4)} ${(Math.hypot(p.x, p.y) / tableR > 1.0 ? 1.0 : Math.hypot(p.x, p.y) / tableR).toFixed(4)}`).filter(l => l !== "").join('\n');
+            document.getElementById('statusTxt').innerText = `Path Ready!`; document.getElementById('designPhaseControls').style.display = 'none'; document.getElementById('productionPhaseControls').style.display = 'block'; document.getElementById('simulationArea').style.display = 'block'; render();
         }
         
-        function returnToEditing() { 
-            processedPoints = []; 
-            document.getElementById('designPhaseControls').style.display = 'block'; 
-            document.getElementById('productionPhaseControls').style.display = 'none'; 
-            document.getElementById('simulationArea').style.display = 'none';
-            resetStatus(); 
-        }
-
-        function generateGCodeStringFromProcessed() {
-            const tableRadius = parseFloat(document.getElementById('cfgRadius').value);
-            let cmds = [];
-            for(let i=0; i<processedPoints.length; i++) {
-                let p = processedPoints[i];
-                if(p.type === 'cmd') continue;
-                let theta = Math.atan2(p.y, p.x);
-                let rho = Math.hypot(p.x, p.y) / tableRadius;
-                if (rho > 1.0) rho = 1.0;
-                cmds.push(`${theta.toFixed(4)} ${rho.toFixed(4)}`);
-            }
-            return cmds.join('\n');
-        }
-
+        function returnToEditing() { processedPoints = []; document.getElementById('designPhaseControls').style.display = 'block'; document.getElementById('productionPhaseControls').style.display = 'none'; document.getElementById('simulationArea').style.display = 'none'; resetStatus(); }
         function copyGCode() { if(generatedGCode) navigator.clipboard.writeText(generatedGCode).then(() => showToast("Copied!", "success")); }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = localStorage.getItem('theme') || 'light'; document.body.setAttribute('data-theme', savedTheme);
+            const path = window.location.pathname; const navMap = { '/': 'nav-designs', '/designs': 'nav-designs', '/controller': 'nav-controller', '/sketch': 'nav-sketch', '/AI_builder': 'nav-ai', '/led_controls': 'nav-leds', '/terminal': 'nav-terminal', '/settings': 'nav-settings' };
+            document.querySelectorAll('.main-nav a').forEach(a => a.classList.remove('active')); const activeId = navMap[path] || 'nav-sketch'; const el = document.getElementById(activeId); if (el) el.classList.add('active');
+            init(); setTool('draw');
+        });
     </script>
 </body>
 </html>
