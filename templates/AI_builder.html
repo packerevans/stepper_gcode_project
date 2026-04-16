@@ -86,17 +86,21 @@
         /* Mobile: Bottom Nav */
         @media (max-width: 768px) {
             .main-nav {
-                position: fixed;
-                bottom: 0;
+                position: fixed !important;
+                bottom: 0 !important;
+                top: auto !important;
                 left: 0;
                 right: 0;
                 box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
                 border-top: 2px solid #000000;
-                padding: 5px 0;
+                border-bottom: none;
+                background: #ffffff;
+                padding: 12px 0;
             }
+            body[data-theme='dark'] .main-nav { background: #000000; border-top: 2px solid #ffffff; }
             .main-nav a span:not(.icon) { display: none; }
-            .main-nav .icon { margin-bottom: 0; width: 28px; height: 28px; }
-            body { padding-bottom: 60px !important; } 
+            .main-nav .icon { margin-bottom: 0; width: 32px; height: 32px; }
+            body { padding-bottom: 90px !important; height: auto !important; overflow: auto !important; } 
         }
 
         /* Desktop: Top Nav */
@@ -299,6 +303,17 @@
                     </button>
                 </div>
 
+                <div id="post-gen-controls" style="display:none; background:rgba(0,0,0,0.03); border: 2px solid var(--color-border); padding: 15px; margin-bottom:15px;">
+                    <div id="scale-slider-group" style="display:none;">
+                        <label style="color:#000; font-weight:800; font-size:10px; margin-bottom:8px; display:block;">REFINE SHAPE SCALE</label>
+                        <input type="range" id="postScaleSlider" min="0.1" max="2.0" step="0.05" value="1.0" oninput="applyPostScale(this.value)">
+                    </div>
+                    <div id="contrast-slider-group" style="display:none;">
+                        <label style="color:#000; font-weight:800; font-size:10px; margin-bottom:8px; display:block;">REFINE IMAGE CONTRAST</label>
+                        <input type="range" id="postContrastSlider" min="10" max="240" step="1" value="150" oninput="applyPostContrast(this.value)">
+                    </div>
+                </div>
+
                 <div class="recipe-box" id="recipeDisplay">
                     <i>Type a prompt for AI generated clip art, or leave blank to randomize procedural shapes and filters!</i><br><br>
                     <span style="font-size:11px; color:#666;">(Tip: You can still click and drag the canvas to reposition generated designs!)</span>
@@ -358,10 +373,18 @@
         <input type="checkbox" id="shapeConnectMode" checked="">
         <input type="range" id="symSlider" min="1" max="12" value="1" step="1">
         
-        <select id="vortexShape"><option value="custom">Custom</option></select>
+        <select id="vortexShape">
+            <option value="custom">Custom</option>
+            <option value="triangle">Triangle</option>
+            <option value="square">Square</option>
+            <option value="pentagon">Pentagon</option>
+            <option value="hexagon">Hexagon</option>
+            <option value="star">Star</option>
+            <option value="text">Text</option>
+        </select>
         <input type="text" id="vortexChar" value="S">
         <input type="range" id="vortexSwirl" min="5" max="50" step="1" value="20">
-        <input type="range" id="vortexScale" min="0.1" max="2.0" step="0.05" value="1.0">
+        <input type="range" id="vortexScale" min="0.1" max="5.0" step="0.05" value="3.0">
         <input type="range" id="vortexTwist" min="-45" max="45" step="0.5" value="5">
 
         <select id="loopShape"><option value="custom">Custom</option></select>
@@ -370,12 +393,12 @@
         <input type="range" id="loopIter" min="1" max="200" step="1" value="50">
         <input type="range" id="loopAngle" min="0" max="180" step="1" value="5">
         <input type="range" id="loopSpin" min="0" max="30" step="1" value="0">
-        <input type="range" id="loopScale" min="0.1" max="2.0" step="0.05" value="1.0">
+        <input type="range" id="loopScale" min="0.1" max="5.0" step="0.05" value="3.0">
         <input type="range" id="loopOsc" min="0" max="20" step="1" value="0">
 
         <input type="range" min="10" max="240" value="150" id="traceThreshInput">
         <input type="range" min="1" max="5" value="3" step="0.1" id="traceDensityInput">
-        <input type="checkbox" id="spiralConnectMode" checked="">
+        <input type="checkbox" id="spiralConnectMode">
     </div>
 
     <div id="status-toast"></div>
@@ -472,6 +495,44 @@
             };
         }
 
+        let lastPostScale = 1.0;
+        let originalPointsForScale = null;
+
+        function applyPostScale(val) {
+            const factor = val / lastPostScale;
+            lastPostScale = val;
+            
+            if (activeEffectType === 'loop' && loopSourcePath) {
+                loopSourcePath.forEach(p => { if(p.type === 'point') { p.x *= factor; p.y *= factor; } });
+                generateLoop();
+            } else if (activeEffectType === 'sandify' && vortexSourcePath) {
+                vortexSourcePath.forEach(p => { if(p.type === 'point') { p.x *= factor; p.y *= factor; } });
+                scanVortexShape(); generateVortex();
+            } else {
+                rawPoints.forEach(p => { if(p.type === 'point') { p.x *= factor; p.y *= factor; } });
+                render();
+            }
+        }
+
+        function applyPostContrast(val) {
+            document.getElementById('traceThreshInput').value = val;
+            if(traceState.img) commitTraceMove();
+        }
+
+        function showPostGenSlider(type) {
+            document.getElementById('post-gen-controls').style.display = 'block';
+            document.getElementById('scale-slider-group').style.display = (type === 'scale') ? 'block' : 'none';
+            document.getElementById('contrast-slider-group').style.display = (type === 'contrast') ? 'block' : 'none';
+            
+            // Reset slider values to default when shown
+            if (type === 'scale') {
+                document.getElementById('postScaleSlider').value = 1.0;
+                lastPostScale = 1.0;
+            } else {
+                document.getElementById('postContrastSlider').value = 150;
+            }
+        }
+
         function triggerAIGeneration() {
             const prompt = document.getElementById('aiPrompt').value.trim();
             const genBtn = document.querySelector('button[onclick="triggerAIGeneration()"]');
@@ -522,6 +583,7 @@
                         commitTraceMove(); 
                         document.getElementById('recipeDisplay').innerHTML = `<b>AI Subject:</b> "${prompt}"<br><b>Effect:</b> Spiral Density Trace<br><b>Spacing:</b> ${randomDensity}mm`;
                         
+                        showPostGenSlider('contrast');
                         traceState.active = false; 
                         activeEffectType = null;
                         currentTool = 'select'; 
@@ -562,7 +624,7 @@
                 const iters = Math.floor(Math.random() * 90) + 10;
                 const ang = Math.floor(Math.random() * 20) + 1;
                 const spin = Math.floor(Math.random() * 10);
-                const zoom = (Math.random() * 0.8 + 0.6).toFixed(2);
+                const zoom = (Math.random() * 2.0 + 3.0).toFixed(2);
                 const osc = Math.floor(Math.random() * 5);
                 const guides = ['circle', 'square', 'figure8'];
                 const guide = guides[Math.floor(Math.random() * guides.length)];
@@ -582,7 +644,7 @@
                 vortexSourcePath = JSON.parse(JSON.stringify(rawPoints));
                 document.getElementById('vortexShape').value = 'custom';
                 const swirl = Math.floor(Math.random() * 35) + 5;
-                const zoom = (Math.random() * 1.0 + 0.5).toFixed(2);
+                const zoom = (Math.random() * 2.0 + 3.0).toFixed(2);
                 const twist = Math.floor(Math.random() * 60) - 30;
                 document.getElementById('vortexSwirl').value = swirl;
                 document.getElementById('vortexScale').value = zoom;
@@ -597,6 +659,7 @@
                 render();
             }
             document.getElementById('recipeDisplay').innerHTML = recipeHTML;
+            showPostGenSlider('scale');
         }
 
         function generateOrganicShape() {
@@ -651,36 +714,65 @@
         function scanVortexShape() {
             const scanCanvas = document.getElementById('vortexScanCanvas'); const scanCtx = scanCanvas.getContext('2d');
             const w = scanCanvas.width; const h = scanCanvas.height; const cx = w/2; const cy = h/2; const r = w/2 - 20;
+            const type = document.getElementById('vortexShape').value; const txt = document.getElementById('vortexChar').value;
+
             scanCtx.fillStyle = '#000'; scanCtx.fillRect(0, 0, w, h); scanCtx.fillStyle = '#fff'; scanCtx.strokeStyle = '#fff';
             scanCtx.lineWidth = 15; scanCtx.textAlign = 'center'; scanCtx.textBaseline = 'middle';
             scanCtx.save(); scanCtx.beginPath();
-            const tableR = parseFloat(document.getElementById('cfgRadius').value); 
-            const scaleToFit = r / tableR; 
-            scanCtx.beginPath(); 
-            vortexSourcePath.forEach((p, i) => { 
-                if(p.type === 'break' || p.type === 'cmd') return; 
-                const sx = cx + (p.x * scaleToFit); const sy = cy - (p.y * scaleToFit); 
-                if(i===0 || vortexSourcePath[i-1].type === 'break') scanCtx.moveTo(sx, sy); else scanCtx.lineTo(sx, sy); 
-            }); 
+
+            const drawPoly = (sides) => { const offset = -Math.PI / 2; scanCtx.moveTo(cx + r * Math.cos(offset), cy + r * Math.sin(offset)); for (let i = 1; i <= sides; i++) { scanCtx.lineTo(cx + r * Math.cos(offset + i * 2 * Math.PI / sides), cy + r * Math.sin(offset + i * 2 * Math.PI / sides)); } };
+            const drawStar = (pts) => { let rot = Math.PI / 2 * 3; let step = Math.PI / pts; scanCtx.moveTo(cx, cy - r); for (let i = 0; i < pts; i++) { scanCtx.lineTo(cx + Math.cos(rot) * r, cy + Math.sin(rot) * r); rot += step; scanCtx.lineTo(cx + Math.cos(rot) * (r*0.4), cy + Math.sin(rot) * (r*0.4)); rot += step; } scanCtx.lineTo(cx, cy - r); };
+
+            if (type === 'custom') {
+                const tableR = parseFloat(document.getElementById('cfgRadius').value); 
+                const scaleToFit = r / tableR; 
+                
+                // Centering Logic for Custom Shape
+                let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+                vortexSourcePath.forEach(p => { if(p.type === 'point') { minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x); minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y); } });
+                const scx = (minX + maxX) / 2; const scy = (minY + maxY) / 2;
+
+                scanCtx.beginPath(); 
+                vortexSourcePath.forEach((p, i) => { 
+                    if(p.type === 'break' || p.type === 'cmd') return; 
+                    const sx = cx + ((p.x - scx) * scaleToFit); 
+                    const sy = cy - ((p.y - scy) * scaleToFit); 
+                    if(i===0 || vortexSourcePath[i-1].type === 'break') scanCtx.moveTo(sx, sy); else scanCtx.lineTo(sx, sy); 
+                }); 
+                scanCtx.stroke();
+            } else if (type === 'triangle') drawPoly(3);
+            else if (type === 'square') drawPoly(4);
+            else if (type === 'pentagon') drawPoly(5);
+            else if (type === 'hexagon') drawPoly(6);
+            else if (type === 'star') drawStar(5);
+            else if (type === 'text') { scanCtx.font = 'bold 450px Arial'; scanCtx.fillText(txt, cx, cy + 30); }
+
             scanCtx.stroke(); scanCtx.fill(); scanCtx.restore();
             const pixels = scanCtx.getImageData(0, 0, w, h).data; const steps = 3600;
             for (let i = 0; i < steps; i++) { let maxDist = 0; const angle = (i / steps) * Math.PI * 2; const cos = Math.cos(angle); const sin = Math.sin(angle); for (let dist = 0; dist < r; dist += 2) { const x = Math.floor(cx + cos * dist); const y = Math.floor(cy + sin * dist); const idx = (y * w + x) * 4; if (pixels[idx] > 100) maxDist = dist; } vortexState.radiusMap[i] = maxDist / r; }
         }
 
         function generateVortex() {
-            const swirlCount = parseInt(document.getElementById('vortexSwirl').value); 
-            const scaleFac = parseFloat(document.getElementById('vortexScale').value);
-            const twistDeg = parseFloat(document.getElementById('vortexTwist').value); 
-            const tableRadius = parseFloat(document.getElementById('cfgRadius').value);
-            const iterations = 20000; const centerGap = 4; const newPoints = []; newPoints.push({type:'break'});
+            const swirlCount = parseInt(document.getElementById('vortexSwirl').value); const scaleFac = parseFloat(document.getElementById('vortexScale').value) * 0.85;
+            const twistDeg = parseFloat(document.getElementById('vortexTwist').value); const tableRadius = parseFloat(document.getElementById('cfgRadius').value);
+            const iterations = 8000; const centerGap = 4; const newPoints = []; newPoints.push({type:'break'});
+            
             for (let i = 0; i <= iterations; i++) {
-                const t = (i / iterations) * 2 - 1; const progress = Math.abs(t); const spiralAngle = t * swirlCount * Math.PI * 2;
-                const twistRad = (twistDeg * (Math.PI/180)) * swirlCount * Math.abs(t);
-                let lookupAngle = spiralAngle + twistRad; let normAngle = lookupAngle % (Math.PI * 2); if (normAngle < 0) normAngle += Math.PI * 2;
+                const t = i / iterations; // Single arm from 0 to 1
+                const spiralAngle = t * swirlCount * Math.PI * 2;
+                const twistRad = (twistDeg * (Math.PI/180)) * swirlCount * t;
+                let lookupAngle = spiralAngle + twistRad; 
+                let normAngle = lookupAngle % (Math.PI * 2); if (normAngle < 0) normAngle += Math.PI * 2;
                 const mapIdx = Math.floor((normAngle / (Math.PI * 2)) * 3600) % 3600;
-                let shapeFactor = vortexState.radiusMap[mapIdx]; if(shapeFactor < 0.05) shapeFactor = 0.05; 
-                const maxR = tableRadius * scaleFac; const spiralR = centerGap + (progress * (maxR - centerGap)); const r = spiralR * shapeFactor;
-                let x, y; if (t < 0) { x = r * Math.cos(spiralAngle); y = r * Math.sin(spiralAngle); } else { const flipOffset = Math.PI / 2; x = r * Math.cos(spiralAngle + flipOffset); y = r * Math.sin(spiralAngle + flipOffset); }
+                
+                let shapeFactor = vortexState.radiusMap[mapIdx]; 
+                if(shapeFactor < 0.05) shapeFactor = 0.05; 
+                
+                const maxR = tableRadius * scaleFac; 
+                const r = (centerGap + (t * (maxR - centerGap))) * shapeFactor;
+                
+                const x = r * Math.cos(spiralAngle); 
+                const y = r * Math.sin(spiralAngle);
                 newPoints.push({x: x, y: y, type:'point'});
             }
             newPoints.push({type:'break'}); rawPoints = newPoints; render();
@@ -717,7 +809,7 @@
                         const currentAngle = effectiveIter * angleStepDeg * (Math.PI / 180);
                         const currentSpin = effectiveIter * spinStepDeg * (Math.PI / 180);
                         let oscScale = 1.0; if (oscRate > 0) { const freq = oscRate * 0.1; oscScale = 1.0 + 0.4 * Math.sin(effectiveIter * freq); }
-                        const currentScale = scaleFac * oscScale;
+                        const currentScale = scaleFac * oscScale * 0.75;
                         let dx = p.x - cx; let dy = p.y - cy;
                         let spun_x = cx + dx * Math.cos(currentSpin) - dy * Math.sin(currentSpin);
                         let spun_y = cy + dx * Math.sin(currentSpin) + dy * Math.cos(currentSpin);
@@ -813,52 +905,94 @@
         
         document.addEventListener('DOMContentLoaded', () => {
             const path = window.location.pathname;
-            const navMap = { '/': 'nav-designs', '/designs': 'nav-designs', '/controller': 'nav-controller', '/sketch': 'nav-sketch', '/AI_builder': 'nav-ai', '/led_controls': 'nav-leds', '/terminal': 'nav-terminal', '/settings': 'nav-settings' };
+            const navMap = {
+                '/': 'nav-designs',
+                '/controller': 'nav-controller',
+                '/sketch': 'nav-sketch',
+                '/AI_builder': 'nav-ai',
+                '/led_controls': 'nav-leds',
+                '/terminal': 'nav-terminal',
+                '/settings': 'nav-settings'
+            };
+            
+            // Remove active from all first
             document.querySelectorAll('.main-nav a').forEach(a => a.classList.remove('active'));
-            const activeId = navMap[path]; if (activeId) { const el = document.getElementById(activeId); if (el) el.classList.add('active'); } else if (path === '/AI_builder') { const el = document.getElementById('nav-ai'); if (el) el.classList.add('active'); }
+            
+            let activeId = navMap[path];
+            
+            // Smart fallback
+            if (!activeId) {
+                for (const key in navMap) {
+                    if (key !== '/' && path.includes(key)) {
+                        activeId = navMap[key];
+                        break;
+                    }
+                }
+            }
+
+            if (!activeId && (path === '/' || path === '')) {
+                activeId = 'nav-designs';
+            } else if (!activeId && path.includes('AI_builder')) {
+                activeId = 'nav-ai';
+            }
+
+            const el = document.getElementById(activeId);
+            if (el) el.classList.add('active');
             init();
         });
 
         function render() {
-            const w = canvas.width / window.devicePixelRatio; const h = canvas.height / window.devicePixelRatio; ctx.clearRect(0, 0, w, h); ctx.filter = 'none';
+            const w = canvas.width / window.devicePixelRatio; const h = canvas.height / window.devicePixelRatio; ctx.clearRect(0, 0, w, h);
             const tableR = parseFloat(document.getElementById('cfgRadius').value); const sym = parseInt(document.getElementById('symSlider').value); const dark = document.body.getAttribute('data-theme') === 'dark'; const prog = parseInt(document.getElementById('progressSlider').value); document.getElementById('progVal').textContent = prog + '%';
             ctx.save(); ctx.translate(origin.x, origin.y); ctx.beginPath(); ctx.arc(0, 0, tableR*scale, 0, Math.PI*2); ctx.strokeStyle = dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'; ctx.lineWidth = 2; ctx.stroke();
-            const showingFinal = (processedPoints.length > 0); const dataToShow = showingFinal ? processedPoints : rawPoints; const limit = Math.floor(dataToShow.length * (prog/100)); const color = showingFinal ? '#ff0000' : (dark ? '#a1c4fd' : '#007bff'); ctx.lineWidth = 1.5; const loopCount = showingFinal ? 1 : sym;
-            for(let s=0; s<loopCount; s++) { const ang = s * (Math.PI*2/sym); ctx.save(); if(!showingFinal) ctx.rotate(ang); ctx.beginPath(); ctx.strokeStyle = color; let isMove = true; for(let i=0; i<limit; i++) { const p = dataToShow[i]; if(p.type === 'break' || p.type === 'cmd') { isMove = true; continue; } const px = p.x * scale; const py = -p.y * scale; if(isMove) { ctx.moveTo(px, py); isMove = false; } else ctx.lineTo(px, py); } ctx.stroke(); ctx.restore(); }
+            
+            const showingFinal = (processedPoints.length > 0);
+            if (showingFinal) {
+                ctx.lineWidth = 0.1;
+                ctx.strokeStyle = dark ? 'rgba(161, 196, 253, 0.4)' : 'rgba(0, 123, 255, 0.3)';
+                for(let s=0; s<sym; s++) {
+                    const ang = s * (Math.PI*2/sym); ctx.save(); ctx.rotate(ang); ctx.beginPath();
+                    let isMove = true;
+                    for(let i=0; i<rawPoints.length; i++) {
+                        const p = rawPoints[i];
+                        if(p.type === 'break' || p.type === 'cmd') { isMove = true; continue; }
+                        const px = p.x * scale, py = -p.y * scale;
+                        if(isMove) { ctx.moveTo(px, py); isMove = false; } else ctx.lineTo(px, py);
+                    }
+                    ctx.stroke(); ctx.restore();
+                }
+            }
+
+            const dataToShow = showingFinal ? processedPoints : rawPoints, limit = Math.floor(dataToShow.length * (prog/100)), color = showingFinal ? '#ff0000' : (dark ? '#a1c4fd' : '#007bff'); ctx.lineWidth = showingFinal ? 1 : 1.5; const loopCount = showingFinal ? 1 : sym;
+            for(let s=0; s<loopCount; s++) { const ang = s * (Math.PI*2/sym); ctx.save(); if(!showingFinal) ctx.rotate(ang); ctx.beginPath(); ctx.strokeStyle = color; let isMove = true; for(let i=0; i<limit; i++) { const p = dataToShow[i]; if(p.type === 'break' || p.type === 'cmd') { isMove = true; continue; } const px = p.x * scale, py = -p.y * scale; if(isMove) { ctx.moveTo(px, py); isMove = false; } else ctx.lineTo(px, py); } ctx.stroke(); ctx.restore(); }
             ctx.restore();
         }
 
-        async function sendToTable() { if(!generatedGCode) return showToast("Click Compile Path first", "error"); fetch(BASE_URL+'/send_gcode_block', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({gcode:generatedGCode}) }).then(r => r.json()).then(d => showToast(d.success ? "Sent!" : "Error", d.success ? "success" : "error")); }
+        async function sendToTable() { if(!generatedGCode) return showToast("Click Compile Path first", "error"); fetch(BASE_URL+'/send_gcode_block', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({gcode:generatedGCode, filename:'ai_export.txt'}) }).then(r => r.json()).then(d => showToast(d.success ? "Sent!" : "Error", d.success ? "success" : "error")); }
         async function saveToServer() { if(!generatedGCode) return showToast("Compile Path first!", "error"); let n = prompt("Enter filename:"); if(n) { if(!n.toLowerCase().endsWith('.txt')) n += ".txt"; fetch(BASE_URL+'/save_design', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({filename:n, gcode:generatedGCode}) }).then(r => r.json()).then(d => showToast(d.success ? "Saved!" : "Failed", d.success ? "success" : "error")); } }
         
         function prepareGCode() {
             if(rawPoints.length === 0) return showToast("Generate something first!", "error");
-            const tableR = parseFloat(document.getElementById('cfgRadius').value); const sym = parseInt(document.getElementById('symSlider').value);
-            let shapes = []; let curShape = []; let hasHandDrawnLines = false;
-            rawPoints.forEach(p => { if(p.source === 'draw') hasHandDrawnLines = true; if(p.type === 'break' || p.type === 'cmd') { if(curShape.length > 0) shapes.push(curShape); curShape = []; } else curShape.push(p); });
-            if(curShape.length > 0) shapes.push(curShape);
-            const useSpiral = (hasHandDrawnLines && shapes.length > 1);
-            if (useSpiral) {
-                const imgData = rasterizeCanvasForTrace(); const density = parseFloat(document.getElementById('traceDensityInput').value) || 3.0; const ballSizeMm = parseFloat(document.getElementById('cfgBallSize').value);
-                const pts = calculateSpiralTrace(imgData, 150, density, ballSizeMm, tableR); processedPoints = pts;
-                generatedGCode = generateGCodeStringFromProcessed(); document.getElementById('statusTxt').innerText = `Path Ready! (Spiral Connected)`;
-                document.getElementById('designPhaseControls').style.display = 'none'; document.getElementById('productionPhaseControls').style.display = 'block'; document.getElementById('simulationArea').style.display = 'block'; render(); return;
+            const tableR = parseFloat(document.getElementById('cfgRadius').value), sym = parseInt(document.getElementById('symSlider').value);
+            let shapes = [], curShape = []; rawPoints.forEach(p => { if(p.type === 'break' || p.type === 'cmd') { if(curShape.length > 0) shapes.push(curShape); curShape = []; } else curShape.push(p); }); if(curShape.length > 0) shapes.push(curShape);
+            
+            if (document.getElementById('spiralConnectMode').checked) {
+                const imgData = rasterizeCanvasForTrace(); processedPoints = calculateSpiralTrace(imgData, 150, 3.0, 13.0, tableR);
+            } else {
+                let pool = []; for(let s=0; s<sym; s++) { const ang = s * (Math.PI*2/sym), c = Math.cos(ang), si = Math.sin(ang); shapes.forEach(sh => pool.push(sh.map(p => ({ x: p.x*c - p.y*si, y: p.x*si + p.y*c, type: 'point' })))); }
+                processedPoints = []; pool.forEach((sh, i) => { if(i > 0) processedPoints.push({x: sh[0].x, y: sh[0].y, type:'point'}); sh.forEach(p => processedPoints.push(p)); });
             }
-            let pool = []; for(let s=0; s<sym; s++) { const ang = s * (Math.PI*2/sym); const c = Math.cos(ang), si = Math.sin(ang); shapes.forEach(sh => { pool.push(sh.map(p => ({ x: p.x*c - p.y*si, y: p.x*si + p.y*c, type: 'point' }))); }); }
-            let sortedShapes = []; if (pool.length > 0) { let bestIdx = 0, minDist = Infinity; for(let i=0; i<pool.length; i++) { let d1 = Math.hypot(pool[i][0].x, pool[i][0].y); let d2 = Math.hypot(pool[i][pool[i].length-1].x, pool[i][pool[i].length-1].y); if(d1 < minDist) { minDist = d1; bestIdx = i; } if(d2 < minDist) { minDist = d2; bestIdx = i; } }
-            let startShape = pool[bestIdx]; pool.splice(bestIdx, 1); if(Math.hypot(startShape[0].x, startShape[0].y) > Math.hypot(startShape[startShape.length-1].x, startShape[startShape.length-1].y)) { startShape.reverse(); } sortedShapes.push(startShape);
-            let curPos = startShape[startShape.length-1]; while(pool.length > 0) { let bIdx = -1, bDist = Infinity, bRev = false; for(let i=0; i<pool.length; i++) { let dS = Math.hypot(curPos.x - pool[i][0].x, curPos.y - pool[i][0].y); if(dS < bDist) { bDist=dS; bIdx=i; bRev=false; } let dE = Math.hypot(curPos.x - pool[i][pool[i].length-1].x, curPos.y - pool[i][pool[i].length-1].y); if(dE < bDist) { bDist=dE; bIdx=i; bRev=true; } } let winner = pool[bIdx]; if(bRev) winner.reverse(); sortedShapes.push(winner); curPos = winner[winner.length-1]; pool.splice(bIdx, 1); } }
-            processedPoints = []; if(sortedShapes.length > 0) { for(let i=0; i<sortedShapes.length; i++) { if(i > 0) { let next = sortedShapes[i][0]; processedPoints.push({x: next.x, y: next.y, type: 'point'}); } sortedShapes[i].forEach(p => processedPoints.push(p)); } }
-            generatedGCode = generateGCodeStringFromProcessed(); document.getElementById('statusTxt').innerText = `Path Ready! Compiled ${sortedShapes.length} objects.`;
-            document.getElementById('designPhaseControls').style.display = 'none'; document.getElementById('productionPhaseControls').style.display = 'block'; document.getElementById('simulationArea').style.display = 'block'; render();
+            generatedGCode = processedPoints.map(p => {
+                if (p.type === 'cmd') return "";
+                let theta = Math.atan2(p.y, p.x);
+                let rho = Math.hypot(p.x, p.y) / tableR;
+                if (rho > 1.0) rho = 1.0; // Clamps points to the perimeter
+                return `${theta.toFixed(4)} ${rho.toFixed(4)}`;
+            }).filter(l => l !== "").join('\n');
+            document.getElementById('statusTxt').innerText = `Path Ready!`; document.getElementById('designPhaseControls').style.display = 'none'; document.getElementById('productionPhaseControls').style.display = 'block'; document.getElementById('simulationArea').style.display = 'block'; render();
         }
         
         function returnToEditing() { processedPoints = []; document.getElementById('designPhaseControls').style.display = 'block'; document.getElementById('productionPhaseControls').style.display = 'none'; document.getElementById('simulationArea').style.display = 'none'; resetStatus(); }
-        function generateGCodeStringFromProcessed() {
-            const tableRadius = parseFloat(document.getElementById('cfgRadius').value); let cmds = [];
-            for(let i=0; i<processedPoints.length; i++) { let p = processedPoints[i]; if(p.type === 'cmd') continue; let theta = Math.atan2(p.y, p.x); let rho = Math.hypot(p.x, p.y) / tableRadius; if (rho > 1.0) rho = 1.0; cmds.push(`${theta.toFixed(4)} ${rho.toFixed(4)}`); }
-            return cmds.join('\n');
-        }
         function copyGCode() { if(generatedGCode) navigator.clipboard.writeText(generatedGCode).then(() => showToast("Copied!", "success")); }
     </script>
 </body>

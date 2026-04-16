@@ -200,6 +200,10 @@ class SchedulerThread(threading.Thread):
             # UPDATED: Set Color to Black (Serial)
             send_led_persistent(0, 0, 0)
         
+        elif action == "led_on":
+            # Set Color to White (Full)
+            send_led_persistent(255, 255, 255)
+        
         elif action == "led_color" and val:
             try:
                 r, g, b = hex_to_rgb(val)
@@ -213,6 +217,12 @@ class SchedulerThread(threading.Thread):
             if arduino_connected:
                 with lock: arduino.write(b"PAUSE\n")
             log_message("Automation: Sand Table Paused.")
+
+        elif action == "resume_sand":
+            is_paused = False
+            if arduino_connected:
+                with lock: arduino.write(b"RESUME\n")
+            log_message("Automation: Sand Table Resumed.")
 
         elif action == "sand_shuffle":
             try:

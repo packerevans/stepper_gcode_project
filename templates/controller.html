@@ -70,12 +70,11 @@
 
         .main-nav a:hover, .main-nav a.active {
             opacity: 1;
-            background: #000000;
-            color: #ffffff;
+            outline: 2px solid #000000;
+            outline-offset: -2px;
         }
         body[data-theme='dark'] .main-nav a:hover, body[data-theme='dark'] .main-nav a.active {
-            background: #ffffff;
-            color: #000000;
+            outline: 2px solid #ffffff;
         }
 
         .main-nav .icon {
@@ -97,11 +96,31 @@
                 right: 0;
                 box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
                 border-top: 2px solid #000000;
-                padding: 5px 0;
+                padding: 12px 0; /* Increased height */
             }
             .main-nav a span:not(.icon) { display: none; }
-            .main-nav .icon { margin-bottom: 0; width: 28px; height: 28px; }
-            body { padding-bottom: 60px !important; } 
+            .main-nav .icon { margin-bottom: 0; width: 32px; height: 32px; } /* Larger icons */
+            body { padding-bottom: 90px !important; } 
+
+            /* Shrink Live View for Mobile */
+            .live-view-card {
+                padding: 10px;
+                margin-bottom: 15px;
+            }
+            #viewCanvas {
+                width: 250px; /* Shrunk from full width */
+                height: 250px;
+                margin: 0 auto;
+                display: block;
+            }
+            .joystick-container {
+                width: 200px;
+                height: 200px;
+            }
+            .joystick-stick {
+                width: 60px;
+                height: 60px;
+            }
         }
 
         /* Desktop: Top Nav */
@@ -182,16 +201,24 @@
 
         /* --- Live View --- */
         .live-view-card {
-            background: var(--color-surface);
-            padding: 20px;
+            background: var(--color-terminal-bg);
+            padding: 15px;
             border: 2px solid var(--color-border);
             margin-bottom: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
         }
         canvas {
-            width: 100%; aspect-ratio: 1/1; 
-            background: var(--color-terminal-bg);
+            width: 100%; max-width: 400px; aspect-ratio: 1/1; 
+            background: #ffffff; /* Contrast against the card bg */
             border: 2px solid var(--color-border);
+            display: block;
         }
+        body[data-theme='dark'] canvas { background: #111111; }
 
         /* --- Joystick --- */
         .joystick-container {
@@ -220,6 +247,34 @@
             text-transform: uppercase;
         }
         #sent-popup.active { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+        /* --- LOADING SCREEN STYLES --- */
+        #loadingOverlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background-color: rgba(255, 255, 255, 0.7);
+            z-index: 9999;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(5px);
+        }
+        body[data-theme='dark'] #loadingOverlay { background-color: rgba(0, 0, 0, 0.7); }
+        
+        .loader-spinner {
+            border: 6px solid #f3f3f3;
+            border-top: 6px solid #000;
+            width: 50px; height: 50px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+        body[data-theme='dark'] .loader-spinner { border-top-color: #fff; border-color: #333; }
+        
+        .loader-text { font-weight: 800; color: var(--color-text); letter-spacing: 2px; text-transform: uppercase; }
+        
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         @media (max-width: 600px) {
             .controls { grid-template-columns: 1fr; }
@@ -250,6 +305,11 @@
 
         <div id="sent-popup">SENT!</div>
 
+        <div id="loadingOverlay">
+            <div class="loader-spinner"></div>
+            <div class="loader-text" id="loaderStatus">Centering...</div>
+        </div>
+
         <div class="container mx-auto">
             <div class="live-view-card">
                 <h3 class="mb-4 font-bold">Live View</h3>
@@ -279,12 +339,25 @@
         const container = document.getElementById('joyContainer');
 
         let ballPos = { theta: 0, rho: 0 };
+        let visualPos = { theta: 0, rho: 0 }; // Smoothed position for drawing
         let isDragging = false;
+        let isCentering = false; // Block inputs during reset
         let joyPos = { x: 0, y: 0 };
         let moveInterval = null;
 
         // --- DRAWING ---
         function drawBall() {
+            // Smoothly interpolate visualPos toward ballPos
+            const ease = 0.15; // Animation smoothness (lower = smoother/slower)
+            
+            // Handle theta wrap-around for smoother rotation interpolation
+            let diffTheta = ballPos.theta - visualPos.theta;
+            while (diffTheta > Math.PI) diffTheta -= Math.PI * 2;
+            while (diffTheta < -Math.PI) diffTheta += Math.PI * 2;
+            
+            visualPos.theta += diffTheta * ease;
+            visualPos.rho += (ballPos.rho - visualPos.rho) * ease;
+
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
             // Grid lines
@@ -295,10 +368,10 @@
             }
             ctx.stroke();
 
-            // Ball position calculation
-            const r = ballPos.rho * 180;
-            const x = 200 + r * Math.cos(ballPos.theta);
-            const y = 200 + r * Math.sin(ballPos.theta);
+            // Ball position calculation (using visualPos for smoothness)
+            const r = visualPos.rho * 180;
+            const x = 200 + r * Math.cos(visualPos.theta);
+            const y = 200 + r * Math.sin(visualPos.theta);
 
             // Draw shadow/path
             ctx.fillStyle = 'rgba(0,0,0,0.1)';
@@ -317,11 +390,13 @@
 
             document.getElementById('val-theta').textContent = ballPos.theta.toFixed(2);
             document.getElementById('val-rho').textContent = ballPos.rho.toFixed(2);
+            
+            requestAnimationFrame(drawBall);
         }
 
         // --- JOYSTICK LOGIC ---
         function handleMove(e) {
-            if (!isDragging) return;
+            if (!isDragging || isCentering) return;
             
             const rect = container.getBoundingClientRect();
             const centerX = rect.width / 2;
@@ -347,12 +422,12 @@
         }
 
         function startMoveLoop() {
-            if (moveInterval) return;
-            // Send location every 0.25 seconds (250ms) as requested
+            if (moveInterval || isCentering) return;
+            // Send location every 0.25 seconds (250ms)
             moveInterval = setInterval(() => {
                 if (Math.abs(joyPos.x) < 5 && Math.abs(joyPos.y) < 5) return;
 
-                const stepScale = 0.05; 
+                const stepScale = 0.035; // Reduced from 0.05 for slower, more controlled movement
                 
                 let curX = ballPos.rho * Math.cos(ballPos.theta);
                 let curY = ballPos.rho * Math.sin(ballPos.theta);
@@ -368,7 +443,7 @@
                 ballPos.rho = newRho;
                 ballPos.theta = newTheta;
 
-                drawBall();
+                // drawBall() is now handled by requestAnimationFrame for 60fps smoothness
                 sendMove();
             }, 250); 
         }
@@ -391,6 +466,7 @@
         }
 
         async function sendCommand(cmd) {
+            if (isCentering) return;
             try {
                 const res = await fetch('/send', {
                     method: 'POST',
@@ -407,18 +483,35 @@
         }
 
         function resetToCenter() {
-            ballPos = { theta: 0, rho: 0 };
-            drawBall();
-            sendMove();
-            showPopup("Centered");
+            if (isCentering) return;
+            isCentering = true;
+            document.getElementById('loadingOverlay').style.display = 'flex';
+            
+            const centerInterval = setInterval(() => {
+                // Move towards rho=0 at the same speed as manual joystick movement
+                if (ballPos.rho > 0.007) {
+                    ballPos.rho -= 0.007; // Matched to joystick speed
+                } else {
+                    ballPos.rho = 0;
+                    ballPos.theta = 0;
+                    clearInterval(centerInterval);
+                    
+                    // Final move command to sync backend
+                    sendMove().then(() => {
+                        isCentering = false;
+                        document.getElementById('loadingOverlay').style.display = 'none';
+                        showPopup("Centered");
+                    });
+                }
+            }, 50); // Fast enough to look smooth, slow enough to be safe
         }
 
         // --- EVENT LISTENERS ---
-        container.addEventListener('mousedown', () => { isDragging = true; startMoveLoop(); });
+        container.addEventListener('mousedown', () => { if(!isCentering) { isDragging = true; startMoveLoop(); } });
         window.addEventListener('mousemove', handleMove);
         window.addEventListener('mouseup', () => { isDragging = false; stopMoveLoop(); });
 
-        container.addEventListener('touchstart', (e) => { isDragging = true; startMoveLoop(); e.preventDefault(); }, {passive: false});
+        container.addEventListener('touchstart', (e) => { if(!isCentering) { isDragging = true; startMoveLoop(); e.preventDefault(); } }, {passive: false});
         window.addEventListener('touchmove', handleMove, {passive: false});
         window.addEventListener('touchend', () => { isDragging = false; stopMoveLoop(); });
 

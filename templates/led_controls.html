@@ -61,12 +61,11 @@
 
         .main-nav a:hover, .main-nav a.active {
             opacity: 1;
-            background: #000000;
-            color: #ffffff;
+            outline: 2px solid #000000;
+            outline-offset: -2px;
         }
         body[data-theme='dark'] .main-nav a:hover, body[data-theme='dark'] .main-nav a.active {
-            background: #ffffff;
-            color: #000000;
+            outline: 2px solid #ffffff;
         }
 
         .main-nav .icon {
@@ -92,11 +91,11 @@
                 right: 0;
                 box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
                 border-top: 2px solid #000000;
-                padding: 5px 0;
+                padding: 12px 0; /* Increased from 5px */
             }
             .main-nav a span:not(.icon) { display: none; }
-            .main-nav .icon { margin-bottom: 0; width: 28px; height: 28px; }
-            body { padding-bottom: 70px !important; } 
+            .main-nav .icon { margin-bottom: 0; width: 32px; height: 32px; } /* Increased from 28px */
+            body { padding-bottom: 90px !important; } /* Increased from 70px to match taller bar */
         }
 
         /* Desktop: Top Nav */
@@ -732,7 +731,27 @@
                 '/terminal': 'nav-terminal',
                 '/settings': 'nav-settings'
             };
-            const activeId = navMap[path] || 'nav-designs';
+            
+            // Remove active from all first to be safe
+            document.querySelectorAll('.main-nav a').forEach(a => a.classList.remove('active'));
+            
+            let activeId = navMap[path];
+            
+            // Smart fallback: check if the path contains any of the keys
+            if (!activeId) {
+                for (const key in navMap) {
+                    if (key !== '/' && path.includes(key)) {
+                        activeId = navMap[key];
+                        break;
+                    }
+                }
+            }
+
+            // Final fallback to designs ONLY if we are actually at root
+            if (!activeId && (path === '/' || path === '')) {
+                activeId = 'nav-designs';
+            }
+
             const el = document.getElementById(activeId);
             if (el) el.classList.add('active');
 

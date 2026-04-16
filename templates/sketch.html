@@ -83,11 +83,24 @@
         }
         .main-nav svg { width: 100%; height: 100%; fill: currentColor; }
 
-        /* Mobile: Top Nav */
+        /* Mobile: Bottom Nav */
         @media (max-width: 768px) {
+            .main-nav {
+                position: fixed !important;
+                bottom: 0 !important;
+                top: auto !important;
+                left: 0;
+                right: 0;
+                border-top: 2px solid #000000;
+                border-bottom: none;
+                background: #ffffff;
+                padding: 12px 0;
+                box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            }
+            body[data-theme='dark'] .main-nav { background: #000000; border-top: 2px solid #ffffff; }
             .main-nav a span:not(.icon) { display: none; }
-            .main-nav .icon { margin-bottom: 0; width: 28px; height: 28px; }
-            body { padding-bottom: 0 !important; } 
+            .main-nav .icon { margin-bottom: 0; width: 32px; height: 32px; }
+            body { padding-bottom: 90px !important; height: auto !important; overflow: auto !important; } 
         }
 
         /* Desktop: Top Nav */
@@ -479,6 +492,17 @@
 
                 <hr style="border:0; border-top:1px solid #ddd; margin: 15px 0;">
                 
+                <div id="post-gen-controls" style="display:none; background:rgba(0,0,0,0.03); border: 2px solid #000; padding: 15px; margin-bottom:15px;">
+                    <div id="scale-slider-group" style="display:none;">
+                        <label style="color:#000; font-weight:800; font-size:10px; margin-bottom:8px; display:block;">REFINE SHAPE SCALE</label>
+                        <input type="range" id="postScaleSlider" min="0.1" max="2.0" step="0.05" value="1.0" oninput="applyPostScale(this.value)">
+                    </div>
+                    <div id="contrast-slider-group" style="display:none;">
+                        <label style="color:#000; font-weight:800; font-size:10px; margin-bottom:8px; display:block;">REFINE IMAGE CONTRAST</label>
+                        <input type="range" id="postContrastSlider" min="10" max="240" step="1" value="150" oninput="applyPostContrast(this.value)">
+                    </div>
+                </div>
+
                 <div class="toggle-row" id="spiralConnectWrapper" style="background:rgba(0,0,0,0.03); padding:8px; border-radius:0 !important; margin-bottom:10px; border: 1px solid #000; display: none;">
                     <span style="font-weight:600; font-size:13px;"><svg viewBox="0 0 24 24" style="width:16px; height:16px; fill:currentColor; vertical-align:middle; margin-right:4px;"><path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M15.1,15.1C14.3,15.9 13.2,16.4 12,16.4C9.6,16.4 7.6,14.4 7.6,12C7.6,10.8 8.1,9.7 8.9,8.9C9.7,8.1 10.8,7.6 12,7.6C14.4,7.6 16.4,9.6 16.4,12C16.4,12.6 16.2,13.1 15.9,13.6L14.5,12.2C14.5,12.1 14.5,12.1 14.5,12C14.5,10.6 13.4,9.5 12,9.5C11.3,9.5 10.7,9.8 10.3,10.3C9.8,10.7 9.5,11.3 9.5,12C9.5,13.4 10.6,14.5 12,14.5C12.7,14.5 13.3,14.2 13.7,13.7L15.1,15.1Z"/></svg> Spiral Connect Drawing</span>
                     <label class="switch">
@@ -549,6 +573,41 @@
         let rawPoints = []; 
         let processedPoints = []; 
         let historyStack = [];
+        let lastPostScale = 1.0;
+
+        function applyPostScale(val) {
+            const factor = val / lastPostScale;
+            lastPostScale = val;
+            
+            if (activeEffectType === 'loop' && loopSourcePath) {
+                loopSourcePath.forEach(p => { if(p.type === 'point') { p.x *= factor; p.y *= factor; } });
+                generateLoop();
+            } else if (activeEffectType === 'sandify' && vortexSourcePath) {
+                vortexSourcePath.forEach(p => { if(p.type === 'point') { p.x *= factor; p.y *= factor; } });
+                scanVortexShape(); generateVortex(true);
+            } else {
+                rawPoints.forEach(p => { if(p.type === 'point') { p.x *= factor; p.y *= factor; } });
+                render();
+            }
+        }
+
+        function applyPostContrast(val) {
+            document.getElementById('traceThreshInput').value = val;
+            if(traceState.img) commitTraceMove(true);
+        }
+
+        function showPostGenSlider(type) {
+            document.getElementById('post-gen-controls').style.display = 'block';
+            document.getElementById('scale-slider-group').style.display = (type === 'scale') ? 'block' : 'none';
+            document.getElementById('contrast-slider-group').style.display = (type === 'contrast') ? 'block' : 'none';
+            
+            if (type === 'scale') {
+                document.getElementById('postScaleSlider').value = 1.0;
+                lastPostScale = 1.0;
+            } else {
+                document.getElementById('postContrastSlider').value = document.getElementById('traceThreshInput').value;
+            }
+        }
         let isDrawing = false;
         let currentTool = 'draw';
         let origin = {x:0, y:0};
@@ -764,8 +823,22 @@
             const drawStar = (pts) => { let rot = Math.PI / 2 * 3; let step = Math.PI / pts; scanCtx.moveTo(cx, cy - r); for (let i = 0; i < pts; i++) { scanCtx.lineTo(cx + Math.cos(rot) * r, cy + Math.sin(rot) * r); rot += step; scanCtx.lineTo(cx + Math.cos(rot) * (r*0.4), cy + Math.sin(rot) * (r*0.4)); rot += step; } scanCtx.lineTo(cx, cy - r); };
 
             if (type === 'custom') {
-                const tableR = parseFloat(document.getElementById('cfgRadius').value); const scaleToFit = r / tableR; 
-                scanCtx.beginPath(); vortexSourcePath.forEach((p, i) => { if(p.type === 'break' || p.type === 'cmd') return; const sx = cx + (p.x * scaleToFit); const sy = cy - (p.y * scaleToFit); if(i===0 || vortexSourcePath[i-1].type === 'break') scanCtx.moveTo(sx, sy); else scanCtx.lineTo(sx, sy); }); scanCtx.stroke(); 
+                const tableR = parseFloat(document.getElementById('cfgRadius').value); 
+                const scaleToFit = r / tableR; 
+                
+                // Centering Logic for Custom Shape
+                let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+                vortexSourcePath.forEach(p => { if(p.type === 'point') { minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x); minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y); } });
+                const scx = (minX + maxX) / 2; const scy = (minY + maxY) / 2;
+
+                scanCtx.beginPath(); 
+                vortexSourcePath.forEach((p, i) => { 
+                    if(p.type === 'break' || p.type === 'cmd') return; 
+                    const sx = cx + ((p.x - scx) * scaleToFit); 
+                    const sy = cy - ((p.y - scy) * scaleToFit); 
+                    if(i===0 || vortexSourcePath[i-1].type === 'break') scanCtx.moveTo(sx, sy); else scanCtx.lineTo(sx, sy); 
+                }); 
+                scanCtx.stroke();
             } else if (type === 'triangle') drawPoly(3);
             else if (type === 'square') drawPoly(4);
             else if (type === 'pentagon') drawPoly(5);
@@ -778,21 +851,31 @@
             for (let i = 0; i < steps; i++) { let maxDist = 0; const angle = (i / steps) * Math.PI * 2; const cos = Math.cos(angle); const sin = Math.sin(angle); for (let dist = 0; dist < r; dist += 2) { const x = Math.floor(cx + cos * dist); const y = Math.floor(cy + sin * dist); const idx = (y * w + x) * 4; if (pixels[idx] > 100) maxDist = dist; } vortexState.radiusMap[i] = maxDist / r; }
         }
 
-        function generateVortex() {
-            const swirlCount = parseInt(document.getElementById('vortexSwirl').value); const scaleFac = parseFloat(document.getElementById('vortexScale').value);
+        function generateVortex(isAdjustment = false) {
+            const swirlCount = parseInt(document.getElementById('vortexSwirl').value); const scaleFac = parseFloat(document.getElementById('vortexScale').value) * 0.85;
             const twistDeg = parseFloat(document.getElementById('vortexTwist').value); const tableRadius = parseFloat(document.getElementById('cfgRadius').value);
-            const iterations = 20000; const centerGap = 4; const newPoints = []; newPoints.push({type:'break'});
+            const iterations = 8000; const centerGap = 4; const newPoints = []; newPoints.push({type:'break'});
+            
             for (let i = 0; i <= iterations; i++) {
-                const t = (i / iterations) * 2 - 1; const progress = Math.abs(t); const spiralAngle = t * swirlCount * Math.PI * 2;
-                const twistRad = (twistDeg * (Math.PI/180)) * swirlCount * Math.abs(t);
-                let lookupAngle = spiralAngle + twistRad; let normAngle = lookupAngle % (Math.PI * 2); if (normAngle < 0) normAngle += Math.PI * 2;
+                const t = i / iterations; // Single arm from 0 to 1
+                const spiralAngle = t * swirlCount * Math.PI * 2;
+                const twistRad = (twistDeg * (Math.PI/180)) * swirlCount * t;
+                let lookupAngle = spiralAngle + twistRad; 
+                let normAngle = lookupAngle % (Math.PI * 2); if (normAngle < 0) normAngle += Math.PI * 2;
                 const mapIdx = Math.floor((normAngle / (Math.PI * 2)) * 3600) % 3600;
-                let shapeFactor = vortexState.radiusMap[mapIdx]; if(shapeFactor < 0.05) shapeFactor = 0.05; 
-                const maxR = tableRadius * scaleFac; const spiralR = centerGap + (progress * (maxR - centerGap)); const r = spiralR * shapeFactor;
-                let x, y; if (t < 0) { x = r * Math.cos(spiralAngle); y = r * Math.sin(spiralAngle); } else { const flipOffset = Math.PI / 2; x = r * Math.cos(spiralAngle + flipOffset); y = r * Math.sin(spiralAngle + flipOffset); }
+                
+                let shapeFactor = vortexState.radiusMap[mapIdx]; 
+                if(shapeFactor < 0.05) shapeFactor = 0.05; 
+                
+                const maxR = tableRadius * scaleFac; 
+                const r = (centerGap + (t * (maxR - centerGap))) * shapeFactor;
+                
+                const x = r * Math.cos(spiralAngle); 
+                const y = r * Math.sin(spiralAngle);
                 newPoints.push({x: x, y: y, type:'point'});
             }
             newPoints.push({type:'break'}); rawPoints = newPoints; render();
+            if (!isAdjustment) showPostGenSlider('scale');
         }
 
         function updateVortexParams() {
@@ -882,7 +965,7 @@
                         let shapeProgress = stretchMode ? (numPts > 1 ? ptIdx / (numPts - 1) : 0) : 0, effectiveIter = i + shapeProgress;
                         const currentAngle = effectiveIter * angleStepDeg * (Math.PI / 180), currentSpin = effectiveIter * spinStepDeg * (Math.PI / 180);
                         let oscScale = 1.0; if (oscRate > 0) oscScale = 1.0 + 0.4 * Math.sin(effectiveIter * oscRate * 0.1);
-                        const currentScale = scaleFac * oscScale;
+                        const currentScale = scaleFac * oscScale * 0.75;
                         let dx = p.x - cx, dy = p.y - cy;
                         let spun_x = cx + dx * Math.cos(currentSpin) - dy * Math.sin(currentSpin), spun_y = cy + dx * Math.sin(currentSpin) + dy * Math.cos(currentSpin);
                         let sx = spun_x * currentScale, sy = spun_y * currentScale;
@@ -893,7 +976,8 @@
                 });
                 if (!stretchMode && i < iterations - 1) newPoints.push({type: 'break'});
             }
-            newPoints.push({type: 'break'}); rawPoints = newPoints; render();
+            newPoints.push({type:'break'}); rawPoints = newPoints; render();
+            showPostGenSlider('scale');
         }
 
         function calculateSpiralTrace(imgData, thresh, density, ballSizeMm, tableR) {
@@ -966,7 +1050,9 @@
             bCtx.fillStyle = "white"; bCtx.fillRect(0, 0, size, size); bCtx.save(); bCtx.translate(size/2, size/2); bCtx.translate(traceState.x, traceState.y); bCtx.rotate(traceState.rotation * Math.PI / 180);
             const drawW = traceState.img.width * traceState.scale, drawH = traceState.img.height * traceState.scale;
             bCtx.drawImage(traceState.img, -drawW/2, -drawH/2, drawW, drawH); bCtx.restore();
-            traceImgData = bCtx.getImageData(0,0,size,size); runHighPrecisionTrace();
+            traceImgData = bCtx.getImageData(0,0,size,size); 
+            runHighPrecisionTrace();
+            showPostGenSlider('contrast');
         }
 
         function runHighPrecisionTrace() {
@@ -989,9 +1075,14 @@
         function clearCanvas() { saveState(); rawPoints = []; traceState.active=false; updateToolSettings(); render(); }
         
         function setTool(t) {
-            currentTool = t; const buttons = ['btnDraw', 'btnErase', 'btnSelect', 'btnSandify', 'btnLoop', 'btnTrace', 'btnText'];
+            currentTool = t; const buttons = ['btnDraw', 'btnErase', 'btnSelect', 'btnSandify', 'btnLoop', 'btnTrace', 'btnText', 'btnStamp'];
             buttons.forEach(b => { const el = document.getElementById(b); if(el) el.className = (b.toLowerCase().includes(t) || (t==='trace_set' && b==='btnTrace')) ? 'active' : 'secondary'; });
             updateToolSettings();
+            
+            // Hide post-gen controls when switching tools
+            const pgControls = document.getElementById('post-gen-controls');
+            if (pgControls) pgControls.style.display = 'none';
+            
             if(t === 'select' && traceState.active) document.getElementById('traceMoveMsg').style.display = 'block'; else document.getElementById('traceMoveMsg').style.display = 'none';
             if(t === 'sandify') { activeEffectType = 'sandify'; if (rawPoints.length === 0) addShape('random'); vortexSourcePath = JSON.parse(JSON.stringify(rawPoints)); document.getElementById('vortexShape').value = 'custom'; updateVortexParams(); }
             if(t === 'loop') { activeEffectType = 'loop'; loopPathOffset = {x: 0, y: 0}; if (rawPoints.length === 0) addShape('circle'); loopSourcePath = JSON.parse(JSON.stringify(rawPoints)); document.getElementById('loopShape').value = 'custom'; updateLoopParams(); }
@@ -1025,9 +1116,8 @@
                 if (currentTool === 'draw' && shapes > 1) { 
                     if (spiralWrapper.style.display === 'none') {
                         spiralWrapper.style.display = 'flex';
-                        spiralToggle.checked = true;
                     }
-                } else { spiralWrapper.style.display = 'none'; spiralToggle.checked = false; }
+                } else { spiralWrapper.style.display = 'none'; }
             }
         }
 
@@ -1089,7 +1179,13 @@
                 let pool = []; for(let s=0; s<sym; s++) { const ang = s * (Math.PI*2/sym), c = Math.cos(ang), si = Math.sin(ang); shapes.forEach(sh => pool.push(sh.map(p => ({ x: p.x*c - p.y*si, y: p.x*si + p.y*c, type: 'point' })))); }
                 processedPoints = []; pool.forEach((sh, i) => { if(i > 0) processedPoints.push({x: sh[0].x, y: sh[0].y, type:'point'}); sh.forEach(p => processedPoints.push(p)); });
             }
-            generatedGCode = processedPoints.map(p => p.type === 'cmd' ? "" : `${Math.atan2(p.y, p.x).toFixed(4)} ${(Math.hypot(p.x, p.y) / tableR > 1.0 ? 1.0 : Math.hypot(p.x, p.y) / tableR).toFixed(4)}`).filter(l => l !== "").join('\n');
+            generatedGCode = processedPoints.map(p => {
+                if (p.type === 'cmd') return "";
+                let theta = Math.atan2(p.y, p.x);
+                let rho = Math.hypot(p.x, p.y) / tableR;
+                if (rho > 1.0) rho = 1.0; // Clamps points to the perimeter
+                return `${theta.toFixed(4)} ${rho.toFixed(4)}`;
+            }).filter(l => l !== "").join('\n');
             document.getElementById('statusTxt').innerText = `Path Ready!`; document.getElementById('designPhaseControls').style.display = 'none'; document.getElementById('productionPhaseControls').style.display = 'block'; document.getElementById('simulationArea').style.display = 'block'; render();
         }
         
