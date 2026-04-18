@@ -443,10 +443,40 @@
         function pauseDesign() { sendCmd('PAUSE', 'Paused'); }
         function resumeDesign() { sendCmd('RESUME', 'Resumed'); }
 
+        function formatTimeFromMicroseconds(us) {
+            if(!us || us === 0) return "...";
+            let seconds = Math.round(us / 1000000);
+            if (seconds < 60) return seconds + "s";
+            let mins = Math.floor(seconds / 60);
+            let secs = seconds % 60;
+            return `${mins}m ${secs}s`;
+        }
+
         async function updateQ() {
             try {
-                let r = await fetch(`${BASE_URL}/status_full`); let d = await r.json(); isWaiting = d.is_waiting; 
-                let playText = "Select a design"; if (d.playing) { playText = d.is_paused ? `Paused: ${d.playing}` : `Playing: ${d.playing}`; } else if (d.is_waiting) { playText = `Cooling down...`; }
+                let r = await fetch(`${BASE_URL}/status_full`); 
+                let d = await r.json(); 
+                isWaiting = d.is_waiting; 
+                
+                let playText = "Select a design"; 
+                if (d.playing) { 
+                    playText = d.is_paused ? `Paused: ${d.playing}` : `Playing: ${d.playing}`;
+                    
+                    // Add countdown if progress available
+                    if (d.progress && d.progress.total > 0) {
+                        let remainingPercent = (d.progress.total - d.progress.sent) / d.progress.total;
+                        // Find the card to get its base time
+                        let card = document.querySelector(`.card[data-name="${d.playing}.txt"]`);
+                        if (card && card.dataset.baseTime > 0) {
+                            let speed = globalSettings.speed || 1.0;
+                            let remainingUs = card.dataset.baseTime * speed * remainingPercent;
+                            playText += ` (${formatTimeFromMicroseconds(remainingUs)} left)`;
+                        }
+                    }
+                } else if (d.is_waiting) { 
+                    playText = `Cooling down...`; 
+                }
+                
                 document.getElementById('playing-display').textContent = playText;
                 let qText = "Queue empty"; let listHTML = "";
                 if(d.queue_items && d.queue_items.length > 0) { let count = d.queue_count || d.queue_items.length; qText = `Next: ${d.next_up} (+${count-1})`; d.queue_items.forEach(item => { listHTML += `<div class="queue-item"><span>${item.index+1}. ${item.name}</span><button class="btn-remove" onclick="removeFromQueue(${item.index}, '${item.type}')">✕</button></div>`; }); } 
@@ -462,8 +492,6 @@
             let g=document.getElementById('grid'); g.innerHTML='';
             fs.forEach(f=>{ let d=document.createElement('div'), clean=f.replace('.txt',''); d.className='card'; d.dataset.name=f; d.dataset.hasPng="false"; d.dataset.baseTime="0"; d.onclick=(e)=>{if(e.target.className!=='select-dot')runDesign(f)}; d.innerHTML=`<div class="card-img-wrap"><canvas data-f="${f}" width="300" height="300"></canvas><div class="select-dot" onclick="toggleSelect('${f}', event)"></div></div><div class="card-body"><h3 class="card-title">${clean}</h3><div class="card-meta">Est: <span id="t-${clean}">...</span></div></div>`; g.appendChild(d); observer.observe(d.querySelector('canvas')); }); renderSel();
         }
-
-        function formatTimeFromMicroseconds(us) { if(!us) return "..."; let seconds = Math.round(us / 1000000); if (seconds < 60) return seconds + "s"; return Math.ceil(seconds / 60) + "m"; }
 
         function loadPreview(cvs, f) {
             let clean = f.replace('.txt',''); let card = cvs.closest('.card');

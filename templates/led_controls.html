@@ -433,6 +433,7 @@
         let selectedMode = 1; // 1: Flash, 2: Fade, 3: Jump
         let modePresets = Array(12).fill("#ffffff");
         let unusedPresets = Array(12).fill(true);
+        let selectedPresetIndex = null;
 
         let currentHue = 0;
         let currentSat = 0;
@@ -509,8 +510,8 @@
             const mainPicker = document.getElementById('colorPicker');
             
             const rect = canvas.getBoundingClientRect();
-            let x = (e.clientX || e.touches[0].clientX) - rect.left;
-            let y = (e.clientY || e.touches[0].clientY) - rect.top;
+            let x = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
+            let y = (e.clientY || (e.touches && e.touches[0].clientY)) - rect.top;
             
             const dx = x - rect.width / 2;
             const dy = y - rect.height / 2;
@@ -535,10 +536,18 @@
             preview.style.backgroundColor = hex;
             hexText.innerText = hex;
             mainPicker.value = hex;
+
+            // Apply immediately to selected preset if in settings mode
+            if (settingsMode && selectedPresetIndex !== null) {
+                modePresets[selectedPresetIndex] = hex;
+                unusedPresets[selectedPresetIndex] = false;
+                loadFavorites();
+            }
         }
 
         function toggleSettings() {
             settingsMode = !settingsMode;
+            selectedPresetIndex = null; // Reset selection
             document.getElementById('selectColorSection').style.display = settingsMode ? 'none' : 'block';
             document.getElementById('modeSection').style.display = settingsMode ? 'block' : 'none';
             document.getElementById('applyModeBtn').style.display = settingsMode ? 'block' : 'none';
@@ -567,14 +576,19 @@
                     const slider = document.getElementById('lightnessSlider');
                     
                     const handleMove = (e) => { if(isDraggingWheel) updateColorFromWheel(e); };
-                    const handleUp = () => { isDraggingWheel = false; window.removeEventListener('mousemove', handleMove); window.removeEventListener('mouseup', handleUp); };
+                    const handleUp = () => { isDraggingWheel = false; window.removeEventListener('mousemove', handleMove); window.removeEventListener('mouseup', handleUp); window.removeEventListener('touchmove', handleMove); window.removeEventListener('touchend', handleUp); };
                     
-                    wrapper.addEventListener('mousedown', (e) => {
+                    const downHandler = (e) => {
                         isDraggingWheel = true;
                         updateColorFromWheel(e);
                         window.addEventListener('mousemove', handleMove);
                         window.addEventListener('mouseup', handleUp);
-                    });
+                        window.addEventListener('touchmove', handleMove, { passive: false });
+                        window.addEventListener('touchend', handleUp);
+                    };
+
+                    wrapper.addEventListener('mousedown', downHandler);
+                    wrapper.addEventListener('touchstart', downHandler, { passive: false });
                     
                     slider.addEventListener('input', () => {
                         drawWheel();
@@ -582,6 +596,12 @@
                         document.getElementById('colorPreview').style.backgroundColor = hex;
                         document.getElementById('hexValueDisplay').innerText = hex;
                         document.getElementById('colorPicker').value = hex;
+                        
+                        if (settingsMode && selectedPresetIndex !== null) {
+                            modePresets[selectedPresetIndex] = hex;
+                            unusedPresets[selectedPresetIndex] = false;
+                            loadFavorites();
+                        }
                     });
                     
                     drawWheel();
@@ -610,6 +630,13 @@
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(() => {
                 sendCurrentState();
+                // Update selected preset if in settings mode
+                if (settingsMode && selectedPresetIndex !== null) {
+                    const hex = document.getElementById('colorPicker').value;
+                    modePresets[selectedPresetIndex] = hex;
+                    unusedPresets[selectedPresetIndex] = false;
+                    loadFavorites();
+                }
             }, 200);
         }
 
@@ -630,15 +657,18 @@
 
         async function applyFavorite(hex, index) {
             if (settingsMode) {
-                // In settings mode, clicking a preset changes its color or toggles unused state
-                const newColor = document.getElementById('colorPicker').value;
-                if (modePresets[index] === newColor && !unusedPresets[index]) {
-                    // Toggle unused if same color clicked again
-                    unusedPresets[index] = true;
-                    modePresets[index] = "#ffffff";
+                // Toggle selection
+                if (selectedPresetIndex === index) {
+                    // Clicking again toggles 'unused' state
+                    unusedPresets[index] = !unusedPresets[index];
+                    if (unusedPresets[index]) modePresets[index] = "#ffffff";
                 } else {
-                    unusedPresets[index] = false;
-                    modePresets[index] = newColor;
+                    selectedPresetIndex = index;
+                    // Sync picker to this preset's color if it's not unused
+                    if (!unusedPresets[index]) {
+                        document.getElementById('colorPicker').value = modePresets[index];
+                        // We would need to update the wheel UI here too if we wanted full sync
+                    }
                 }
                 loadFavorites();
             } else {
@@ -654,7 +684,7 @@
             if (settingsMode) {
                 modePresets.forEach((color, i) => {
                     const circle = document.createElement('div');
-                    circle.className = 'fav-circle' + (unusedPresets[i] ? ' unused' : '');
+                    circle.className = 'fav-circle' + (unusedPresets[i] ? ' unused' : '') + (selectedPresetIndex === i ? ' selected' : '');
                     circle.style.backgroundColor = color;
                     circle.onclick = () => applyFavorite(color, i);
                     container.appendChild(circle);

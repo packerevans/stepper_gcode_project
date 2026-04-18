@@ -614,8 +614,17 @@ def status_full():
     for i, j in enumerate(job_queue): q.append({"index": i, "name": j['filename'].replace('.txt', ''), "type": "queue"})
     if is_looping:
         for i in range(min(len(loop_playlist), 10)): q.append({"index": i, "name": loop_playlist[i].replace('.txt', ''), "type": "loop"})
+    
+    progress = None
+    if current_gcode_runner and current_gcode_runner.is_alive():
+        progress = {
+            "sent": current_gcode_runner.lines_sent,
+            "total": current_gcode_runner.total_lines
+        }
+
     return jsonify({
         "playing": current_job_name.replace('.txt', '') if current_job_name else None,
+        "progress": progress,
         "queue_count": len(job_queue),
         "queue_items": q,
         "next_up": q[0]["name"] if q else "None",
