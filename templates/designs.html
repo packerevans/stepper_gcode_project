@@ -300,6 +300,24 @@
         </div>
     </div>
 
+    <div id="live-view-modal" class="overlay" style="display:none; justify-content: center; align-items: center; z-index: 4000;">
+        <div class="modal-content" style="max-width: 500px; padding: 20px; position: relative; background: var(--color-surface);">
+            <button onclick="toggleLiveView()" style="position: absolute; top: 10px; right: 10px; background: none; border: none; font-size: 24px; cursor: pointer; color: var(--color-text); font-weight: 800;">✕</button>
+            <h2 style="margin-bottom: 20px; font-weight: 800;">Live View</h2>
+            
+            <div style="width: 280px; height: 280px; margin: 0 auto; border: 8px solid #333; border-radius: 50%; background: #fff; overflow: hidden; position: relative; box-shadow: inset 0 0 15px rgba(0,0,0,0.2);">
+                <canvas id="live-canvas" width="400" height="400" style="width: 100%; height: 100%; transform: rotate(180deg);"></canvas>
+            </div>
+
+            <div style="margin-top: 25px; text-align: left;">
+                <h3 style="font-size: 0.9rem; border-bottom: 2px solid var(--color-border); padding-bottom: 5px; margin-bottom: 10px;">Upcoming Queue</h3>
+                <div id="live-queue-list" style="max-height: 150px; overflow-y: auto; font-size: 0.8rem;">
+                    <div style="opacity: 0.6; text-align: center; padding: 10px;">Queue empty</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="loop-indicator" style="display: none;">
         <span>Drawing on Repeat</span>
         <button class="close-loop" onclick="cancelLoop()">✕</button>
@@ -316,8 +334,10 @@
     </nav>
 
     <div class="ribbon-bar">
-        <div style="width: 32px;"></div> <!-- Spacer -->
-        <div class="playing-display-container" style="text-align: center;">
+        <button class="theme-toggle" onclick="toggleLiveView()" title="Live View" style="grid-column: 1; justify-self: start;">
+            <svg viewBox="0 0 24 24"><path d="M21,3H3C1.9,3,1,3.9,1,5v12c0,1.1,0.9,2,2,2h5v2h8v-2h5c1.1,0,2-0.9,2-2V5C23,3.9,22.1,3,21,3z M21,17H3V5h18V17z"/></svg>
+        </button>
+        <div class="playing-display-container" style="grid-column: 2; text-align: center;">
             <div id="playing-display" class="playing-display">Select a design</div>
             <div class="queue-wrapper" onclick="toggleQueue(event)">
                 <span id="queue-display">Queue empty</span>
@@ -499,6 +519,7 @@
                 isWaiting = d.is_waiting; 
                 
                 let playText = "Select a design"; 
+                let remainingUs = 0;
                 if (d.playing) { 
                     playText = d.is_paused ? `Paused: ${d.playing}` : `Playing: ${d.playing}`;
                     
@@ -509,7 +530,7 @@
                         let card = document.querySelector(`.card[data-name="${d.playing}.txt"]`);
                         if (card && card.dataset.baseTime > 0) {
                             let speed = globalSettings.speed || 1.0;
-                            let remainingUs = card.dataset.baseTime * speed * remainingPercent;
+                            remainingUs = card.dataset.baseTime * speed * remainingPercent;
                             playText += ` (${formatTimeFromMicroseconds(remainingUs)} left)`;
                         }
                     }
@@ -519,10 +540,140 @@
                 
                 document.getElementById('playing-display').textContent = playText;
                 let qText = "Queue empty"; let listHTML = "";
-                if(d.queue_items && d.queue_items.length > 0) { let count = d.queue_count || d.queue_items.length; qText = `Next: ${d.next_up} (+${count-1})`; d.queue_items.forEach(item => { listHTML += `<div class="queue-item"><span>${item.index+1}. ${item.name}</span><button class="btn-remove" onclick="removeFromQueue(${item.index}, '${item.type}')">✕</button></div>`; }); } 
-                else { listHTML = `<div class="queue-empty-msg">No items in queue</div>`; }
-                document.getElementById('queue-display').textContent = qText; document.getElementById('queue-list').innerHTML = listHTML; document.getElementById('loop-indicator').style.display = d.is_looping ? 'flex' : 'none';
+                let liveQHTML = "";
+                let currentTime = new Date();
+                let cumulativeUs = remainingUs;
+
+                if(d.queue_items && d.queue_items.length > 0) { 
+                    let count = d.queue_count || d.queue_items.length; 
+                    qText = `Next: ${d.next_up} (+${count-1})`; 
+                    
+                    d.queue_items.forEach((item, idx) => { 
+                        listHTML += `<div class="queue-item"><span>${item.index+1}. ${item.name}</span><button class="btn-remove" onclick="removeFromQueue(${item.index}, '${item.type}')">✕</button></div>`; 
+                        
+                        // Calculate timestamp for Live View
+                        let card = document.querySelector(`.card[data-name="${item.name}.txt"]`);
+                        let durationUs = card ? (parseFloat(card.dataset.baseTime) * (globalSettings.speed || 1.0)) : 0;
+                        let startTime = new Date(currentTime.getTime() + (cumulativeUs / 1000));
+                        let timeStr = startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        
+                        liveQHTML += `
+                            <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,0.05);">
+                                <span style="font-weight: 700;">${idx+1}. ${item.name}</span>
+                                <span style="opacity: 0.6;">Starts @ ${timeStr}</span>
+                            </div>
+                        `;
+                        cumulativeUs += durationUs + (globalSettings.cooldown * 1000000); // Add cooldown
+                    }); 
+                } 
+                else { 
+                    listHTML = `<div class="queue-empty-msg">No items in queue</div>`; 
+                    liveQHTML = `<div style="opacity: 0.6; text-align: center; padding: 10px;">Queue empty</div>`;
+                }
+                
+                document.getElementById('queue-display').textContent = qText; 
+                document.getElementById('queue-list').innerHTML = listHTML; 
+                document.getElementById('live-queue-list').innerHTML = liveQHTML;
+                document.getElementById('loop-indicator').style.display = d.is_looping ? 'flex' : 'none';
+
+                // Update Live View if open
+                if (document.getElementById('live-view-modal').style.display === 'flex' && d.playing) {
+                    renderLiveView(d.playing, d.progress);
+                }
             } catch(e){}
+        }
+
+        let liveViewCache = { name: null, gcode: null };
+        function toggleLiveView() {
+            const modal = document.getElementById('live-view-modal');
+            if (modal.style.display === 'none' || modal.style.display === '') {
+                modal.style.display = 'flex';
+                updateQ();
+            } else {
+                modal.style.display = 'none';
+            }
+        }
+
+        async function renderLiveView(name, progress) {
+            if (!name || !progress) return;
+            let gcode = "";
+            if (liveViewCache.name === name) {
+                gcode = liveViewCache.gcode;
+            } else {
+                try {
+                    let r = await fetch(`${BASE_URL}/designs/${name}.txt`);
+                    gcode = await r.text();
+                    liveViewCache = { name, gcode };
+                } catch(e) { return; }
+            }
+
+            const cvs = document.getElementById('live-canvas');
+            const ctx = cvs.getContext('2d');
+            const w = cvs.width, h = cvs.height;
+            ctx.clearRect(0,0,w,h);
+
+            const lines = gcode.split('\n').map(l => l.split('#')[0].split(';')[0].trim()).filter(l => l !== "");
+            let path = []; let tb = null; let te = null;
+
+            lines.forEach(l => {
+                let theta, rho;
+                if(l.toUpperCase().startsWith('G1')){ 
+                    let parts = l.substring(3).trim().split(/\s+/); 
+                    theta = parseFloat(parts[0]) || 0; rho = parseFloat(parts[1]) || 0; 
+                } else { 
+                    let parts = l.split(/\s+/); if(parts.length >= 2) { theta = parseFloat(parts[0]); rho = parseFloat(parts[1]); }
+                }
+                if(!isNaN(theta) && !isNaN(rho)) {
+                    let x = rho * (L1 + L2) * Math.cos(theta); 
+                    let y = rho * (L1 + L2) * Math.sin(theta);
+                    if(tb === null) { 
+                        let ik = calculateIK(x, y, 0); tb = ik.b; te = ik.e; 
+                        path.push(getXY(tb, te)); 
+                    } else {
+                        let ik = calculateIK(x, y, tb);
+                        let next_b = ik.b, next_e = ik.e;
+                        let dist = Math.max(Math.abs(next_b - tb), Math.abs(next_e - te));
+                        let steps = Math.max(1, Math.ceil(dist / 100));
+                        for(let k=1; k<=steps; k++) {
+                            path.push(getXY(tb + (next_b-tb)*(k/steps), te + (next_e-te)*(k/steps)));
+                        }
+                        tb = next_b; te = next_e;
+                    }
+                }
+            });
+
+            if (path.length < 2) return;
+            
+            let minX=-202, maxX=202, minY=-202, maxY=202; 
+            let sc = (Math.min(w, h) / (maxX - minX)) * 0.95;
+            const splitIdx = Math.floor((progress.sent / progress.total) * path.length);
+
+            ctx.beginPath();
+            ctx.strokeStyle = '#ccc';
+            ctx.lineWidth = 1.5;
+            for(let i=Math.max(0, splitIdx-1); i<path.length; i++) {
+                let px = w/2 + path[i].x * sc;
+                let py = h/2 + path[i].y * sc;
+                if (i === Math.max(0, splitIdx-1)) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+            }
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2.5;
+            for(let i=0; i<=splitIdx; i++) {
+                let px = w/2 + path[i].x * sc;
+                let py = h/2 + path[i].y * sc;
+                if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+            }
+            ctx.stroke();
+
+            if (path[splitIdx]) {
+                ctx.beginPath();
+                ctx.fillStyle = '#f00';
+                ctx.arc(w/2 + path[splitIdx].x * sc, h/2 + path[splitIdx].y * sc, 5, 0, Math.PI*2);
+                ctx.fill();
+            }
         }
 
         async function loadLib() { let g=document.getElementById('grid'); g.innerHTML='Loading...'; let r=await fetch(`${BASE_URL}/api/designs`), files=await r.json(); allFiles=files; renderGrid(files.slice(0,15)); if(files.length>15) document.getElementById('more-btn').style.display='inline-block'; }
