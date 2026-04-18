@@ -611,9 +611,14 @@ def get_status():
 @app.route("/status_full", methods=["GET"])
 def status_full():
     q = []
-    for i, j in enumerate(job_queue): q.append({"index": i, "name": j['filename'].replace('.txt', ''), "type": "queue"})
+    # Add active job_queue items
+    for i, j in enumerate(job_queue): 
+        q.append({"index": i, "name": j['filename'].replace('.txt', ''), "type": "queue"})
+    
+    # Add upcoming loop items (limit to 10 for performance)
     if is_looping:
-        for i in range(min(len(loop_playlist), 10)): q.append({"index": i, "name": loop_playlist[i].replace('.txt', ''), "type": "loop"})
+        for i in range(min(len(loop_playlist), 10)): 
+            q.append({"index": i, "name": loop_playlist[i].replace('.txt', ''), "type": "loop"})
     
     progress = None
     if current_gcode_runner and current_gcode_runner.is_alive():
@@ -628,7 +633,9 @@ def status_full():
         "queue_count": len(job_queue),
         "queue_items": q,
         "next_up": q[0]["name"] if q else "None",
-        "is_looping": is_looping, "is_paused": is_paused, "is_waiting": is_waiting  
+        "is_looping": is_looping, 
+        "is_paused": is_paused, 
+        "is_waiting": is_waiting  
     })
 
 @app.route("/remove_from_queue", methods=["POST"])

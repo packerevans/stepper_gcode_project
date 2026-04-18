@@ -213,6 +213,9 @@
         button.action-btn:hover { background: #000000; color: #ffffff; }
         body[data-theme='dark'] button.action-btn:hover { background: #ffffff; color: #000000; }
 
+        button.action-btn.danger { border-color: #ef4444; color: #ef4444; }
+        button.action-btn.danger:hover { background: #ef4444; color: #fff; }
+
         .btn-primary { border-width: 2px !important; } /* Standardized border width */
 
         /* --- General Popup --- */
@@ -340,6 +343,7 @@
             <button class="action-btn" onclick="shuffleLoop()">Shuffle All</button>
             <button class="action-btn btn-primary" onclick="resumeDesign()">Resume</button>
             <button class="action-btn" onclick="pauseDesign()">Pause</button>
+            <button class="action-btn danger" onclick="abortDesign()">Abort</button>
         </div>
     </div>
 
@@ -437,7 +441,43 @@
 
         async function runDesign(f) { if (isWaiting) { pendingDesign = f; document.getElementById('cooldown-modal').style.display = 'flex'; return; } await executeDesign(f); }
         async function cooldownChoice(choice) { document.getElementById('cooldown-modal').style.display = 'none'; if (!pendingDesign) return; if (choice === 'now') { await fetch(`${BASE_URL}/api/skip_cooldown`, { method: "POST" }); await executeDesign(pendingDesign); } else if (choice === 'queue') { await executeDesign(pendingDesign); } pendingDesign = null; }
-        async function executeDesign(f) { let speed = globalSettings.speed || 1.0; let r=await fetch(`${BASE_URL}/designs/${f}`), txt=await r.text(); let gcode = txt.split('\n').map(l=>{ let trimmed = l.trim(); if(trimmed.startsWith('#') || trimmed.startsWith(';') || trimmed === "") return ""; if(trimmed.toUpperCase().startsWith('G1')){ let p=trimmed.substring(2).trim().split(/\s+/); return `${p[0]} ${p[1]}`; } return trimmed; }).filter(l => l !== "").join('\n'); let resp = await fetch(`${BASE_URL}/send_gcode_block`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({gcode:gcode, filename:f}) }); let data = await resp.json(); if(data.success) { showPopup("Sent!"); updateQ(); } else { showPopup("Error!", true); } }
+        async function executeDesign(f) { 
+            let speed = globalSettings.speed || 1.0; 
+            let r=await fetch(`${BASE_URL}/designs/${f}`), txt=await r.text(); 
+            let gcode = txt.split('\n').map(l=>{ 
+                let trimmed = l.trim(); 
+                if(trimmed.startsWith('#') || trimmed.startsWith(';') || trimmed === "") return ""; 
+                if(trimmed.toUpperCase().startsWith('G1')){ 
+                    let p=trimmed.substring(2).trim().split(/\s+/); 
+                    return `${p[0]} ${p[1]}`; 
+                } 
+                return trimmed; 
+            }).filter(l => l !== "").join('\n'); 
+            
+            let resp = await fetch(`${BASE_URL}/send_gcode_block`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({gcode:gcode, filename:f}) }); 
+            let data = await resp.json(); 
+            if(data.success) { 
+                if (data.message === "Queued") {
+                    showPopup("Added to Queue");
+                } else {
+                    showPopup("Sent!"); 
+                }
+                updateQ(); 
+            } else { 
+                showPopup("Error!", true); 
+            } 
+        }
+
+        async function abortDesign() {
+            if(!confirm("Abort current design and clear queue/loop?")) return;
+            showPopup("Aborting...");
+            await fetch(`${BASE_URL}/send`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({command: "CLEAR"})
+            });
+            updateQ();
+        }
 
         function sendCmd(c, popupText) { if(popupText) showPopup(popupText); fetch(`${BASE_URL}/send`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({command:c})}); }
         function pauseDesign() { sendCmd('PAUSE', 'Paused'); }
