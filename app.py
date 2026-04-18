@@ -240,10 +240,10 @@ class SchedulerThread(threading.Thread):
             path = os.path.join(DESIGNS_FOLDER, val)
             if os.path.exists(path):
                 with open(path, 'r') as f: gcode = f.read()
-                if current_gcode_runner is None or not current_gcode_runner.is_alive():
-                    start_job({'gcode': gcode, 'filename': val})
-                else:
+                if is_waiting or (current_gcode_runner and current_gcode_runner.is_alive()):
                     job_queue.append({'gcode': gcode, 'filename': val})
+                else:
+                    start_job({'gcode': gcode, 'filename': val})
 
 # === THETA-RHO RUNNER ===
 class GCodeRunner(threading.Thread):
@@ -307,45 +307,78 @@ class GCodeRunner(threading.Thread):
 def on_job_finished(): process_queue(wait_enabled=True)
 
 def process_queue(wait_enabled=True):
-    global current_job_name, is_looping, is_waiting, is_paused
+    global current_job_name, is_looping, is_waiting, is_paused, skip_cooldown
+    
+    # Prevent multiple overlapping queue processors
     if current_gcode_runner and current_gcode_runner.is_alive(): return
+    if is_waiting and wait_enabled: return 
 
-    next_job = None
-    if len(job_queue) > 0: next_job = job_queue.popleft()
-    elif is_looping and len(loop_playlist) > 0:
-        next_file = loop_playlist.pop(0)
-        loop_playlist.append(next_file) 
-        try:
-            with open(os.path.join(DESIGNS_FOLDER, next_file), 'r') as f: 
-                next_job = {'gcode': f.read(), 'filename': next_file}
-        except: process_queue(wait_enabled=False); return
-
-    if next_job:
+    def run_queue():
+        global is_waiting, skip_cooldown, is_looping
+        
         if wait_enabled:
             is_waiting = True
-            
-            # --- UPDATED COOLDOWN LOGIC ---
-            wait_time = int(SYSTEM_SETTINGS.get('cooldown', 30))
+            try:
+                # Robust type handling for cooldown setting
+                raw_cd = SYSTEM_SETTINGS.get('cooldown', 30)
+                if raw_cd is None or raw_cd == "":
+                    wait_time = 30
+                else:
+                    wait_time = int(raw_cd)
+            except (ValueError, TypeError):
+                wait_time = 30
+                
             log_message(f"Cooling down for {wait_time}s...")
-            
             if arduino_connected:
                 with lock: arduino.write(b"PAUSE\n")
             
+            # Wait loop with early exit checks
             for _ in range(wait_time): 
                 if skip_cooldown: break
+                # Exit if loop cancelled and queue emptied during wait
                 if not is_looping and len(job_queue) == 0: break
                 time.sleep(1)
+            
             is_waiting = False
             skip_cooldown = False
-        start_job(next_job)
+
+        # Find the next job AFTER the wait
+        next_job = None
+        if len(job_queue) > 0: 
+            next_job = job_queue.popleft()
+        elif is_looping and len(loop_playlist) > 0:
+            next_file = loop_playlist.pop(0)
+            loop_playlist.append(next_file) 
+            try:
+                with open(os.path.join(DESIGNS_FOLDER, next_file), 'r') as f: 
+                    next_job = {'gcode': f.read(), 'filename': next_file}
+            except Exception as e:
+                log_message(f"Error reading loop file: {e}")
+                # Use a small delay before retrying to prevent CPU spinning on error
+                time.sleep(1)
+                process_queue(wait_enabled=False)
+                return
+
+        if next_job:
+            start_job(next_job)
+        else:
+            log_message("Queue empty.")
+            current_job_name = None
+            if arduino_connected:
+                with lock: arduino.write(b"PAUSE\n")
+            is_waiting = False
+
+    # Run the queue processor in a separate thread if it's going to wait
+    if wait_enabled:
+        threading.Thread(target=run_queue, daemon=True).start()
     else:
-        log_message("Queue empty.")
-        current_job_name = None
-        if arduino_connected:
-            with lock: arduino.write(b"PAUSE\n")
+        run_queue()
 
 def start_job(job_data):
     if not arduino_connected: return
+    # Ensure is_waiting is False when a job starts
+    global is_waiting
+    is_waiting = False
     with lock: arduino.write(b"RESUME\n") 
     GCodeRunner(job_data['gcode'], job_data['filename'], on_complete=on_job_finished).start()
 
@@ -613,10 +646,14 @@ def cancel_loop():
 def send_gcode_block_route():
     if not arduino_connected: return jsonify(success=False, error="Arduino Disconnected (Check USB)"), 500
     d = request.json; g = d.get("gcode"); f = d.get("filename")
-    if not current_gcode_runner or not current_gcode_runner.is_alive():
-        start_job({'gcode': g, 'filename': f}); return jsonify(success=True, message=f"Started {f}")
+    
+    # If currently in cooldown or already running a job, append to queue
+    if is_waiting or (current_gcode_runner and current_gcode_runner.is_alive()):
+        job_queue.append({'gcode': g, 'filename': f})
+        return jsonify(success=True, message="Queued")
     else:
-        job_queue.append({'gcode': g, 'filename': f}); return jsonify(success=True, message="Queued")
+        start_job({'gcode': g, 'filename': f})
+        return jsonify(success=True, message=f"Started {f}")
 
 @app.route("/delete_design", methods=["POST"])
 def delete_design():

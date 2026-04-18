@@ -487,23 +487,24 @@
             isCentering = true;
             document.getElementById('loadingOverlay').style.display = 'flex';
             
+            // Immediately send the move command to the backend for rho=0
+            ballPos.rho = 0;
+            ballPos.theta = 0;
+            sendMove();
+            
             const centerInterval = setInterval(() => {
-                // Move towards rho=0 at the same speed as manual joystick movement
-                if (ballPos.rho > 0.007) {
-                    ballPos.rho -= 0.007; // Matched to joystick speed
+                // Animate visualPos towards 0 for the user
+                if (visualPos.rho > 0.05) {
+                    visualPos.rho -= 0.05;
                 } else {
-                    ballPos.rho = 0;
-                    ballPos.theta = 0;
+                    visualPos.rho = 0;
+                    visualPos.theta = 0;
                     clearInterval(centerInterval);
-                    
-                    // Final move command to sync backend
-                    sendMove().then(() => {
-                        isCentering = false;
-                        document.getElementById('loadingOverlay').style.display = 'none';
-                        showPopup("Centered");
-                    });
+                    isCentering = false;
+                    document.getElementById('loadingOverlay').style.display = 'none';
+                    showPopup("Centered");
                 }
-            }, 50); // Fast enough to look smooth, slow enough to be safe
+            }, 50);
         }
 
         // --- EVENT LISTENERS ---

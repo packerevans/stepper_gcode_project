@@ -953,23 +953,44 @@
         function generateLoop() {
             const iterations = parseInt(document.getElementById('loopIter').value), angleStepDeg = parseFloat(document.getElementById('loopAngle').value);
             const spinStepDeg = parseFloat(document.getElementById('loopSpin').value), scaleFac = parseFloat(document.getElementById('loopScale').value), oscRate = parseFloat(document.getElementById('loopOsc').value), stretchMode = document.getElementById('loopStretchMode').checked;
+            const shapeType = document.getElementById('loopShape').value;
+            
+            let sourcePts = [];
+            if (shapeType === 'custom') {
+                sourcePts = JSON.parse(JSON.stringify(loopSourcePath));
+            } else {
+                const r = 50; 
+                if (shapeType === 'circle') { for(let i=0; i<=36; i++) { const a = (i/36)*Math.PI*2; sourcePts.push({x: Math.cos(a)*r, y: Math.sin(a)*r, type:'point'}); } }
+                else if (shapeType === 'square') { sourcePts = [{x:-r,y:-r,type:'point'}, {x:r,y:-r,type:'point'}, {x:r,y:r,type:'point'}, {x:-r,y:r,type:'point'}, {x:-r,y:-r,type:'point'}]; }
+                else if (shapeType === 'triangle') { sourcePts = [{x:0,y:r,type:'point'}, {x:r*0.86,y:-r/2,type:'point'}, {x:-r*0.86,y:-r/2,type:'point'}, {x:0,y:r,type:'point'}]; }
+                else if (shapeType === 'pentagon') { for(let i=0; i<=5; i++) { const a = (i/5)*Math.PI*2 - Math.PI/2; sourcePts.push({x: Math.cos(a)*r, y: Math.sin(a)*r, type:'point'}); } }
+                else if (shapeType === 'hexagon') { for(let i=0; i<=6; i++) { const a = (i/6)*Math.PI*2; sourcePts.push({x: Math.cos(a)*r, y: Math.sin(a)*r, type:'point'}); } }
+                else if (shapeType === 'star') { for(let i=0; i<=10; i++) { const a = (i/10)*Math.PI*2 + Math.PI/2; const rad = (i%2===0) ? r : r*0.4; sourcePts.push({x: Math.cos(a)*rad, y: Math.sin(a)*rad, type:'point'}); } }
+            }
+
             let newPoints = []; newPoints.push({type: 'break'});
-            const pointsOnly = loopSourcePath.filter(p => p.type === 'point'), numPts = pointsOnly.length; if(numPts === 0) return;
-            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity; pointsOnly.forEach(p => { minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x); minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y); });
+            const pointsOnly = sourcePts.filter(p => p.type === 'point'), numPts = pointsOnly.length; if(numPts === 0) return;
+            
+            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity; 
+            pointsOnly.forEach(p => { minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x); minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y); });
             let cx = (minX+maxX)/2, cy = (minY+maxY)/2;
+
             for(let i=0; i<iterations; i++) {
                 let ptIdx = 0;
-                loopSourcePath.forEach((p, idx) => {
-                    if(p.type === 'break' || p.type === 'cmd') { if (!stretchMode) if (idx !== 0 && idx !== loopSourcePath.length - 1) newPoints.push({...p}); } 
-                    else {
+                sourcePts.forEach((p, idx) => {
+                    if(p.type === 'break' || p.type === 'cmd') { 
+                        if (!stretchMode && idx !== 0 && idx !== sourcePts.length - 1) newPoints.push({type: 'break'}); 
+                    } else {
                         let shapeProgress = stretchMode ? (numPts > 1 ? ptIdx / (numPts - 1) : 0) : 0, effectiveIter = i + shapeProgress;
                         const currentAngle = effectiveIter * angleStepDeg * (Math.PI / 180), currentSpin = effectiveIter * spinStepDeg * (Math.PI / 180);
                         let oscScale = 1.0; if (oscRate > 0) oscScale = 1.0 + 0.4 * Math.sin(effectiveIter * oscRate * 0.1);
                         const currentScale = scaleFac * oscScale * 0.75;
+                        
                         let dx = p.x - cx, dy = p.y - cy;
-                        let spun_x = cx + dx * Math.cos(currentSpin) - dy * Math.sin(currentSpin), spun_y = cy + dx * Math.sin(currentSpin) + dy * Math.cos(currentSpin);
+                        let spun_x = dx * Math.cos(currentSpin) - dy * Math.sin(currentSpin), spun_y = dx * Math.sin(currentSpin) + dy * Math.cos(currentSpin);
                         let sx = spun_x * currentScale, sy = spun_y * currentScale;
                         let rx = sx * Math.cos(currentAngle) - sy * Math.sin(currentAngle), ry = sx * Math.sin(currentAngle) + sy * Math.cos(currentAngle);
+                        
                         let pathPt = getLoopPathPoint(effectiveIter / iterations);
                         newPoints.push({x: rx + pathPt.x + loopPathOffset.x, y: ry + pathPt.y + loopPathOffset.y, type: 'point'}); ptIdx++;
                     }

@@ -104,6 +104,15 @@
                 box-shadow: 0 2px 5px rgba(0,0,0,0.05);
             }
         }
+
+        /* Mobile Fixes */
+        @media (max-width: 480px) {
+            .container { padding: 0 10px; margin-top: 15px; }
+            .card { padding: 15px 15px; margin-bottom: 15px; }
+            .days-grid { gap: 4px; }
+            .day-label { font-size: 0.6rem; padding: 10px 0; }
+            input[type="time"] { font-size: 16px; } /* Prevent iOS zoom */
+        }
         
         /* Header */
         .header-nav {
