@@ -305,6 +305,14 @@
 
         <div id="sent-popup">SENT!</div>
 
+        <div id="motion-warning" style="display:none; background: #dc2626; color: #fff; padding: 15px; text-align: center; margin-bottom: 20px; font-weight: 800;">
+            <div style="margin-bottom: 10px;">DESIGN IN MOTION</div>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button class="btn-action" style="padding: 8px 16px; font-size: 12px; background: #fff; color: #000;" id="motionPauseBtn" onclick="sendCommand('PAUSE')">Pause Design</button>
+                <button class="btn-action" style="padding: 8px 16px; font-size: 12px; background: #000; color: #fff; border-color: #fff;" onclick="quitDesign()">Quit Design</button>
+            </div>
+        </div>
+
         <div id="loadingOverlay">
             <div class="loader-spinner"></div>
             <div class="loader-text" id="loaderStatus">Centering...</div>
@@ -319,15 +327,12 @@
                 </div>
             </div>
 
-            <div class="joystick-container" id="joyContainer">
+            <div class="joystick-container" id="joyContainer" style="margin-bottom: 40px;">
                 <div class="joystick-stick" id="joyStick"></div>
             </div>
 
-            <div class="controls mb-10">
-                <button class="btn-action" onclick="resetToCenter()">Center</button>
-                <button class="btn-action" onclick="sendCommand('PAUSE')">Pause</button>
-                <button class="btn-action" onclick="sendCommand('RESUME')">Resume</button>
-                <button class="btn-action btn-danger" onclick="sendCommand('CLEAR')">Clear</button>
+            <div style="display: flex; justify-content: center;">
+                <button class="btn-action" onclick="resetToCenter()" style="width: 100%; max-width: 250px;">Center Arm</button>
             </div>
         </div>
     </div>
@@ -394,6 +399,29 @@
             requestAnimationFrame(drawBall);
         }
 
+        async function updateStatus() {
+            try {
+                const res = await fetch('/status_full');
+                const data = await res.json();
+                const warning = document.getElementById('motion-warning');
+                const pauseBtn = document.getElementById('motionPauseBtn');
+                
+                if (data.playing) {
+                    warning.style.display = 'block';
+                    pauseBtn.innerText = data.is_paused ? 'Resume Design' : 'Pause Design';
+                    pauseBtn.onclick = () => sendCommand(data.is_paused ? 'RESUME' : 'PAUSE');
+                } else {
+                    warning.style.display = 'none';
+                }
+            } catch(e) {}
+        }
+
+        async function quitDesign() {
+            if(!confirm("Quit current design and clear queue?")) return;
+            await sendCommand('CLEAR');
+            updateStatus();
+        }
+
         // --- JOYSTICK LOGIC ---
         function handleMove(e) {
             if (!isDragging || isCentering) return;
@@ -402,8 +430,8 @@
             const centerX = rect.width / 2;
             const centerY = rect.height / 2;
             
-            let clientX = e.clientX || (e.touches && e.touches[0].clientX);
-            let clientY = e.clientY || (e.touches && e.touches[0].clientY);
+            let clientX = (e.clientX || (e.touches && e.touches[0].clientX));
+            let clientY = (e.clientY || (e.touches && e.touches[0].clientY));
             
             let dx = clientX - rect.left - centerX;
             let dy = clientY - rect.top - centerY;
@@ -423,27 +451,18 @@
 
         function startMoveLoop() {
             if (moveInterval || isCentering) return;
-            // Send location every 0.25 seconds (250ms)
             moveInterval = setInterval(() => {
                 if (Math.abs(joyPos.x) < 5 && Math.abs(joyPos.y) < 5) return;
-
-                const stepScale = 0.035; // Reduced from 0.05 for slower, more controlled movement
-                
+                const stepScale = 0.035;
                 let curX = ballPos.rho * Math.cos(ballPos.theta);
                 let curY = ballPos.rho * Math.sin(ballPos.theta);
-
                 curX += (joyPos.x / 80) * stepScale;
                 curY += (joyPos.y / 80) * stepScale;
-
                 let newRho = Math.sqrt(curX*curX + curY*curY);
                 let newTheta = Math.atan2(curY, curX);
-
                 if (newRho > 1.0) newRho = 1.0;
-
                 ballPos.rho = newRho;
                 ballPos.theta = newTheta;
-
-                // drawBall() is now handled by requestAnimationFrame for 60fps smoothness
                 sendMove();
             }, 250); 
         }
@@ -466,7 +485,6 @@
         }
 
         async function sendCommand(cmd) {
-            if (isCentering) return;
             try {
                 const res = await fetch('/send', {
                     method: 'POST',
@@ -476,6 +494,7 @@
                 const data = await res.json();
                 if (data.success) {
                     showPopup(cmd);
+                    updateStatus();
                 }
             } catch(e) {
                 console.error(e);
@@ -487,15 +506,14 @@
             isCentering = true;
             document.getElementById('loadingOverlay').style.display = 'flex';
             
-            // Immediately send the move command to the backend for rho=0
             ballPos.rho = 0;
             ballPos.theta = 0;
             sendMove();
             
             const centerInterval = setInterval(() => {
-                // Animate visualPos towards 0 for the user
-                if (visualPos.rho > 0.05) {
+                if (visualPos.rho > 0.01) {
                     visualPos.rho -= 0.05;
+                    if(visualPos.rho < 0) visualPos.rho = 0;
                 } else {
                     visualPos.rho = 0;
                     visualPos.theta = 0;
@@ -531,26 +549,27 @@
             setTimeout(() => p.classList.remove('active'), 800);
         }
 
-        // Set active nav link
         document.addEventListener('DOMContentLoaded', () => {
             const savedTheme = localStorage.getItem('theme') || 'light';
             document.body.setAttribute('data-theme', savedTheme);
 
             const path = window.location.pathname;
-            const navMap = {
-                '/': 'nav-designs',
-                '/controller': 'nav-controller',
-                '/sketch': 'nav-sketch',
-                '/AI_builder': 'nav-ai',
-                '/led_controls': 'nav-leds',
-                '/terminal': 'nav-terminal',
-                '/settings': 'nav-settings'
-            };
+            const navMap = { '/': 'nav-designs', '/controller': 'nav-controller', '/sketch': 'nav-sketch', '/AI_builder': 'nav-ai', '/led_controls': 'nav-leds', '/terminal': 'nav-terminal', '/settings': 'nav-settings' };
             const activeId = navMap[path] || 'nav-controller';
             const el = document.getElementById(activeId);
             if (el) el.classList.add('active');
+            
+            // Auto-resume motors on load
+            fetch('/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ command: 'RESUME' }) });
+            
             drawBall();
+            updateStatus();
+            setInterval(updateStatus, 3000);
         });
+    </script>
+</body>
+</html>
+
     </script>
 </body>
 </html>

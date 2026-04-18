@@ -576,78 +576,105 @@
                 document.getElementById('live-queue-list').innerHTML = liveQHTML;
                 document.getElementById('loop-indicator').style.display = d.is_looping ? 'flex' : 'none';
 
-                // Update Live View if open
-                if (document.getElementById('live-view-modal').style.display === 'flex' && d.playing) {
-                    renderLiveView(d.playing, d.progress);
+                // Update Live View Target if open
+                if (document.getElementById('live-view-modal').style.display === 'flex' && d.playing && d.progress) {
+                    targetProgress = d.progress.sent / d.progress.total;
+                    if (liveViewCache.name !== d.playing) {
+                        prepareLivePath(d.playing);
+                    }
                 }
             } catch(e){}
         }
 
-        let liveViewCache = { name: null, gcode: null };
+        let liveViewCache = { name: null, gcode: null, path: [] };
+        let visualProgress = 0;
+        let targetProgress = 0;
+        let animationActive = false;
+
         function toggleLiveView() {
             const modal = document.getElementById('live-view-modal');
             if (modal.style.display === 'none' || modal.style.display === '') {
                 modal.style.display = 'flex';
+                if (!animationActive) {
+                    animationActive = true;
+                    requestAnimationFrame(liveAnimationLoop);
+                }
                 updateQ();
             } else {
                 modal.style.display = 'none';
+                animationActive = false;
             }
         }
 
-        async function renderLiveView(name, progress) {
-            if (!name || !progress) return;
-            let gcode = "";
-            if (liveViewCache.name === name) {
-                gcode = liveViewCache.gcode;
+        function liveAnimationLoop() {
+            if (!animationActive) return;
+            
+            // Smoothly interpolate visualProgress towards targetProgress
+            const diff = targetProgress - visualProgress;
+            if (Math.abs(diff) > 0.0001) {
+                visualProgress += diff * 0.05; // Adjust 0.05 for "slowness" of smoothing
             } else {
-                try {
-                    let r = await fetch(`${BASE_URL}/designs/${name}.txt`);
-                    gcode = await r.text();
-                    liveViewCache = { name, gcode };
-                } catch(e) { return; }
+                visualProgress = targetProgress;
             }
+
+            drawLiveProgress();
+            requestAnimationFrame(liveAnimationLoop);
+        }
+
+        async function prepareLivePath(name) {
+            try {
+                let r = await fetch(`${BASE_URL}/designs/${name}.txt`);
+                let gcode = await r.text();
+                
+                const lines = gcode.split('\n').map(l => l.split('#')[0].split(';')[0].trim()).filter(l => l !== "");
+                let path = []; let tb = null; let te = null;
+
+                lines.forEach(l => {
+                    let theta, rho;
+                    if(l.toUpperCase().startsWith('G1')){ 
+                        let parts = l.substring(3).trim().split(/\s+/); 
+                        theta = parseFloat(parts[0]) || 0; rho = parseFloat(parts[1]) || 0; 
+                    } else { 
+                        let parts = l.split(/\s+/); if(parts.length >= 2) { theta = parseFloat(parts[0]); rho = parseFloat(parts[1]); }
+                    }
+                    if(!isNaN(theta) && !isNaN(rho)) {
+                        let x = rho * (L1 + L2) * Math.cos(theta); 
+                        let y = rho * (L1 + L2) * Math.sin(theta);
+                        if(tb === null) { 
+                            let ik = calculateIK(x, y, 0); tb = ik.b; te = ik.e; 
+                            path.push(getXY(tb, te)); 
+                        } else {
+                            let ik = calculateIK(x, y, tb);
+                            let next_b = ik.b, next_e = ik.e;
+                            let dist = Math.max(Math.abs(next_b - tb), Math.abs(next_e - te));
+                            let steps = Math.max(1, Math.ceil(dist / 100));
+                            for(let k=1; k<=steps; k++) {
+                                path.push(getXY(tb + (next_b-tb)*(k/steps), te + (next_e-te)*(k/steps)));
+                            }
+                            tb = next_b; te = next_e;
+                        }
+                    }
+                });
+                liveViewCache = { name, gcode, path };
+                visualProgress = targetProgress; // Snap to target on first load
+            } catch(e) { console.error(e); }
+        }
+
+        function drawLiveProgress() {
+            const path = liveViewCache.path;
+            if (!path || path.length < 2) return;
 
             const cvs = document.getElementById('live-canvas');
             const ctx = cvs.getContext('2d');
             const w = cvs.width, h = cvs.height;
             ctx.clearRect(0,0,w,h);
 
-            const lines = gcode.split('\n').map(l => l.split('#')[0].split(';')[0].trim()).filter(l => l !== "");
-            let path = []; let tb = null; let te = null;
-
-            lines.forEach(l => {
-                let theta, rho;
-                if(l.toUpperCase().startsWith('G1')){ 
-                    let parts = l.substring(3).trim().split(/\s+/); 
-                    theta = parseFloat(parts[0]) || 0; rho = parseFloat(parts[1]) || 0; 
-                } else { 
-                    let parts = l.split(/\s+/); if(parts.length >= 2) { theta = parseFloat(parts[0]); rho = parseFloat(parts[1]); }
-                }
-                if(!isNaN(theta) && !isNaN(rho)) {
-                    let x = rho * (L1 + L2) * Math.cos(theta); 
-                    let y = rho * (L1 + L2) * Math.sin(theta);
-                    if(tb === null) { 
-                        let ik = calculateIK(x, y, 0); tb = ik.b; te = ik.e; 
-                        path.push(getXY(tb, te)); 
-                    } else {
-                        let ik = calculateIK(x, y, tb);
-                        let next_b = ik.b, next_e = ik.e;
-                        let dist = Math.max(Math.abs(next_b - tb), Math.abs(next_e - te));
-                        let steps = Math.max(1, Math.ceil(dist / 100));
-                        for(let k=1; k<=steps; k++) {
-                            path.push(getXY(tb + (next_b-tb)*(k/steps), te + (next_e-te)*(k/steps)));
-                        }
-                        tb = next_b; te = next_e;
-                    }
-                }
-            });
-
-            if (path.length < 2) return;
-            
             let minX=-202, maxX=202, minY=-202, maxY=202; 
             let sc = (Math.min(w, h) / (maxX - minX)) * 0.95;
-            const splitIdx = Math.floor((progress.sent / progress.total) * path.length);
+            
+            const splitIdx = Math.floor(visualProgress * path.length);
 
+            // Draw Future Path (Gray)
             ctx.beginPath();
             ctx.strokeStyle = '#ccc';
             ctx.lineWidth = 1.5;
@@ -658,6 +685,7 @@
             }
             ctx.stroke();
 
+            // Draw Past Path (Black)
             ctx.beginPath();
             ctx.strokeStyle = '#000';
             ctx.lineWidth = 2.5;
@@ -668,10 +696,12 @@
             }
             ctx.stroke();
 
-            if (path[splitIdx]) {
+            // Draw Ball Position
+            const ballPt = path[Math.min(splitIdx, path.length - 1)];
+            if (ballPt) {
                 ctx.beginPath();
                 ctx.fillStyle = '#f00';
-                ctx.arc(w/2 + path[splitIdx].x * sc, h/2 + path[splitIdx].y * sc, 5, 0, Math.PI*2);
+                ctx.arc(w/2 + ballPt.x * sc, h/2 + ballPt.y * sc, 5, 0, Math.PI*2);
                 ctx.fill();
             }
         }
