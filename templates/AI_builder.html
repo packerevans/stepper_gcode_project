@@ -564,7 +564,7 @@
                 
                 img.onload = function() {
                     const sparklesIcon = `<svg viewBox="0 0 24 24" style="width:16px; height:16px; fill:currentColor; vertical-align:middle; display:inline-block; margin-right:4px;"><path d="M12,15.41L12.58,15L12,14.59L11.41,15L12,15.41M12,21L13.1,18.9L15.2,17.8L13.1,16.7L12,14.6L10.9,16.7L8.8,17.8L10.9,18.9L12,21M18,13L19.1,10.9L21.2,9.8L19.1,8.7L18,6.6L16.9,8.7L14.8,9.8L16.9,10.9L18,13M9,13L10.1,10.9L12.2,9.8L10.1,8.7L9,6.6L7.9,8.7L5.8,9.8L7.9,10.9L9,13Z"/></svg>`;
-                    document.getElementById('recipeDisplay').innerHTML = `${sparklesIcon} <b>Processing:</b><br>"${prompt}"<br><i>Calculating Spiral Vectors...</i>`;
+                    document.getElementById('recipeDisplay').innerHTML = `${sparklesIcon} <b>Processing:</b><br>"${prompt}"<br><i>Calculating Detail Contours...</i>`;
                     
                     setTimeout(() => {
                         const transform = autoCenterAndScale(img, 800);
@@ -576,12 +576,10 @@
                         traceState.baseScale = transform.scale; 
                         traceState.scale = transform.scale;
                         
-                        const randomDensity = (Math.random() * 2.5 + 2.0).toFixed(1);
-                        document.getElementById('traceDensityInput').value = randomDensity;
                         document.getElementById('traceThreshInput').value = 150;
                         
                         commitTraceMove(); 
-                        document.getElementById('recipeDisplay').innerHTML = `<b>AI Subject:</b> "${prompt}"<br><b>Effect:</b> Spiral Density Trace<br><b>Spacing:</b> ${randomDensity}mm`;
+                        document.getElementById('recipeDisplay').innerHTML = `<b>AI Subject:</b> "${prompt}"<br><b>Effect:</b> Contour Detail Trace`;
                         
                         showPostGenSlider('contrast');
                         traceState.active = false; 
@@ -601,7 +599,7 @@
 
         function doRandomDesign() {
             clearCanvas();
-            const shapes = ['circle', 'square', 'triangle', 'hexagon', 'star', 'spiral', 'organic'];
+            const shapes = ['circle', 'square', 'triangle', 'hexagon', 'star', 'organic'];
             const baseShape = shapes[Math.floor(Math.random() * shapes.length)];
             if (baseShape === 'organic') {
                 rawPoints = generateOrganicShape();
