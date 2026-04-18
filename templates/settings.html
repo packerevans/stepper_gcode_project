@@ -16,7 +16,28 @@
             --color-text: #000000;
             --color-border: #000000;
             --color-shadow: rgba(0, 0, 0, 0.08);
+            --border-radius: 0px;
+            --font-main: 'Inter', system-ui, -apple-system, sans-serif;
+            --button-weight: 800;
         }
+
+        /* --- Interface Styles --- */
+        body[data-style='HI-TECH'] {
+            --color-primary: #a1c4fd; --border-radius: 0px;
+            --font-main: 'Inter', system-ui, sans-serif; --button-weight: 800;
+        }
+        body[data-style='MODERN'] {
+            --color-primary: #6366f1; --border-radius: 16px;
+            --font-main: 'Inter', system-ui, sans-serif; --button-weight: 600;
+        }
+        body[data-style='MODERN'] { text-transform: none; letter-spacing: 0; }
+        body[data-style='MODERN'] h1, body[data-style='MODERN'] h2, body[data-style='MODERN'] .main-nav a span { text-transform: none; letter-spacing: -0.5px; }
+
+        body[data-style='INDUSTRIAL'] {
+            --color-primary: #f59e0b; --border-radius: 2px;
+            --font-main: 'Inter', monospace; --button-weight: 900;
+        }
+
         body[data-theme='dark'] {
             --color-bg: #000000;
             --color-surface: #0a0a0a;
@@ -24,7 +45,7 @@
             --color-border: #ffffff;
         }
         body {
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            font-family: var(--font-main);
             background: var(--color-bg); color: var(--color-text);
             margin: 0; padding: 0;
             text-transform: uppercase;
@@ -35,14 +56,16 @@
         /* --- Global Navigation --- */
         .main-nav {
             z-index: 2000;
-            background: #ffffff;
+            background: var(--color-surface);
             display: flex;
             justify-content: space-around;
             align-items: center;
             padding: 10px 0;
-            border-bottom: 2px solid #000000;
+            border-bottom: 2px solid var(--color-border);
+            border-radius: var(--border-radius);
         }
-        body[data-theme='dark'] .main-nav { background: #000000; border-top: 2px solid #ffffff; border-bottom: none; }
+        body[data-style='MODERN'] .main-nav { border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin: 10px; width: calc(100% - 20px); }
+        body[data-theme='dark'] .main-nav { background: var(--color-surface); border-top: 2px solid var(--color-border); border-bottom: none; }
 
         .main-nav a {
             text-decoration: none;
@@ -157,66 +180,31 @@
         
         /* Cards */
         .card {
-            background: var(--color-surface); border-radius: 0 !important;
+            background: var(--color-surface); border-radius: var(--border-radius);
             padding: 15px 25px; margin-bottom: 25px;
             border: 2px solid var(--color-border);
             box-shadow: 4px 4px 0px var(--color-border);
         }
+        body[data-style='MODERN'] .card { box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid var(--color-border); }
+        body[data-style='INDUSTRIAL'] .card { border-width: 4px; box-shadow: 8px 8px 0px var(--color-border); }
         
-        /* Collapsible Styles */
-        summary { 
-            cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between;
-            outline: none; font-weight: 800; font-size: 1rem; color: var(--color-text);
-        }
-        summary::-webkit-details-marker { display: none; }
-        summary h2 { margin: 0; font-size: 1rem; font-weight: 800; }
-        summary::after { content: '+'; font-weight: 900; font-size: 1.2rem; }
-        details[open] summary::after { content: '-'; }
-        
-        .card-content { 
-            margin-top: 20px; border-top: 1px solid var(--color-border); padding-top: 20px;
-        }
-
-        /* Forms */
-        .form-group { margin-bottom: 20px; }
-        label { display: block; font-size: 0.8rem; font-weight: 700; margin-bottom: 8px; opacity: 0.7; }
-        select, input[type="time"], input[type="text"], input[type="color"], input[type="password"], input[type="number"], input[type="range"] {
-            width: 100%; padding: 12px; border-radius: 0 !important;
-            border: 2px solid var(--color-border);
-            background: var(--color-bg); color: var(--color-text);
-            font-size: 14px; font-weight: 600; box-sizing: border-box;
-            font-family: inherit; text-transform: uppercase;
-        }
-        input[type="range"] { padding: 0; accent-color: #000; }
-        
-        /* Days Selector */
-        .days-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-top: 8px; }
-        .day-check { display: none; }
-        .day-label {
-            background: var(--color-bg); padding: 12px 0; border: 2px solid var(--color-border);
-            text-align: center; font-size: 0.7rem; font-weight: 800; cursor: pointer;
-            transition: 0.2s;
-        }
-        .day-check:checked + .day-label {
-            background: #000000; color: #ffffff;
-        }
-        body[data-theme='dark'] .day-check:checked + .day-label { background: #ffffff; color: #000000; }
-
         /* Buttons */
         .btn {
-            background: #ffffff; color: #000000; border: 2px solid #000000;
-            padding: 14px 20px; border-radius: 0 !important; font-weight: 800;
+            background: var(--color-surface); color: var(--color-text); border: 2px solid var(--color-border);
+            padding: 14px 20px; border-radius: var(--border-radius); font-weight: var(--button-weight);
             cursor: pointer; width: 100%; margin-top: 10px;
             text-transform: uppercase; transition: 0.2s;
-            letter-spacing: 1px;
+            letter-spacing: 1px; font-family: var(--font-main);
         }
-        body[data-theme='dark'] .btn { background: #000000; color: #ffffff; border-color: #ffffff; }
-        .btn:hover { background: #000000; color: #ffffff; }
-        body[data-theme='dark'] .btn:hover { background: #ffffff; color: #000000; }
+        body[data-style='MODERN'] .btn { background: var(--color-primary); color: #fff; border: none; text-transform: none; }
+        body[data-style='INDUSTRIAL'] .btn { border-width: 3px; text-decoration: underline; }
+        
+        .btn:hover { background: var(--color-text); color: var(--color-surface); }
+        body[data-style='MODERN'] .btn:hover { opacity: 0.9; transform: translateY(-2px); }
         .btn:active { transform: scale(0.98); opacity: 0.9; }
 
         .btn-delete { border-color: #dc2626; color: #dc2626; width: auto; padding: 8px 16px; font-size: 0.7rem; }
-        .btn-delete:hover { background: #dc2626; color: #fff; }
+        .btn-delete:hover { background: #dc2626 !color: #fff; }
         .btn-delete:active { transform: scale(0.95); }
 
         /* Schedule List */
@@ -343,6 +331,26 @@
     <div id="sent-popup">SENT!</div>
 
     <div class="container">
+
+        <div class="card">
+            <details open>
+                <summary><h2>Interface Appearance</h2></summary>
+                <div class="card-content">
+                    <div class="form-group">
+                        <label>Interface Style</label>
+                        <div style="font-size:0.7rem; font-weight: 700; opacity:0.5; margin-bottom:12px;">
+                            Choose the overall look and feel of the controller.
+                        </div>
+                        <select id="set-style" onchange="applyStyle(this.value)">
+                            <option value="HI-TECH">HI-TECH (Cyberpunk / Modern)</option>
+                            <option value="MODERN">MODERN (Soft / Minimal)</option>
+                            <option value="INDUSTRIAL">INDUSTRIAL (Raw / Mechanical)</option>
+                        </select>
+                    </div>
+                    <button class="btn" onclick="saveGeneralSettings()">Save Appearance</button>
+                </div>
+            </details>
+        </div>
         
         <div class="card">
             <details>
@@ -555,20 +563,30 @@
                     document.getElementById('set-speed').value = d.speed;
                     document.getElementById('speed-val').textContent = d.speed;
                 }
+                if(d.style !== undefined) {
+                    document.getElementById('set-style').value = d.style;
+                    applyStyle(d.style);
+                }
             } catch(e) { console.log(e); }
+        }
+
+        function applyStyle(style) {
+            document.body.setAttribute('data-style', style);
+            localStorage.setItem('style', style);
         }
 
         async function saveGeneralSettings() {
             showPopup("Saving...");
             let cd = parseInt(document.getElementById('set-cooldown').value);
             let sp = parseFloat(document.getElementById('set-speed').value);
+            let st = document.getElementById('set-style').value;
             await fetch('/api/settings', {
                 method: 'POST', headers: {'Content-Type':'application/json'},
-                body: JSON.stringify({cooldown: cd, speed: sp})
+                body: JSON.stringify({cooldown: cd, speed: sp, style: st})
             });
+            applyStyle(st);
             showPopup("Settings Saved!");
         }
-
         async function getTunnelStatus() {
             try {
                 let r = await fetch('/api/tunnel');

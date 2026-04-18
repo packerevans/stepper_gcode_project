@@ -430,7 +430,7 @@
         ]; 
         
         let settingsMode = false;
-        let selectedMode = 1; // 1: Flash, 2: Fade, 3: Jump
+        let selectedMode = 2; // 1: Flash, 2: Fade, 3: Jump
         let modePresets = Array(12).fill("#ffffff");
         let unusedPresets = Array(12).fill(true);
         let selectedPresetIndex = null;
@@ -612,6 +612,11 @@
             
             document.getElementById('settingsBtn').innerText = settingsMode ? 'Back' : 'Function';
             loadFavorites();
+
+            // Highlight correct mode button if switching back to settings
+            if (settingsMode) {
+                setMode(selectedMode);
+            }
         }
 
         function setMode(m) {
@@ -661,14 +666,18 @@
                 if (selectedPresetIndex === index) {
                     // Clicking again toggles 'unused' state
                     unusedPresets[index] = !unusedPresets[index];
-                    if (unusedPresets[index]) modePresets[index] = "#ffffff";
+                    if (unusedPresets[index]) {
+                        modePresets[index] = "#ffffff";
+                    } else {
+                        // Re-apply current picker color if toggling back to used
+                        modePresets[index] = document.getElementById('colorPicker').value;
+                    }
                 } else {
                     selectedPresetIndex = index;
-                    // Sync picker to this preset's color if it's not unused
-                    if (!unusedPresets[index]) {
-                        document.getElementById('colorPicker').value = modePresets[index];
-                        // We would need to update the wheel UI here too if we wanted full sync
-                    }
+                    // Instantly apply current color on picker to the new tile
+                    const currentColor = document.getElementById('colorPicker').value;
+                    modePresets[index] = currentColor;
+                    unusedPresets[index] = false;
                 }
                 loadFavorites();
             } else {

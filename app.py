@@ -22,7 +22,8 @@ ARDUINO_PROJECT_PATH = os.path.join(BASE_DIR, 'Sand')
 # Default Settings
 DEFAULT_SETTINGS = {
     "cooldown": 30,
-    "speed": 1.0
+    "speed": 1.0,
+    "style": "HI-TECH"
 }
 
 # Load Settings Helper

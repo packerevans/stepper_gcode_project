@@ -1202,8 +1202,18 @@
         function returnToEditing() { processedPoints = []; document.getElementById('designPhaseControls').style.display = 'block'; document.getElementById('productionPhaseControls').style.display = 'none'; document.getElementById('simulationArea').style.display = 'none'; resetStatus(); }
         function copyGCode() { if(generatedGCode) navigator.clipboard.writeText(generatedGCode).then(() => showToast("Copied!", "success")); }
 
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             const savedTheme = localStorage.getItem('theme') || 'light'; document.body.setAttribute('data-theme', savedTheme);
+            
+            // Apply interface style from settings
+            try {
+                const res = await fetch('/api/settings');
+                const settings = await res.json();
+                if (settings.style) {
+                    document.body.setAttribute('data-style', settings.style);
+                }
+            } catch(e) {}
+
             const path = window.location.pathname; const navMap = { '/': 'nav-designs', '/designs': 'nav-designs', '/controller': 'nav-controller', '/sketch': 'nav-sketch', '/AI_builder': 'nav-ai', '/led_controls': 'nav-leds', '/terminal': 'nav-terminal', '/settings': 'nav-settings' };
             document.querySelectorAll('.main-nav a').forEach(a => a.classList.remove('active')); const activeId = navMap[path] || 'nav-sketch'; const el = document.getElementById(activeId); if (el) el.classList.add('active');
             init(); setTool('draw');
