@@ -19,24 +19,22 @@
             --border-radius: 0px;
             --font-main: 'Inter', system-ui, -apple-system, sans-serif;
             --button-weight: 800;
+            --text-transform: uppercase;
+            --letter-spacing: 1px;
         }
 
         /* --- Interface Styles --- */
         body[data-style='HI-TECH'] {
             --color-primary: #a1c4fd; --border-radius: 0px;
             --font-main: 'Inter', system-ui, sans-serif; --button-weight: 800;
+            --text-transform: uppercase; --letter-spacing: 1px;
         }
         body[data-style='MODERN'] {
             --color-primary: #6366f1; --border-radius: 16px;
             --font-main: 'Inter', system-ui, sans-serif; --button-weight: 600;
+            --text-transform: none; --letter-spacing: 0;
         }
-        body[data-style='MODERN'] { text-transform: none; letter-spacing: 0; }
         body[data-style='MODERN'] h1, body[data-style='MODERN'] h2, body[data-style='MODERN'] .main-nav a span { text-transform: none; letter-spacing: -0.5px; }
-
-        body[data-style='INDUSTRIAL'] {
-            --color-primary: #f59e0b; --border-radius: 2px;
-            --font-main: 'Inter', monospace; --button-weight: 900;
-        }
 
         body[data-theme='dark'] {
             --color-bg: #000000;
@@ -48,8 +46,8 @@
             font-family: var(--font-main);
             background: var(--color-bg); color: var(--color-text);
             margin: 0; padding: 0;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+            text-transform: var(--text-transform);
+            letter-spacing: var(--letter-spacing);
             transition: background 0.3s, color 0.3s;
         }
 
@@ -63,6 +61,7 @@
             padding: 10px 0;
             border-bottom: 2px solid var(--color-border);
             border-radius: var(--border-radius);
+            transition: all 0.3s;
         }
         body[data-style='MODERN'] .main-nav { border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin: 10px; width: calc(100% - 20px); }
         body[data-theme='dark'] .main-nav { background: var(--color-surface); border-top: 2px solid var(--color-border); border-bottom: none; }
@@ -86,6 +85,7 @@
             outline: 2px solid #000000;
             outline-offset: -2px;
         }
+        body[data-style='MODERN'] .main-nav a:hover, body[data-style='MODERN'] .main-nav a.active { outline: none; background: rgba(0,0,0,0.03); }
         body[data-theme='dark'] .main-nav a:hover, body[data-theme='dark'] .main-nav a.active {
             outline: 2px solid #ffffff;
         }
@@ -110,7 +110,9 @@
                 box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
                 border-top: 2px solid #000000;
                 padding: 12px 0;
+                border-radius: var(--border-radius) var(--border-radius) 0 0;
             }
+            body[data-style='MODERN'] .main-nav { margin: 0; width: 100%; border-radius: 0; }
             body[data-theme='dark'] .main-nav { border-top-color: #ffffff; }
             .main-nav a span:not(.icon) { display: none; }
             .main-nav .icon { margin-bottom: 0; width: 32px; height: 32px; }
@@ -147,6 +149,18 @@
             color: #000000;
             border-bottom: 2px solid #000000;
             position: relative;
+        }
+        body[data-theme='dark'] .header-nav { background: #000000; color: #ffffff; border-bottom-color: #ffffff; }
+
+        .header-title {
+            grid-column: 2;
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: 800;
+            margin: 0;
+            white-space: nowrap;
+            text-transform: var(--text-transform);
+            letter-spacing: 2px;
         }
         body[data-theme='dark'] .header-nav { background: #000000; color: #ffffff; border-bottom-color: #ffffff; }
 
@@ -344,7 +358,6 @@
                         <select id="set-style" onchange="applyStyle(this.value)">
                             <option value="HI-TECH">HI-TECH (Cyberpunk / Modern)</option>
                             <option value="MODERN">MODERN (Soft / Minimal)</option>
-                            <option value="INDUSTRIAL">INDUSTRIAL (Raw / Mechanical)</option>
                         </select>
                     </div>
                     <button class="btn" onclick="saveGeneralSettings()">Save Appearance</button>
