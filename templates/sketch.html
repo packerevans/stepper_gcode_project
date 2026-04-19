@@ -468,6 +468,7 @@
                 <div class="btn-group">
                     <button id="btnDraw" onclick="setTool('draw')" class="active"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor; margin-right:8px;"><path d="M14.06,9L15,9.94L5.92,19H5V18.08L14.06,9M17.66,3C17.41,3 17.15,3.1 16.96,3.29L15.13,5.12L18.88,8.87L20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18.17,3.09 17.92,3 17.66,3M14.06,6.19L3,17.25V21H6.75L17.81,9.94L14.06,6.19Z"/></svg> Draw</button>
                     <button id="btnErase" onclick="setTool('erase')" class="secondary"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor; margin-right:8px;"><path d="M16.24,3.56L21.19,8.44C21.97,9.22 21.97,10.48 21.19,11.26L11.78,20.67C11,21.45 9.74,21.45 8.96,20.67L4.01,15.79C3.23,15.01 3.23,13.75 4.01,12.97L13.42,3.56C14.2,2.78 15.46,2.78 16.24,3.56M13.56,10.08L6.83,16.81L10.37,20.35L17.1,13.62L13.56,10.08Z"/></svg> Erase</button>
+                    <button id="btnClear" onclick="clearCanvas()" class="secondary" style="color:var(--danger);"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor; margin-right:8px;"><path d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19V4M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"/></svg> Clear</button>
                 </div>
 
                 <div class="btn-group">
@@ -867,13 +868,54 @@
             if (!isAdjustment) showPostGenSlider('scale');
         }
 
+        function saveToolSettings(tool, settings) {
+            localStorage.setItem(`sketch_settings_${tool}`, JSON.stringify(settings));
+        }
+
+        function loadToolSettings() {
+            try {
+                const vortex = JSON.parse(localStorage.getItem('sketch_settings_vortex'));
+                if (vortex) {
+                    document.getElementById('vortexSwirl').value = vortex.swirl || 20;
+                    document.getElementById('vortexScale').value = vortex.scale || 3.0;
+                    document.getElementById('vortexTwist').value = vortex.twist || 5;
+                    document.getElementById('vortexShape').value = vortex.shape || 'custom';
+                    document.getElementById('vortexChar').value = vortex.char || 'S';
+                }
+                const loop = JSON.parse(localStorage.getItem('sketch_settings_loop'));
+                if (loop) {
+                    document.getElementById('loopIter').value = loop.iters || 50;
+                    document.getElementById('loopAngle').value = loop.angle || 5;
+                    document.getElementById('loopSpin').value = loop.spin || 0;
+                    document.getElementById('loopScale').value = loop.scale || 3.0;
+                    document.getElementById('loopOsc').value = loop.osc || 0;
+                    document.getElementById('loopShape').value = loop.shape || 'custom';
+                    document.getElementById('loopGuidePath').value = loop.guide || 'circle';
+                    document.getElementById('loopStretchMode').checked = loop.stretch !== undefined ? loop.stretch : true;
+                }
+                const text = JSON.parse(localStorage.getItem('sketch_settings_text'));
+                if (text) {
+                    document.getElementById('toolTextInput').value = text.text || 'Sketch';
+                    document.getElementById('toolTextSize').value = text.size || 120;
+                    document.getElementById('toolTextFont').value = text.font || 'Arial';
+                }
+            } catch(e) { console.error("Error loading settings:", e); }
+        }
+
         function updateVortexParams() {
             if(currentTool === 'sandify') {
-                document.getElementById('val-swirl').innerText = document.getElementById('vortexSwirl').value;
-                document.getElementById('val-scale').innerText = document.getElementById('vortexScale').value;
-                document.getElementById('val-twist').innerText = document.getElementById('vortexTwist').value;
-                const type = document.getElementById('vortexShape').value;
-                document.getElementById('vortexTextContainer').style.display = type === 'text' ? 'block' : 'none';
+                const swirl = document.getElementById('vortexSwirl').value;
+                const scale = document.getElementById('vortexScale').value;
+                const twist = document.getElementById('vortexTwist').value;
+                const shape = document.getElementById('vortexShape').value;
+                const char = document.getElementById('vortexChar').value;
+                
+                document.getElementById('val-swirl').innerText = swirl;
+                document.getElementById('val-scale').innerText = scale;
+                document.getElementById('val-twist').innerText = twist;
+                document.getElementById('vortexTextContainer').style.display = shape === 'text' ? 'block' : 'none';
+                
+                saveToolSettings('vortex', { swirl, scale, twist, shape, char });
                 scanVortexShape(); generateVortex();
             }
         }
@@ -930,11 +972,22 @@
 
         function updateLoopParams() {
             if(currentTool === 'loop') {
-                document.getElementById('val-loop-iter').innerText = document.getElementById('loopIter').value;
-                document.getElementById('val-loop-angle').innerText = document.getElementById('loopAngle').value;
-                document.getElementById('val-loop-spin').innerText = document.getElementById('loopSpin').value;
-                document.getElementById('val-loop-scale').innerText = document.getElementById('loopScale').value;
-                document.getElementById('val-loop-osc').innerText = document.getElementById('loopOsc').value;
+                const iters = document.getElementById('loopIter').value;
+                const angle = document.getElementById('loopAngle').value;
+                const spin = document.getElementById('loopSpin').value;
+                const scale = document.getElementById('loopScale').value;
+                const osc = document.getElementById('loopOsc').value;
+                const shape = document.getElementById('loopShape').value;
+                const guide = document.getElementById('loopGuidePath').value;
+                const stretch = document.getElementById('loopStretchMode').checked;
+
+                document.getElementById('val-loop-iter').innerText = iters;
+                document.getElementById('val-loop-angle').innerText = angle;
+                document.getElementById('val-loop-spin').innerText = spin;
+                document.getElementById('val-loop-scale').innerText = scale;
+                document.getElementById('val-loop-osc').innerText = osc;
+                
+                saveToolSettings('loop', { iters, angle, spin, scale, osc, shape, guide, stretch });
                 generateLoop();
             }
         }
@@ -1132,12 +1185,36 @@
         }
 
         function renderTextToTrace() {
-            const text = document.getElementById('toolTextInput').value, size = parseInt(document.getElementById('toolTextSize').value), font = document.getElementById('toolTextFont').value, density = document.getElementById('textDensityInput').value;
-            document.getElementById('textDensityVal').innerText = density; const buff = document.getElementById('hiddenTraceBuffer'), bCtx = buff.getContext('2d'), canvasSize = 800;
-            bCtx.fillStyle = "white"; bCtx.fillRect(0, 0, canvasSize, canvasSize); bCtx.fillStyle = "black"; bCtx.font = `bold ${size}px ${font}`; bCtx.textAlign = "center"; bCtx.textBaseline = "middle";
+            const text = document.getElementById('toolTextInput').value;
+            const size = parseInt(document.getElementById('toolTextSize').value);
+            const font = document.getElementById('toolTextFont').value;
+            
+            saveToolSettings('text', { text, size, font });
+            
+            const buff = document.getElementById('hiddenTraceBuffer'), bCtx = buff.getContext('2d'), canvasSize = 800;
+            
+            bCtx.fillStyle = "white"; bCtx.fillRect(0, 0, canvasSize, canvasSize);
+            bCtx.strokeStyle = "black"; bCtx.lineWidth = 2;
+            bCtx.font = `bold ${size}px ${font}`; bCtx.textAlign = "center"; bCtx.textBaseline = "middle";
+            
             const lines = text.split('\n'), lineHeight = size * 1.1, totalHeight = lineHeight * (lines.length - 1), startY = (canvasSize / 2) - (totalHeight / 2);
-            lines.forEach((line, i) => bCtx.fillText(line, canvasSize / 2, startY + (i * lineHeight)));
-            traceImgData = bCtx.getImageData(0, 0, canvasSize, canvasSize); runHighPrecisionTrace();
+            lines.forEach((line, i) => bCtx.strokeText(line, canvasSize / 2, startY + (i * lineHeight)));
+            
+            const imgData = bCtx.getImageData(0,0,canvasSize,canvasSize);
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            const scaleFac = (tableR * 2) / canvasSize;
+            
+            let points = [];
+            for(let y=2; y<canvasSize-2; y+=3) {
+                for(let x=2; x<canvasSize-2; x+=3) {
+                    const idx = (y * canvasSize + x) * 4;
+                    if(imgData.data[idx] < 128) { 
+                        points.push({ x: (x - 400) * scaleFac, y: (400 - y) * scaleFac, type: 'point' });
+                    }
+                }
+            }
+            rawPoints = [{type:'break'}].concat(points).concat([{type:'break'}]);
+            render();
         }
 
         function commitTextMove() { setTool('draw'); }
@@ -1153,7 +1230,6 @@
             
             const showingFinal = (processedPoints.length > 0);
             
-            // Draw background original lines if we are showing the final path
             if (showingFinal) {
                 ctx.lineWidth = 0.1;
                 ctx.strokeStyle = dark ? 'rgba(161, 196, 253, 0.4)' : 'rgba(0, 123, 255, 0.3)';
@@ -1183,17 +1259,15 @@
             if(rawPoints.length === 0) return showToast("Draw something first!", "error");
             const tableR = parseFloat(document.getElementById('cfgRadius').value), sym = parseInt(document.getElementById('symSlider').value);
             let shapes = [], curShape = []; rawPoints.forEach(p => { if(p.type === 'break' || p.type === 'cmd') { if(curShape.length > 0) shapes.push(curShape); curShape = []; } else curShape.push(p); }); if(curShape.length > 0) shapes.push(curShape);
-            if (document.getElementById('spiralConnectMode').checked) {
-                const imgData = rasterizeCanvasForTrace(); processedPoints = calculateSpiralTrace(imgData, 150, 3.0, 13.0, tableR);
-            } else {
-                let pool = []; for(let s=0; s<sym; s++) { const ang = s * (Math.PI*2/sym), c = Math.cos(ang), si = Math.sin(ang); shapes.forEach(sh => pool.push(sh.map(p => ({ x: p.x*c - p.y*si, y: p.x*si + p.y*c, type: 'point' })))); }
-                processedPoints = []; pool.forEach((sh, i) => { if(i > 0) processedPoints.push({x: sh[0].x, y: sh[0].y, type:'point'}); sh.forEach(p => processedPoints.push(p)); });
-            }
+            
+            let pool = []; for(let s=0; s<sym; s++) { const ang = s * (Math.PI*2/sym), c = Math.cos(ang), si = Math.sin(ang); shapes.forEach(sh => pool.push(sh.map(p => ({ x: p.x*c - p.y*si, y: p.x*si + p.y*c, type: 'point' })))); }
+            processedPoints = []; pool.forEach((sh, i) => { if(i > 0) processedPoints.push({x: sh[0].x, y: sh[0].y, type:'point'}); sh.forEach(p => processedPoints.push(p)); });
+            
             generatedGCode = processedPoints.map(p => {
                 if (p.type === 'cmd') return "";
                 let theta = Math.atan2(p.y, p.x);
                 let rho = Math.hypot(p.x, p.y) / tableR;
-                if (rho > 1.0) rho = 1.0; // Clamps points to the perimeter
+                if (rho > 1.0) rho = 1.0; 
                 return `${theta.toFixed(4)} ${rho.toFixed(4)}`;
             }).filter(l => l !== "").join('\n');
             document.getElementById('statusTxt').innerText = `Path Ready!`; document.getElementById('designPhaseControls').style.display = 'none'; document.getElementById('productionPhaseControls').style.display = 'block'; document.getElementById('simulationArea').style.display = 'block'; render();
@@ -1216,6 +1290,8 @@
 
             const path = window.location.pathname; const navMap = { '/': 'nav-designs', '/designs': 'nav-designs', '/controller': 'nav-controller', '/sketch': 'nav-sketch', '/AI_builder': 'nav-ai', '/led_controls': 'nav-leds', '/terminal': 'nav-terminal', '/settings': 'nav-settings' };
             document.querySelectorAll('.main-nav a').forEach(a => a.classList.remove('active')); const activeId = navMap[path] || 'nav-sketch'; const el = document.getElementById(activeId); if (el) el.classList.add('active');
+            
+            loadToolSettings();
             init(); setTool('draw');
         });
     </script>
