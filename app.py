@@ -733,7 +733,7 @@ def designs(): return render_template("designs.html")
 def serve_design_file(filename): return send_from_directory(DESIGNS_FOLDER, filename)
 @app.route('/api/designs')
 def list_designs():
-    try: return jsonify([f for f in os.listdir(DESIGNS_FOLDER) if f.endswith('.txt')])
+    try: return jsonify([f for f in os.listdir(DESIGNS_FOLDER) if f.endswith('.txt') or f.endswith('.thr')])
     except: return jsonify([])
 @app.route("/terminal/logs")
 def get_logs():
