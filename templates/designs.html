@@ -307,6 +307,7 @@
         let selectedFiles = new Set();
         let allFiles = [];
         let isWaiting = false; 
+        let isPaused = false;
         let pendingDesign = null;
         let globalSettings = { speed: 1.0, cooldown: 30 };
 
@@ -446,7 +447,9 @@
 
         async function updateQ() {
             try {
-                let r = await fetch(`${BASE_URL}/status_full`); let d = await r.json(); isWaiting = d.is_waiting; 
+                let r = await fetch(`${BASE_URL}/status_full`); let d = await r.json(); 
+                isWaiting = d.is_waiting; 
+                isPaused = d.is_paused;
                 let playText = "Select a design"; let remainingUs = 0;
                 if (d.playing) { 
                     playText = d.is_paused ? `Paused: ${d.playing}` : `Playing: ${d.playing}`;
@@ -478,12 +481,16 @@
             } catch(e){}
         }
 
-        let liveViewCache = { name: null, path: [] }; let visualProgress = 0; let targetProgress = 0; let animationActive = false;
+        let liveViewCache = { name: null, path: [], estDurationMs: 0 }; let visualProgress = 0; let targetProgress = 0; let animationActive = false; let lastAnimTime = 0;
         function toggleLiveView() {
             const modal = document.getElementById('live-view-modal');
             if (modal.style.display === 'none' || modal.style.display === '') { 
                 modal.style.display = 'flex'; 
-                if (!animationActive) { animationActive = true; requestAnimationFrame(liveAnimationLoop); } 
+                if (!animationActive) { 
+                    animationActive = true; 
+                    lastAnimTime = performance.now();
+                    requestAnimationFrame(liveAnimationLoop); 
+                } 
                 updateQ(); 
             } 
             else { 
@@ -491,24 +498,47 @@
                 animationActive = false; 
             }
         }
-        function liveAnimationLoop() { if (!animationActive) return; const diff = targetProgress - visualProgress; if (Math.abs(diff) > 0.0001) visualProgress += diff * 0.05; else visualProgress = targetProgress; drawLiveProgress(); requestAnimationFrame(liveAnimationLoop); }
+        function liveAnimationLoop(now) {
+            if (!animationActive) return;
+            const dt = now - lastAnimTime;
+            lastAnimTime = now;
+
+            if (liveViewCache.name && !isPaused && !isWaiting && visualProgress < 1) {
+                // Predictive drift: move at estimated velocity
+                const estVelocity = 1.0 / (liveViewCache.estDurationMs / (globalSettings.speed || 1.0));
+                visualProgress += estVelocity * dt;
+
+                // Gentle sync: move towards actual reported progress from server
+                const diff = targetProgress - visualProgress;
+                visualProgress += diff * 0.01; // Low sync force for smoothness
+            }
+
+            if (visualProgress > 1) visualProgress = 1;
+            if (visualProgress < 0) visualProgress = 0;
+
+            drawLiveProgress();
+            requestAnimationFrame(liveAnimationLoop);
+        }
 
         async function prepareLivePath(name) {
             try {
                 let r = await fetch(`${BASE_URL}/designs/${name}.txt`); let gcode = await r.text();
                 const lines = gcode.split('\n').map(l => l.split('#')[0].split(';')[0].trim()).filter(l => l !== "");
-                let path = []; let tb = 0; let te = 0;
+                let path = []; let tb = 0; let te = 0; let totalSteps = 0;
                 lines.forEach(l => {
                     let theta, rho; if(l.toUpperCase().startsWith('G1')){ let parts = l.substring(3).trim().split(/\s+/); theta = parseFloat(parts[0]) || 0; rho = parseFloat(parts[1]) || 0; } 
                     else { let parts = l.split(/\s+/); if(parts.length >= 2) { theta = parseFloat(parts[0]); rho = parseFloat(parts[1]); } }
                     if(!isNaN(theta) && !isNaN(rho)) {
                         let x = rho * 202.6 * Math.cos(theta); let y = rho * 202.6 * Math.sin(theta);
                         let ik = calculateIK(x, y, tb); let dist = Math.max(Math.abs(ik.b - tb), Math.abs(ik.e - te));
+                        totalSteps += dist;
                         let steps = Math.max(1, Math.ceil(dist / 100)); for(let k=1; k<=steps; k++) path.push(getXY(tb + (ik.b-tb)*(k/steps), te + (ik.e-te)*(k/steps)));
                         tb = ik.b; te = ik.e;
                     }
                 });
-                liveViewCache = { name, path }; visualProgress = targetProgress;
+                liveViewCache = { name, path, estDurationMs: (totalSteps * 2000) / 1000 }; 
+                visualProgress = targetProgress;
+                lastAnimTime = performance.now();
             } catch(e) {}
         }
         function drawLiveProgress() {
