@@ -87,6 +87,9 @@ is_calibrating = False
 calibration_done = False 
 skip_cooldown = False    
 
+current_theta = 0.0
+current_rho = 0.0
+
 current_job_name = None  
 next_job_name = None     
 
@@ -268,7 +271,16 @@ class GCodeRunner(threading.Thread):
                 self.slot_available_event.set() 
 
     def send_line(self, line):
+        global current_theta, current_rho
         try:
+            # Basic parsing for state tracking: line format is usually "THETA RHO"
+            parts = line.strip().split()
+            if len(parts) >= 2:
+                try:
+                    current_theta = float(parts[0])
+                    current_rho = float(parts[1])
+                except: pass
+
             log_message(f"TX (Runner): {line}")
             with lock: arduino.write((line + "\n").encode())
             self.lines_sent += 1
@@ -506,10 +518,14 @@ def controller_page(): return render_template("controller.html")
 
 @app.route("/api/move", methods=["POST"])
 def manual_move():
+    global current_theta, current_rho
     if not arduino_connected: return jsonify(success=False, error="Arduino Disconnected")
     data = request.json
     theta = data.get("theta")
     rho = data.get("rho")
+    # Update state tracking
+    current_theta = float(theta)
+    current_rho = float(rho)
     # Send as raw theta rho to the firmware
     cmd = f"{theta} {rho}\n"
     log_message(f"TX (Manual): {cmd.strip()}")
@@ -630,6 +646,7 @@ def status_full():
     return jsonify({
         "playing": current_job_name.replace('.txt', '') if current_job_name else None,
         "progress": progress,
+        "position": {"theta": current_theta, "rho": current_rho},
         "queue_count": len(job_queue),
         "queue_items": q,
         "next_up": q[0]["name"] if q else "None",

@@ -421,6 +421,7 @@
             requestAnimationFrame(drawBall);
         }
 
+        let hasInitialized = false;
         async function updateStatus() {
             try {
                 const res = await fetch('/status_full');
@@ -428,6 +429,18 @@
                 const warning = document.getElementById('motion-warning');
                 const pauseBtn = document.getElementById('motionPauseBtn');
                 
+                // Simulator sync: Update ball position from server
+                if (data.position && (data.playing || !hasInitialized)) {
+                    ballPos.theta = data.position.theta;
+                    ballPos.rho = data.position.rho;
+                    
+                    if (!hasInitialized) {
+                        visualPos.theta = ballPos.theta;
+                        visualPos.rho = ballPos.rho;
+                        hasInitialized = true;
+                    }
+                }
+
                 if (data.playing) {
                     warning.style.display = 'block';
                     pauseBtn.innerText = data.is_paused ? 'Resume Design' : 'Pause Design';
