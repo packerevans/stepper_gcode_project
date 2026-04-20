@@ -354,19 +354,6 @@
                             Checking...
                         </div>
                     </div>
-
-                    <div style="margin-top: 25px; border-top: 1px solid var(--color-border); padding-top: 20px;">
-                        <div style="display: flex; align-items: center; justify-content: space-between;">
-                            <label style="margin-bottom: 0;">Auto-Start on Boot</label>
-                            <label class="switch">
-                                <input type="checkbox" id="tunnel-auto" onchange="saveTunnelKey()">
-                                <span class="slider-tog"></span>
-                            </label>
-                        </div>
-                        <p style="font-size: 10px; font-weight: 700; opacity: 0.5; margin-top: 10px;">
-                            The secure tunnel will automatically reopen if the table restarts.
-                        </p>
-                    </div>
                 </div>
             </details>
         </div>
@@ -535,10 +522,10 @@
          
          async function saveTunnelKey() {
             const key = document.getElementById('tunnel-key').value;
-            const auto = document.getElementById('tunnel-auto').checked;
+            if(!key) return;
             await fetch('/api/tunnel/key', {
                 method: 'POST', headers: {'Content-Type':'application/json'},
-                body: JSON.stringify({key, auto})
+                body: JSON.stringify({key})
             });
             showPopup("Tunnel Updated");
             getTunnelStatus();
@@ -551,7 +538,6 @@
                 let statusDiv = document.getElementById('tunnel-status');
                 if (d.active) {
                     statusDiv.innerHTML = `<span style="color:#0f0;">ACTIVE:</span> <a href="${d.url}" target="_blank" style="color:var(--color-primary);">${d.url}</a>`;
-                    document.getElementById('tunnel-auto').checked = d.auto_start;
                 } else {
                     statusDiv.innerHTML = `<span style="color:#f00;">INACTIVE:</span> (Set Auth Token above)`;
                 }
