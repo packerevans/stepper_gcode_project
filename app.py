@@ -609,16 +609,22 @@ def shutdown(): subprocess.Popen(["sudo", "shutdown", "now"]); return jsonify(su
 @app.route("/reboot", methods=["POST"])
 def reboot(): subprocess.Popen(["sudo", "reboot"]); return jsonify(success=True)
 
-@app.route("/api/schedule", methods=["GET", "POST", "DELETE"])
+@app.route("/api/schedule", methods=["GET", "POST"])
+@app.route("/api/schedules", methods=["GET", "POST"])
 def api_schedule():
     if request.method == "GET": return jsonify(load_schedules())
     if request.method == "POST":
         d = request.json; s = load_schedules(); s.append(d); save_schedules(s)
         return jsonify(success=True)
-    if request.method == "DELETE":
-        idx = request.json.get('index'); s = load_schedules()
-        if 0<=idx<len(s): del s[idx]; save_schedules(s)
+
+@app.route("/api/schedules/<int:idx>", methods=["DELETE"])
+def api_delete_schedule(idx):
+    s = load_schedules()
+    if 0 <= idx < len(s):
+        del s[idx]
+        save_schedules(s)
         return jsonify(success=True)
+    return jsonify(success=False, message="Index out of range")
 
 @app.route("/status")
 def get_status():

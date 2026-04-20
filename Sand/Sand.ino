@@ -35,7 +35,7 @@ const float L2 = 101.3;
 const float gearRatio = 1.125;
 const float stepsPerDeg = 8.888888;
 const float stepsPerRad = stepsPerDeg * (180.0 / PI);
-const float interpolationRes = 1.0; // LGT8 @ 32MHz can handle 1.0mm easily
+const float interpolationRes = 0.4; // LGT8 @ 32MHz can handle 0.4mm easily
 
 // --- SPEED SETTINGS ---
 int centerDelay = 500;    

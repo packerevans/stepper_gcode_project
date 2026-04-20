@@ -110,10 +110,11 @@
         /* Mobile Fixes */
         @media (max-width: 480px) {
             .container { padding: 0 10px; margin-top: 15px; }
-            .card { padding: 15px 15px; margin-bottom: 15px; }
+            .card { padding: 15px 10px; margin-bottom: 15px; }
             .days-grid { gap: 4px; }
-            .day-label { font-size: 0.6rem; padding: 10px 0; }
-            input[type="time"] { font-size: 16px; } /* Prevent iOS zoom */
+            .day-label { font-size: 0.55rem; padding: 8px 0; letter-spacing: 0; }
+            input[type="time"] { font-size: 16px; padding: 10px 6px; } /* Prevent iOS zoom */
+            .btn { padding: 12px 10px; font-size: 0.75rem; }
         }
         
         /* Header */
@@ -162,7 +163,6 @@
             background: var(--color-surface); border-radius: 0 !important;
             padding: 15px 25px; margin-bottom: 25px;
             border: 2px solid var(--color-border);
-            box-shadow: 4px 4px 0px var(--color-border);
         }
         
         /* Collapsible Styles */
@@ -382,7 +382,7 @@
                     <div class="form-group">
                         <label>Cooldown Time (Seconds)</label>
                         <div style="font-size:0.7rem; font-weight: 700; opacity:0.5; margin-bottom:12px;">
-                            Time to wait between designs when shuffling or looping.
+                            time to wait between designs
                         </div>
                         <input type="number" id="set-cooldown" min="0" max="3600" value="30">
                     </div>
@@ -417,7 +417,7 @@
                         </div>
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-group" id="token-input-group">
                         <label>Auth Token</label>
                         <input type="password" id="tunnel-key" placeholder="Paste key here..." onchange="saveTunnelKey()">
                     </div>
@@ -703,7 +703,7 @@
                     return;
                 }
 
-                data.forEach(s => {
+                data.forEach((s, idx) => {
                     let item = document.createElement('div');
                     item.className = "schedule-item";
                     let days = s.days.map(d => ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d]).join(", ");
@@ -721,7 +721,7 @@
                             <div class="sch-days">${days}</div>
                             <div class="sch-action">Action: ${actionText}</div>
                         </div>
-                        <button class="btn btn-delete" onclick="deleteSchedule(${s.id})">Delete</button>
+                        <button class="btn btn-delete" onclick="deleteSchedule(${idx})">Delete</button>
                     `;
                     list.appendChild(item);
                 });
@@ -755,9 +755,9 @@
          }
 
          async function clearQueue() {
-            if(!confirm("E-Stop: Abort current design and clear all queued tasks?")) return;
+            if(!confirm("Reset Arm: Abort current design and clear all queued tasks?")) return;
             await fetch('/send', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({command:'CLEAR'}) });
-            showPopup("Table Aborted");
+            showPopup("Arm Reset");
          }
 
          function sendCmd(c, p) { showPopup(p); fetch('/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({command:c})}); }
@@ -782,12 +782,19 @@
                 let r = await fetch('/api/tunnel');
                 let d = await r.json();
                 let statusDiv = document.getElementById('tunnel-status');
-                if (d.active) {
-                    statusDiv.innerHTML = `<span style="color:#0f0;">ACTIVE:</span> <a href="${d.url}" target="_blank" style="color:var(--color-primary);">${d.url}</a>`;
+                let tokenGroup = document.getElementById('token-input-group');
+                
+                if (d.public_url) {
+                    statusDiv.innerHTML = `<span style="color:#0f0;">ACTIVE:</span> <a href="${d.public_url}" target="_blank" style="color:var(--color-primary);">${d.public_url}</a>`;
+                    tokenGroup.style.display = 'none'; // Hide token input when active
                 } else {
                     statusDiv.innerHTML = `<span style="color:#f00;">INACTIVE:</span> (Set Auth Token above)`;
+                    tokenGroup.style.display = 'block'; // Show token input when inactive
+                    if (d.has_token) {
+                        statusDiv.innerHTML = `<span style="color:#f00;">INACTIVE:</span> (Token set, but tunnel not running)`;
+                    }
                 }
-            } catch(e) {}
+            } catch(e) { console.error("Error checking tunnel status:", e); }
          }
 
         document.addEventListener('DOMContentLoaded', () => {
