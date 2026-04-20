@@ -157,12 +157,14 @@
             letter-spacing: 1px;
             font-family: inherit;
         }
-        .action-btn:hover { background: var(--color-text); color: var(--color-surface); }
+        .action-btn:hover { background: #000 !important; color: #fff !important; border-color: #000; }
         .action-btn:active { transform: scale(0.96); }
         
         .action-btn.btn-primary { border-width: 2px; background: var(--color-bg); }
+        .action-btn.btn-primary:hover { border-width: 4px; }
+        
         .action-btn.danger { border-color: #ef4444; color: #ef4444; }
-        .action-btn.danger:hover { background: #ef4444; color: #fff; }
+        .action-btn.danger:hover { background: #ef4444 !important; color: #fff !important; border-color: #ef4444; }
 
         /* --- Grid --- */
         .grid { display: grid; gap: 15px; padding: 15px; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); max-width: 1200px; margin: 0 auto; }
