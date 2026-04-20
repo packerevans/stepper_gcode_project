@@ -414,32 +414,6 @@
             </details>
         </div>
 
-        <div class="card">
-            <details>
-                <summary><h2>Firmware Update</h2></summary>
-                <div class="card-content">
-                    <p style="font-size: 0.75rem; font-weight: 600; opacity: 0.7; margin-bottom: 20px; line-height: 1.5;">
-                        Compile and flash the latest 'Sand.ino' code to your Arduino. This takes about 30 seconds.
-                    </p>
-                    <button class="btn" onclick="updateFirmware()">Flash Firmware</button>
-                    <div id="flash-log" style="display:none; margin-top: 15px; padding: 12px; background: #000; color: #0f0; font-family: 'Inter', monospace; font-size: 10px; max-height: 200px; overflow-y: auto; text-transform: none; letter-spacing: 0;">
-                    </div>
-                </div>
-            </details>
-        </div>
-
-        <div class="card">
-            <details>
-                <summary><h2>Restart Controller</h2></summary>
-                <div class="card-content">
-                    <p style="font-size: 0.75rem; font-weight: 600; opacity: 0.7; margin-bottom: 20px;">
-                        Restart the background Python service and Ngrok tunnel.
-                    </p>
-                    <button class="btn btn-delete" onclick="restartApp()">Restart App</button>
-                </div>
-            </details>
-        </div>
-
     </div>
 
     <script>
@@ -547,42 +521,10 @@
             loadSchedules();
          }
 
-         async function updateFirmware() {
-             const btn = event.target;
-             const log = document.getElementById('flash-log');
-             if(!confirm("Warning: Table will be unresponsive for 30s. Start flash?")) return;
-             
-             btn.disabled = true; btn.innerText = "Compiling & Flashing...";
-             log.style.display = "block"; log.innerText = "Connecting to compiler...\n";
-
-             try {
-                 const res = await fetch('/api/update_firmware', { method: 'POST' });
-                 const data = await res.json();
-                 log.innerText += data.output;
-                 if(data.success) {
-                     showPopup("Flash Successful!");
-                     btn.innerText = "Flash Successful!";
-                 } else {
-                     showPopup("Flash Failed!", true);
-                     btn.innerText = "Retry Flash";
-                 }
-             } catch(e) {
-                 log.innerText += "\nError: " + e;
-             }
-             btn.disabled = false;
-         }
-
          async function clearQueue() {
             if(!confirm("E-Stop: Abort current design and clear all queued tasks?")) return;
             await fetch('/send', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({command:'CLEAR'}) });
             showPopup("Table Aborted");
-         }
-
-         async function restartApp() {
-            if(!confirm("Restart background controller? Connection will drop for 10s.")) return;
-            fetch('/restart_app', { method: 'POST' });
-            showPopup("Restarting...");
-            setTimeout(() => location.reload(), 8000);
          }
 
          function sendCmd(c, p) { showPopup(p); fetch('/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({command:c})}); }
