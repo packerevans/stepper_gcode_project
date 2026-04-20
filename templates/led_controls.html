@@ -415,7 +415,8 @@
             <div style="display:flex; gap:10px; justify-content: center; margin-top:20px; flex-wrap: wrap;">
                 <button onclick="toggleSettings()" id="settingsBtn">Function</button>
                 <button onclick="saveCurrentToFavorite()" id="saveBtn">Save Current</button>
-                <button onclick="applyFavorite('#000000')" style="background-color: #000; color: #fff; border-color: #000;">OFF</button>
+                <button onclick="applyFavorite('#000000')" id="offBtn" style="background-color: #000; color: #fff; border-color: #000;">OFF</button>
+                <button onclick="resetFunctionPresets()" id="clearPresetsBtn" style="display:none; color: #ef4444; border-color: #ef4444;">Clear</button>
             </div>
             <button id="applyModeBtn" class="action-btn" style="display:none; margin-top:15px; width:100%;" onclick="sendModeCommand()">Apply Mode</button>
         </div>
@@ -552,6 +553,8 @@
             document.getElementById('modeSection').style.display = settingsMode ? 'block' : 'none';
             document.getElementById('applyModeBtn').style.display = settingsMode ? 'block' : 'none';
             document.getElementById('saveBtn').style.display = settingsMode ? 'none' : 'block';
+            document.getElementById('offBtn').style.display = settingsMode ? 'none' : 'block';
+            document.getElementById('clearPresetsBtn').style.display = settingsMode ? 'block' : 'none';
             
             const titleEl = document.getElementById('presets-title');
             if (settingsMode) {
@@ -617,6 +620,14 @@
             if (settingsMode) {
                 setMode(selectedMode);
             }
+        }
+
+        function resetFunctionPresets() {
+            if(!confirm("Clear all pattern colors?")) return;
+            modePresets = Array(12).fill("#ffffff");
+            unusedPresets = Array(12).fill(true);
+            selectedPresetIndex = null;
+            loadFavorites();
         }
 
         function setMode(m) {
