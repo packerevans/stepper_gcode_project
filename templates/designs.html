@@ -491,12 +491,10 @@
                 modal.style.display = 'flex'; 
                 if (!animationActive) { animationActive = true; requestAnimationFrame(liveAnimationLoop); } 
                 updateQ(); 
-                showPopup("LIVE VIEW ON");
             } 
             else { 
                 modal.style.display = 'none'; 
                 animationActive = false; 
-                showPopup("LIVE VIEW OFF");
             }
         }
         function liveAnimationLoop() { if (!animationActive) return; const diff = targetProgress - visualProgress; if (Math.abs(diff) > 0.0001) visualProgress += diff * 0.05; else visualProgress = targetProgress; drawLiveProgress(); requestAnimationFrame(liveAnimationLoop); }
