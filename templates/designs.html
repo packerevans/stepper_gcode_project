@@ -364,7 +364,7 @@
 
         async function loopSelected() {
             if(selectedFiles.size === 0) return;
-            showPopup("Looping...");
+            showPopup("LOOPING!");
             await fetch(`${BASE_URL}/set_loop`, { 
                 method: "POST", 
                 headers: {"Content-Type": "application/json"}, 
@@ -375,7 +375,7 @@
 
         async function shuffleLoop() {
             if(allFiles.length === 0) return;
-            showPopup("Shuffling...");
+            showPopup("SHUFFLING!");
             await fetch(`${BASE_URL}/set_loop`, { 
                 method: "POST", 
                 headers: {"Content-Type": "application/json"}, 
@@ -385,7 +385,7 @@
         }
 
         async function cancelLoop() { 
-            showPopup("Loop Cancelled");
+            showPopup("LOOP CANCELLED");
             await fetch(`${BASE_URL}/set_loop`, { 
                 method: "POST", 
                 headers: {"Content-Type": "application/json"}, 
@@ -396,10 +396,10 @@
 
         async function deleteSelected() {
             if(!confirm(`Delete ${selectedFiles.size} designs?`)) return;
-            showPopup("Deleting...");
             for(let f of selectedFiles) {
                 await fetch(`${BASE_URL}/delete_design`, { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({filename: f}) });
             }
+            showPopup("DELETED!");
             selectedFiles.clear(); renderSel(); loadLib();
         }
 
@@ -412,7 +412,7 @@
             const ta = document.createElement('textarea'); ta.value = txt;
             ta.style.position = "fixed"; ta.style.left = "-9999px"; document.body.appendChild(ta);
             ta.focus(); ta.select();
-            try { document.execCommand('copy'); showPopup("Copied!"); selectedFiles.clear(); renderSel(); } catch (err) { showPopup("Error", true); }
+            try { document.execCommand('copy'); showPopup("COPIED!"); selectedFiles.clear(); renderSel(); } catch (err) { showPopup("Error", true); }
             document.body.removeChild(ta);
         }
 
@@ -428,19 +428,19 @@
             }).filter(l => l !== "").join('\n'); 
             let resp = await fetch(`${BASE_URL}/send_gcode_block`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({gcode:gcode, filename:f}) }); 
             let data = await resp.json(); 
-            if(data.success) { if (data.message === "Queued") showPopup("Added to Queue"); else showPopup("Sent!"); updateQ(); } else showPopup("Error!", true); 
+            if(data.success) { if (data.message === "Queued") showPopup("ADDED TO QUEUE"); else showPopup("SENT!"); updateQ(); } else showPopup("Error!", true); 
         }
 
         async function abortDesign() {
             if(!confirm("Abort current design and clear queue/loop?")) return;
-            showPopup("Aborting...");
             await fetch(`${BASE_URL}/send`, { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({command: "CLEAR"}) });
+            showPopup("STOPPED!");
             updateQ();
         }
 
         function sendCmd(c, p) { if(p) showPopup(p); fetch(`${BASE_URL}/send`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({command:c})}); }
-        function pauseDesign() { sendCmd('PAUSE', 'Paused'); }
-        function resumeDesign() { sendCmd('RESUME', 'Resumed'); }
+        function pauseDesign() { sendCmd('PAUSE', 'PAUSED!'); }
+        function resumeDesign() { sendCmd('RESUME', 'RESUMED!'); }
 
         function formatTimeFromMicroseconds(us) { if(!us || us === 0) return "..."; let seconds = Math.round(us / 1000000); if (seconds < 60) return seconds + "s"; let mins = Math.floor(seconds / 60); let secs = seconds % 60; return `${mins}m ${secs}s`; }
 
