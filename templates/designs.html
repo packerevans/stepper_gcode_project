@@ -60,7 +60,8 @@
 
         .main-nav a:hover, .main-nav a.active {
             opacity: 1;
-            background: var(--color-surface) !important;
+            background: #000 !important;
+            color: #fff !important;
             outline: 2px solid var(--color-border);
             outline-offset: -2px;
         }
@@ -191,7 +192,7 @@
         body[data-theme='dark'] .selection-bar { background: #fff; color: #000; border-color: #000; }
         .bar-actions { display: flex; gap: 8px; flex-wrap: nowrap; overflow-x: auto; }
         .bar-btn { background: none; border: 2px solid currentColor; color: inherit; padding: 8px 12px; font-weight: 800; cursor: pointer; text-transform: uppercase; font-size: 0.75rem; white-space: nowrap; flex-shrink: 0; }
-        .bar-btn:hover { background: currentColor; color: var(--color-bg); }
+        .bar-btn:hover { background: #fff; color: #000; }
 
         /* Modals */
         .overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.8); z-index: 4000; display: none; align-items: center; justify-content: center; }
@@ -327,6 +328,7 @@
             const next = body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
             body.setAttribute('data-theme', next);
             localStorage.setItem('theme', next);
+            showPopup(`THEME: ${next.toUpperCase()}`);
         }
 
         function showPopup(text, isError=false) {
@@ -340,6 +342,7 @@
         function toggleQueue(e) { e.stopPropagation(); document.getElementById('queue-dropdown').classList.toggle('show'); }
         async function removeFromQueue(index, type) {
             await fetch(`${BASE_URL}/remove_from_queue`, { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({index, type}) });
+            showPopup("REMOVED");
             updateQ();
         }
 
@@ -482,8 +485,17 @@
         let liveViewCache = { name: null, path: [] }; let visualProgress = 0; let targetProgress = 0; let animationActive = false;
         function toggleLiveView() {
             const modal = document.getElementById('live-view-modal');
-            if (modal.style.display === 'none' || modal.style.display === '') { modal.style.display = 'flex'; if (!animationActive) { animationActive = true; requestAnimationFrame(liveAnimationLoop); } updateQ(); } 
-            else { modal.style.display = 'none'; animationActive = false; }
+            if (modal.style.display === 'none' || modal.style.display === '') { 
+                modal.style.display = 'flex'; 
+                if (!animationActive) { animationActive = true; requestAnimationFrame(liveAnimationLoop); } 
+                updateQ(); 
+                showPopup("LIVE VIEW ON");
+            } 
+            else { 
+                modal.style.display = 'none'; 
+                animationActive = false; 
+                showPopup("LIVE VIEW OFF");
+            }
         }
         function liveAnimationLoop() { if (!animationActive) return; const diff = targetProgress - visualProgress; if (Math.abs(diff) > 0.0001) visualProgress += diff * 0.05; else visualProgress = targetProgress; drawLiveProgress(); requestAnimationFrame(liveAnimationLoop); }
 
@@ -515,7 +527,7 @@
         }
 
         async function loadLib() { let g=document.getElementById('grid'); g.innerHTML='Loading...'; let r=await fetch(`${BASE_URL}/api/designs`), files=await r.json(); allFiles=files; renderGrid(files.slice(0,15)); if(files.length>15) document.getElementById('more-btn').style.display='inline-block'; }
-        function showAll() { renderGrid(allFiles); document.getElementById('more-btn').style.display='none'; }
+        function showAll() { renderGrid(allFiles); document.getElementById('more-btn').style.display='none'; showPopup("SHOWING ALL"); }
         function renderGrid(fs) {
             let g=document.getElementById('grid'); g.innerHTML='';
             fs.forEach(f=>{ 
