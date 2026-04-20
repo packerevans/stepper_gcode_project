@@ -673,8 +673,16 @@ def send_gcode_block_route():
 
 @app.route("/delete_design", methods=["POST"])
 def delete_design():
-    f = request.json.get("filename"); p = os.path.join(DESIGNS_FOLDER, f)
-    if os.path.exists(p): os.remove(p); os.remove(p.replace('.txt','.png')); return jsonify(success=True)
+    f = request.json.get("filename")
+    if not f: return jsonify(success=False)
+    p = os.path.join(DESIGNS_FOLDER, f)
+    if os.path.exists(p):
+        os.remove(p)
+        # Attempt to remove corresponding thumbnail if it exists
+        thumb = p.replace('.txt', '.png').replace('.thr', '.png')
+        if os.path.exists(thumb):
+            os.remove(thumb)
+        return jsonify(success=True)
     return jsonify(success=False)
 
 @app.route("/save_design", methods=["POST"])
