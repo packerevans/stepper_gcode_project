@@ -341,9 +341,7 @@
                 </div>
             </div>
 
-            <div style="text-align:center; font-size:12px; margin-bottom:15px; color:#666;">
-                Status: <span id="statusTxt" style="font-weight:bold; color:var(--primary);">Ready to Build</span>
-            </div>
+
 
             <div class="btn-group">
                 <button onclick="sendToTable()" class="active">
@@ -899,7 +897,7 @@
         function updateUI() { const symEl = document.getElementById('symVal'); if (symEl) symEl.textContent = document.getElementById('symSlider').value + 'x'; render(); }
         function showToast(msg, type) { const t = document.getElementById('status-toast'); t.textContent = msg; t.className = type; t.style.opacity = 1; setTimeout(()=>t.style.opacity=0, 3000); }
         function toggleTheme() { const b = document.body; b.setAttribute('data-theme', b.getAttribute('data-theme')==='dark'?'light':'dark'); render(); }
-        function resetStatus() { generatedGCode = null; processedPoints = []; document.getElementById('statusTxt').innerText = "Ready to Build"; document.getElementById('progressSlider').value = 100; render(); }
+        function resetStatus() { generatedGCode = null; processedPoints = []; document.getElementById('progressSlider').value = 100; render(); }
         
         document.addEventListener('DOMContentLoaded', () => {
             const path = window.location.pathname;
@@ -987,7 +985,7 @@
                 if (rho > 1.0) rho = 1.0; // Clamps points to the perimeter
                 return `${theta.toFixed(4)} ${rho.toFixed(4)}`;
             }).filter(l => l !== "").join('\n');
-            document.getElementById('statusTxt').innerText = `Path Ready!`; document.getElementById('designPhaseControls').style.display = 'none'; document.getElementById('productionPhaseControls').style.display = 'block'; document.getElementById('simulationArea').style.display = 'block'; render();
+            document.getElementById('designPhaseControls').style.display = 'none'; document.getElementById('productionPhaseControls').style.display = 'block'; document.getElementById('simulationArea').style.display = 'block'; render();
         }
         
         function returnToEditing() { processedPoints = []; document.getElementById('designPhaseControls').style.display = 'block'; document.getElementById('productionPhaseControls').style.display = 'none'; document.getElementById('simulationArea').style.display = 'none'; resetStatus(); }
