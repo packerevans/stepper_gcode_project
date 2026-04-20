@@ -253,7 +253,6 @@
         <span style="font-weight:800; padding-left:5px;" id="sel-count">0 Selected</span>
         <div class="bar-actions">
             <button class="bar-btn" onclick="loopSelected()">Loop</button>
-            <button class="bar-btn" onclick="copySelected()">Copy</button>
             <button class="bar-btn danger" onclick="deleteSelected()">Delete</button>
         </div>
     </div>
@@ -407,19 +406,6 @@
             }
             showPopup("DELETED!");
             selectedFiles.clear(); renderSel(); loadLib();
-        }
-
-        async function copySelected() {
-            let txt = "";
-            for(let f of selectedFiles) {
-                let r = await fetch(`${BASE_URL}/designs/${f}`);
-                txt += `; --- ${f} ---\n${await r.text()}\n\n`;
-            }
-            const ta = document.createElement('textarea'); ta.value = txt;
-            ta.style.position = "fixed"; ta.style.left = "-9999px"; document.body.appendChild(ta);
-            ta.focus(); ta.select();
-            try { document.execCommand('copy'); showPopup("COPIED!"); selectedFiles.clear(); renderSel(); } catch (err) { showPopup("Error", true); }
-            document.body.removeChild(ta);
         }
 
         async function runDesign(f) { if (isWaiting) { pendingDesign = f; document.getElementById('cooldown-modal').style.display = 'flex'; return; } await executeDesign(f); }
