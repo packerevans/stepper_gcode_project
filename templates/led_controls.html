@@ -436,6 +436,31 @@
         let unusedPresets = Array(12).fill(true);
         let selectedPresetIndex = null;
 
+        function saveModeSettings() {
+            const settings = {
+                mode: selectedMode,
+                presets: modePresets,
+                unused: unusedPresets,
+                duration: document.getElementById('durSlider').value
+            };
+            localStorage.setItem('led_function_settings', JSON.stringify(settings));
+        }
+
+        function loadModeSettings() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('led_function_settings'));
+                if (saved) {
+                    selectedMode = saved.mode || 2;
+                    modePresets = saved.presets || Array(12).fill("#ffffff");
+                    unusedPresets = saved.unused || Array(12).fill(true);
+                    if (saved.duration) {
+                        document.getElementById('durSlider').value = saved.duration;
+                        document.getElementById('dur-val').innerText = saved.duration + 's';
+                    }
+                }
+            } catch(e) { console.error("Error loading LED settings", e); }
+        }
+
         let currentHue = 0;
         let currentSat = 0;
         let isDraggingWheel = false;
@@ -542,6 +567,7 @@
             if (settingsMode && selectedPresetIndex !== null) {
                 modePresets[selectedPresetIndex] = hex;
                 unusedPresets[selectedPresetIndex] = false;
+                saveModeSettings();
                 loadFavorites();
             }
         }
@@ -636,10 +662,12 @@
             if(m === 1) document.getElementById('mode-flash').classList.add('active');
             if(m === 2) document.getElementById('mode-fade').classList.add('active');
             if(m === 3) document.getElementById('mode-jump').classList.add('active');
+            saveModeSettings();
         }
 
         function updateDurationLabel() {
             document.getElementById('dur-val').innerText = document.getElementById('durSlider').value + 's';
+            saveModeSettings();
         }
 
         function handleColorInput() {
@@ -651,6 +679,7 @@
                     const hex = document.getElementById('colorPicker').value;
                     modePresets[selectedPresetIndex] = hex;
                     unusedPresets[selectedPresetIndex] = false;
+                    saveModeSettings();
                     loadFavorites();
                 }
             }, 200);
@@ -690,6 +719,7 @@
                     modePresets[index] = currentColor;
                     unusedPresets[index] = false;
                 }
+                saveModeSettings();
                 loadFavorites();
             } else {
                 document.getElementById('colorPicker').value = hex;
@@ -805,6 +835,7 @@
             const el = document.getElementById(activeId);
             if (el) el.classList.add('active');
 
+            loadModeSettings();
             loadFavorites(); // This makes the boxes show immediately
         });
     </script>
