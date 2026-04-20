@@ -4,7 +4,7 @@
     <title>Sand Table Designs</title>
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <style>
-        /* --- Modern Variables --- */
+        /* --- Root Variables --- */
         :root {
             --color-primary: #a1c4fd; 
             --color-secondary: #7fb2f0; 
@@ -13,26 +13,8 @@
             --color-text: #000000;
             --color-border: #000000;
             --color-selected: #a1c4fd; 
-            --color-selected-ring: #000000;
             --border-radius: 0px;
-            --font-main: 'Segoe UI', Roboto, sans-serif;
-            --button-weight: 800;
-            --text-transform: uppercase;
-            --letter-spacing: 1px;
         }
-
-        /* --- Interface Styles --- */
-        body[data-style='HI-TECH'] {
-            --color-primary: #a1c4fd; --border-radius: 0px;
-            --font-main: 'Segoe UI', Roboto, sans-serif; --button-weight: 800;
-            --text-transform: uppercase; --letter-spacing: 1px;
-        }
-        body[data-style='MODERN'] {
-            --color-primary: #6366f1; --border-radius: 16px;
-            --font-main: 'Inter', system-ui, sans-serif; --button-weight: 600;
-            --text-transform: none; --letter-spacing: 0;
-        }
-        body[data-style='MODERN'] h1, body[data-style='MODERN'] h2, body[data-style='MODERN'] h3, body[data-style='MODERN'] .main-nav a span { text-transform: none; letter-spacing: -0.5px; }
 
         body[data-theme='dark'] {
             --color-bg: #000000;
@@ -42,16 +24,16 @@
         }
 
         body {
-            font-family: var(--font-main);
+            font-family: 'Segoe UI', Roboto, sans-serif;
             background: var(--color-bg);
             color: var(--color-text);
             margin: 0; padding: 0;
             transition: background 0.3s, color 0.3s;
-            text-transform: var(--text-transform);
-            letter-spacing: var(--letter-spacing);
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
-        /* --- Global Navigation --- */
+        /* --- Global Navigation (Desktop) --- */
         .main-nav {
             z-index: 2000;
             background: var(--color-surface);
@@ -60,11 +42,7 @@
             align-items: center;
             padding: 10px 0;
             border-bottom: 2px solid var(--color-border);
-            border-radius: var(--border-radius);
-            transition: all 0.3s;
         }
-        body[data-style='MODERN'] .main-nav { border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin: 10px; width: calc(100% - 20px); }
-        body[data-theme='dark'] .main-nav { background: var(--color-surface); border-top: none; border-bottom: 2px solid var(--color-border); }
 
         .main-nav a {
             text-decoration: none;
@@ -77,144 +55,29 @@
             opacity: 0.7;
             transition: opacity 0.2s, color 0.2s;
             flex: 1;
-            border: 2px solid transparent;
-            box-sizing: border-box;
-            border-radius: var(--border-radius);
+            padding: 8px 0;
         }
-        body[data-theme='dark'] .main-nav a { color: var(--color-text); }
 
         .main-nav a:hover, .main-nav a.active {
             opacity: 1;
             background: var(--color-surface) !important;
-            color: var(--color-text) !important;
-            border: 2px solid var(--color-border);
-            box-sizing: border-box;
-        }
-        body[data-style='MODERN'] .main-nav a:hover, body[data-style='MODERN'] .main-nav a.active {
-            border: none; background: rgba(0,0,0,0.05) !important;
-        }
-        body[data-theme='dark'][data-style='MODERN'] .main-nav a:hover, body[data-theme='dark'][data-style='MODERN'] .main-nav a.active {
-            background: rgba(255,255,255,0.1) !important;
-        }
-        
-        body[data-theme='dark'] .main-nav a:hover, body[data-theme='dark'] .main-nav a.active {
-            background: var(--color-surface) !important;
-            color: var(--color-text) !important;
-            border: 2px solid var(--color-border);
+            outline: 2px solid var(--color-border);
+            outline-offset: -2px;
         }
 
-        .main-nav .icon {
-            width: 24px;
-            height: 24px;
-...
-        /* --- Controls --- */
-        .controls-wrapper { max-width: 1200px; margin: 20px auto 10px; padding: 0 15px; }
-        .status-pill { background: #000; color: #fff; padding: 4px 12px; border-radius: var(--border-radius); font-size: 0.85rem; font-weight: 700; opacity: 0; transition: opacity 0.3s; display: inline-block; margin-bottom: 10px; border: 1px solid #fff; }
-        body[data-theme='dark'] .status-pill { background: #fff; color: #000; border-color: #000; }
-        .status-pill.active { opacity: 1; }
+        .main-nav .icon { width: 24px; height: 24px; margin-bottom: 4px; }
+        .main-nav svg { width: 100%; height: 100%; fill: currentColor; }
 
-        .main-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 25px; }
-        button.action-btn {
-            background: var(--color-surface); color: var(--color-text);
-            border: 2px solid var(--color-border); padding: 12px 20px;
-            font-weight: var(--button-weight); font-size: 0.85rem; cursor: pointer;
-            text-transform: var(--text-transform); transition: all 0.2s;
-            border-radius: var(--border-radius);
-            font-family: var(--font-main);
-        }
-        body[data-style='MODERN'] button.action-btn { border: none; background: rgba(0,0,0,0.05); }
-        body[data-theme='dark'][data-style='MODERN'] button.action-btn { background: rgba(255,255,255,0.1); }
-        
-        button.action-btn:hover { background: var(--color-text); color: var(--color-surface); }
-        body[data-style='MODERN'] button.action-btn:hover { background: var(--color-primary); color: #fff; transform: translateY(-2px); }
-
-        button.action-btn.danger { border-color: #ef4444; color: #ef4444; }
-        button.action-btn.danger:hover { background: #ef4444; color: #fff; }
-
-        .btn-primary { border-width: 2px !important; } /* Standardized border width */
-        body[data-style='MODERN'] .btn-primary { background: var(--color-primary) !important; color: #fff !important; }
-
-        /* --- Grid --- */
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-            gap: 20px; padding: 0 15px 40px; max-width: 1200px; margin: 0 auto;
-        }
-
-        .card {
-            background: var(--color-surface);
-            border: 2px solid var(--color-border);
-            border-radius: var(--border-radius);
-            overflow: hidden; cursor: pointer; transition: all 0.2s ease;
-            position: relative;
-            box-shadow: 4px 4px 0px var(--color-border);
-        }
-        body[data-style='MODERN'] .card { border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-
-        .card:hover { transform: translateY(-5px); }
-        body[data-style='MODERN'] .card:hover { box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
-        .card.selected { border-color: var(--color-primary); border-width: 3px; }
-        
-        .card-img-wrap { position: relative; width: 100%; aspect-ratio: 1/1; background: #fff; border-bottom: 2px solid var(--color-border); }
-        body[data-theme='dark'] .card-img-wrap { background: #111; }
-        body[data-style='MODERN'] .card-img-wrap { border-bottom: none; }
-
-
-        .main-nav .icon {
-            width: 24px;
-            height: 24px;
-            margin-bottom: 4px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .main-nav svg {
-            width: 100%;
-            height: 100%;
-            fill: currentColor;
-        }
-
-        /* Mobile View Navigation */
-        @media (max-width: 768px) {
-            .main-nav {
-                position: fixed;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                background: #ffffff;
-                border-top: 2px solid #000000;
-                padding: 12px 0; /* Increased height to match other pages */
-                box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-            }
-            body[data-theme='dark'] .main-nav { background: #000000; border-top: 2px solid #ffffff; }
-            
-            .main-nav a span:not(.icon) { display: none; }
-            .main-nav .icon { margin-bottom: 0; width: 32px; height: 32px; } /* Increased icon size */
-            body { padding-bottom: 90px !important; } /* Space for the bottom bar */
-        }
-
-        /* Desktop View Navigation */
-        @media (min-width: 769px) {
-            .main-nav {
-                position: sticky;
-                top: 0;
-                border-bottom: 1px solid rgba(0,0,0,0.05);
-                padding: 10px 0;
-                box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            }
-        }
-
-        /* --- Header / Ribbon Bar --- */
+        /* --- Header / Ribbon Bar (Desktop Top) --- */
         .ribbon-bar {
             display: grid;
             grid-template-columns: 48px 1fr 48px;
             align-items: center;
             padding: 10px 15px;
             background: var(--color-surface);
-            border-bottom: 2px solid #000;
-            position: relative;
+            border-bottom: 2px solid var(--color-border);
+            z-index: 1000;
         }
-        body[data-theme='dark'] .ribbon-bar { border-bottom-color: #ffffff; }
 
         .playing-display {
             grid-column: 2;
@@ -226,192 +89,121 @@
             text-overflow: ellipsis;
         }
 
+        /* --- Mobile View Layout --- */
+        @media (max-width: 768px) {
+            /* Nav moves to very bottom */
+            .main-nav {
+                position: fixed;
+                bottom: 0; left: 0; right: 0;
+                border-top: 2px solid var(--color-border);
+                border-bottom: none;
+                padding: 12px 0;
+                box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            }
+            .main-nav a span:not(.icon) { display: none; }
+            .main-nav .icon { width: 32px; height: 32px; margin-bottom: 0; }
+
+            /* Ribbon moves to bottom, just above Nav */
+            .ribbon-bar {
+                position: fixed;
+                bottom: 70px; /* Above main-nav */
+                left: 0; right: 0;
+                border-top: 2px solid var(--color-border);
+                border-bottom: none;
+                background: var(--color-surface);
+                box-shadow: 0 -4px 10px rgba(0,0,0,0.05);
+            }
+
+            body { padding-bottom: 140px !important; }
+        }
+
         .theme-toggle {
             grid-column: 3;
             justify-self: end;
             background: none; border: none; cursor: pointer; color: var(--color-text);
             width: 32px; height: 32px; padding: 4px;
             display: flex; align-items: center; justify-content: center;
-            z-index: 2500;
         }
         .theme-toggle svg { width: 100%; height: 100%; fill: currentColor; }
         .theme-toggle .moon { display: none; }
         body[data-theme='dark'] .theme-toggle .sun { display: none; }
         body[data-theme='dark'] .theme-toggle .moon { display: block; }
 
-        /* Queue Dropdown Styles */
-        .queue-wrapper { position: relative; font-size: 0.8rem; opacity: 0.9; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; font-weight: 600; margin-top: 2px; }
-        .queue-wrapper:hover { opacity: 1; text-decoration: underline; }
-        
+        /* Queue Dropdown */
+        .queue-wrapper { position: relative; font-size: 0.8rem; opacity: 0.9; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; font-weight: 600; }
         .queue-dropdown {
-            display: none; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
-            margin-top: 10px; background: var(--color-surface); 
-            border: 2px solid var(--color-border); border-radius: 0 !important; 
-            min-width: 260px; max-width: 90vw;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.15); 
-            z-index: 1000; overflow: hidden;
-            text-align: left;
+            display: none; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+            margin-bottom: 10px; background: var(--color-surface); 
+            border: 2px solid var(--color-border); min-width: 260px;
+            box-shadow: 0 -10px 25px rgba(0,0,0,0.15); z-index: 1001;
         }
+        @media (min-width: 769px) { .queue-dropdown { bottom: auto; top: 100%; margin-top: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); } }
         .queue-dropdown.show { display: block; }
-        .queue-list { max-height: 300px; overflow-y: auto; }
-        .queue-item {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 8px 12px; border-bottom: 1px solid var(--color-border);
-            font-size: 0.85rem; color: var(--color-text);
-        }
-        .queue-item:last-child { border-bottom: none; }
-        .btn-remove {
-            background: none; border: none; color: #ef4444; 
-            font-weight: bold; cursor: pointer; padding: 4px 8px;
-            border-radius: 0 !important;
-        }
-
-        /* --- Loop Indicator --- */
-        #loop-indicator {
-            background-color: var(--color-primary);
-            color: #000;
-            text-align: center; padding: 8px; font-weight: 700; font-size: 0.9rem;
-            display: none; justify-content: center; align-items: center; gap: 10px;
-            border-bottom: 2px solid #000;
-        }
-        .close-loop { background: none; border: 2px solid #000; border-radius: 0 !important; width:20px; height:20px; line-height:16px; cursor: pointer; font-size:12px; font-weight: 800; }
+        .queue-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid var(--color-border); }
+        .btn-remove { background: none; border: none; color: #ef4444; font-weight: bold; cursor: pointer; }
 
         /* --- Hero --- */
-        .hero-container { width: 100%; margin: 0; padding: 0; }
-        .hero-image { width: 100%; height: 200px; object-fit: cover; border-bottom: 2px solid #000; }
-        body[data-theme='dark'] .hero-image { border-bottom-color: #ffffff; }
+        .hero-image { width: 100%; height: 180px; object-fit: cover; border-bottom: 2px solid var(--color-border); }
 
         /* --- Controls --- */
-        .controls-wrapper { max-width: 1200px; margin: 20px auto 10px; padding: 0 15px; }
-        .status-pill { background: #000; color: #fff; padding: 4px 12px; border-radius: 0 !important; font-size: 0.85rem; font-weight: 700; opacity: 0; transition: opacity 0.3s; display: inline-block; margin-bottom: 10px; border: 1px solid #fff; }
-        body[data-theme='dark'] .status-pill { background: #fff; color: #000; border: 1px solid #000; }
-
-        .main-actions { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 5px; }
+        .controls-wrapper { max-width: 1200px; margin: 20px auto; padding: 0 15px; }
+        .status-pill { background: #000; color: #fff; padding: 6px 15px; font-size: 0.8rem; font-weight: 800; border: 1px solid #fff; margin-bottom: 15px; display: inline-block; }
+        body[data-theme='dark'] .status-pill { background: #fff; color: #000; border-color: #000; }
         
-        button.action-btn {
-            background: #ffffff; color: #000000;
-            border: 2px solid #000000; padding: 12px 24px;
-            border-radius: 0 !important; font-weight: 700; font-size: 0.9rem; cursor: pointer; white-space: nowrap;
-            text-transform: uppercase; font-family: inherit;
+        .main-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+        .action-btn {
+            background: var(--color-surface); color: var(--color-text);
+            border: 2px solid var(--color-border); padding: 14px 20px;
+            font-weight: 800; font-size: 0.85rem; cursor: pointer;
+            text-transform: uppercase; flex: 1; min-width: 120px;
+            transition: all 0.2s;
         }
-        body[data-theme='dark'] button.action-btn { background: #000000; color: #ffffff; border-color: #ffffff; }
-        
-        button.action-btn:hover { background: #000000; color: #ffffff; }
-        body[data-theme='dark'] button.action-btn:hover { background: #ffffff; color: #000000; }
-
-        button.action-btn.danger { border-color: #ef4444; color: #ef4444; }
-        button.action-btn.danger:hover { background: #ef4444; color: #fff; }
-
-        .btn-primary { border-width: 2px !important; } /* Standardized border width */
-
-        /* --- General Popup --- */
-        #sent-popup {
-            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9);
-            background: #000; color: #fff;
-            padding: 25px 50px; border: 4px solid #fff;
-            font-size: 2rem; font-weight: 800; opacity: 0; pointer-events: none; z-index: 2000;
-            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            text-transform: uppercase;
-        }
-        #sent-popup.active { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-        #sent-popup.error { background: #ef4444; border-color: #fff; }
+        .action-btn:hover { background: var(--color-text); color: var(--color-surface); }
+        .action-btn.btn-primary { border-width: 3px; }
+        .action-btn.danger { border-color: #ef4444; color: #ef4444; }
+        .action-btn.danger:hover { background: #ef4444; color: #fff; }
 
         /* --- Grid --- */
-        .grid { display: grid; gap: 16px; padding: 15px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); max-width: 1200px; margin: 0 auto; }
-
-        .card {
-            background: var(--color-surface); border-radius: 0 !important;
-            overflow: hidden; position: relative;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            transition: transform 0.2s; cursor: pointer;
-            border: 2px solid #000;
-        }
-        body[data-theme='dark'] .card { border-color: #ffffff; }
-        .card.selected { border-width: 4px; transform: scale(0.98); }
-
-        .card-img-wrap { position: relative; aspect-ratio: 1/1; background: #fff; width: 100%; border-bottom: 2px solid #000; }
-        body[data-theme='dark'] .card-img-wrap { border-bottom-color: #fff; }
-        
-        .card canvas { width: 100%; height: 100%; display: block; transform: rotate(180deg); }
-        
-        .select-dot {
-            position: absolute; top: 10px; right: 10px;
-            width: 24px; height: 24px; border-radius: 0 !important;
-            background: rgba(0,0,0,0.2); border: 2px solid #000;
-            z-index: 10; transition: 0.2s;
-        }
-        .card.selected .select-dot { background: var(--color-selected); border-color: #000; }
-        
-        .card-body { padding: 12px; }
-        .card-title { margin: 0; font-size: 0.9rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .card-meta { font-size: 0.75rem; opacity: 0.8; margin-top: 4px; font-weight: 600; }
+        .grid { display: grid; gap: 15px; padding: 15px; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); max-width: 1200px; margin: 0 auto; }
+        .card { background: var(--color-surface); border: 2px solid var(--color-border); cursor: pointer; transition: transform 0.2s; position: relative; }
+        .card:hover { transform: translateY(-5px); }
+        .card.selected { border-width: 4px; border-color: var(--color-primary); }
+        .card-img-wrap { aspect-ratio: 1/1; background: #eee; border-bottom: 2px solid var(--color-border); }
+        body[data-theme='dark'] .card-img-wrap { background: #111; }
+        .card canvas { width: 100%; height: 100%; transform: rotate(180deg); }
+        .select-dot { position: absolute; top: 8px; right: 8px; width: 22px; height: 22px; border: 2px solid var(--color-border); background: rgba(0,0,0,0.1); z-index: 5; }
+        .card.selected .select-dot { background: var(--color-primary); }
+        .card-body { padding: 10px; }
+        .card-title { margin: 0; font-size: 0.85rem; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .card-meta { font-size: 0.7rem; opacity: 0.6; margin-top: 4px; font-weight: 700; }
 
         /* --- Floating Selection Bar --- */
         .selection-bar {
-            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(150px);
-            background: #000; color: #fff;
-            padding: 12px 20px; border: 3px solid #fff; border-radius: var(--border-radius);
-            display: flex; gap: 15px; align-items: center;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 3000; /* Higher than nav */
+            position: fixed; bottom: 140px; left: 50%; transform: translateX(-50%) translateY(200px);
+            background: #000; color: #fff; padding: 15px 25px; border: 3px solid #fff;
+            display: flex; gap: 20px; align-items: center; z-index: 3000;
             transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            min-width: 300px; justify-content: space-between;
+            min-width: 300px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
-        @media (max-width: 768px) {
-            .selection-bar { bottom: 100px; } /* Lift above bottom nav */
-        }
-        body[data-theme='dark'] .selection-bar { background: #fff; color: #000; border-color: #000; }
         .selection-bar.active { transform: translateX(-50%) translateY(0); }
-        .bar-actions { display: flex; gap: 10px; }
-        .bar-btn { 
-            background: transparent; border: 2px solid currentColor; color: inherit; 
-            padding: 8px 16px; border-radius: 0 !important; cursor: pointer; 
-            font-size: 0.9rem; font-weight: 700; text-transform: uppercase;
-        }
+        body[data-theme='dark'] .selection-bar { background: #fff; color: #000; border-color: #000; }
+        .bar-btn { background: none; border: 2px solid currentColor; color: inherit; padding: 8px 16px; font-weight: 800; cursor: pointer; text-transform: uppercase; font-size: 0.8rem; }
         .bar-btn:hover { background: currentColor; color: var(--color-bg); }
 
-        .overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.8); z-index: 1050; display: none; }
+        /* Modals */
+        .overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.8); z-index: 4000; display: none; align-items: center; justify-content: center; }
         .modal-content { background: var(--color-surface); padding: 30px; border: 4px solid var(--color-border); text-align: center; max-width: 400px; width: 90%; }
+
+        #sent-popup {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9);
+            background: #000; color: #fff; padding: 30px 60px; border: 4px solid #fff;
+            font-size: 2.5rem; font-weight: 900; opacity: 0; pointer-events: none; z-index: 5000;
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        #sent-popup.active { opacity: 1; transform: translate(-50%, -50%) scale(1); }
     </style>
 </head>
 <body data-theme="light">
-
-    <div id="sent-popup">SENT!</div>
-
-    <div id="cooldown-modal" class="overlay" style="display:none; justify-content: center; align-items: center; z-index: 3000;">
-        <div class="modal-content">
-            <h2 style="margin-top: 0; font-weight: 800;">Cooldown</h2>
-            <p style="font-weight: 600;">Start now or add to queue?</p>
-            <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
-                <button class="action-btn btn-primary" onclick="cooldownChoice('now')">Start Now</button>
-                <button class="action-btn" onclick="cooldownChoice('queue')">Add to Queue</button>
-                <button class="action-btn" style="background:transparent; border-style: dashed;" onclick="cooldownChoice('cancel')">Cancel</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="live-view-modal" class="overlay" style="display:none; justify-content: center; align-items: center; z-index: 4000;">
-        <div class="modal-content" style="max-width: 500px; padding: 20px; position: relative; background: var(--color-surface);">
-            <button onclick="toggleLiveView()" style="position: absolute; top: 10px; right: 10px; background: none; border: none; font-size: 24px; cursor: pointer; color: var(--color-text); font-weight: 800;">✕</button>
-            <h2 style="margin-bottom: 20px; font-weight: 800;">Live View</h2>
-            
-            <div style="width: 280px; height: 280px; margin: 0 auto; border: 8px solid #333; border-radius: 50%; background: #fff; overflow: hidden; position: relative; box-shadow: inset 0 0 15px rgba(0,0,0,0.2);">
-                <canvas id="live-canvas" width="400" height="400" style="width: 100%; height: 100%; transform: rotate(180deg);"></canvas>
-            </div>
-
-            <div style="margin-top: 25px; text-align: left;">
-                <h3 style="font-size: 0.9rem; border-bottom: 2px solid var(--color-border); padding-bottom: 5px; margin-bottom: 10px;">Upcoming Queue</h3>
-                <div id="live-queue-list" style="max-height: 150px; overflow-y: auto; font-size: 0.8rem;">
-                    <div style="opacity: 0.6; text-align: center; padding: 10px;">Queue empty</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="loop-indicator" style="display: none;">
-        <span>Drawing on Repeat</span>
-        <button class="close-loop" onclick="cancelLoop()">✕</button>
-    </div>
-
     <nav class="main-nav">
         <a href="/" id="nav-designs" class="active"><span class="icon"><svg viewBox="0 0 24 24"><path d="M12 2L4.5 20.29L5.21 21L12 18L18.79 21L19.5 20.29L12 2Z"></path></svg></span><span>Designs</span></a>
         <a href="/controller" id="nav-controller"><span class="icon"><svg viewBox="0 0 24 24"><path d="M13 13V11H11V13H13M15 9V5H13V7H11V5H9V9H7V11H5V13H7V15H9V19H11V17H13V19H15V15H17V13H19V11H17V9H15Z"></path></svg></span><span>Control</span></a>
@@ -465,11 +257,39 @@
     <div id="selection-bar" class="selection-bar">
         <span style="font-weight:800; padding-left:5px;" id="sel-count">0 Selected</span>
         <div class="bar-actions">
-            <button class="bar-btn loop" onclick="loopSelected()">Loop</button>
+            <button class="bar-btn" onclick="loopSelected()">Loop</button>
             <button class="bar-btn" onclick="copySelected()">Copy</button>
             <button class="bar-btn danger" onclick="deleteSelected()">Delete</button>
         </div>
     </div>
+
+    <div id="cooldown-modal" class="overlay">
+        <div class="modal-content">
+            <h2 style="margin-top: 0; font-weight: 800;">Cooldown</h2>
+            <p style="font-weight: 600;">Start now or add to queue?</p>
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
+                <button class="action-btn btn-primary" onclick="cooldownChoice('now')">Start Now</button>
+                <button class="action-btn" onclick="cooldownChoice('queue')">Add to Queue</button>
+                <button class="action-btn" style="background:transparent; border-style: dashed;" onclick="cooldownChoice('cancel')">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="live-view-modal" class="overlay">
+        <div class="modal-content" style="max-width: 500px; padding: 20px; position: relative;">
+            <button onclick="toggleLiveView()" style="position: absolute; top: 10px; right: 10px; background: none; border: none; font-size: 24px; cursor: pointer; color: var(--color-text); font-weight: 800;">✕</button>
+            <h2 style="margin-bottom: 20px; font-weight: 800;">Live View</h2>
+            <div style="width: 280px; height: 280px; margin: 0 auto; border: 8px solid var(--color-border); border-radius: 50%; background: #fff; overflow: hidden; position: relative; box-shadow: inset 0 0 15px rgba(0,0,0,0.2);">
+                <canvas id="live-canvas" width="400" height="400" style="width: 100%; height: 100%; transform: rotate(180deg);"></canvas>
+            </div>
+            <div style="margin-top: 25px; text-align: left;">
+                <h3 style="font-size: 0.9rem; border-bottom: 2px solid var(--color-border); padding-bottom: 5px; margin-bottom: 10px;">Upcoming Queue</h3>
+                <div id="live-queue-list" style="max-height: 150px; overflow-y: auto; font-size: 0.8rem;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="sent-popup">SENT!</div>
 
     <script>
         const BASE_URL = `${window.location.protocol}//${window.location.host}`;
@@ -479,348 +299,234 @@
         let pendingDesign = null;
         let globalSettings = { speed: 1.0, cooldown: 30 };
 
-        async function refreshSettings() {
+        async function fetchSettings() {
             try {
-                let r = await fetch('/api/settings');
+                let r = await fetch(`${BASE_URL}/api/settings`);
                 globalSettings = await r.json();
-            } catch(e) { console.error("Failed to load settings", e); }
+            } catch(e){}
         }
-        refreshSettings();
 
-        const observer = new IntersectionObserver((e,o)=>{e.forEach(x=>{if(x.isIntersecting){loadPreview(x.target,x.target.dataset.f);o.unobserve(x.target)}})},{rootMargin:"150px"});
         const L1=101.3, L2=101.3, R=9/8, S_RAD=(3200/360)*(180/Math.PI);
-
-        function getShortestRotation(raw, last) { let diff = (raw - last) / (2 * Math.PI); return raw - (Math.round(diff) * 2 * Math.PI); }
-        function calculateIK(x, y, lastBaseSteps) {
-            let dist = Math.hypot(x, y); const maxReach = L1 + L2;
-            if (dist > maxReach) { x = (x / dist) * maxReach; y = (y / dist) * maxReach; dist = maxReach; }
-            if (dist < 1.0) return { b: 0, e: -Math.PI * S_RAD };
-            const lastT1 = -lastBaseSteps / S_RAD; 
-            let cosBend = Math.max(-1, Math.min(1, (dist*dist - L1*L1 - L2*L2) / (2 * L1 * L2)));
-            const bend = Math.acos(cosBend); const k1 = L1 + L2 * Math.cos(bend), k2 = L2 * Math.sin(bend);
-            let t1 = Math.atan2(y, x) - Math.atan2(k2, k1); t1 = getShortestRotation(t1, lastT1);
-            return { b: -t1 * S_RAD, e: -(bend + R * t1) * S_RAD };
+        function calculateIK(x, y, lastB) {
+            let d = Math.hypot(x, y); const maxR = L1+L2; if(d > maxR) { x*=(maxR/d); y*=(maxR/d); d=maxR; }
+            if(d < 1) return { b: lastB, e: -Math.PI * S_RAD };
+            let cosB = (d*d - L1*L1 - L2*L2) / (2*L1*L2);
+            let bend = Math.acos(Math.max(-1, Math.min(1, cosB)));
+            let t1 = Math.atan2(y, x) - Math.atan2(L2*Math.sin(bend), L1+L2*Math.cos(bend));
+            let lastT1 = -lastB / S_RAD; t1 = t1 - (Math.round((t1 - lastT1) / (Math.PI*2)) * (Math.PI*2));
+            return { b: -t1 * S_RAD, e: -(bend + 1.125*t1) * S_RAD };
         }
-        function getXY(b, e) { let t1 = -b / S_RAD; let tb = -e / S_RAD - (R * t1); let t2 = t1 + tb; return { x: L1 * Math.cos(t1) + L2 * Math.cos(t2), y: L1 * Math.sin(t1) + L2 * Math.sin(t2) }; }
+        function getXY(b, e) {
+            let t1 = -b / S_RAD; let bend = -e / S_RAD - 1.125*t1;
+            return { x: L1*Math.cos(t1) + L2*Math.cos(t1+bend), y: L1*Math.sin(t1) + L2*Math.sin(t1+bend) };
+        }
 
-        function drawTrace(cvs, txt) {
-            let ctx = cvs.getContext('2d'), w=cvs.width, h=cvs.height; ctx.clearRect(0,0,w,h);
-            const lines = txt.split('\n'); let path = []; let tb = null; let te = null; 
-            for(let i=0; i<lines.length; i++){
-                let l = lines[i].trim(); if(l.length < 1 || l.startsWith('#') || l.startsWith(';')) continue;
-                let theta, rho;
-                if(l.toUpperCase().startsWith('G1')){ let parts = l.substring(3).trim().split(/\s+/); theta = parseFloat(parts[0]) || 0; rho = parseFloat(parts[1]) || 0; } 
-                else { let parts = l.split(/\s+/); if(parts.length < 2) continue; theta = parseFloat(parts[0]); rho = parseFloat(parts[1]); }
-                if(isNaN(theta) || isNaN(rho)) continue;
-                let x = rho * (L1 + L2) * Math.cos(theta); let y = rho * (L1 + L2) * Math.sin(theta);
-                if(tb === null) { let ik = calculateIK(x, y, 0); tb = ik.b; te = ik.e; path.push(getXY(tb, te)); continue; }
-                let ik = calculateIK(x, y, tb); let next_b = ik.b; let next_e = ik.e;
-                let dist = Math.max(Math.abs(next_b - tb), Math.abs(next_e - te)); let stepCount = Math.max(2, Math.ceil(dist / 50)); 
-                for(let k=1; k<=stepCount; k++){ let t = k/stepCount; let interp_b = tb + (next_b - tb) * t; let interp_e = te + (next_e - te) * t; path.push(getXY(interp_b, interp_e)); }
-                tb = next_b; te = next_e;
-            }
-            if(path.length < 2) return;
-            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
-            for(let p of path){ if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y; }
-            let rangeX = maxX - minX || 1; let rangeY = maxY - minY || 1;
-            let sc = (Math.min(w, h) / Math.max(rangeX, rangeY)) * 0.9; let cx = (minX + maxX) / 2; let cy = (minY + maxY) / 2;
-            ctx.beginPath(); ctx.strokeStyle=getComputedStyle(document.body).getPropertyValue('--color-text'); ctx.lineWidth=1.5;
-            let p0 = path[0]; let sx = w/2 - (p0.x-cx)*sc; let sy = h/2 - (p0.y-cy)*-sc; ctx.moveTo(sx, sy);
-            for(let i=1; i<path.length; i++){ let p = path[i]; let px = w/2 - (p.x-cx)*sc; let py = h/2 - (p.y-cy)*-sc; ctx.lineTo(px, py); }
-            ctx.stroke();
+        function toggleTheme() {
+            const body = document.body;
+            const next = body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            body.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+        }
+
+        function showPopup(text, isError=false) {
+            let p = document.getElementById('sent-popup');
+            p.textContent = text;
+            if(isError) p.classList.add('error'); else p.classList.remove('error');
+            p.classList.add('active');
+            setTimeout(() => p.classList.remove('active'), 1000);
         }
 
         function toggleQueue(e) { e.stopPropagation(); document.getElementById('queue-dropdown').classList.toggle('show'); }
-        async function removeFromQueue(idx, type) { if(!confirm("Remove?")) return; try { await fetch(`${BASE_URL}/remove_from_queue`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({index: idx, type: type}) }); updateQ(); } catch(e) {} }
-        window.onclick = function(e) { if(!e.target.closest('.queue-wrapper') && !e.target.closest('.queue-dropdown')) document.getElementById('queue-dropdown').classList.remove('show'); }
+        async function removeFromQueue(index, type) {
+            await fetch(`${BASE_URL}/remove_from_queue`, { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({index, type}) });
+            updateQ();
+        }
 
-        function toggleTheme() { let b = document.body, n = b.getAttribute('data-theme')==='dark'?'light':'dark'; b.setAttribute('data-theme', n); localStorage.setItem('theme', n); }
+        function toggleSelect(f, e) {
+            e.stopPropagation();
+            if(selectedFiles.has(f)) selectedFiles.delete(f); else selectedFiles.add(f);
+            renderSel();
+        }
 
-        function showPopup(text, isError = false) { let p = document.getElementById('sent-popup'); p.textContent = text; if(isError) p.classList.add('error'); else p.classList.remove('error'); p.classList.add('active'); setTimeout(() => { p.classList.remove('active'); }, 1000); }
+        function renderSel() {
+            const bar = document.getElementById('selection-bar');
+            const count = document.getElementById('sel-count');
+            document.querySelectorAll('.card').forEach(c => {
+                if(selectedFiles.has(c.dataset.name)) c.classList.add('selected'); else c.classList.remove('selected');
+            });
+            if(selectedFiles.size > 0) {
+                bar.classList.add('active');
+                count.textContent = `${selectedFiles.size} Selected`;
+            } else {
+                bar.classList.remove('active');
+            }
+        }
 
-        function toggleSelect(f, e) { e.stopPropagation(); if(selectedFiles.has(f)) selectedFiles.delete(f); else selectedFiles.add(f); renderSel(); }
-        function renderSel() { document.querySelectorAll('.card').forEach(c=>{ if(selectedFiles.has(c.dataset.name)) c.classList.add('selected'); else c.classList.remove('selected'); }); let bar=document.getElementById('selection-bar'); if(selectedFiles.size>0){ bar.classList.add('active'); document.getElementById('sel-count').textContent=`${selectedFiles.size} Selected`; } else bar.classList.remove('active'); }
+        async function loopSelected() {
+            if(selectedFiles.size === 0) return;
+            showPopup("Looping...");
+            await fetch(`${BASE_URL}/set_loop`, { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({files: Array.from(selectedFiles)}) });
+            selectedFiles.clear(); renderSel(); updateQ();
+        }
 
-        async function shuffleLoop() { if(allFiles.length === 0) return showPopup("No designs", true); showPopup("Shuffling..."); let shuffled = [...allFiles].sort(() => 0.5 - Math.random()); await fetch(`${BASE_URL}/set_loop`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({files:shuffled}) }); updateQ(); }
-        async function loopSelected() { let files = Array.from(selectedFiles); if(files.length === 0) return; showPopup("Looping..."); await fetch(`${BASE_URL}/set_loop`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({files:files}) }); selectedFiles.clear(); renderSel(); updateQ(); }
-        async function cancelLoop() { showPopup("Loop Cancelled"); await fetch(`${BASE_URL}/cancel_loop`, {method:"POST"}); updateQ(); }
+        async function shuffleLoop() {
+            if(allFiles.length === 0) return;
+            showPopup("Shuffling...");
+            let shuffled = [...allFiles].sort(() => 0.5 - Math.random());
+            await fetch(`${BASE_URL}/set_loop`, { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({files: shuffled}) });
+            updateQ();
+        }
 
-        async function deleteSelected() { let toDel = [], protectedCount = 0; for(let f of selectedFiles) { let c = document.querySelector(`.card[data-name="${f}"]`); if(c && c.dataset.hasPng==="true") protectedCount++; else toDel.push(f); } if(!toDel.length) { if(protectedCount) showPopup("Protected!", true); return; } if(!confirm(`Delete ${toDel.length} files?`)) return; showPopup("Deleting..."); for(let f of toDel) await fetch(`${BASE_URL}/delete_design`, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filename:f})}); selectedFiles.clear(); renderSel(); loadLib(); }
-        async function copySelected() { let txt = ""; showPopup("Copying..."); try { for(let f of selectedFiles) { let r = await fetch(`${BASE_URL}/designs/${f}`); txt += `; --- ${f} ---\n${await r.text()}\n\n`; } } catch(e) { showPopup("Error", true); return; } const ta = document.createElement("textarea"); ta.value = txt; ta.style.position = "fixed"; ta.style.left = "-9999px"; document.body.appendChild(ta); ta.focus(); ta.select(); try { document.execCommand('copy'); showPopup("Copied!"); selectedFiles.clear(); renderSel(); } catch (err) { showPopup("Copy Failed", true); } document.body.removeChild(ta); }
+        async function cancelLoop() { await fetch(`${BASE_URL}/cancel_loop`, { method: "POST" }); updateQ(); }
+
+        async function deleteSelected() {
+            if(!confirm(`Delete ${selectedFiles.size} designs?`)) return;
+            showPopup("Deleting...");
+            for(let f of selectedFiles) {
+                await fetch(`${BASE_URL}/delete_design`, { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({filename: f}) });
+            }
+            selectedFiles.clear(); renderSel(); loadLib();
+        }
+
+        async function copySelected() {
+            let txt = "";
+            for(let f of selectedFiles) {
+                let r = await fetch(`${BASE_URL}/designs/${f}`);
+                txt += `; --- ${f} ---\n${await r.text()}\n\n`;
+            }
+            const ta = document.createElement('textarea'); ta.value = txt;
+            ta.style.position = "fixed"; ta.style.left = "-9999px"; document.body.appendChild(ta);
+            ta.focus(); ta.select();
+            try { document.execCommand('copy'); showPopup("Copied!"); selectedFiles.clear(); renderSel(); } catch (err) { showPopup("Error", true); }
+            document.body.removeChild(ta);
+        }
 
         async function runDesign(f) { if (isWaiting) { pendingDesign = f; document.getElementById('cooldown-modal').style.display = 'flex'; return; } await executeDesign(f); }
         async function cooldownChoice(choice) { document.getElementById('cooldown-modal').style.display = 'none'; if (!pendingDesign) return; if (choice === 'now') { await fetch(`${BASE_URL}/api/skip_cooldown`, { method: "POST" }); await executeDesign(pendingDesign); } else if (choice === 'queue') { await executeDesign(pendingDesign); } pendingDesign = null; }
+
         async function executeDesign(f) { 
-            let speed = globalSettings.speed || 1.0; 
             let r=await fetch(`${BASE_URL}/designs/${f}`), txt=await r.text(); 
             let gcode = txt.split('\n').map(l=>{ 
-                let trimmed = l.trim(); 
-                if(trimmed.startsWith('#') || trimmed.startsWith(';') || trimmed === "") return ""; 
-                if(trimmed.toUpperCase().startsWith('G1')){ 
-                    let p=trimmed.substring(2).trim().split(/\s+/); 
-                    return `${p[0]} ${p[1]}`; 
-                } 
+                let trimmed = l.trim(); if(trimmed.startsWith('#') || trimmed.startsWith(';') || trimmed === "") return ""; 
+                if(trimmed.toUpperCase().startsWith('G1')){ let p=trimmed.substring(2).trim().split(/\s+/); return `${p[0]} ${p[1]}`; } 
                 return trimmed; 
             }).filter(l => l !== "").join('\n'); 
-            
             let resp = await fetch(`${BASE_URL}/send_gcode_block`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({gcode:gcode, filename:f}) }); 
             let data = await resp.json(); 
-            if(data.success) { 
-                if (data.message === "Queued") {
-                    showPopup("Added to Queue");
-                } else {
-                    showPopup("Sent!"); 
-                }
-                updateQ(); 
-            } else { 
-                showPopup("Error!", true); 
-            } 
+            if(data.success) { if (data.message === "Queued") showPopup("Added to Queue"); else showPopup("Sent!"); updateQ(); } else showPopup("Error!", true); 
         }
 
         async function abortDesign() {
             if(!confirm("Abort current design and clear queue/loop?")) return;
             showPopup("Aborting...");
-            await fetch(`${BASE_URL}/send`, {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({command: "CLEAR"})
-            });
+            await fetch(`${BASE_URL}/send`, { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({command: "CLEAR"}) });
             updateQ();
         }
 
-        function sendCmd(c, popupText) { if(popupText) showPopup(popupText); fetch(`${BASE_URL}/send`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({command:c})}); }
+        function sendCmd(c, p) { if(p) showPopup(p); fetch(`${BASE_URL}/send`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({command:c})}); }
         function pauseDesign() { sendCmd('PAUSE', 'Paused'); }
         function resumeDesign() { sendCmd('RESUME', 'Resumed'); }
 
-        function formatTimeFromMicroseconds(us) {
-            if(!us || us === 0) return "...";
-            let seconds = Math.round(us / 1000000);
-            if (seconds < 60) return seconds + "s";
-            let mins = Math.floor(seconds / 60);
-            let secs = seconds % 60;
-            return `${mins}m ${secs}s`;
-        }
+        function formatTimeFromMicroseconds(us) { if(!us || us === 0) return "..."; let seconds = Math.round(us / 1000000); if (seconds < 60) return seconds + "s"; let mins = Math.floor(seconds / 60); let secs = seconds % 60; return `${mins}m ${secs}s`; }
 
         async function updateQ() {
             try {
-                let r = await fetch(`${BASE_URL}/status_full`); 
-                let d = await r.json(); 
-                isWaiting = d.is_waiting; 
-                
-                let playText = "Select a design"; 
-                let remainingUs = 0;
+                let r = await fetch(`${BASE_URL}/status_full`); let d = await r.json(); isWaiting = d.is_waiting; 
+                let playText = "Select a design"; let remainingUs = 0;
                 if (d.playing) { 
                     playText = d.is_paused ? `Paused: ${d.playing}` : `Playing: ${d.playing}`;
-                    
-                    // Add countdown if progress available
                     if (d.progress && d.progress.total > 0) {
                         let remainingPercent = (d.progress.total - d.progress.sent) / d.progress.total;
-                        // Find the card to get its base time
                         let card = document.querySelector(`.card[data-name="${d.playing}.txt"]`);
                         if (card && card.dataset.baseTime > 0) {
-                            let speed = globalSettings.speed || 1.0;
-                            remainingUs = card.dataset.baseTime * speed * remainingPercent;
+                            remainingUs = card.dataset.baseTime * (globalSettings.speed || 1.0) * remainingPercent;
                             playText += ` (${formatTimeFromMicroseconds(remainingUs)} left)`;
                         }
                     }
-                } else if (d.is_waiting) { 
-                    playText = `Cooling down...`; 
-                }
-                
+                } else if (d.is_waiting) playText = `Cooling down...`; 
                 document.getElementById('playing-display').textContent = playText;
-                let qText = "Queue empty"; let listHTML = "";
-                let liveQHTML = "";
-                let currentTime = new Date();
-                let cumulativeUs = remainingUs;
-
+                let qText = "Queue empty"; let listHTML = ""; let liveQHTML = ""; let currentTime = new Date(); let cumulativeUs = remainingUs;
                 if(d.queue_items && d.queue_items.length > 0) { 
-                    let count = d.queue_count || d.queue_items.length; 
-                    qText = `Next: ${d.next_up} (+${count-1})`; 
-                    
+                    qText = `Next: ${d.next_up} (+${d.queue_count-1})`; 
                     d.queue_items.forEach((item, idx) => { 
                         listHTML += `<div class="queue-item"><span>${item.index+1}. ${item.name}</span><button class="btn-remove" onclick="removeFromQueue(${item.index}, '${item.type}')">✕</button></div>`; 
-                        
-                        // Calculate timestamp for Live View
                         let card = document.querySelector(`.card[data-name="${item.name}.txt"]`);
                         let durationUs = card ? (parseFloat(card.dataset.baseTime) * (globalSettings.speed || 1.0)) : 0;
                         let startTime = new Date(currentTime.getTime() + (cumulativeUs / 1000));
-                        let timeStr = startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                        
-                        liveQHTML += `
-                            <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,0.05);">
-                                <span style="font-weight: 700;">${idx+1}. ${item.name}</span>
-                                <span style="opacity: 0.6;">Starts @ ${timeStr}</span>
-                            </div>
-                        `;
-                        cumulativeUs += durationUs + (globalSettings.cooldown * 1000000); // Add cooldown
+                        liveQHTML += `<div class="queue-item"><span>${idx+1}. ${item.name}</span><span style="opacity:0.6;">@ ${startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>`;
+                        cumulativeUs += durationUs + (globalSettings.cooldown * 1000000); 
                     }); 
-                } 
-                else { 
-                    listHTML = `<div class="queue-empty-msg">No items in queue</div>`; 
-                    liveQHTML = `<div style="opacity: 0.6; text-align: center; padding: 10px;">Queue empty</div>`;
-                }
-                
-                document.getElementById('queue-display').textContent = qText; 
-                document.getElementById('queue-list').innerHTML = listHTML; 
-                document.getElementById('live-queue-list').innerHTML = liveQHTML;
+                } else { listHTML = `<div style="padding:15px; opacity:0.5; font-size:0.8rem;">Queue empty</div>`; liveQHTML = listHTML; }
+                document.getElementById('queue-display').textContent = qText; document.getElementById('queue-list').innerHTML = listHTML; document.getElementById('live-queue-list').innerHTML = liveQHTML;
                 document.getElementById('loop-indicator').style.display = d.is_looping ? 'flex' : 'none';
-
-                // Update Live View Target if open
-                if (document.getElementById('live-view-modal').style.display === 'flex' && d.playing && d.progress) {
-                    targetProgress = d.progress.sent / d.progress.total;
-                    if (liveViewCache.name !== d.playing) {
-                        prepareLivePath(d.playing);
-                    }
-                }
+                if (document.getElementById('live-view-modal').style.display === 'flex' && d.playing && d.progress) { targetProgress = d.progress.sent / d.progress.total; if (liveViewCache.name !== d.playing) prepareLivePath(d.playing); }
             } catch(e){}
         }
 
-        let liveViewCache = { name: null, gcode: null, path: [] };
-        let visualProgress = 0;
-        let targetProgress = 0;
-        let animationActive = false;
-
+        let liveViewCache = { name: null, path: [] }; let visualProgress = 0; let targetProgress = 0; let animationActive = false;
         function toggleLiveView() {
             const modal = document.getElementById('live-view-modal');
-            if (modal.style.display === 'none' || modal.style.display === '') {
-                modal.style.display = 'flex';
-                if (!animationActive) {
-                    animationActive = true;
-                    requestAnimationFrame(liveAnimationLoop);
-                }
-                updateQ();
-            } else {
-                modal.style.display = 'none';
-                animationActive = false;
-            }
+            if (modal.style.display === 'none' || modal.style.display === '') { modal.style.display = 'flex'; if (!animationActive) { animationActive = true; requestAnimationFrame(liveAnimationLoop); } updateQ(); } 
+            else { modal.style.display = 'none'; animationActive = false; }
         }
-
-        function liveAnimationLoop() {
-            if (!animationActive) return;
-            
-            // Smoothly interpolate visualProgress towards targetProgress
-            const diff = targetProgress - visualProgress;
-            if (Math.abs(diff) > 0.0001) {
-                visualProgress += diff * 0.05; // Adjust 0.05 for "slowness" of smoothing
-            } else {
-                visualProgress = targetProgress;
-            }
-
-            drawLiveProgress();
-            requestAnimationFrame(liveAnimationLoop);
-        }
+        function liveAnimationLoop() { if (!animationActive) return; const diff = targetProgress - visualProgress; if (Math.abs(diff) > 0.0001) visualProgress += diff * 0.05; else visualProgress = targetProgress; drawLiveProgress(); requestAnimationFrame(liveAnimationLoop); }
 
         async function prepareLivePath(name) {
             try {
-                let r = await fetch(`${BASE_URL}/designs/${name}.txt`);
-                let gcode = await r.text();
-                
+                let r = await fetch(`${BASE_URL}/designs/${name}.txt`); let gcode = await r.text();
                 const lines = gcode.split('\n').map(l => l.split('#')[0].split(';')[0].trim()).filter(l => l !== "");
-                let path = []; let tb = null; let te = null;
-
+                let path = []; let tb = 0; let te = 0;
                 lines.forEach(l => {
-                    let theta, rho;
-                    if(l.toUpperCase().startsWith('G1')){ 
-                        let parts = l.substring(3).trim().split(/\s+/); 
-                        theta = parseFloat(parts[0]) || 0; rho = parseFloat(parts[1]) || 0; 
-                    } else { 
-                        let parts = l.split(/\s+/); if(parts.length >= 2) { theta = parseFloat(parts[0]); rho = parseFloat(parts[1]); }
-                    }
+                    let theta, rho; if(l.toUpperCase().startsWith('G1')){ let parts = l.substring(3).trim().split(/\s+/); theta = parseFloat(parts[0]) || 0; rho = parseFloat(parts[1]) || 0; } 
+                    else { let parts = l.split(/\s+/); if(parts.length >= 2) { theta = parseFloat(parts[0]); rho = parseFloat(parts[1]); } }
                     if(!isNaN(theta) && !isNaN(rho)) {
-                        let x = rho * (L1 + L2) * Math.cos(theta); 
-                        let y = rho * (L1 + L2) * Math.sin(theta);
-                        if(tb === null) { 
-                            let ik = calculateIK(x, y, 0); tb = ik.b; te = ik.e; 
-                            path.push(getXY(tb, te)); 
-                        } else {
-                            let ik = calculateIK(x, y, tb);
-                            let next_b = ik.b, next_e = ik.e;
-                            let dist = Math.max(Math.abs(next_b - tb), Math.abs(next_e - te));
-                            let steps = Math.max(1, Math.ceil(dist / 100));
-                            for(let k=1; k<=steps; k++) {
-                                path.push(getXY(tb + (next_b-tb)*(k/steps), te + (next_e-te)*(k/steps)));
-                            }
-                            tb = next_b; te = next_e;
-                        }
+                        let x = rho * 202.6 * Math.cos(theta); let y = rho * 202.6 * Math.sin(theta);
+                        let ik = calculateIK(x, y, tb); let dist = Math.max(Math.abs(ik.b - tb), Math.abs(ik.e - te));
+                        let steps = Math.max(1, Math.ceil(dist / 100)); for(let k=1; k<=steps; k++) path.push(getXY(tb + (ik.b-tb)*(k/steps), te + (ik.e-te)*(k/steps)));
+                        tb = ik.b; te = ik.e;
                     }
                 });
-                liveViewCache = { name, gcode, path };
-                visualProgress = targetProgress; // Snap to target on first load
-            } catch(e) { console.error(e); }
+                liveViewCache = { name, path }; visualProgress = targetProgress;
+            } catch(e) {}
         }
-
         function drawLiveProgress() {
-            const path = liveViewCache.path;
-            if (!path || path.length < 2) return;
-
-            const cvs = document.getElementById('live-canvas');
-            const ctx = cvs.getContext('2d');
-            const w = cvs.width, h = cvs.height;
-            ctx.clearRect(0,0,w,h);
-
-            let minX=-202, maxX=202, minY=-202, maxY=202; 
-            let sc = (Math.min(w, h) / (maxX - minX)) * 0.95;
-            
-            const splitIdx = Math.floor(visualProgress * path.length);
-
-            // Draw Future Path (Gray)
-            ctx.beginPath();
-            ctx.strokeStyle = '#ccc';
-            ctx.lineWidth = 1.5;
-            for(let i=Math.max(0, splitIdx-1); i<path.length; i++) {
-                let px = w/2 + path[i].x * sc;
-                let py = h/2 + path[i].y * sc;
-                if (i === Math.max(0, splitIdx-1)) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-            }
-            ctx.stroke();
-
-            // Draw Past Path (Black)
-            ctx.beginPath();
-            ctx.strokeStyle = '#000';
-            ctx.lineWidth = 2.5;
-            for(let i=0; i<=splitIdx; i++) {
-                let px = w/2 + path[i].x * sc;
-                let py = h/2 + path[i].y * sc;
-                if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-            }
-            ctx.stroke();
-
-            // Draw Ball Position
-            const ballPt = path[Math.min(splitIdx, path.length - 1)];
-            if (ballPt) {
-                ctx.beginPath();
-                ctx.fillStyle = '#f00';
-                ctx.arc(w/2 + ballPt.x * sc, h/2 + ballPt.y * sc, 5, 0, Math.PI*2);
-                ctx.fill();
-            }
+            const path = liveViewCache.path; if (!path || path.length < 2) return;
+            const cvs = document.getElementById('live-canvas'); const ctx = cvs.getContext('2d'); const w = cvs.width, h = cvs.height; ctx.clearRect(0,0,w,h);
+            let sc = (Math.min(w, h) / 405) * 0.95; const splitIdx = Math.floor(visualProgress * path.length);
+            ctx.beginPath(); ctx.strokeStyle = '#ccc'; ctx.lineWidth = 1.5; for(let i=Math.max(0, splitIdx-1); i<path.length; i++) { let px = w/2 + path[i].x * sc, py = h/2 + path[i].y * sc; if (i === Math.max(0, splitIdx-1)) ctx.moveTo(px, py); else ctx.lineTo(px, py); } ctx.stroke();
+            ctx.beginPath(); ctx.strokeStyle = '#000'; ctx.lineWidth = 2.5; for(let i=0; i<=splitIdx; i++) { let px = w/2 + path[i].x * sc, py = h/2 + path[i].y * sc; if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); } ctx.stroke();
+            const ballPt = path[Math.min(splitIdx, path.length - 1)]; if (ballPt) { ctx.beginPath(); ctx.fillStyle = '#f00'; ctx.arc(w/2 + ballPt.x * sc, h/2 + ballPt.y * sc, 5, 0, Math.PI*2); ctx.fill(); }
         }
 
         async function loadLib() { let g=document.getElementById('grid'); g.innerHTML='Loading...'; let r=await fetch(`${BASE_URL}/api/designs`), files=await r.json(); allFiles=files; renderGrid(files.slice(0,15)); if(files.length>15) document.getElementById('more-btn').style.display='inline-block'; }
         function showAll() { renderGrid(allFiles); document.getElementById('more-btn').style.display='none'; }
-        
         function renderGrid(fs) {
             let g=document.getElementById('grid'); g.innerHTML='';
-            fs.forEach(f=>{ let d=document.createElement('div'), clean=f.replace('.txt',''); d.className='card'; d.dataset.name=f; d.dataset.hasPng="false"; d.dataset.baseTime="0"; d.onclick=(e)=>{if(e.target.className!=='select-dot')runDesign(f)}; d.innerHTML=`<div class="card-img-wrap"><canvas data-f="${f}" width="300" height="300"></canvas><div class="select-dot" onclick="toggleSelect('${f}', event)"></div></div><div class="card-body"><h3 class="card-title">${clean}</h3><div class="card-meta">Est: <span id="t-${clean}">...</span></div></div>`; g.appendChild(d); observer.observe(d.querySelector('canvas')); }); renderSel();
+            fs.forEach(f=>{ 
+                let d=document.createElement('div'), clean=f.replace('.txt',''); d.className='card'; d.dataset.name=f; d.dataset.baseTime="0"; d.onclick=(e)=>{if(e.target.className!=='select-dot')runDesign(f)}; 
+                d.innerHTML=`<div class="card-img-wrap"><canvas data-f="${f}" width="300" height="300"></canvas><div class="select-dot" onclick="toggleSelect('${f}', event)"></div></div><div class="card-body"><h3 class="card-title">${clean}</h3><div class="card-meta">Est: <span id="t-${clean}">...</span></div></div>`; 
+                g.appendChild(d); observer.observe(d.querySelector('canvas')); 
+            }); renderSel();
         }
-
         function loadPreview(cvs, f) {
-            let clean = f.replace('.txt',''); let card = cvs.closest('.card');
             fetch(`${BASE_URL}/designs/${f}`).then(r => r.text()).then(async t => {
-                let tm = 0; let lines = t.split('\n');
-                for(let l of lines) { let trimmed = l.trim(); if(trimmed === "" || trimmed.startsWith('#')) continue; if(trimmed.toUpperCase().startsWith('G1')){ let m = trimmed.match(/^G1\s+(\-?\d+\.?\d*)\s+(\-?\d+\.?\d*)\s+(\d+)/i); if(m) tm += Math.max(Math.abs(parseFloat(m[1])), Math.abs(parseFloat(m[2]))) * parseInt(m[3]); } else { tm += 20000; } }
-                card.dataset.baseTime = tm; let speed = globalSettings.speed || 1.0; document.getElementById(`t-${clean}`).textContent = formatTimeFromMicroseconds(tm * speed);
-                let img = new Image(); img.src = `${BASE_URL}/designs/${clean}.png`;
-                img.onload = () => { cvs.getContext('2d').drawImage(img,0,0,300,300); card.dataset.hasPng="true"; };
-                img.onerror = () => { drawTrace(cvs, t); };
+                let tm = 0; let lines = t.split('\n'); let path = []; let tb=0, te=0;
+                lines.forEach(l=>{
+                    let theta, rho; if(l.toUpperCase().startsWith('G1')){ let parts = l.substring(3).trim().split(/\s+/); theta = parseFloat(parts[0])||0; rho = parseFloat(parts[1])||0; } 
+                    else { let parts = l.split(/\s+/); if(parts.length >= 2) { theta = parseFloat(parts[0]); rho = parseFloat(parts[1]); } }
+                    if(!isNaN(theta) && !isNaN(rho)) { let x = rho*202.6*Math.cos(theta), y = rho*202.6*Math.sin(theta); let ik = calculateIK(x, y, tb); tm += Math.max(Math.abs(ik.b-tb), Math.abs(ik.e-te)) * 30; path.push(getXY(ik.b, ik.e)); tb=ik.b; te=ik.e; }
+                });
+                const card = cvs.closest('.card'), clean = f.replace('.txt',''); card.dataset.baseTime = tm;
+                document.getElementById(`t-${clean}`).textContent = formatTimeFromMicroseconds(tm * (globalSettings.speed || 1.0));
+                let ctxP = cvs.getContext('2d'), w=cvs.width, h=cvs.height; ctxP.clearRect(0,0,w,h);
+                let sc = (w/405)*0.9; ctxP.beginPath(); ctxP.strokeStyle = '#000'; ctxP.lineWidth = 2;
+                path.forEach((p,i)=>{ if(i===0) ctxP.moveTo(w/2+p.x*sc, h/2+p.y*sc); else ctxP.lineTo(w/2+p.x*sc, h/2+p.y*sc); }); ctxP.stroke();
             });
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
             const savedTheme = localStorage.getItem('theme') || 'light'; document.body.setAttribute('data-theme', savedTheme);
-            
-            const path = window.location.pathname; const navMap = { '/': 'nav-designs', '/designs': 'nav-designs', '/controller': 'nav-controller', '/sketch': 'nav-sketch', '/AI_builder': 'nav-ai', '/led_controls': 'nav-leds', '/terminal': 'nav-terminal', '/settings': 'nav-settings' };
-            document.querySelectorAll('.main-nav a').forEach(a => a.classList.remove('active')); const activeId = navMap[path] || 'nav-designs'; const el = document.getElementById(activeId); if (el) el.classList.add('active');
-            loadLib(); updateQ(); setInterval(updateQ, 3000);
+            await fetchSettings(); loadLib(); updateQ(); setInterval(updateQ, 3000);
         });
     </script>
 </body></html>
