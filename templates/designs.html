@@ -250,7 +250,6 @@
         <span style="font-weight:800; padding-left:5px;" id="sel-count">0 Selected</span>
         <div class="bar-actions">
             <button class="bar-btn" onclick="loopSelected()">Loop</button>
-            <button class="bar-btn" onclick="cancelLoop()">Cancel Loop</button>
             <button class="bar-btn" onclick="copySelected()">Copy</button>
             <button class="bar-btn danger" onclick="deleteSelected()">Delete</button>
         </div>
@@ -366,7 +365,7 @@
         async function loopSelected() {
             if(selectedFiles.size === 0) return;
             showPopup("Looping...");
-            await fetch(`${BASE_URL}/api/loop`, { 
+            await fetch(`${BASE_URL}/set_loop`, { 
                 method: "POST", 
                 headers: {"Content-Type": "application/json"}, 
                 body: JSON.stringify({filenames: Array.from(selectedFiles)}) 
@@ -377,7 +376,7 @@
         async function shuffleLoop() {
             if(allFiles.length === 0) return;
             showPopup("Shuffling...");
-            await fetch(`${BASE_URL}/api/loop`, { 
+            await fetch(`${BASE_URL}/set_loop`, { 
                 method: "POST", 
                 headers: {"Content-Type": "application/json"}, 
                 body: JSON.stringify({filenames: allFiles}) 
@@ -387,7 +386,11 @@
 
         async function cancelLoop() { 
             showPopup("Loop Cancelled");
-            await fetch(`${BASE_URL}/api/cancel_loop`, { method: "POST" }); 
+            await fetch(`${BASE_URL}/set_loop`, { 
+                method: "POST", 
+                headers: {"Content-Type": "application/json"}, 
+                body: JSON.stringify({filenames: []}) 
+            }); 
             updateQ(); 
         }
 
