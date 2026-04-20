@@ -435,7 +435,7 @@
             if(!confirm("Abort current design and clear queue/loop?")) return;
             await fetch(`${BASE_URL}/send`, { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({command: "CLEAR"}) });
             showPopup("STOPPED!");
-            updateQ();
+            setTimeout(() => location.reload(), 1000);
         }
 
         function sendCmd(c, p) { if(p) showPopup(p); fetch(`${BASE_URL}/send`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({command:c})}); }
@@ -536,7 +536,7 @@
                 lines.forEach(l=>{
                     let theta, rho; if(l.toUpperCase().startsWith('G1')){ let parts = l.substring(3).trim().split(/\s+/); theta = parseFloat(parts[0])||0; rho = parseFloat(parts[1])||0; } 
                     else { let parts = l.split(/\s+/); if(parts.length >= 2) { theta = parseFloat(parts[0]); rho = parseFloat(parts[1]); } }
-                    if(!isNaN(theta) && !isNaN(rho)) { let x = rho*202.6*Math.cos(theta), y = rho*202.6*Math.sin(theta); let ik = calculateIK(x, y, tb); tm += Math.max(Math.abs(ik.b-tb), Math.abs(ik.e-te)) * 30; path.push(getXY(ik.b, ik.e)); tb=ik.b; te=ik.e; }
+                    if(!isNaN(theta) && !isNaN(rho)) { let x = rho*202.6*Math.cos(theta), y = rho*202.6*Math.sin(theta); let ik = calculateIK(x, y, tb); tm += Math.max(Math.abs(ik.b-tb), Math.abs(ik.e-te)) * 2000; path.push(getXY(ik.b, ik.e)); tb=ik.b; te=ik.e; }
                 });
                 const card = cvs.closest('.card'), clean = f.replace('.txt','').replace('.thr',''); card.dataset.baseTime = tm;
                 document.getElementById(`t-${clean}`).textContent = formatTimeFromMicroseconds(tm * (globalSettings.speed || 1.0));
