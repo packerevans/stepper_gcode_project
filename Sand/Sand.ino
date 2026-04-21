@@ -59,6 +59,7 @@ long curElbowSteps = 0;
 bool paused = false;
 bool isExecutingThr = false;
 bool shouldAbort = false;
+bool baseCalRotating = false;
 
 #define BAUD_RATE 250000
 char serialBuf[64];
@@ -101,6 +102,32 @@ void setup() {
 void loop() {
   processSerialQueue();
   updateLedMode();
+
+  if (baseCalRotating && !isExecutingThr) {
+    digitalWrite(dirBase, LOW);
+    digitalWrite(stepBase, HIGH); delayMicroseconds(2);
+    digitalWrite(stepBase, LOW);  delayMicroseconds(1000); 
+  }
+}
+
+void handleStepCommand(char* dir) {
+  digitalWrite(enPin, LOW);
+  if (strcasecmp(dir, "BASE_L") == 0) {
+    digitalWrite(dirBase, HIGH);
+    for(int i=0; i<10; i++){ digitalWrite(stepBase, HIGH); delayMicroseconds(2); digitalWrite(stepBase, LOW); delayMicroseconds(1000); }
+  }
+  else if (strcasecmp(dir, "BASE_R") == 0) {
+    digitalWrite(dirBase, LOW);
+    for(int i=0; i<10; i++){ digitalWrite(stepBase, HIGH); delayMicroseconds(2); digitalWrite(stepBase, LOW); delayMicroseconds(1000); }
+  }
+  else if (strcasecmp(dir, "ARM_L") == 0) {
+    digitalWrite(dirArm, HIGH);
+    for(int i=0; i<10; i++){ digitalWrite(stepArm, HIGH); delayMicroseconds(2); digitalWrite(stepArm, LOW); delayMicroseconds(1000); }
+  }
+  else if (strcasecmp(dir, "ARM_R") == 0) {
+    digitalWrite(dirArm, LOW);
+    for(int i=0; i<10; i++){ digitalWrite(stepArm, HIGH); delayMicroseconds(2); digitalWrite(stepArm, LOW); delayMicroseconds(1000); }
+  }
 }
 
 void updateLedMode() {
@@ -184,6 +211,24 @@ void handleCommand(char* cmd) {
   }
   else if (strcasecmp(start, "CALIBRATE") == 0) {
     if (!isExecutingThr) calibrate();
+  }
+  else if (strcasecmp(start, "START_BASE") == 0) {
+    baseCalRotating = true;
+    digitalWrite(enPin, LOW);
+  }
+  else if (strcasecmp(start, "STOP_BASE") == 0) {
+    baseCalRotating = false;
+  }
+  else if (strncasecmp(start, "STEP_", 5) == 0) {
+    handleStepCommand(start + 5);
+  }
+  else if (strcasecmp(start, "SET_ZERO") == 0) {
+    curBaseSteps = 0;
+    curElbowSteps = 0;
+    curTheta = 0;
+    curRho = 0;
+    baseCalRotating = false;
+    Serial.println(F("ZERO_SET"));
   }
   else if (strncasecmp(start, "SPEED ", 6) == 0) {
     float newMult = atof(start + 6);

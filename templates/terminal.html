@@ -296,10 +296,45 @@
             <div class="system-actions">
                 <button id="updateBtn" class="btn-action" onclick="sendCommand('/update_firmware', 'Update Firmware')">Update FW</button>
                 <button id="pullBtn" class="btn-action" onclick="sendCommand('/pull', 'Git Pull')">Git Pull</button>
+                <button id="calMenuBtn" class="btn-action" onclick="openCalModal()">Manual Cal</button>
                 <button id="resetAppBtn" class="btn-action btn-danger" onclick="sendCommand('/restart_app', 'Reset App')">Reset App</button>
                 <button id="rebootBtn" class="btn-action btn-danger" onclick="sendCommand('/reboot', 'Reboot')">Reboot</button>
                 <button id="shutdownBtn" class="btn-action btn-danger" onclick="sendCommand('/shutdown', 'Shutdown')">Shutdown</button>
             </div>
+
+...
+
+    <div id="calModal" class="hidden fixed inset-0 bg-black bg-opacity-90 z-[4000] flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-zinc-900 border-4 border-black dark:border-white w-full max-w-md p-6">
+            <h2 class="text-2xl font-black mb-6 text-center tracking-tighter">MANUAL CALIBRATION</h2>
+            
+            <div class="grid grid-cols-2 gap-4 mb-8">
+                <button onclick="sendCalCmd('START_BASE')" class="btn-action bg-green-500 text-white border-none">START BASE</button>
+                <button onclick="sendCalCmd('STOP_BASE')" class="btn-action bg-yellow-500 text-white border-none">PAUSE BASE</button>
+            </div>
+
+            <div class="mb-8">
+                <p class="text-xs font-bold opacity-50 mb-2">BASE CORRECTION</p>
+                <div class="flex gap-2">
+                    <button onmousedown="startStepping('BASE_L')" onmouseup="stopStepping()" ontouchstart="startStepping('BASE_L')" ontouchend="stopStepping()" class="btn-action flex-1">◀</button>
+                    <button onmousedown="startStepping('BASE_R')" onmouseup="stopStepping()" ontouchstart="startStepping('BASE_R')" ontouchend="stopStepping()" class="btn-action flex-1">▶</button>
+                </div>
+            </div>
+
+            <div class="mb-8">
+                <p class="text-xs font-bold opacity-50 mb-2">ARM CORRECTION</p>
+                <div class="flex gap-2">
+                    <button onmousedown="startStepping('ARM_L')" onmouseup="stopStepping()" ontouchstart="startStepping('ARM_L')" ontouchend="stopStepping()" class="btn-action flex-1">◀</button>
+                    <button onmousedown="startStepping('ARM_R')" onmouseup="stopStepping()" ontouchstart="startStepping('ARM_R')" ontouchend="stopStepping()" class="btn-action flex-1">▶</button>
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-3">
+                <button onclick="sendCalCmd('SET_ZERO')" class="btn-action bg-blue-600 text-white border-none py-4">SET 0,0 & SAVE</button>
+                <button onclick="closeCalModal()" class="btn-action border-dashed opacity-50">CANCEL</button>
+            </div>
+        </div>
+    </div>
         </div>
 
         <div id="flashMessages" class="min-h-0"></div>
@@ -429,6 +464,27 @@
                 logElement.textContent = data.join("\n");
                 if (isScrolledToBottom) logElement.scrollTop = logElement.scrollHeight;
             } catch (e) {}
+        }
+
+        /* --- CALIBRATION LOGIC --- */
+        let stepInterval = null;
+        function openCalModal() { document.getElementById('calModal').classList.remove('hidden'); }
+        function closeCalModal() { document.getElementById('calModal').classList.add('hidden'); stopStepping(); }
+        
+        async function sendCalCmd(cmd) {
+            await fetch('/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ command: cmd }) });
+        }
+
+        function startStepping(dir) {
+            if(stepInterval) return;
+            sendCalCmd(`STEP_${dir}`); // Send initial step
+            stepInterval = setInterval(() => {
+                sendCalCmd(`STEP_${dir}`);
+            }, 100); // 10 steps per second
+        }
+
+        function stopStepping() {
+            if(stepInterval) { clearInterval(stepInterval); stepInterval = null; }
         }
     </script>
 </body>
