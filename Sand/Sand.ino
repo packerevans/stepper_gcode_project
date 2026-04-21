@@ -395,11 +395,10 @@ bool processThrLine(char* line) {
   curTheta = curTheta + distTheta; 
   curRho = targetRho;
   
-  // --- PREVENT FLOATING POINT PRECISION LOSS ---
+// --- PREVENT FLOATING POINT PRECISION LOSS ---
   // The table is receiving continuous angles (e.g., 10 * PI), 
   // so we still need to silently reset the internal math memory to 0 
   // after every physical rotation so the 32-bit chip stays accurate.
-  const float TWO_PI = 2.0 * PI;
   const long baseRevSteps = round(TWO_PI * stepsPerRad);
   const long elbowRevSteps = round(TWO_PI * stepsPerRad * gearRatio);
 
