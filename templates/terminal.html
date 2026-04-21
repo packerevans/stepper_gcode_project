@@ -304,35 +304,28 @@
 
 ...
 
-    <div id="calModal" class="hidden fixed inset-0 bg-black bg-opacity-90 z-[4000] flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-zinc-900 border-4 border-black dark:border-white w-full max-w-md p-6">
-            <h2 class="text-2xl font-black mb-6 text-center tracking-tighter">MANUAL CALIBRATION</h2>
+    <div id="calModal" class="hidden fixed inset-0 bg-white dark:bg-black bg-opacity-95 z-[4000] flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-black border-4 border-black dark:border-white w-full max-w-sm p-6 relative">
+            <button onclick="closeCalModal()" class="absolute top-2 right-2 text-2xl font-black p-2 hover:opacity-50">✕</button>
+            <h2 class="text-xl font-black mb-8 text-center tracking-tighter">MANUAL CALIBRATION</h2>
             
-            <div class="grid grid-cols-2 gap-4 mb-8">
-                <button onclick="sendCalCmd('START_BASE')" class="btn-action bg-green-500 text-white border-none">START BASE</button>
-                <button onclick="sendCalCmd('STOP_BASE')" class="btn-action bg-yellow-500 text-white border-none">PAUSE BASE</button>
-            </div>
-
-            <div class="mb-8">
-                <p class="text-xs font-bold opacity-50 mb-2">BASE CORRECTION</p>
-                <div class="flex gap-2">
-                    <button onmousedown="startStepping('BASE_L')" onmouseup="stopStepping()" ontouchstart="startStepping('BASE_L')" ontouchend="stopStepping()" class="btn-action flex-1">◀</button>
-                    <button onmousedown="startStepping('BASE_R')" onmouseup="stopStepping()" ontouchstart="startStepping('BASE_R')" ontouchend="stopStepping()" class="btn-action flex-1">▶</button>
+            <div class="mb-10">
+                <p class="text-[10px] font-black mb-3 text-center tracking-widest opacity-40">BASE POSITION</p>
+                <div class="flex gap-4">
+                    <button onmousedown="startStepping('BASE_L')" onmouseup="stopStepping()" ontouchstart="startStepping('BASE_L')" ontouchend="stopStepping()" class="btn-action bg-white text-black border-2 border-black flex-1 text-2xl">◀</button>
+                    <button onmousedown="startStepping('BASE_R')" onmouseup="stopStepping()" ontouchstart="startStepping('BASE_R')" ontouchend="stopStepping()" class="btn-action bg-white text-black border-2 border-black flex-1 text-2xl">▶</button>
                 </div>
             </div>
 
-            <div class="mb-8">
-                <p class="text-xs font-bold opacity-50 mb-2">ARM CORRECTION</p>
-                <div class="flex gap-2">
-                    <button onmousedown="startStepping('ARM_L')" onmouseup="stopStepping()" ontouchstart="startStepping('ARM_L')" ontouchend="stopStepping()" class="btn-action flex-1">◀</button>
-                    <button onmousedown="startStepping('ARM_R')" onmouseup="stopStepping()" ontouchstart="startStepping('ARM_R')" ontouchend="stopStepping()" class="btn-action flex-1">▶</button>
+            <div class="mb-10">
+                <p class="text-[10px] font-black mb-3 text-center tracking-widest opacity-40">ARM POSITION</p>
+                <div class="flex gap-4">
+                    <button onmousedown="startStepping('ARM_L')" onmouseup="stopStepping()" ontouchstart="startStepping('ARM_L')" ontouchend="stopStepping()" class="btn-action bg-white text-black border-2 border-black flex-1 text-2xl">◀</button>
+                    <button onmousedown="startStepping('ARM_R')" onmouseup="stopStepping()" ontouchstart="startStepping('ARM_R')" ontouchend="stopStepping()" class="btn-action bg-white text-black border-2 border-black flex-1 text-2xl">▶</button>
                 </div>
             </div>
 
-            <div class="flex flex-col gap-3">
-                <button onclick="sendCalCmd('SET_ZERO')" class="btn-action bg-blue-600 text-white border-none py-4">SET 0,0 & SAVE</button>
-                <button onclick="closeCalModal()" class="btn-action border-dashed opacity-50">CANCEL</button>
-            </div>
+            <button onclick="sendCalCmd('SET_ZERO')" class="btn-action bg-black text-white dark:bg-white dark:text-black border-2 border-black dark:border-white w-full py-5 text-sm font-black tracking-widest">SAVE 0,0 POSITION</button>
         </div>
     </div>
         </div>

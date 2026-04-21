@@ -4,6 +4,7 @@
  */
 
 #include <Arduino.h>
+#include <EEPROM.h>
 
 struct IKResult {
   long baseSteps;
@@ -79,6 +80,14 @@ void moveBresenham(long da, long db, int delayUs);
 void setup() {
   Serial.begin(BAUD_RATE);
   Serial.setTimeout(10);
+
+  // Load saved positions from EEPROM
+  EEPROM.get(0, curBaseSteps);
+  EEPROM.get(sizeof(long), curElbowSteps);
+  // Sanity check: if EEPROM is fresh (all 255/FF), reset to 0
+  if (curBaseSteps == -1 && curElbowSteps == -1) {
+    curBaseSteps = 0; curElbowSteps = 0;
+  }
   
   pinMode(stepBase, OUTPUT); pinMode(dirBase, OUTPUT);
   pinMode(stepArm, OUTPUT);  pinMode(dirArm, OUTPUT);
@@ -228,7 +237,9 @@ void handleCommand(char* cmd) {
     curTheta = 0;
     curRho = 0;
     baseCalRotating = false;
-    Serial.println(F("ZERO_SET"));
+    EEPROM.put(0, curBaseSteps);
+    EEPROM.put(sizeof(long), curElbowSteps);
+    Serial.println(F("ZERO_SAVED"));
   }
   else if (strncasecmp(start, "SPEED ", 6) == 0) {
     float newMult = atof(start + 6);
