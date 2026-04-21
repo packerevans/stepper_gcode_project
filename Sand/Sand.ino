@@ -35,7 +35,7 @@ const float L2 = 101.3;
 const float gearRatio = 1.125;
 const float stepsPerDeg = 8.888888;
 const float stepsPerRad = stepsPerDeg * (180.0 / PI);
-const float interpolationRes = 0.4; // LGT8 @ 32MHz can handle 0.4mm easily
+const float interpolationRes = 1.0; // LGT8 @ 32MHz 
 
 // --- SPEED SETTINGS ---
 int centerDelay = 500;    
@@ -337,11 +337,32 @@ void moveToPolar(float theta, float rho) {
   float x = r_mm * cos(theta);
   float y = r_mm * sin(theta);
   IKResult target = calculateIK(x, y);
+
+  long da = target.elbowSteps - curElbowSteps;
+  long db = target.baseSteps - curBaseSteps;
+  long steps = max(abs(da), abs(db));
+
+  // If no movement is required, exit early
+  if (steps == 0) return;
+
+  // 1. Calculate the ideal time a 1mm segment SHOULD take, based on your UI's perimeter setting.
+  // (stepsPerRad / tableRadius) gives us the exact steps needed for a 1mm arc at the very edge.
+  float stepsPerMmEdge = stepsPerRad / tableRadius; 
+  float targetTimeMicros = perimeterDelay * stepsPerMmEdge;
+
+  // 2. Divide the target time by the actual steps required for THIS specific move.
+  // This forces the delay to dynamically adapt to the geometry!
+  int delayUs = round(targetTimeMicros / steps);
+
+  // 3. Enforce your hardware speed limit (centerDelay).
+  // Near the exact dead-center, the math will demand infinite RPM. 
+  // This clamp protects the TMC2209s from stalling.
+  if (delayUs < centerDelay) {
+    delayUs = centerDelay;
+  }
+
+  moveBresenham(da, db, delayUs);
   
-  float speedFactor = (rho > 1.0) ? 1.0 : rho;
-  int delayUs = centerDelay + ((perimeterDelay - centerDelay) * speedFactor);
-  
-  moveBresenham(target.elbowSteps - curElbowSteps, target.baseSteps - curBaseSteps, delayUs);
   curBaseSteps = target.baseSteps; 
   curElbowSteps = target.elbowSteps;
 }
@@ -365,7 +386,7 @@ IKResult calculateIK(float x, float y) {
   
   return { 
     (long)round(-t1 * stepsPerRad), 
-    (long)round(-(bend + gearRatio * t1) * stepsPerRad) 
+    (long)round(-gearRatio * (bend + t1) * stepsPerRad)
   };
 }
 
