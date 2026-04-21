@@ -469,8 +469,9 @@ IKResult calculateIK(float x, float y) {
     y *= (maxReach/dist); 
     dist = maxReach; 
   }
-  // Apply gearRatio properly at the dead-center exit so it doesn't math-jump
-  if (dist < 1.0) return { 0, (long)round(-gearRatio * PI * stepsPerRad) }; 
+  
+  // REVERTED: The physical bend is a 1.0 ratio. Dead center is exactly 1600 steps (PI).
+  if (dist < 1.0) return { 0, (long)round(-PI * stepsPerRad) }; 
   
   float lastT1 = -(float)curBaseSteps / stepsPerRad;
   float cosBend = (dist * dist - L1 * L1 - L2 * L2) / (2.0 * L1 * L2);
@@ -479,11 +480,13 @@ IKResult calculateIK(float x, float y) {
   
   t1 = t1 - (round((t1 - lastT1) / (2.0 * PI)) * 2.0 * PI);
   
+  // REVERTED: Your original, brilliant split-ratio equation!
   return { 
     (long)round(-t1 * stepsPerRad), 
-    (long)round(-gearRatio * (bend + t1) * stepsPerRad)
+    (long)round(-(bend + gearRatio * t1) * stepsPerRad)
   };
 }
+
 
 void moveBresenham(long da, long db, int delayUs) {
   if (da == 0 && db == 0) return;
