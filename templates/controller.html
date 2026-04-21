@@ -488,7 +488,7 @@
             if (moveInterval || isCentering) return;
             moveInterval = setInterval(() => {
                 if (Math.abs(joyPos.x) < 5 && Math.abs(joyPos.y) < 5) return;
-                const stepScale = 0.035;
+                const stepScale = 0.015; // Smaller steps for smoothness
                 let curX = ballPos.rho * Math.cos(ballPos.theta);
                 let curY = ballPos.rho * Math.sin(ballPos.theta);
                 curX += (joyPos.x / 80) * stepScale;
@@ -499,7 +499,7 @@
                 ballPos.rho = newRho;
                 ballPos.theta = newTheta;
                 sendMove();
-            }, 250); 
+            }, 100); // More frequent updates (10fps)
         }
 
         function stopMoveLoop() {

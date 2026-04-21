@@ -1264,20 +1264,94 @@
         
         function prepareGCode() {
             if(rawPoints.length === 0) return showToast("Draw something first!", "error");
-            const tableR = parseFloat(document.getElementById('cfgRadius').value), sym = parseInt(document.getElementById('symSlider').value);
-            let shapes = [], curShape = []; rawPoints.forEach(p => { if(p.type === 'break' || p.type === 'cmd') { if(curShape.length > 0) shapes.push(curShape); curShape = []; } else curShape.push(p); }); if(curShape.length > 0) shapes.push(curShape);
+            const tableR = parseFloat(document.getElementById('cfgRadius').value);
+            const sym = parseInt(document.getElementById('symSlider').value);
             
-            let pool = []; for(let s=0; s<sym; s++) { const ang = s * (Math.PI*2/sym), c = Math.cos(ang), si = Math.sin(ang); shapes.forEach(sh => pool.push(sh.map(p => ({ x: p.x*c - p.y*si, y: p.x*si + p.y*c, type: 'point' })))); }
-            processedPoints = []; pool.forEach((sh, i) => { if(i > 0) processedPoints.push({x: sh[0].x, y: sh[0].y, type:'point'}); sh.forEach(p => processedPoints.push(p)); });
+            // 1. Group raw points into distinct shapes
+            let shapes = [], curShape = [];
+            rawPoints.forEach(p => {
+                if(p.type === 'break' || p.type === 'cmd') {
+                    if(curShape.length > 0) shapes.push(curShape);
+                    curShape = [];
+                } else curShape.push(p);
+            });
+            if(curShape.length > 0) shapes.push(curShape);
             
-            generatedGCode = processedPoints.map(p => {
-                if (p.type === 'cmd') return "";
-                let theta = Math.atan2(p.y, p.x);
+            // 2. Create symmetrical copies and pool them
+            let pool = [];
+            for(let s=0; s<sym; s++) {
+                const ang = s * (Math.PI*2/sym);
+                const c = Math.cos(ang), si = Math.sin(ang);
+                shapes.forEach(sh => {
+                    pool.push(sh.map(p => ({
+                        x: p.x*c - p.y*si,
+                        y: p.x*si + p.y*c,
+                        type: 'point'
+                    })));
+                });
+            }
+
+            // 3. Chain shapes together with interpolation (Smooth connections)
+            processedPoints = [];
+            let lastX = 0, lastY = 0;
+            
+            pool.forEach((sh, shIdx) => {
+                if(sh.length === 0) return;
+                
+                // Interpolate from last shape to start of this shape
+                if(shIdx > 0) {
+                    interpolateBetween(lastX, lastY, sh[0].x, sh[0].y, processedPoints);
+                }
+                
+                // Interpolate through the shape points
+                for(let i=0; i<sh.length-1; i++) {
+                    interpolateBetween(sh[i].x, sh[i].y, sh[i+1].x, sh[i+1].y, processedPoints);
+                }
+                
+                lastX = sh[sh.length-1].x;
+                lastY = sh[sh.length-1].y;
+            });
+
+            // 4. UNWRAP THETA (The secret to smooth circles)
+            let currentTheta = 0;
+            let lastRawTheta = 0;
+            
+            generatedGCode = processedPoints.map((p, i) => {
+                let rawTheta = Math.atan2(p.y, p.x);
                 let rho = Math.hypot(p.x, p.y) / tableR;
-                if (rho > 1.0) rho = 1.0; 
-                return `${theta.toFixed(4)} ${rho.toFixed(4)}`;
-            }).filter(l => l !== "").join('\n');
-            document.getElementById('statusTxt').innerText = `Path Ready!`; document.getElementById('designPhaseControls').style.display = 'none'; document.getElementById('productionPhaseControls').style.display = 'block'; document.getElementById('simulationArea').style.display = 'block'; render();
+                if (rho > 1.0) rho = 1.0;
+
+                if (i > 0) {
+                    let diff = rawTheta - lastRawTheta;
+                    if (diff < -Math.PI) diff += Math.PI * 2;
+                    if (diff > Math.PI) diff -= Math.PI * 2;
+                    currentTheta += diff;
+                } else {
+                    currentTheta = rawTheta;
+                }
+                
+                lastRawTheta = rawTheta;
+                return `${currentTheta.toFixed(4)} ${rho.toFixed(4)}`;
+            }).join('\n');
+
+            document.getElementById('statusTxt').innerText = `Path Ready!`;
+            document.getElementById('designPhaseControls').style.display = 'none';
+            document.getElementById('productionPhaseControls').style.display = 'block';
+            document.getElementById('simulationArea').style.display = 'block';
+            render();
+        }
+
+        function interpolateBetween(x1, y1, x2, y2, targetArray) {
+            const dist = Math.hypot(x2-x1, y2-y1);
+            const steps = Math.max(1, Math.floor(dist / 2.0)); // 2mm segments for speed
+            for(let i=0; i<=steps; i++) {
+                const t = i/steps;
+                targetArray.push({
+                    x: x1 + (x2-x1)*t,
+                    y: y1 + (y2-y1)*t,
+                    type: 'point'
+                });
+            }
         }
         
         function returnToEditing() { processedPoints = []; document.getElementById('designPhaseControls').style.display = 'block'; document.getElementById('productionPhaseControls').style.display = 'none'; document.getElementById('simulationArea').style.display = 'none'; resetStatus(); }
