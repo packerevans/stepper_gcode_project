@@ -360,10 +360,20 @@ bool processThrLine(char* line) {
   float targetTheta = atof(line);
   float targetRho = atof(spacePtr + 1);
 
-  // Because Sandify and the new web app send continuous angles, 
-  // we just trust the math and calculate the raw distance!
   float distTheta = targetTheta - curTheta;
   float distRho = targetRho - curRho;
+
+  // --- THE SHORTEST PATH FILTER ---
+  // If the GCode jumps from -PI to +PI, the math sees a full 360° spin (6.28).
+  // This filter forces the Arduino to realize they are the exact same physical 
+  // spot and take the shortest path, preventing violent loops!
+  while (distTheta > PI) {
+    distTheta -= (2.0 * PI);
+  }
+  while (distTheta < -PI) {
+    distTheta += (2.0 * PI);
+  }
+  // --------------------------------
   
   float avgR = ((curRho + targetRho) / 2.0) * tableRadius;
   float totalDist = sqrt(pow(avgR * abs(distTheta), 2) + pow(abs(distRho * tableRadius), 2));
@@ -395,20 +405,19 @@ bool processThrLine(char* line) {
   curTheta = curTheta + distTheta; 
   curRho = targetRho;
   
-// --- PREVENT FLOATING POINT PRECISION LOSS ---
-  // The table is receiving continuous angles (e.g., 10 * PI), 
-  // so we still need to silently reset the internal math memory to 0 
-  // after every physical rotation so the 32-bit chip stays accurate.
-  const long baseRevSteps = round(TWO_PI * stepsPerRad);
-  const long elbowRevSteps = round(TWO_PI * stepsPerRad * gearRatio);
+  // --- PREVENT FLOATING POINT PRECISION LOSS ---
+  // Silently resets the internal math memory to 0 after every 
+  // physical rotation so the 32-bit chip stays accurate on long playlists.
+  const long baseRevSteps = round((2.0 * PI) * stepsPerRad);
+  const long elbowRevSteps = round((2.0 * PI) * stepsPerRad * gearRatio);
 
   while (curTheta > PI) {
-    curTheta -= TWO_PI;
+    curTheta -= (2.0 * PI);
     curBaseSteps += baseRevSteps; 
     curElbowSteps += elbowRevSteps;
   }
   while (curTheta < -PI) {
-    curTheta += TWO_PI;
+    curTheta += (2.0 * PI);
     curBaseSteps -= baseRevSteps;
     curElbowSteps -= elbowRevSteps;
   }
@@ -460,7 +469,7 @@ IKResult calculateIK(float x, float y) {
     y *= (maxReach/dist); 
     dist = maxReach; 
   }
-  // ADDED FIX: Apply gearRatio properly at the dead-center exit so it doesn't math-jump
+  // Apply gearRatio properly at the dead-center exit so it doesn't math-jump
   if (dist < 1.0) return { 0, (long)round(-gearRatio * PI * stepsPerRad) }; 
   
   float lastT1 = -(float)curBaseSteps / stepsPerRad;
