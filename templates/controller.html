@@ -488,18 +488,25 @@
             if (moveInterval || isCentering) return;
             moveInterval = setInterval(() => {
                 if (Math.abs(joyPos.x) < 5 && Math.abs(joyPos.y) < 5) return;
-                const stepScale = 0.015; // Smaller steps for smoothness
+                const stepScale = 0.012; // Slower for better control
                 let curX = ballPos.rho * Math.cos(ballPos.theta);
                 let curY = ballPos.rho * Math.sin(ballPos.theta);
                 curX += (joyPos.x / 80) * stepScale;
                 curY += (joyPos.y / 80) * stepScale;
                 let newRho = Math.sqrt(curX*curX + curY*curY);
                 let newTheta = Math.atan2(curY, curX);
+                
                 if (newRho > 1.0) newRho = 1.0;
+                // Fix: if we are at the center, theta is 0
+                if (newRho < 0.005) {
+                    newRho = 0;
+                    newTheta = 0;
+                }
+                
                 ballPos.rho = newRho;
                 ballPos.theta = newTheta;
                 sendMove();
-            }, 100); // More frequent updates (10fps)
+            }, 100); 
         }
 
         function stopMoveLoop() {
@@ -594,17 +601,14 @@
             const el = document.getElementById(activeId);
             if (el) el.classList.add('active');
             
-            // Auto-resume motors on load
+            // Auto-resume motors and set starting speed to 0.5
             fetch('/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ command: 'RESUME' }) });
+            fetch('/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ command: 'SPEED 0.5' }) });
             
             drawBall();
             updateStatus();
             setInterval(updateStatus, 3000);
         });
-    </script>
-</body>
-</html>
-
     </script>
 </body>
 </html>

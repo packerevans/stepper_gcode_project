@@ -1343,7 +1343,7 @@
 
         function interpolateBetween(x1, y1, x2, y2, targetArray) {
             const dist = Math.hypot(x2-x1, y2-y1);
-            const steps = Math.max(1, Math.floor(dist / 2.0)); // 2mm segments for speed
+            const steps = Math.max(1, Math.floor(dist / 1.0)); // 1.0mm segments for high detail
             for(let i=0; i<=steps; i++) {
                 const t = i/steps;
                 targetArray.push({

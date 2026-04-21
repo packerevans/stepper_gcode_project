@@ -35,7 +35,7 @@ const float L2 = 101.3;
 const float gearRatio = 1.125;
 const float stepsPerDeg = 8.888888;
 const float stepsPerRad = stepsPerDeg * (180.0 / PI);
-const float interpolationRes = 1.0; // LGT8 @ 32MHz 
+const float interpolationRes = 1.0; // LGT8 @ 32MHz easily handles 1.0mm
 
 // --- SPEED SETTINGS ---
 int centerDelay = 500;    
@@ -283,16 +283,16 @@ bool processThrLine(char* line) {
 
   float distTheta = targetTheta - curTheta;
 
-  // --- THE FIX: Angle Wrapping (Shortest Path) ---
-  // If the commanded distance is more than half a circle (PI), 
-  // subtract a full circle (2PI) to force it to go the shorter way around.
+  // --- CRITICAL FIX 1: Angle Wrapping (Shortest Path) ---
+  // REQUIRED because the Web App's Math.atan2() jumps from +PI to -PI.
+  // This forces the arm to take the shortest continuous path.
   while (distTheta > PI) {
     distTheta -= (2.0 * PI);
   }
   while (distTheta < -PI) {
     distTheta += (2.0 * PI);
   }
-  // -----------------------------------------------
+  // ------------------------------------------------------
 
   float distRho = targetRho - curRho;
   
@@ -324,14 +324,32 @@ bool processThrLine(char* line) {
     moveToPolar(curTheta + (distTheta * (float)i/steps), curRho + (distRho * (float)i/steps));
   }
 
-  // IMPORTANT FIX: We update curTheta based on the distance actually traveled, 
-  // rather than the raw target coordinate. This prevents the internal coordinate 
-  // system from violently jumping when crossing the boundary.
+  // Update curTheta based on distance traveled
   curTheta = curTheta + distTheta; 
   curRho = targetRho;
   
+  // --- CRITICAL FIX 2: Prevent Floating Point Precision Loss ---
+  // Silently resets the math back to near-zero after every full rotation 
+  // so the 32-bit chip never runs out of decimal memory.
+  const float TWO_PI = 2.0 * PI;
+  const long baseRevSteps = round(TWO_PI * stepsPerRad);
+  const long elbowRevSteps = round(TWO_PI * stepsPerRad * gearRatio);
+
+  while (curTheta > PI) {
+    curTheta -= TWO_PI;
+    curBaseSteps += baseRevSteps; 
+    curElbowSteps += elbowRevSteps;
+  }
+  while (curTheta < -PI) {
+    curTheta += TWO_PI;
+    curBaseSteps -= baseRevSteps;
+    curElbowSteps -= elbowRevSteps;
+  }
+  // -------------------------------------------------------------
+  
   return true;
 }
+
 void moveToPolar(float theta, float rho) {
   float r_mm = rho * tableRadius;
   float x = r_mm * cos(theta);
