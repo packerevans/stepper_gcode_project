@@ -281,19 +281,9 @@ bool processThrLine(char* line) {
   float targetTheta = atof(line);
   float targetRho = atof(spacePtr + 1);
 
+  // Because Sandify and the new web app send continuous angles, 
+  // we just trust the math and calculate the raw distance!
   float distTheta = targetTheta - curTheta;
-
-  // --- CRITICAL FIX 1: Angle Wrapping (Shortest Path) ---
-  // REQUIRED because the Web App's Math.atan2() jumps from +PI to -PI.
-  // This forces the arm to take the shortest continuous path.
-  while (distTheta > PI) {
-    distTheta -= (2.0 * PI);
-  }
-  while (distTheta < -PI) {
-    distTheta += (2.0 * PI);
-  }
-  // ------------------------------------------------------
-
   float distRho = targetRho - curRho;
   
   float avgR = ((curRho + targetRho) / 2.0) * tableRadius;
@@ -305,17 +295,15 @@ bool processThrLine(char* line) {
   shouldAbort = false;
 
   for (int i = 1; i <= steps; i++) {
-    // Poll the serial buffer during movement so PAUSE executes immediately
     processSerialQueue(); 
 
     while (paused) {
       delay(10);
-      processSerialQueue(); // Keep polling while paused so we can RESUME
+      processSerialQueue(); 
       if (shouldAbort) break;
     }
     
     if (shouldAbort) {
-      // Save EXACT mathematical position so the next move starts cleanly
       curTheta = curTheta + (distTheta * (float)(i-1)/steps);
       curRho = curRho + (distRho * (float)(i-1)/steps);
       return false; 
@@ -324,13 +312,14 @@ bool processThrLine(char* line) {
     moveToPolar(curTheta + (distTheta * (float)i/steps), curRho + (distRho * (float)i/steps));
   }
 
-  // Update curTheta based on distance traveled
+  // Update physical position tracking
   curTheta = curTheta + distTheta; 
   curRho = targetRho;
   
-  // --- CRITICAL FIX 2: Prevent Floating Point Precision Loss ---
-  // Silently resets the math back to near-zero after every full rotation 
-  // so the 32-bit chip never runs out of decimal memory.
+  // --- PREVENT FLOATING POINT PRECISION LOSS ---
+  // The table is receiving continuous angles (e.g., 10 * PI), 
+  // so we still need to silently reset the internal math memory to 0 
+  // after every physical rotation so the 32-bit chip stays accurate.
   const float TWO_PI = 2.0 * PI;
   const long baseRevSteps = round(TWO_PI * stepsPerRad);
   const long elbowRevSteps = round(TWO_PI * stepsPerRad * gearRatio);
@@ -345,7 +334,7 @@ bool processThrLine(char* line) {
     curBaseSteps -= baseRevSteps;
     curElbowSteps -= elbowRevSteps;
   }
-  // -------------------------------------------------------------
+  // ---------------------------------------------
   
   return true;
 }
