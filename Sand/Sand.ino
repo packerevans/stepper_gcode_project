@@ -81,12 +81,20 @@ void setup() {
   Serial.begin(BAUD_RATE);
   Serial.setTimeout(10);
 
-  // Load saved positions from EEPROM
-  EEPROM.get(0, curBaseSteps);
-  EEPROM.get(sizeof(long), curElbowSteps);
-  // Sanity check: if EEPROM is fresh (all 255/FF), reset to 0
+  // Load ALL saved positions from EEPROM (Steps AND Coordinates)
+  int eeAddr = 0;
+  EEPROM.get(eeAddr, curBaseSteps); eeAddr += sizeof(long);
+  EEPROM.get(eeAddr, curElbowSteps); eeAddr += sizeof(long);
+  EEPROM.get(eeAddr, curTheta); eeAddr += sizeof(float);
+  EEPROM.get(eeAddr, curRho);
+  
+  // Sanity check: if EEPROM is fresh (all 255/FF), initialize to perfect center
   if (curBaseSteps == -1 && curElbowSteps == -1) {
-    curBaseSteps = 0; curElbowSteps = 0;
+    curTheta = 0; 
+    curRho = 0;
+    IKResult zeroPos = calculateIK(0, 0);
+    curBaseSteps = zeroPos.baseSteps; 
+    curElbowSteps = zeroPos.elbowSteps;
   }
   
   pinMode(stepBase, OUTPUT); pinMode(dirBase, OUTPUT);
@@ -232,23 +240,24 @@ void handleCommand(char* cmd) {
     handleStepCommand(start + 5);
   }
   else if (strcasecmp(start, "SET_ZERO") == 0) {
-    // 1. Reset high-level coordinates
+    // 1. We assume you just manually jogged the ball perfectly to the center
     curTheta = 0;
     curRho = 0;
     
-    // 2. Reset motor step counters
-    curBaseSteps = 0;
-    curElbowSteps = 0;
+    // 2. We sync the step counters to exactly what the math expects for the center position
+    IKResult zeroPos = calculateIK(0, 0);
+    curBaseSteps = zeroPos.baseSteps;
+    curElbowSteps = zeroPos.elbowSteps;
     
     // 3. Clear state flags
     baseCalRotating = false;
     
-    // 4. PERSIST to memory
-    EEPROM.put(0, curBaseSteps);
-    EEPROM.put(sizeof(long), curElbowSteps);
-    
-    // 5. Force the IK state to match the new zero immediately
-    moveToPolar(0, 0); 
+    // 4. PERSIST ALL STATE to memory so it survives a reboot
+    int eeAddr = 0;
+    EEPROM.put(eeAddr, curBaseSteps); eeAddr += sizeof(long);
+    EEPROM.put(eeAddr, curElbowSteps); eeAddr += sizeof(long);
+    EEPROM.put(eeAddr, curTheta); eeAddr += sizeof(float);
+    EEPROM.put(eeAddr, curRho);
     
     Serial.println(F("ZERO_SAVED"));
   }
@@ -302,7 +311,6 @@ void calibrate() {
     Serial.println(F("ERROR: BASE HOMING FAILED"));
     return;
   }
-  curBaseSteps = 0; 
 
   // Home Arm
   currentSteps = 0;
@@ -317,9 +325,13 @@ void calibrate() {
     return;
   }
 
-  curElbowSteps = 0; 
+  // Sync variables to the center perfectly
   curTheta = 0; 
   curRho = 0;
+  IKResult zeroPos = calculateIK(0, 0);
+  curBaseSteps = zeroPos.baseSteps;
+  curElbowSteps = zeroPos.elbowSteps;
+  
   Serial.println(F("CALIBRATION_COMPLETE"));
 }
 
@@ -387,6 +399,7 @@ bool processThrLine(char* line) {
   // The table is receiving continuous angles (e.g., 10 * PI), 
   // so we still need to silently reset the internal math memory to 0 
   // after every physical rotation so the 32-bit chip stays accurate.
+  const float TWO_PI = 2.0 * PI;
   const long baseRevSteps = round(TWO_PI * stepsPerRad);
   const long elbowRevSteps = round(TWO_PI * stepsPerRad * gearRatio);
 
@@ -448,7 +461,8 @@ IKResult calculateIK(float x, float y) {
     y *= (maxReach/dist); 
     dist = maxReach; 
   }
-  if (dist < 1.0) return { 0, (long)(-PI * stepsPerRad) }; 
+  // ADDED FIX: Apply gearRatio properly at the dead-center exit so it doesn't math-jump
+  if (dist < 1.0) return { 0, (long)round(-gearRatio * PI * stepsPerRad) }; 
   
   float lastT1 = -(float)curBaseSteps / stepsPerRad;
   float cosBend = (dist * dist - L1 * L1 - L2 * L2) / (2.0 * L1 * L2);
