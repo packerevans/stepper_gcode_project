@@ -5,6 +5,7 @@ import re
 import socket
 import json
 import datetime
+import shutil
 from collections import deque
 import wifi_tools 
 from pyngrok import ngrok, conf 
@@ -559,48 +560,47 @@ def git_pull():
 
 @app.route("/update_firmware", methods=["POST"])
 def update_firmware():
-    global arduino, arduino_connected, arduino_port
-    if arduino: 
-        try: arduino.close()
-        except: pass
-        arduino_connected = False
+    global arduino, arduino_connected
     
-    # EXACT FQBN and Parameters that worked manually
-    FQBN = "lgt8fx:avr:328:clock_source=internal,clock_div=1,variant=modelP,upload_speed=115200"
-    
-    # LGT8fx index URL (kept as safety)
-    LGT_URL = "https://raw.githubusercontent.com/dbuezas/lgt8fx/master/package_lgt8fx_index.json"
-    
+    # 1. Paths & Setup
+    SKETCH_PATH = "/home/sandtable2/stepper_gcode_project/Sand"
+    BUILD_PATH = f"{SKETCH_PATH}/build"
+    CONF_PATH = "/home/sandtable2/.arduino15/packages/arduino/tools/avrdude/8.0.0-arduino1/etc/avrdude.conf"
+    HEX_FILE = f"{BUILD_PATH}/Sand.ino.hex"
+    FQBN = "lgt8fx:avr:328:clock_source=internal,clock_div=1,variant=modelP"
+
     try:
-        log_message(f"Starting firmware update on {arduino_port}...")
+        # 2. Clean old builds for speed & fresh compile
+        if os.path.exists(BUILD_PATH): shutil.rmtree(BUILD_PATH)
+        os.makedirs(BUILD_PATH)
         
-        # 1. Compile & Upload in one go (EXACTLY matching working manual command)
-        # Using the same --upload flag and parameters
-        flash_cmd = [
-            "arduino-cli", "compile", 
-            "--additional-urls", LGT_URL,
-            "--fqbn", FQBN, 
-            ARDUINO_PROJECT_PATH, 
-            "--upload", "-p", arduino_port
-        ]
+        # 3. High-Speed Compile
+        log_message("Compiling Firmware...")
+        subprocess.run(["arduino-cli", "compile", "--fqbn", FQBN, "--output-dir", BUILD_PATH, SKETCH_PATH], check=True)
+
+        # 4. Critical Flash Window: Disconnect -> Reset -> Blast -> Reconnect
+        if arduino: 
+            arduino.close()
+            arduino_connected = False
+
+        log_message("Flashing LGT8F...")
+        # Hardware Reset
+        subprocess.run(["sudo", "pinctrl", "set", "18", "op", "dl"], check=True)
+        time.sleep(0.1)
+        subprocess.run(["sudo", "pinctrl", "set", "18", "op", "dh"], check=True)
+
+        # Immediate avrdude blast (no verify for max speed)
+        subprocess.run([
+            "/usr/bin/avrdude", "-C", CONF_PATH, "-p", "atmega328p", "-c", "arduino", 
+            "-P", "/dev/ttyS0", "-b", "115200", "-D", "-V", "-U", f"flash:w:{HEX_FILE}:i"
+        ], check=True, capture_output=True)
         
-        log_message(f"Flashing: {' '.join(flash_cmd)}")
-        
-        # Run and capture output
-        result = subprocess.run(flash_cmd, capture_output=True, text=True, check=True)
-        
-        log_message("Upload Successful!")
+        log_message("Firmware Updated Successfully!")
         connect_arduino()
-        return jsonify(success=True, message="Firmware Updated Successfully!")
-        
-    except subprocess.CalledProcessError as e:
-        error_msg = f"Flash Error: {e.stderr or e.stdout}"
-        log_message(error_msg)
-        print(error_msg)
-        connect_arduino()
-        return jsonify(success=False, message=error_msg)
+        return jsonify(success=True, message="Success!")
+
     except Exception as e:
-        log_message(f"System Error: {str(e)}")
+        log_message(f"Update Failed: {str(e)}")
         connect_arduino()
         return jsonify(success=False, message=str(e))
 
