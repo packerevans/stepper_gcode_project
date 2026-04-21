@@ -232,13 +232,24 @@ void handleCommand(char* cmd) {
     handleStepCommand(start + 5);
   }
   else if (strcasecmp(start, "SET_ZERO") == 0) {
-    curBaseSteps = 0;
-    curElbowSteps = 0;
+    // 1. Reset high-level coordinates
     curTheta = 0;
     curRho = 0;
+    
+    // 2. Reset motor step counters
+    curBaseSteps = 0;
+    curElbowSteps = 0;
+    
+    // 3. Clear state flags
     baseCalRotating = false;
+    
+    // 4. PERSIST to memory
     EEPROM.put(0, curBaseSteps);
     EEPROM.put(sizeof(long), curElbowSteps);
+    
+    // 5. Force the IK state to match the new zero immediately
+    moveToPolar(0, 0); 
+    
     Serial.println(F("ZERO_SAVED"));
   }
   else if (strncasecmp(start, "SPEED ", 6) == 0) {
