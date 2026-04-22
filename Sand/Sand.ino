@@ -54,8 +54,6 @@ bool isQueueFull() { return ((qHead + 1) % QUEUE_SIZE) == qTail; }
 bool isQueueEmpty() { return qHead == qTail; }
 
 // --- THE HOLDING PATTERN ---
-// If the queue is 128/128 full, we hold the incoming command here 
-// until the motors finish a move and free up a spot.
 bool hasPendingMove = false;
 float pendingTheta = 0;
 float pendingRho = 0;
@@ -93,6 +91,8 @@ void processModeCommand(char* data);
 void moveToPolar(float theta, float rho);
 IKResult calculateIK(float x, float y);
 void moveBresenham(long da, long db, int delayUs);
+void updateLedMode();
+void handleStepCommand(char* dir);
 
 void setup() {
   Serial.begin(BAUD_RATE);
@@ -128,7 +128,6 @@ void setup() {
 }
 
 void loop() {
-  // Always check the USB cord for new data
   if (!hasPendingMove) {
     processSerialQueue();
   }
@@ -141,11 +140,7 @@ void loop() {
     digitalWrite(stepBase, LOW);  delayMicroseconds(1000); 
   }
 
-  // ==========================================
   // PART 1: THE PRODUCER (The Inbox Handler)
-  // If we are holding a command, and the queue finally has space, 
-  // drop it in the queue and instantly yell "OK" so Python sends more!
-  // ==========================================
   if (hasPendingMove && !isQueueFull()) {
     qTheta[qHead] = pendingTheta;
     qRho[qHead] = pendingRho;
@@ -154,11 +149,7 @@ void loop() {
     Serial.println(F("OK")); 
   }
 
-  // ==========================================
   // PART 2: THE CONSUMER (The Motor Driver)
-  // Deaf to the outside world. If the queue has commands, execute them 
-  // as fast as mathematically possible until the queue is empty.
-  // ==========================================
   if (!isExecutingThr && !isQueueEmpty() && !paused) {
     isExecutingThr = true;
     
@@ -171,6 +162,47 @@ void loop() {
       Serial.println(F("ABORTED"));
     }
     isExecutingThr = false;
+  }
+}
+
+void updateLedMode() {
+  if (ledMode == 0 || numModeColors == 0) return;
+  
+  unsigned long now = millis();
+  if (ledMode == 1) { 
+    if (now - lastLedUpdate >= ledInterval) {
+      lastLedUpdate = now;
+      currentModeStep = (currentModeStep + 1) % (numModeColors * 2);
+      if (currentModeStep % 2 == 0) {
+        int idx = currentModeStep / 2;
+        analogWrite(redPin, modeColors[idx].r);
+        analogWrite(greenPin, modeColors[idx].g);
+        analogWrite(bluePin, modeColors[idx].b);
+      } else {
+        analogWrite(redPin, 0); analogWrite(greenPin, 0); analogWrite(bluePin, 0);
+      }
+    }
+  }
+  else if (ledMode == 2) { 
+    float t = (float)((now - lastLedUpdate) % ledInterval) / ledInterval;
+    if (now - lastLedUpdate >= ledInterval) {
+      lastLedUpdate = now;
+      currentModeStep = (currentModeStep + 1) % numModeColors;
+    }
+    int nextStep = (currentModeStep + 1) % numModeColors;
+    int r = modeColors[currentModeStep].r + (modeColors[nextStep].r - modeColors[currentModeStep].r) * t;
+    int g = modeColors[currentModeStep].g + (modeColors[nextStep].g - modeColors[currentModeStep].g) * t;
+    int b = modeColors[currentModeStep].b + (modeColors[nextStep].b - modeColors[currentModeStep].b) * t;
+    analogWrite(redPin, r); analogWrite(greenPin, g); analogWrite(bluePin, b);
+  }
+  else if (ledMode == 3) { 
+    if (now - lastLedUpdate >= ledInterval) {
+      lastLedUpdate = now;
+      currentModeStep = (currentModeStep + 1) % numModeColors;
+      analogWrite(redPin, modeColors[currentModeStep].r);
+      analogWrite(greenPin, modeColors[currentModeStep].g);
+      analogWrite(bluePin, modeColors[currentModeStep].b);
+    }
   }
 }
 
@@ -245,7 +277,6 @@ void handleCommand(char* cmd) {
     ledMode = 0; processRgbLine(start); Serial.println(F("RGB_OK"));
   }
   else {
-    // --- PARSING THE THETA-RHO COMMAND ---
     char* spacePtr = strchr(start, ' ');
     if (spacePtr != NULL) {
       *spacePtr = '\0'; 
@@ -253,12 +284,10 @@ void handleCommand(char* cmd) {
       float targetRho = atof(spacePtr + 1);
 
       if (isQueueFull()) {
-        // Queue is full! Hold the package in our hands, do not drop it, and DO NOT yell "OK".
         hasPendingMove = true;
         pendingTheta = targetTheta;
         pendingRho = targetRho;
       } else {
-        // Queue has space! Drop it in and instantly yell "OK".
         qTheta[qHead] = targetTheta;
         qRho[qHead] = targetRho;
         qHead = (qHead + 1) % QUEUE_SIZE;
@@ -267,8 +296,6 @@ void handleCommand(char* cmd) {
     }
   }
 }
-
-// ... [calibrate, processRgbLine, handleStepCommand, processModeCommand functions remain exactly the same] ...
 
 void handleStepCommand(char* dir) {
   digitalWrite(enPin, LOW);
@@ -337,8 +364,6 @@ bool processThrMove(float targetTheta, float targetRho) {
   shouldAbort = false;
 
   for (int i = 1; i <= steps; i++) {
-    // If we aren't holding a pending move, keep emptying the hardware mailbox 
-    // so the USB cord doesn't overflow while the motors are spinning!
     if (!hasPendingMove) {
       processSerialQueue(); 
     }
@@ -386,7 +411,6 @@ void moveToPolar(float theta, float rho) {
 
   if (delayUs < centerDelay) delayUs = centerDelay;
 
-  // --- REACTIVE CORNERING ---
   static int lastDirArm = -1; static int lastDirBase = -1; static int brakeCounter = 0;
   int dirA = (da > 0) ? 1 : ((da < 0) ? 0 : lastDirArm);
   int dirB = (db > 0) ? 1 : ((db < 0) ? 0 : lastDirBase);
