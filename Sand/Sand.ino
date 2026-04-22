@@ -44,7 +44,7 @@ int perimeterDelay = 1200; // Fast perimeter sweeps
 float SPEED_MULTIPLIER = 1.0;
 
 // --- COMMAND RESERVOIR (RING BUFFER) ---
-#define QUEUE_SIZE 64 // Array size 64
+#define QUEUE_SIZE 128 // Array size 64
 float qTheta[QUEUE_SIZE];
 float qRho[QUEUE_SIZE];
 volatile int qHead = 0;
@@ -464,14 +464,45 @@ void moveToPolar(float theta, float rho) {
 
   float stepsPerMmEdge = stepsPerRad / tableRadius; 
   float targetTimeMicros = perimeterDelay * stepsPerMmEdge;
-
   int delayUs = round(targetTimeMicros / steps);
 
   if (delayUs < centerDelay) {
     delayUs = centerDelay;
   }
 
-  moveBresenham(da, db, delayUs);
+  // --- THE REACTIVE CORNERING BRAKE ---
+  // These 'static' variables remember the motor state between 1mm moves
+  static int lastDirArm = -1;
+  static int lastDirBase = -1;
+  static int brakeCounter = 0;
+  
+  // If a motor doesn't move this segment (da=0), it inherits its last known direction
+  int dirA = (da > 0) ? 1 : ((da < 0) ? 0 : lastDirArm);
+  int dirB = (db > 0) ? 1 : ((db < 0) ? 0 : lastDirBase);
+  
+  // Did either motor violently reverse direction?
+  if (lastDirArm != -1 && lastDirBase != -1) {
+    if (dirA != lastDirArm || dirB != lastDirBase) {
+      brakeCounter = 10; // Trigger the soft-start for the next 10 millimeters!
+    }
+  }
+  
+  lastDirArm = dirA;
+  lastDirBase = dirB;
+  
+  int finalDelay = delayUs;
+  
+  // Apply the Acceleration Ramp
+  if (brakeCounter > 0) {
+    // If brakeCounter is 10, speed is cut by 4x. 
+    // It smoothly drops to 3.7x, 3.4x, etc., until back to normal speed.
+    float brakeMultiplier = 1.0 + (0.3 * brakeCounter); 
+    finalDelay = round(delayUs * brakeMultiplier);
+    brakeCounter--;
+  }
+  // ------------------------------------
+
+  moveBresenham(da, db, finalDelay);
   
   curBaseSteps = target.baseSteps; 
   curElbowSteps = target.elbowSteps;

@@ -430,6 +430,8 @@
             "#A1C4FD", "#C2E9FB", "#FBC2EB", "#E2BBFF", "#FFDAB9", "#8FD3F4"
         ]; 
         
+        let userFavorites = JSON.parse(localStorage.getItem('led_user_favorites')) || [];
+        
         let settingsMode = false;
         let selectedMode = 2; // 1: Flash, 2: Fade, 3: Jump
         let modePresets = Array(12).fill("#ffffff");
