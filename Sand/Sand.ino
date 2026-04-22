@@ -128,9 +128,9 @@ void setup() {
 }
 
 void loop() {
-  if (!hasPendingMove) {
-    processSerialQueue();
-  }
+  // THE FIX: The Arduino must ALWAYS listen to the USB cord, 
+  // so it can hear the "RESUME" shout even if the queue is totally full.
+  processSerialQueue();
   
   updateLedMode();
 
@@ -364,13 +364,13 @@ bool processThrMove(float targetTheta, float targetRho) {
   shouldAbort = false;
 
   for (int i = 1; i <= steps; i++) {
-    if (!hasPendingMove) {
-      processSerialQueue(); 
-    }
+    // THE FIX: Never stop listening!
+    processSerialQueue(); 
 
     while (paused) {
       delay(10);
-      if (!hasPendingMove) processSerialQueue(); 
+      // THE FIX: Never stop listening, even while paused!
+      processSerialQueue(); 
       if (shouldAbort) break;
     }
     
