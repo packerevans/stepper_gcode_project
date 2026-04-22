@@ -321,14 +321,14 @@ def on_job_finished(): process_queue(wait_enabled=True)
 
 def process_queue(wait_enabled=True):
     global current_job_name, is_looping, is_waiting, is_paused, skip_cooldown
-    
+
     # Prevent multiple overlapping queue processors
     if current_gcode_runner and current_gcode_runner.is_alive(): return
-    if is_waiting and wait_enabled: return 
+    if is_waiting and wait_enabled: return
 
     def run_queue():
-        global is_waiting, skip_cooldown, is_looping
-        
+        global is_waiting, skip_cooldown, is_looping, is_paused
+
         if wait_enabled:
             is_waiting = True
             try:
@@ -340,24 +340,28 @@ def process_queue(wait_enabled=True):
                     wait_time = int(raw_cd)
             except (ValueError, TypeError):
                 wait_time = 30
-                
+
             log_message(f"Cooling down for {wait_time}s...")
             if arduino_connected:
                 with lock: arduino.write(b"PAUSE\n")
-            
+
             # Wait loop with early exit checks
-            for _ in range(wait_time): 
+            elapsed = 0
+            while elapsed < wait_time:
                 if skip_cooldown: break
-                # Exit if loop cancelled and queue emptied during wait
                 if not is_looping and len(job_queue) == 0: break
+
+                # If paused during cooldown, don't count down
+                if not is_paused:
+                    elapsed += 1
+
                 time.sleep(1)
-            
+
             is_waiting = False
             skip_cooldown = False
 
         # Find the next job AFTER the wait
-        next_job = None
-        if len(job_queue) > 0: 
+        next_job = None        if len(job_queue) > 0: 
             next_job = job_queue.popleft()
         elif is_looping and len(loop_playlist) > 0:
             next_file = loop_playlist.pop(0)
@@ -521,6 +525,11 @@ def controller_page(): return render_template("controller.html")
 def manual_move():
     global current_theta, current_rho
     if not arduino_connected: return jsonify(success=False, error="Arduino Disconnected")
+    
+    # Block manual moves if design is playing or in cooldown
+    if (current_gcode_runner and current_gcode_runner.is_alive()) or is_waiting:
+        return jsonify(success=False, error="Cannot move manually while design is active"), 400
+
     data = request.json
     theta = data.get("theta")
     rho = data.get("rho")
@@ -729,9 +738,13 @@ def send_command():
     global is_paused
     cmd = request.json.get("command")
     if cmd == "CLEAR":
-        global is_looping, loop_playlist; is_looping = False; loop_playlist = []; job_queue.clear()
+        global is_looping, loop_playlist, is_paused; 
+        is_looping = False; loop_playlist = []; job_queue.clear(); is_paused = False
         if current_gcode_runner: current_gcode_runner.is_running = False
-        if arduino_connected: lock.acquire(); arduino.write(b"CLEAR\n"); lock.release()
+        if arduino_connected: 
+            with lock: 
+                arduino.write(b"CLEAR\n")
+                arduino.write(b"RESUME\n")
         return jsonify(success=True)
     if cmd == "PAUSE": is_paused = True
     elif cmd == "RESUME": is_paused = False

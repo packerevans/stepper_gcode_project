@@ -328,9 +328,8 @@
         <div id="sent-popup">SENT!</div>
 
         <div id="motion-warning" style="display:none; background: #dc2626; color: #fff; padding: 15px; text-align: center; margin-bottom: 20px; font-weight: 800;">
-            <div style="margin-bottom: 10px;">DESIGN IN MOTION</div>
+            <div style="margin-bottom: 10px;">END DESIGN BEFORE CONTROLLING</div>
             <div style="display: flex; gap: 10px; justify-content: center;">
-                <button class="btn-action" style="padding: 8px 16px; font-size: 12px; background: #fff; color: #000;" id="motionPauseBtn" onclick="sendCommand('PAUSE')">Pause Design</button>
                 <button class="btn-action" style="padding: 8px 16px; font-size: 12px; background: #000; color: #fff; border-color: #fff;" onclick="quitDesign()">Quit Design</button>
             </div>
         </div>
@@ -354,7 +353,7 @@
             </div>
 
             <div style="display: flex; justify-content: center;">
-                <button class="btn-action" onclick="resetToCenter()" style="width: 100%; max-width: 250px;">Center Arm</button>
+                <button id="centerBtn" class="btn-action" onclick="resetToCenter()" style="width: 100%; max-width: 250px;">Center Arm</button>
             </div>
         </div>
     </div>
@@ -427,7 +426,8 @@
                 const res = await fetch('/status_full');
                 const data = await res.json();
                 const warning = document.getElementById('motion-warning');
-                const pauseBtn = document.getElementById('motionPauseBtn');
+                const joy = document.getElementById('joyContainer');
+                const centerBtn = document.getElementById('centerBtn');
                 
                 // Simulator sync: Update ball position from server
                 if (data.position && (data.playing || !hasInitialized)) {
@@ -441,12 +441,14 @@
                     }
                 }
 
-                if (data.playing) {
+                if (data.playing || data.is_waiting) {
                     warning.style.display = 'block';
-                    pauseBtn.innerText = data.is_paused ? 'Resume Design' : 'Pause Design';
-                    pauseBtn.onclick = () => sendCommand(data.is_paused ? 'RESUME' : 'PAUSE');
+                    joy.style.display = 'none';
+                    centerBtn.style.display = 'none';
                 } else {
                     warning.style.display = 'none';
+                    joy.style.display = 'flex';
+                    centerBtn.style.display = 'block';
                 }
             } catch(e) {}
         }
