@@ -1,5 +1,5 @@
 /*
- * Sand Table Firmware - Theta-Rho Processor
+ * Sand Table Firmware - Theta-Rho Processor with Command Reservoir
  * Optimized for LGT8F328P (32MHz) & TMC2209 Stepper Drivers
  */
 
@@ -33,19 +33,29 @@ const int ms3 = 19;
 const float tableRadius = 202.6; 
 const float L1 = 101.3;          
 const float L2 = 101.3;          
-// THE FIX: An idler pulley does not change the transmission ratio. 46/52 is exactly 1.0!
-const float gearRatio = 1.209;
+const float gearRatio = 1.209; // Your perfect empirical ratio
 const float stepsPerDeg = 8.888888;
 const float stepsPerRad = stepsPerDeg * (180.0 / PI);
 const float interpolationRes = 1.0; 
 
 // --- SPEED SETTINGS ---
-int centerDelay = 350;    
-int perimeterDelay = 1500; 
+int centerDelay = 250;     // Fast crossing
+int perimeterDelay = 1200; // Fast perimeter sweeps
 float SPEED_MULTIPLIER = 1.0;
 
+// --- COMMAND RESERVOIR (RING BUFFER) ---
+#define QUEUE_SIZE 5 // Array size of 5 holds 4 commands safely
+float qTheta[QUEUE_SIZE];
+float qRho[QUEUE_SIZE];
+volatile int qHead = 0;
+volatile int qTail = 0;
+bool owesOK = false;
+
+bool isQueueFull() { return ((qHead + 1) % QUEUE_SIZE) == qTail; }
+bool isQueueEmpty() { return qHead == qTail; }
+
 // --- LED MODE STATE ---
-int ledMode = 0; // 0: Static, 1: Flash, 2: Fade, 3: Jump
+int ledMode = 0; 
 unsigned long ledInterval = 1000;
 unsigned long lastLedUpdate = 0;
 int currentModeStep = 0;
@@ -72,7 +82,7 @@ void processSerialQueue();
 void handleCommand(char* cmd);
 void calibrate();
 void processRgbLine(char* line);
-bool processThrLine(char* line);
+bool processThrMove(float targetTheta, float targetRho);
 void processModeCommand(char* data);
 void moveToPolar(float theta, float rho);
 IKResult calculateIK(float x, float y);
@@ -82,14 +92,13 @@ void setup() {
   Serial.begin(BAUD_RATE);
   Serial.setTimeout(10);
 
-  // Load ALL saved positions from EEPROM (Steps AND Coordinates)
+  // Load ALL saved positions from EEPROM
   int eeAddr = 0;
   EEPROM.get(eeAddr, curBaseSteps); eeAddr += sizeof(long);
   EEPROM.get(eeAddr, curElbowSteps); eeAddr += sizeof(long);
   EEPROM.get(eeAddr, curTheta); eeAddr += sizeof(float);
   EEPROM.get(eeAddr, curRho);
   
-  // Sanity check: if EEPROM is fresh (all 255/FF), initialize to perfect center
   if (curBaseSteps == -1 && curElbowSteps == -1) {
     curTheta = 0; 
     curRho = 0;
@@ -107,13 +116,12 @@ void setup() {
 
   pinMode(redPin, OUTPUT); pinMode(greenPin, OUTPUT); pinMode(bluePin, OUTPUT);
 
-  // Microstepping Setup
   pinMode(ms1, OUTPUT); pinMode(ms2, OUTPUT); pinMode(ms3, OUTPUT);
   digitalWrite(ms1, HIGH); 
   digitalWrite(ms2, HIGH); 
   digitalWrite(ms3, LOW);
 
-  digitalWrite(enPin, LOW); // Energize motors
+  digitalWrite(enPin, LOW); 
   Serial.println(F("SAND_TABLE_READY"));
 }
 
@@ -125,6 +133,31 @@ void loop() {
     digitalWrite(dirBase, LOW);
     digitalWrite(stepBase, HIGH); delayMicroseconds(2);
     digitalWrite(stepBase, LOW);  delayMicroseconds(1000); 
+  }
+
+  // --- RESERVOIR EXECUTION ENGINE ---
+  // If we have commands saved up, pop the oldest one and execute it!
+  if (!isExecutingThr && !isQueueEmpty() && !paused) {
+    isExecutingThr = true;
+    
+    float nextTheta = qTheta[qTail];
+    float nextRho = qRho[qTail];
+    qTail = (qTail + 1) % QUEUE_SIZE;
+
+    // We just freed up a slot! If Python was blocked waiting for an OK, send it now.
+    if (owesOK) {
+      Serial.println(F("OK"));
+      owesOK = false;
+    }
+
+    if (!processThrMove(nextTheta, nextRho)) {
+      // If the move was aborted (CLEAR), flush the reservoir
+      qHead = 0; 
+      qTail = 0;
+      owesOK = false;
+      Serial.println(F("ABORTED"));
+    }
+    isExecutingThr = false;
   }
 }
 
@@ -223,6 +256,7 @@ void handleCommand(char* cmd) {
     paused = true; 
     digitalWrite(enPin, HIGH); 
     shouldAbort = true;
+    qHead = 0; qTail = 0; owesOK = false; // Flush reservoir
     Serial.println(F("CLEARED"));
   }
   else if (strcasecmp(start, "CALIBRATE") == 0) {
@@ -247,6 +281,7 @@ void handleCommand(char* cmd) {
     curElbowSteps = zeroPos.elbowSteps;
     
     baseCalRotating = false;
+    qHead = 0; qTail = 0; owesOK = false; // Flush reservoir
     
     int eeAddr = 0;
     EEPROM.put(eeAddr, curBaseSteps); eeAddr += sizeof(long);
@@ -260,8 +295,9 @@ void handleCommand(char* cmd) {
     float newMult = atof(start + 6);
     if (newMult > 0.1 && newMult < 10.0) {
       SPEED_MULTIPLIER = newMult;
-      centerDelay = 500 / SPEED_MULTIPLIER;
-      perimeterDelay = 3000 / SPEED_MULTIPLIER;
+      // You can still use the multiplier via web app if needed!
+      centerDelay = 250 / SPEED_MULTIPLIER;
+      perimeterDelay = 1200 / SPEED_MULTIPLIER;
       Serial.print(F("SPEED_SET:")); Serial.println(SPEED_MULTIPLIER);
     }
   }
@@ -275,14 +311,26 @@ void handleCommand(char* cmd) {
     Serial.println(F("RGB_OK"));
   }
   else {
-    if (!isExecutingThr) {
-      isExecutingThr = true;
-      if (processThrLine(start)) {
-        Serial.println(F("OK"));
-      } else {
-        Serial.println(F("ABORTED"));
+    // --- THIS IS THE RESERVOIR FILLER ---
+    char* spacePtr = strchr(start, ' ');
+    if (spacePtr != NULL) {
+      *spacePtr = '\0'; 
+      float targetTheta = atof(start);
+      float targetRho = atof(spacePtr + 1);
+
+      if (!isQueueFull()) {
+        qTheta[qHead] = targetTheta;
+        qRho[qHead] = targetRho;
+        qHead = (qHead + 1) % QUEUE_SIZE;
+
+        // If we STILL have room, tell Python to send another immediately!
+        if (!isQueueFull()) {
+          Serial.println(F("OK"));
+        } else {
+          // Reservoir is full. Withhold the OK to block Python until a move finishes.
+          owesOK = true; 
+        }
       }
-      isExecutingThr = false;
     }
   }
 }
@@ -324,6 +372,7 @@ void calibrate() {
   curBaseSteps = zeroPos.baseSteps;
   curElbowSteps = zeroPos.elbowSteps;
   
+  qHead = 0; qTail = 0; owesOK = false;
   Serial.println(F("CALIBRATION_COMPLETE"));
 }
 
@@ -344,14 +393,7 @@ void processRgbLine(char* line) {
   }
 }
 
-bool processThrLine(char* line) {
-  char* spacePtr = strchr(line, ' ');
-  if (spacePtr == NULL) return false;
-
-  *spacePtr = '\0'; 
-  float targetTheta = atof(line);
-  float targetRho = atof(spacePtr + 1);
-
+bool processThrMove(float targetTheta, float targetRho) {
   float distTheta = targetTheta - curTheta;
   float distRho = targetRho - curRho;
 
@@ -371,7 +413,7 @@ bool processThrLine(char* line) {
   shouldAbort = false;
 
   for (int i = 1; i <= steps; i++) {
-    processSerialQueue(); 
+    processSerialQueue(); // Keeps the reservoir filling in the background!
 
     while (paused) {
       delay(10);
@@ -444,8 +486,6 @@ IKResult calculateIK(float x, float y) {
     dist = maxReach; 
   }
   
-  // THE FIX: If crossing dead center, hold the base safely locked in place and just fold the elbow.
-  // This prevents the arm from violently unwinding 10 rotations if a design hits rho = 0.
   if (dist < 1.0) {
     float lastT1 = -(float)curBaseSteps / stepsPerRad;
     return { 
