@@ -672,9 +672,19 @@ def remove_from_queue():
 
 @app.route("/set_loop", methods=["POST"])
 def set_loop():
-    global is_looping, loop_playlist
-    loop_playlist = request.json.get("files", []); is_looping = True
-    if not current_gcode_runner or not current_gcode_runner.is_alive(): process_queue(wait_enabled=False)
+    global is_looping, loop_playlist, skip_cooldown
+    # designs.html sends 'filenames', but we also check 'files' for compatibility
+    new_files = request.json.get("filenames", request.json.get("files", []))
+    loop_playlist = new_files
+    is_looping = len(loop_playlist) > 0
+    
+    log_message(f"Loop set with {len(loop_playlist)} items. Looping: {is_looping}")
+    
+    if is_looping:
+        if is_waiting:
+            skip_cooldown = True
+        elif not current_gcode_runner or not current_gcode_runner.is_alive():
+            process_queue(wait_enabled=False)
     return jsonify(success=True)
 
 @app.route("/cancel_loop", methods=["POST"])

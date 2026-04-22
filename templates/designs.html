@@ -390,10 +390,12 @@
         async function shuffleLoop() {
             if(allFiles.length === 0) return;
             showPopup("SHUFFLING!");
+            // Create a shuffled copy of allFiles
+            let shuffled = [...allFiles].sort(() => Math.random() - 0.5);
             await fetch(`${BASE_URL}/set_loop`, { 
                 method: "POST", 
                 headers: {"Content-Type": "application/json"}, 
-                body: JSON.stringify({filenames: allFiles}) 
+                body: JSON.stringify({filenames: shuffled}) 
             });
             updateQ();
         }
