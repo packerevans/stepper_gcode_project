@@ -1344,7 +1344,7 @@
 function interpolateBetween(x1, y1, x2, y2, targetArray) {
             const dist = Math.hypot(x2-x1, y2-y1);
             // THE FIX: Increased from 1.0 to 4.0 to stop serial starvation!
-            const steps = Math.max(1, Math.floor(dist / 4.0)); 
+            const steps = Math.max(1, Math.floor(dist / 1.0)); 
             for(let i=0; i<=steps; i++) {
                 const t = i/steps;
                 targetArray.push({

@@ -44,7 +44,7 @@ int perimeterDelay = 1200; // Fast perimeter sweeps
 float SPEED_MULTIPLIER = 1.0;
 
 // --- COMMAND RESERVOIR (RING BUFFER) ---
-#define QUEUE_SIZE 5 // Array size of 5 holds 4 commands safely
+#define QUEUE_SIZE 64 // Array size 64
 float qTheta[QUEUE_SIZE];
 float qRho[QUEUE_SIZE];
 volatile int qHead = 0;
