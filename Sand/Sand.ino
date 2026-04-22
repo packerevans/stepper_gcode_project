@@ -40,8 +40,8 @@ const float stepsPerRad = stepsPerDeg * (180.0 / PI);
 const float interpolationRes = 1.0; 
 
 // --- SPEED SETTINGS ---
-int centerDelay = 500;    
-int perimeterDelay = 3000; 
+int centerDelay = 350;    
+int perimeterDelay = 1500; 
 float SPEED_MULTIPLIER = 1.0;
 
 // --- LED MODE STATE ---
