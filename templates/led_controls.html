@@ -742,7 +742,9 @@
                     container.appendChild(circle);
                 });
             } else {
-                DEFAULT_FAVS.forEach((color, i) => {
+                // Show default favorites followed by user added favorites
+                const allFavs = [...DEFAULT_FAVS, ...userFavorites];
+                allFavs.forEach((color, i) => {
                     const circle = document.createElement('div');
                     circle.className = 'fav-circle';
                     circle.style.backgroundColor = color;
@@ -750,6 +752,31 @@
                     container.appendChild(circle);
                 });
             }
+            
+            const clearBtn = document.getElementById('clearPresetsBtn');
+            if (!settingsMode) {
+                clearBtn.style.display = userFavorites.length > 0 ? 'block' : 'none';
+                clearBtn.onclick = clearUserFavorites;
+                clearBtn.innerText = "Clear Colors";
+            }
+        }
+
+        function saveCurrentToFavorite() {
+            const current = document.getElementById('colorPicker').value;
+            // Prevent duplicates and limit count
+            if (!userFavorites.includes(current)) {
+                userFavorites.push(current);
+                if (userFavorites.length > 24) userFavorites.shift(); // Limit to 24 user colors
+                localStorage.setItem('led_user_favorites', JSON.stringify(userFavorites));
+                loadFavorites();
+            }
+        }
+
+        function clearUserFavorites() {
+            if(!confirm("Clear all your saved colors?")) return;
+            userFavorites = [];
+            localStorage.setItem('led_user_favorites', JSON.stringify(userFavorites));
+            loadFavorites();
         }
 
         function sendModeCommand() {
@@ -769,13 +796,6 @@
             const duration = (parseFloat(document.getElementById('durSlider').value) * 1000).toFixed(0);
             const cmd = `C${selectedMode},${duration},${colors.join(',')}`;
             sendCommand(cmd);
-        }
-
-        function saveCurrentToFavorite() {
-            const current = document.getElementById('colorPicker').value;
-            // This function remains for non-settings mode if needed, 
-            // but the request focuses on the new settings behavior.
-            alert("Presets are currently locked to pastel defaults.");
         }
 
         async function sendCommand(cmd, logIt = true) {
