@@ -33,10 +33,11 @@ const int ms3 = 19;
 const float tableRadius = 202.6; 
 const float L1 = 101.3;          
 const float L2 = 101.3;          
-const float gearRatio = (52/46);
+// THE FIX: An idler pulley does not change the transmission ratio. 48 to 48 is exactly 1.0!
+const float gearRatio = 1.125;
 const float stepsPerDeg = 8.888888;
 const float stepsPerRad = stepsPerDeg * (180.0 / PI);
-const float interpolationRes = 1.0; // LGT8 @ 32MHz easily handles 1.0mm
+const float interpolationRes = 1.0; 
 
 // --- SPEED SETTINGS ---
 int centerDelay = 500;    
@@ -110,7 +111,7 @@ void setup() {
   pinMode(ms1, OUTPUT); pinMode(ms2, OUTPUT); pinMode(ms3, OUTPUT);
   digitalWrite(ms1, HIGH); 
   digitalWrite(ms2, HIGH); 
-  digitalWrite(ms3, LOW); // Note: On some TMC2209 boards, pulling MS3 HIGH enables SpreadCycle (noisy). Set LOW for StealthChop (silent) if needed.
+  digitalWrite(ms3, LOW);
 
   digitalWrite(enPin, LOW); // Energize motors
   Serial.println(F("SAND_TABLE_READY"));
@@ -151,7 +152,7 @@ void updateLedMode() {
   if (ledMode == 0 || numModeColors == 0) return;
   
   unsigned long now = millis();
-  if (ledMode == 1) { // Flash
+  if (ledMode == 1) { 
     if (now - lastLedUpdate >= ledInterval) {
       lastLedUpdate = now;
       currentModeStep = (currentModeStep + 1) % (numModeColors * 2);
@@ -165,7 +166,7 @@ void updateLedMode() {
       }
     }
   }
-  else if (ledMode == 2) { // Fade
+  else if (ledMode == 2) { 
     float t = (float)((now - lastLedUpdate) % ledInterval) / ledInterval;
     if (now - lastLedUpdate >= ledInterval) {
       lastLedUpdate = now;
@@ -177,7 +178,7 @@ void updateLedMode() {
     int b = modeColors[currentModeStep].b + (modeColors[nextStep].b - modeColors[currentModeStep].b) * t;
     analogWrite(redPin, r); analogWrite(greenPin, g); analogWrite(bluePin, b);
   }
-  else if (ledMode == 3) { // Jump
+  else if (ledMode == 3) { 
     if (now - lastLedUpdate >= ledInterval) {
       lastLedUpdate = now;
       currentModeStep = (currentModeStep + 1) % numModeColors;
@@ -204,7 +205,6 @@ void processSerialQueue() {
 }
 
 void handleCommand(char* cmd) {
-  // Trim leading whitespace
   char* start = cmd;
   while (*start == ' ' || *start == '\t') start++;
   
@@ -212,7 +212,6 @@ void handleCommand(char* cmd) {
 
   if (strcasecmp(start, "PAUSE") == 0) {
     paused = true; 
-    // enPin remains LOW so TMC2209 holds torque and microstep position
     Serial.println(F("PAUSED"));
   }
   else if (strcasecmp(start, "RESUME") == 0 || strcasecmp(start, "R") == 0) {
@@ -222,7 +221,7 @@ void handleCommand(char* cmd) {
   }
   else if (strcasecmp(start, "CLEAR") == 0) {
     paused = true; 
-    digitalWrite(enPin, HIGH); // Safe to cut power since we are dropping position tracking anyway
+    digitalWrite(enPin, HIGH); 
     shouldAbort = true;
     Serial.println(F("CLEARED"));
   }
@@ -240,19 +239,15 @@ void handleCommand(char* cmd) {
     handleStepCommand(start + 5);
   }
   else if (strcasecmp(start, "SET_ZERO") == 0) {
-    // 1. We assume you just manually jogged the ball perfectly to the center
     curTheta = 0;
     curRho = 0;
     
-    // 2. We sync the step counters to exactly what the math expects for the center position
     IKResult zeroPos = calculateIK(0, 0);
     curBaseSteps = zeroPos.baseSteps;
     curElbowSteps = zeroPos.elbowSteps;
     
-    // 3. Clear state flags
     baseCalRotating = false;
     
-    // 4. PERSIST ALL STATE to memory so it survives a reboot
     int eeAddr = 0;
     EEPROM.put(eeAddr, curBaseSteps); eeAddr += sizeof(long);
     EEPROM.put(eeAddr, curElbowSteps); eeAddr += sizeof(long);
@@ -275,7 +270,7 @@ void handleCommand(char* cmd) {
     Serial.println(F("MODE_OK"));
   }
   else if (strchr(start, ',') != NULL) {
-    ledMode = 0; // Stop any animation on manual color change
+    ledMode = 0; 
     processRgbLine(start);
     Serial.println(F("RGB_OK"));
   }
@@ -297,10 +292,9 @@ void calibrate() {
   digitalWrite(enPin, LOW);
   Serial.println(F("STATUS:CALIBRATING"));
 
-  long maxHomingSteps = stepsPerRad * PI * 2.5; // Max steps before assuming hardware failure
+  long maxHomingSteps = stepsPerRad * PI * 2.5; 
   long currentSteps = 0;
 
-  // Home Base
   digitalWrite(dirBase, HIGH); 
   while (digitalRead(baseStopPin) == HIGH && currentSteps < maxHomingSteps) {
     digitalWrite(stepBase, HIGH); delayMicroseconds(2);
@@ -312,7 +306,6 @@ void calibrate() {
     return;
   }
 
-  // Home Arm
   currentSteps = 0;
   digitalWrite(dirArm, HIGH);
   while (digitalRead(elbowStopPin) == HIGH && currentSteps < maxHomingSteps) {
@@ -325,7 +318,6 @@ void calibrate() {
     return;
   }
 
-  // Sync variables to the center perfectly
   curTheta = 0; 
   curRho = 0;
   IKResult zeroPos = calculateIK(0, 0);
@@ -363,20 +355,15 @@ bool processThrLine(char* line) {
   float distTheta = targetTheta - curTheta;
   float distRho = targetRho - curRho;
 
-  // --- THE SHORTEST PATH FILTER ---
-  // If the GCode jumps from -PI to +PI, the math sees a full 360° spin (6.28).
-  // This filter forces the Arduino to realize they are the exact same physical 
-  // spot and take the shortest path, preventing violent loops!
   while (distTheta > PI) {
     distTheta -= (2.0 * PI);
   }
   while (distTheta < -PI) {
     distTheta += (2.0 * PI);
   }
-  // --------------------------------
   
   float avgR = ((curRho + targetRho) / 2.0) * tableRadius;
-  float totalDist = sqrt(pow(avgR * abs(distTheta), 2) + pow(abs(distRho * tableRadius), 2));
+  float totalDist = sqrt(pow(avgR * fabs(distTheta), 2) + pow(fabs(distRho * tableRadius), 2));
   
   int steps = ceil(totalDist / interpolationRes);
   if (steps < 1) steps = 1;
@@ -401,13 +388,9 @@ bool processThrLine(char* line) {
     moveToPolar(curTheta + (distTheta * (float)i/steps), curRho + (distRho * (float)i/steps));
   }
 
-  // Update physical position tracking
   curTheta = curTheta + distTheta; 
   curRho = targetRho;
   
-  // --- PREVENT FLOATING POINT PRECISION LOSS ---
-  // Silently resets the internal math memory to 0 after every 
-  // physical rotation so the 32-bit chip stays accurate on long playlists.
   const long baseRevSteps = round((2.0 * PI) * stepsPerRad);
   const long elbowRevSteps = round((2.0 * PI) * stepsPerRad * gearRatio);
 
@@ -421,7 +404,6 @@ bool processThrLine(char* line) {
     curBaseSteps -= baseRevSteps;
     curElbowSteps -= elbowRevSteps;
   }
-  // ---------------------------------------------
   
   return true;
 }
@@ -436,21 +418,13 @@ void moveToPolar(float theta, float rho) {
   long db = target.baseSteps - curBaseSteps;
   long steps = max(abs(da), abs(db));
 
-  // If no movement is required, exit early
   if (steps == 0) return;
 
-  // 1. Calculate the ideal time a 1mm segment SHOULD take, based on your UI's perimeter setting.
-  // (stepsPerRad / tableRadius) gives us the exact steps needed for a 1mm arc at the very edge.
   float stepsPerMmEdge = stepsPerRad / tableRadius; 
   float targetTimeMicros = perimeterDelay * stepsPerMmEdge;
 
-  // 2. Divide the target time by the actual steps required for THIS specific move.
-  // This forces the delay to dynamically adapt to the geometry!
   int delayUs = round(targetTimeMicros / steps);
 
-  // 3. Enforce your hardware speed limit (centerDelay).
-  // Near the exact dead-center, the math will demand infinite RPM. 
-  // This clamp protects the TMC2209s from stalling.
   if (delayUs < centerDelay) {
     delayUs = centerDelay;
   }
@@ -469,8 +443,16 @@ IKResult calculateIK(float x, float y) {
     y *= (maxReach/dist); 
     dist = maxReach; 
   }
-  // Apply gearRatio properly at the dead-center exit so it doesn't math-jump
-  if (dist < 1.0) return { 0, (long)round(-gearRatio * PI * stepsPerRad) }; 
+  
+  // THE FIX: If crossing dead center, hold the base safely locked in place and just fold the elbow.
+  // This prevents the arm from violently unwinding 10 rotations if a design hits rho = 0.
+  if (dist < 1.0) {
+    float lastT1 = -(float)curBaseSteps / stepsPerRad;
+    return { 
+      curBaseSteps, 
+      (long)round(-(PI + gearRatio * lastT1) * stepsPerRad)
+    };
+  }
   
   float lastT1 = -(float)curBaseSteps / stepsPerRad;
   float cosBend = (dist * dist - L1 * L1 - L2 * L2) / (2.0 * L1 * L2);
@@ -481,7 +463,7 @@ IKResult calculateIK(float x, float y) {
   
   return { 
     (long)round(-t1 * stepsPerRad), 
-    (long)round(-gearRatio * (bend + t1) * stepsPerRad)
+    (long)round(-(bend + gearRatio * t1) * stepsPerRad)
   };
 }
 
@@ -508,7 +490,6 @@ void moveBresenham(long da, long db, int delayUs) {
       accB += steps; 
     }
     
-    // TMC2209 handles 2us pulse easily
     delayMicroseconds(2); 
     digitalWrite(stepArm, LOW); 
     digitalWrite(stepBase, LOW);
@@ -518,7 +499,6 @@ void moveBresenham(long da, long db, int delayUs) {
 }
 
 void processModeCommand(char* data) {
-  // Format: <mode>,<duration>,<r1>,<g1>,<b1>,...
   char* ptr = data;
   ledMode = atoi(ptr);
   ptr = strchr(ptr, ','); if (!ptr) return; ptr++;
