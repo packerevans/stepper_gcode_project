@@ -34,7 +34,7 @@ const float tableRadius = 202.6;
 const float L1 = 101.3;          
 const float L2 = 101.3;          
 // THE FIX: An idler pulley does not change the transmission ratio. 46/52 is exactly 1.0!
-const float gearRatio = 1;
+const float gearRatio = 1.150;
 const float stepsPerDeg = 8.888888;
 const float stepsPerRad = stepsPerDeg * (180.0 / PI);
 const float interpolationRes = 1.0; 
