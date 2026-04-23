@@ -36,7 +36,7 @@ const float L2 = 101.3;
 const float gearRatio = 1.209; 
 const float stepsPerDeg = 8.888888;
 const float stepsPerRad = stepsPerDeg * (180.0 / PI);
-const float interpolationRes = 0.5; // Ultra-high resolution!
+const float interpolationRes = 3; // Ultra-high resolution!
 
 // --- PURE SPEED SETTINGS ---
 int currentStepDelay = 1000; 
