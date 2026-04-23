@@ -36,12 +36,12 @@ const float L2 = 101.3;
 const float gearRatio = 1.209; 
 const float stepsPerDeg = 8.888888;
 const float stepsPerRad = stepsPerDeg * (180.0 / PI);
-const float interpolationRes = 1.0; 
+const float interpolationRes = 4.0; 
 
 // --- PURE SPEED SETTINGS ---
 // A constant, unchanging delay. The motors will hum at a perfect RPM.
 int currentStepDelay = 1000; 
-float SPEED_MULTIPLIER = 10.0;
+float SPEED_MULTIPLIER = 1.0;
 
 // --- RAW STEP RESERVOIR ---
 #define QUEUE_SIZE 128 
