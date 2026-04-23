@@ -361,7 +361,8 @@ def process_queue(wait_enabled=True):
             skip_cooldown = False
 
         # Find the next job AFTER the wait
-        next_job = None        if len(job_queue) > 0: 
+        next_job = None
+        if len(job_queue) > 0: 
             next_job = job_queue.popleft()
         elif is_looping and len(loop_playlist) > 0:
             next_file = loop_playlist.pop(0)
