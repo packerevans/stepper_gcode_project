@@ -36,7 +36,7 @@ const float L2 = 101.3;
 const float gearRatio = 1.209; 
 const float stepsPerDeg = 8.888888;
 const float stepsPerRad = stepsPerDeg * (180.0 / PI);
-const float interpolationRes = 6.0; 
+const float interpolationRes = 0.5; 
 
 // --- PURE SPEED SETTINGS ---
 // A constant, unchanging delay. The motors will hum at a perfect RPM.
