@@ -1,5 +1,6 @@
 /*
  * Sand Table Firmware - Continuous-Time State Machine (Non-Blocking)
+ * Featuring "Soft Pause" Batch Draining & 3.0mm Wiggle Room
  * Optimized for LGT8F328P (32MHz) & TMC2209 Stepper Drivers
  */
 
@@ -33,10 +34,10 @@ const int ms3 = 19;
 const float tableRadius = 202.6; 
 const float L1 = 101.3;          
 const float L2 = 101.3;          
-const float gearRatio = 1.209; 
+const float gearRatio = 1.2041; 
 const float stepsPerDeg = 8.888888;
 const float stepsPerRad = stepsPerDeg * (180.0 / PI);
-const float interpolationRes = 3; // Ultra-high resolution!
+const float interpolationRes = 3.0; // The 3mm wiggle room for buttery sweeping!
 
 // --- PURE SPEED SETTINGS ---
 int currentStepDelay = 1000; 
@@ -57,10 +58,11 @@ long stepDb[STEP_QUEUE_SIZE];
 volatile int stepHead = 0;
 volatile int stepTail = 0;
 
-// --- THE HOLDING PATTERN (The Deadlock Fix) ---
+// --- THE HOLDING PATTERNS ---
 bool hasPendingCmd = false;
 float pendingTheta = 0;
 float pendingRho = 0;
+bool isSoftPausing = false; // NEW: The Soft Pause Flag
 
 // --- PLANNER STATE ---
 bool isDrawingLine = false;
@@ -142,24 +144,18 @@ void setup() {
 }
 
 void loop() {
-  // 1. THE HEARTBEAT: Checks the clock and steps the motors blindly
   runStepperEngine();
-
-  // 2. THE INBOX: Always listen to the USB cord (Never unplug ears!)
   processSerialQueue();
 
-  // 3. THE QUEUE MANAGER: If we are holding a package, wait for a spot, then drop it in!
   if (hasPendingCmd && (((cmdHead + 1) % CMD_QUEUE_SIZE) != cmdTail)) {
     cmdTheta[cmdHead] = pendingTheta;
     cmdRho[cmdHead] = pendingRho;
     cmdHead = (cmdHead + 1) % CMD_QUEUE_SIZE;
     hasPendingCmd = false;
-    Serial.println(F("OK")); // Finally unblock Python!
+    Serial.println(F("OK")); 
   }
 
-  // 4. THE BRAIN: Trickles trigonometry math into the motor queue one segment at a time
   processMathPlanner();
-
   updateLedMode();
 
   if (baseCalRotating && stepsRemaining == 0) {
@@ -167,16 +163,20 @@ void loop() {
     digitalWrite(stepBase, HIGH); delayMicroseconds(2); digitalWrite(stepBase, LOW); delayMicroseconds(1000); 
   }
 
-  // Handle final SYNC command
+  // --- THE SOFT PAUSE TRIGGER ---
+  // Waits until all buffers are completely empty before locking the motors
+  if (isSoftPausing && !hasPendingCmd && (cmdHead == cmdTail) && (stepHead == stepTail) && stepsRemaining == 0) {
+    isSoftPausing = false;
+    paused = true;
+    Serial.println(F("PAUSED"));
+  }
+
   if (!isDrawingLine && !hasPendingCmd && (cmdHead == cmdTail) && (stepHead == stepTail) && stepsRemaining == 0 && owesSyncOK) {
     Serial.println(F("OK"));
     owesSyncOK = false;
   }
 }
 
-// ==========================================
-// THE HEARTBEAT (Zero Math, Pure Physics)
-// ==========================================
 void runStepperEngine() {
   if (paused) return;
 
@@ -225,9 +225,6 @@ void runStepperEngine() {
   }
 }
 
-// ==========================================
-// THE BRAIN (Trickle Math Engine)
-// ==========================================
 void processMathPlanner() {
   if (!isDrawingLine && (cmdHead != cmdTail)) {
     lineTargetTheta = cmdTheta[cmdTail];
@@ -324,15 +321,20 @@ void handleCommand(char* cmd) {
   if (strlen(start) == 0 || start[0] == '#') return;
 
   if (strcasecmp(start, "PAUSE") == 0) {
-    paused = true; Serial.println(F("PAUSED"));
+    isSoftPausing = true; 
+    Serial.println(F("STATUS:DRAINING_BATCH"));
   }
   else if (strcasecmp(start, "RESUME") == 0 || strcasecmp(start, "R") == 0) {
-    paused = false; Serial.println(F("RESUMED"));
+    paused = false; 
+    isSoftPausing = false;
+    Serial.println(F("RESUMED"));
   }
   else if (strcasecmp(start, "CLEAR") == 0) {
-    paused = true; digitalWrite(enPin, HIGH); 
+    paused = true; 
+    isSoftPausing = false;
+    digitalWrite(enPin, HIGH); 
     cmdHead = 0; cmdTail = 0; stepHead = 0; stepTail = 0; stepsRemaining = 0; isDrawingLine = false; owesSyncOK = false;
-    hasPendingCmd = false; // Clear the holding pattern too!
+    hasPendingCmd = false; 
     planTheta = 0; planRho = 0; IKResult zeroPos = calculateIK(0, 0, 0);
     planBaseSteps = zeroPos.baseSteps; planElbowSteps = zeroPos.elbowSteps;
     curBaseSteps = zeroPos.baseSteps; curElbowSteps = zeroPos.elbowSteps;
@@ -355,7 +357,7 @@ void handleCommand(char* cmd) {
     planBaseSteps = zeroPos.baseSteps; planElbowSteps = zeroPos.elbowSteps;
     curBaseSteps = zeroPos.baseSteps; curElbowSteps = zeroPos.elbowSteps;
     baseCalRotating = false; cmdHead = 0; cmdTail = 0; stepHead = 0; stepTail = 0; stepsRemaining = 0; isDrawingLine = false; owesSyncOK = false;
-    hasPendingCmd = false; // Clear the holding pattern too!
+    hasPendingCmd = false; isSoftPausing = false; paused = false;
     
     int eeAddr = 0; EEPROM.put(eeAddr, curBaseSteps); eeAddr += sizeof(long);
     EEPROM.put(eeAddr, curElbowSteps); eeAddr += sizeof(long);
@@ -386,14 +388,12 @@ void handleCommand(char* cmd) {
       float targetTheta = atof(start);
       float targetRho = atof(spacePtr + 1);
 
-      // Check if the inbox has room
       if (((cmdHead + 1) % CMD_QUEUE_SIZE) != cmdTail) {
         cmdTheta[cmdHead] = targetTheta;
         cmdRho[cmdHead] = targetRho;
         cmdHead = (cmdHead + 1) % CMD_QUEUE_SIZE;
         Serial.println(F("OK")); 
       } else {
-        // INBOX FULL! Hold it securely in our hands and do NOT say OK yet.
         hasPendingCmd = true;
         pendingTheta = targetTheta;
         pendingRho = targetRho;
@@ -435,7 +435,7 @@ void calibrate() {
   planTheta = 0; planRho = 0; IKResult zeroPos = calculateIK(0, 0, 0); 
   planBaseSteps = zeroPos.baseSteps; planElbowSteps = zeroPos.elbowSteps;
   curBaseSteps = zeroPos.baseSteps; curElbowSteps = zeroPos.elbowSteps;
-  cmdHead = 0; cmdTail = 0; stepHead = 0; stepTail = 0; owesSyncOK = false; hasPendingCmd = false; 
+  cmdHead = 0; cmdTail = 0; stepHead = 0; stepTail = 0; owesSyncOK = false; hasPendingCmd = false; isSoftPausing = false;
   Serial.println(F("CALIBRATION_COMPLETE"));
 }
 
