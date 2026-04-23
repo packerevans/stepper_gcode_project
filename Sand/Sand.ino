@@ -1,5 +1,5 @@
 /*
- * Sand Table Firmware - Raw Step Pre-Calculation Pipeline
+ * Sand Table Firmware - Pure Producer/Consumer Architecture
  * Optimized for LGT8F328P (32MHz) & TMC2209 Stepper Drivers
  */
 
@@ -43,30 +43,20 @@ int centerDelay = 250;
 int perimeterDelay = 1200; 
 float SPEED_MULTIPLIER = 1.0;
 
-// --- RAW STEP RESERVOIR ---
-// We now store raw steps, skipping math during movement!
+// --- ASYNCHRONOUS COMMAND RESERVOIR ---
 #define QUEUE_SIZE 128 
-long qDa[QUEUE_SIZE];
-long qDb[QUEUE_SIZE];
-int qDelay[QUEUE_SIZE];
+float qTheta[QUEUE_SIZE];
+float qRho[QUEUE_SIZE];
 volatile int qHead = 0;
 volatile int qTail = 0;
-bool owesSyncOK = false;
 
 bool isQueueFull() { return ((qHead + 1) % QUEUE_SIZE) == qTail; }
 bool isQueueEmpty() { return qHead == qTail; }
 
-// --- THE PLANNER TRACKERS ---
-// The brain tracks where the math is currently at
-float planTheta = 0;
-float planRho = 0;
-long planBaseSteps = 0;
-long planElbowSteps = 0;
-
-// --- THE PHYSICAL TRACKERS ---
-// The motors track where the arm is actually at
-long curBaseSteps = 0;
-long curElbowSteps = 0;
+// --- THE HOLDING PATTERN ---
+bool hasPendingMove = false;
+float pendingTheta = 0;
+float pendingRho = 0;
 
 // --- LED MODE STATE ---
 int ledMode = 0; 
@@ -75,6 +65,12 @@ unsigned long lastLedUpdate = 0;
 int currentModeStep = 0;
 int numModeColors = 0;
 struct { byte r, g, b; } modeColors[12];
+
+// --- STATE VARIABLES ---
+float curTheta = 0;
+float curRho = 0;
+long curBaseSteps = 0;
+long curElbowSteps = 0;
 
 bool paused = false;
 bool isExecutingThr = false;
@@ -89,13 +85,13 @@ int bufIdx = 0;
 void processSerialQueue();
 void handleCommand(char* cmd);
 void calibrate();
-void planMove(float targetTheta, float targetRho);
-void executeNextMove();
-IKResult calculateIK(float x, float y, long referenceBaseSteps);
+void processRgbLine(char* line);
+bool processThrMove(float targetTheta, float targetRho);
+void processModeCommand(char* data);
+void moveToPolar(float theta, float rho);
+IKResult calculateIK(float x, float y);
 void moveBresenham(long da, long db, int delayUs);
 void updateLedMode();
-void processRgbLine(char* line);
-void processModeCommand(char* data);
 void handleStepCommand(char* dir);
 
 void setup() {
@@ -105,18 +101,15 @@ void setup() {
   int eeAddr = 0;
   EEPROM.get(eeAddr, curBaseSteps); eeAddr += sizeof(long);
   EEPROM.get(eeAddr, curElbowSteps); eeAddr += sizeof(long);
-  EEPROM.get(eeAddr, planTheta); eeAddr += sizeof(float);
-  EEPROM.get(eeAddr, planRho);
+  EEPROM.get(eeAddr, curTheta); eeAddr += sizeof(float);
+  EEPROM.get(eeAddr, curRho);
   
   if (curBaseSteps == -1 && curElbowSteps == -1) {
-    planTheta = 0; planRho = 0;
-    IKResult zeroPos = calculateIK(0, 0, 0);
+    curTheta = 0; curRho = 0;
+    IKResult zeroPos = calculateIK(0, 0);
     curBaseSteps = zeroPos.baseSteps; 
     curElbowSteps = zeroPos.elbowSteps;
   }
-  
-  planBaseSteps = curBaseSteps;
-  planElbowSteps = curElbowSteps;
   
   pinMode(stepBase, OUTPUT); pinMode(dirBase, OUTPUT);
   pinMode(stepArm, OUTPUT);  pinMode(dirArm, OUTPUT);
@@ -135,7 +128,10 @@ void setup() {
 }
 
 void loop() {
+  // THE FIX: The Arduino must ALWAYS listen to the USB cord, 
+  // so it can hear the "RESUME" shout even if the queue is totally full.
   processSerialQueue();
+  
   updateLedMode();
 
   if (baseCalRotating && !isExecutingThr) {
@@ -144,144 +140,69 @@ void loop() {
     digitalWrite(stepBase, LOW);  delayMicroseconds(1000); 
   }
 
-  // --- THE CONSUMER ENGINE ---
-  // Constantly empty the raw step queue. No math allowed here!
-  if (!isQueueEmpty()) {
-    executeNextMove();
-  } else if (!isExecutingThr && owesSyncOK) {
-    Serial.println(F("OK"));
-    owesSyncOK = false;
+  // PART 1: THE PRODUCER (The Inbox Handler)
+  if (hasPendingMove && !isQueueFull()) {
+    qTheta[qHead] = pendingTheta;
+    qRho[qHead] = pendingRho;
+    qHead = (qHead + 1) % QUEUE_SIZE;
+    hasPendingMove = false;
+    Serial.println(F("OK")); 
+  }
+
+  // PART 2: THE CONSUMER (The Motor Driver)
+  if (!isExecutingThr && !isQueueEmpty() && !paused) {
+    isExecutingThr = true;
+    
+    float nextTheta = qTheta[qTail];
+    float nextRho = qRho[qTail];
+    qTail = (qTail + 1) % QUEUE_SIZE;
+
+    if (!processThrMove(nextTheta, nextRho)) {
+      qHead = 0; qTail = 0; hasPendingMove = false;
+      Serial.println(F("ABORTED"));
+    }
+    isExecutingThr = false;
   }
 }
 
-void executeNextMove() {
-  if (paused || isQueueEmpty()) return;
-  isExecutingThr = true;
+void updateLedMode() {
+  if (ledMode == 0 || numModeColors == 0) return;
   
-  long da = qDa[qTail];
-  long db = qDb[qTail];
-  int delayUs = qDelay[qTail];
-  qTail = (qTail + 1) % QUEUE_SIZE;
-
-  moveBresenham(da, db, delayUs);
-  
-  curBaseSteps += db; // Base
-  curElbowSteps += da; // Arm/Elbow
-
-  isExecutingThr = false;
-}
-
-void planMove(float targetTheta, float targetRho) {
-  float distTheta = targetTheta - planTheta;
-  float distRho = targetRho - planRho;
-
-  while (distTheta > PI) distTheta -= (2.0 * PI);
-  while (distTheta < -PI) distTheta += (2.0 * PI);
-  
-  float avgR = ((planRho + targetRho) / 2.0) * tableRadius;
-  float totalDist = sqrt(pow(avgR * fabs(distTheta), 2) + pow(fabs(distRho * tableRadius), 2));
-  
-  int steps = ceil(totalDist / interpolationRes);
-  if (steps < 1) steps = 1;
-
-  for (int i = 1; i <= steps; i++) {
-    if (shouldAbort) break;
-
-    float nextTheta = planTheta + (distTheta * (float)i/steps);
-    float nextRho = planRho + (distRho * (float)i/steps);
-
-    float r_mm = nextRho * tableRadius;
-    float x = r_mm * cos(nextTheta);
-    float y = r_mm * sin(nextTheta);
-
-    IKResult target = calculateIK(x, y, planBaseSteps);
-
-    long da = target.elbowSteps - planElbowSteps; // Arm
-    long db = target.baseSteps - planBaseSteps;   // Base
-    long maxSteps = max(abs(da), abs(db));
-
-    if (maxSteps > 0) {
-      float stepsPerMmEdge = stepsPerRad / tableRadius; 
-      float targetTimeMicros = perimeterDelay * stepsPerMmEdge;
-      int delayUs = round(targetTimeMicros / maxSteps);
-
-      if (delayUs < centerDelay) delayUs = centerDelay;
-
-      // Soft-Start Cornering Math
-      static int lastDirArm = -1; static int lastDirBase = -1; static int brakeCounter = 0;
-      int dirA = (da > 0) ? 1 : ((da < 0) ? 0 : lastDirArm);
-      int dirB = (db > 0) ? 1 : ((db < 0) ? 0 : lastDirBase);
-      
-      if (lastDirArm != -1 && lastDirBase != -1) {
-        if (dirA != lastDirArm || dirB != lastDirBase) brakeCounter = 10; 
+  unsigned long now = millis();
+  if (ledMode == 1) { 
+    if (now - lastLedUpdate >= ledInterval) {
+      lastLedUpdate = now;
+      currentModeStep = (currentModeStep + 1) % (numModeColors * 2);
+      if (currentModeStep % 2 == 0) {
+        int idx = currentModeStep / 2;
+        analogWrite(redPin, modeColors[idx].r);
+        analogWrite(greenPin, modeColors[idx].g);
+        analogWrite(bluePin, modeColors[idx].b);
+      } else {
+        analogWrite(redPin, 0); analogWrite(greenPin, 0); analogWrite(bluePin, 0);
       }
-      lastDirArm = dirA; lastDirBase = dirB;
-      
-      int finalDelay = delayUs;
-      if (brakeCounter > 0) {
-        finalDelay = round(delayUs * (1.0 + 0.3 * brakeCounter));
-        brakeCounter--;
-      }
-
-      // If the queue is full, keep spinning the motors until a spot opens up!
-      while (isQueueFull()) {
-        executeNextMove();
-        processSerialQueue(); // Keep listening for Pause/Clear
-        if (shouldAbort) break;
-      }
-
-      // Push raw steps to the Consumer
-      qDa[qHead] = da;
-      qDb[qHead] = db;
-      qDelay[qHead] = finalDelay;
-      qHead = (qHead + 1) % QUEUE_SIZE;
-
-      planBaseSteps = target.baseSteps; 
-      planElbowSteps = target.elbowSteps;
     }
   }
-
-  planTheta = targetTheta; 
-  planRho = targetRho;
-  
-  // Internal Precision Saver
-  const long baseRevSteps = round((2.0 * PI) * stepsPerRad);
-  const long elbowRevSteps = round((2.0 * PI) * stepsPerRad * gearRatio);
-
-  while (planTheta > PI) { planTheta -= (2.0 * PI); planBaseSteps += baseRevSteps; planElbowSteps += elbowRevSteps; }
-  while (planTheta < -PI) { planTheta += (2.0 * PI); planBaseSteps -= baseRevSteps; planElbowSteps -= elbowRevSteps; }
-}
-
-IKResult calculateIK(float x, float y, long referenceBaseSteps) {
-  float dist = hypot(x, y); 
-  const float maxReach = L1 + L2;
-  if (dist > maxReach) { x *= (maxReach/dist); y *= (maxReach/dist); dist = maxReach; }
-  
-  if (dist < 1.0) {
-    float lastT1 = -(float)referenceBaseSteps / stepsPerRad;
-    return { referenceBaseSteps, (long)round(-(PI + gearRatio * lastT1) * stepsPerRad) };
+  else if (ledMode == 2) { 
+    float t = (float)((now - lastLedUpdate) % ledInterval) / ledInterval;
+    if (now - lastLedUpdate >= ledInterval) {
+      lastLedUpdate = now;
+      currentModeStep = (currentModeStep + 1) % numModeColors;
+    }
+    int nextStep = (currentModeStep + 1) % numModeColors;
+    int r = modeColors[currentModeStep].r + (modeColors[nextStep].r - modeColors[currentModeStep].r) * t;
+    int g = modeColors[currentModeStep].g + (modeColors[nextStep].g - modeColors[currentModeStep].g) * t;
+    int b = modeColors[currentModeStep].b + (modeColors[nextStep].b - modeColors[currentModeStep].b) * t;
+    analogWrite(redPin, r); analogWrite(greenPin, g); analogWrite(bluePin, b);
   }
-  
-  float lastT1 = -(float)referenceBaseSteps / stepsPerRad;
-  float cosBend = (dist * dist - L1 * L1 - L2 * L2) / (2.0 * L1 * L2);
-  float bend = acos(max(-1.0f, min(1.0f, cosBend)));
-  float t1 = atan2(y, x) - atan2(L2 * sin(bend), L1 + L2 * cos(bend));
-  
-  t1 = t1 - (round((t1 - lastT1) / (2.0 * PI)) * 2.0 * PI);
-  return { (long)round(-t1 * stepsPerRad), (long)round(-(bend + gearRatio * t1) * stepsPerRad) };
-}
-
-void moveBresenham(long da, long db, int delayUs) {
-  if (da == 0 && db == 0) return;
-  digitalWrite(dirArm, (da >= 0) ? HIGH : LOW); digitalWrite(dirBase, (db >= 0) ? HIGH : LOW);
-  long ad = abs(da); long bd = abs(db); long steps = max(ad, bd);
-  long accA = steps / 2; long accB = steps / 2;
-  
-  for (long i = 0; i < steps; i++) {
-    accA -= ad; if (accA < 0) { digitalWrite(stepArm, HIGH); accA += steps; }
-    accB -= bd; if (accB < 0) { digitalWrite(stepBase, HIGH); accB += steps; }
-    delayMicroseconds(2); digitalWrite(stepArm, LOW); digitalWrite(stepBase, LOW);
-    delayMicroseconds(max(1, delayUs));
+  else if (ledMode == 3) { 
+    if (now - lastLedUpdate >= ledInterval) {
+      lastLedUpdate = now;
+      currentModeStep = (currentModeStep + 1) % numModeColors;
+      analogWrite(redPin, modeColors[currentModeStep].r);
+      analogWrite(greenPin, modeColors[currentModeStep].g);
+      analogWrite(bluePin, modeColors[currentModeStep].b);
+    }
   }
 }
 
@@ -313,15 +234,10 @@ void handleCommand(char* cmd) {
   }
   else if (strcasecmp(start, "CLEAR") == 0) {
     paused = true; digitalWrite(enPin, HIGH); shouldAbort = true;
-    qHead = 0; qTail = 0; owesSyncOK = false;
-    planTheta = 0; planRho = 0; 
-    IKResult zeroPos = calculateIK(0, 0, 0);
-    planBaseSteps = zeroPos.baseSteps; planElbowSteps = zeroPos.elbowSteps;
-    curBaseSteps = zeroPos.baseSteps; curElbowSteps = zeroPos.elbowSteps;
-    Serial.println(F("CLEARED"));
+    qHead = 0; qTail = 0; hasPendingMove = false; Serial.println(F("CLEARED"));
   }
   else if (strcasecmp(start, "CALIBRATE") == 0) {
-    if (isQueueEmpty() && !isExecutingThr) calibrate();
+    if (!isExecutingThr) calibrate();
   }
   else if (strcasecmp(start, "START_BASE") == 0) {
     baseCalRotating = true; digitalWrite(enPin, LOW);
@@ -333,22 +249,17 @@ void handleCommand(char* cmd) {
     handleStepCommand(start + 5);
   }
   else if (strcasecmp(start, "SET_ZERO") == 0) {
-    planTheta = 0; planRho = 0;
-    IKResult zeroPos = calculateIK(0, 0, 0);
-    planBaseSteps = zeroPos.baseSteps; planElbowSteps = zeroPos.elbowSteps;
+    curTheta = 0; curRho = 0;
+    IKResult zeroPos = calculateIK(0, 0);
     curBaseSteps = zeroPos.baseSteps; curElbowSteps = zeroPos.elbowSteps;
-    
-    baseCalRotating = false; qHead = 0; qTail = 0; owesSyncOK = false;
+    baseCalRotating = false; qHead = 0; qTail = 0; hasPendingMove = false;
     
     int eeAddr = 0;
     EEPROM.put(eeAddr, curBaseSteps); eeAddr += sizeof(long);
     EEPROM.put(eeAddr, curElbowSteps); eeAddr += sizeof(long);
-    EEPROM.put(eeAddr, planTheta); eeAddr += sizeof(float);
-    EEPROM.put(eeAddr, planRho);
+    EEPROM.put(eeAddr, curTheta); eeAddr += sizeof(float);
+    EEPROM.put(eeAddr, curRho);
     Serial.println(F("ZERO_SAVED"));
-  }
-  else if (strcasecmp(start, "SYNC") == 0) {
-    owesSyncOK = true; 
   }
   else if (strncasecmp(start, "SPEED ", 6) == 0) {
     float newMult = atof(start + 6);
@@ -372,9 +283,16 @@ void handleCommand(char* cmd) {
       float targetTheta = atof(start);
       float targetRho = atof(spacePtr + 1);
 
-      shouldAbort = false;
-      planMove(targetTheta, targetRho);
-      Serial.println(F("OK")); 
+      if (isQueueFull()) {
+        hasPendingMove = true;
+        pendingTheta = targetTheta;
+        pendingRho = targetRho;
+      } else {
+        qTheta[qHead] = targetTheta;
+        qRho[qHead] = targetRho;
+        qHead = (qHead + 1) % QUEUE_SIZE;
+        Serial.println(F("OK")); 
+      }
     }
   }
 }
@@ -413,40 +331,9 @@ void calibrate() {
   }
   if (currentSteps >= maxHomingSteps) { Serial.println(F("ERROR: ARM HOMING FAILED")); return; }
 
-  planTheta = 0; planRho = 0;
-  IKResult zeroPos = calculateIK(0, 0, 0); 
-  planBaseSteps = zeroPos.baseSteps; planElbowSteps = zeroPos.elbowSteps;
-  curBaseSteps = zeroPos.baseSteps; curElbowSteps = zeroPos.elbowSteps;
-  qHead = 0; qTail = 0; owesSyncOK = false; Serial.println(F("CALIBRATION_COMPLETE"));
-}
-
-void updateLedMode() {
-  if (ledMode == 0 || numModeColors == 0) return;
-  unsigned long now = millis();
-  if (ledMode == 1) { 
-    if (now - lastLedUpdate >= ledInterval) {
-      lastLedUpdate = now; currentModeStep = (currentModeStep + 1) % (numModeColors * 2);
-      if (currentModeStep % 2 == 0) {
-        int idx = currentModeStep / 2;
-        analogWrite(redPin, modeColors[idx].r); analogWrite(greenPin, modeColors[idx].g); analogWrite(bluePin, modeColors[idx].b);
-      } else { analogWrite(redPin, 0); analogWrite(greenPin, 0); analogWrite(bluePin, 0); }
-    }
-  }
-  else if (ledMode == 2) { 
-    float t = (float)((now - lastLedUpdate) % ledInterval) / ledInterval;
-    if (now - lastLedUpdate >= ledInterval) { lastLedUpdate = now; currentModeStep = (currentModeStep + 1) % numModeColors; }
-    int nextStep = (currentModeStep + 1) % numModeColors;
-    int r = modeColors[currentModeStep].r + (modeColors[nextStep].r - modeColors[currentModeStep].r) * t;
-    int g = modeColors[currentModeStep].g + (modeColors[nextStep].g - modeColors[currentModeStep].g) * t;
-    int b = modeColors[currentModeStep].b + (modeColors[nextStep].b - modeColors[currentModeStep].b) * t;
-    analogWrite(redPin, r); analogWrite(greenPin, g); analogWrite(bluePin, b);
-  }
-  else if (ledMode == 3) { 
-    if (now - lastLedUpdate >= ledInterval) {
-      lastLedUpdate = now; currentModeStep = (currentModeStep + 1) % numModeColors;
-      analogWrite(redPin, modeColors[currentModeStep].r); analogWrite(greenPin, modeColors[currentModeStep].g); analogWrite(bluePin, modeColors[currentModeStep].b);
-    }
-  }
+  curTheta = 0; curRho = 0;
+  IKResult zeroPos = calculateIK(0, 0); curBaseSteps = zeroPos.baseSteps; curElbowSteps = zeroPos.elbowSteps;
+  qHead = 0; qTail = 0; hasPendingMove = false; Serial.println(F("CALIBRATION_COMPLETE"));
 }
 
 void processRgbLine(char* line) {
@@ -458,6 +345,121 @@ void processRgbLine(char* line) {
       int r = atoi(line); int g = atoi(firstComma + 1); int b = atoi(secondComma + 1);
       analogWrite(redPin, r); analogWrite(greenPin, g); analogWrite(bluePin, b);
     }
+  }
+}
+
+bool processThrMove(float targetTheta, float targetRho) {
+  float distTheta = targetTheta - curTheta;
+  float distRho = targetRho - curRho;
+
+  while (distTheta > PI) { distTheta -= (2.0 * PI); }
+  while (distTheta < -PI) { distTheta += (2.0 * PI); }
+  
+  float avgR = ((curRho + targetRho) / 2.0) * tableRadius;
+  float totalDist = sqrt(pow(avgR * fabs(distTheta), 2) + pow(fabs(distRho * tableRadius), 2));
+  
+  int steps = ceil(totalDist / interpolationRes);
+  if (steps < 1) steps = 1;
+
+  shouldAbort = false;
+
+  for (int i = 1; i <= steps; i++) {
+    // THE FIX: Never stop listening!
+    processSerialQueue(); 
+
+    while (paused) {
+      delay(10);
+      // THE FIX: Never stop listening, even while paused!
+      processSerialQueue(); 
+      if (shouldAbort) break;
+    }
+    
+    if (shouldAbort) {
+      curTheta = curTheta + (distTheta * (float)(i-1)/steps);
+      curRho = curRho + (distRho * (float)(i-1)/steps);
+      return false; 
+    }
+
+    moveToPolar(curTheta + (distTheta * (float)i/steps), curRho + (distRho * (float)i/steps));
+  }
+
+  curTheta = curTheta + distTheta; 
+  curRho = targetRho;
+  
+  const long baseRevSteps = round((2.0 * PI) * stepsPerRad);
+  const long elbowRevSteps = round((2.0 * PI) * stepsPerRad * gearRatio);
+
+  while (curTheta > PI) { curTheta -= (2.0 * PI); curBaseSteps += baseRevSteps; curElbowSteps += elbowRevSteps; }
+  while (curTheta < -PI) { curTheta += (2.0 * PI); curBaseSteps -= baseRevSteps; curElbowSteps -= elbowRevSteps; }
+  
+  return true;
+}
+
+void moveToPolar(float theta, float rho) {
+  float r_mm = rho * tableRadius; float x = r_mm * cos(theta); float y = r_mm * sin(theta);
+  IKResult target = calculateIK(x, y);
+
+  long da = target.elbowSteps - curElbowSteps;
+  long db = target.baseSteps - curBaseSteps;
+  long steps = max(abs(da), abs(db));
+
+  if (steps == 0) return;
+
+  float stepsPerMmEdge = stepsPerRad / tableRadius; 
+  float targetTimeMicros = perimeterDelay * stepsPerMmEdge;
+  int delayUs = round(targetTimeMicros / steps);
+
+  if (delayUs < centerDelay) delayUs = centerDelay;
+
+  static int lastDirArm = -1; static int lastDirBase = -1; static int brakeCounter = 0;
+  int dirA = (da > 0) ? 1 : ((da < 0) ? 0 : lastDirArm);
+  int dirB = (db > 0) ? 1 : ((db < 0) ? 0 : lastDirBase);
+  
+  if (lastDirArm != -1 && lastDirBase != -1) {
+    if (dirA != lastDirArm || dirB != lastDirBase) brakeCounter = 10; 
+  }
+  
+  lastDirArm = dirA; lastDirBase = dirB;
+  int finalDelay = delayUs;
+  if (brakeCounter > 0) {
+    float brakeMultiplier = 1.0 + (0.3 * brakeCounter); 
+    finalDelay = round(delayUs * brakeMultiplier);
+    brakeCounter--;
+  }
+
+  moveBresenham(da, db, finalDelay);
+  curBaseSteps = target.baseSteps; curElbowSteps = target.elbowSteps;
+}
+
+IKResult calculateIK(float x, float y) {
+  float dist = hypot(x, y); const float maxReach = L1 + L2;
+  if (dist > maxReach) { x *= (maxReach/dist); y *= (maxReach/dist); dist = maxReach; }
+  
+  if (dist < 1.0) {
+    float lastT1 = -(float)curBaseSteps / stepsPerRad;
+    return { curBaseSteps, (long)round(-(PI + gearRatio * lastT1) * stepsPerRad) };
+  }
+  
+  float lastT1 = -(float)curBaseSteps / stepsPerRad;
+  float cosBend = (dist * dist - L1 * L1 - L2 * L2) / (2.0 * L1 * L2);
+  float bend = acos(max(-1.0f, min(1.0f, cosBend)));
+  float t1 = atan2(y, x) - atan2(L2 * sin(bend), L1 + L2 * cos(bend));
+  
+  t1 = t1 - (round((t1 - lastT1) / (2.0 * PI)) * 2.0 * PI);
+  return { (long)round(-t1 * stepsPerRad), (long)round(-(bend + gearRatio * t1) * stepsPerRad) };
+}
+
+void moveBresenham(long da, long db, int delayUs) {
+  if (da == 0 && db == 0) return;
+  digitalWrite(dirArm, (da >= 0) ? HIGH : LOW); digitalWrite(dirBase, (db >= 0) ? HIGH : LOW);
+  long ad = abs(da); long bd = abs(db); long steps = max(ad, bd);
+  long accA = steps / 2; long accB = steps / 2;
+  
+  for (long i = 0; i < steps; i++) {
+    accA -= ad; if (accA < 0) { digitalWrite(stepArm, HIGH); accA += steps; }
+    accB -= bd; if (accB < 0) { digitalWrite(stepBase, HIGH); accB += steps; }
+    delayMicroseconds(2); digitalWrite(stepArm, LOW); digitalWrite(stepBase, LOW);
+    delayMicroseconds(max(1, delayUs));
   }
 }
 
