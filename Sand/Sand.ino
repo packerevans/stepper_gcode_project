@@ -57,6 +57,11 @@ long stepDb[STEP_QUEUE_SIZE];
 volatile int stepHead = 0;
 volatile int stepTail = 0;
 
+// --- THE HOLDING PATTERN (The Deadlock Fix) ---
+bool hasPendingCmd = false;
+float pendingTheta = 0;
+float pendingRho = 0;
+
 // --- PLANNER STATE ---
 bool isDrawingLine = false;
 float planTheta = 0;
@@ -140,10 +145,19 @@ void loop() {
   // 1. THE HEARTBEAT: Checks the clock and steps the motors blindly
   runStepperEngine();
 
-  // 2. THE INBOX: Listens to Python instantly
+  // 2. THE INBOX: Always listen to the USB cord (Never unplug ears!)
   processSerialQueue();
 
-  // 3. THE BRAIN: Trickles trigonometry math into the motor queue one segment at a time
+  // 3. THE QUEUE MANAGER: If we are holding a package, wait for a spot, then drop it in!
+  if (hasPendingCmd && (((cmdHead + 1) % CMD_QUEUE_SIZE) != cmdTail)) {
+    cmdTheta[cmdHead] = pendingTheta;
+    cmdRho[cmdHead] = pendingRho;
+    cmdHead = (cmdHead + 1) % CMD_QUEUE_SIZE;
+    hasPendingCmd = false;
+    Serial.println(F("OK")); // Finally unblock Python!
+  }
+
+  // 4. THE BRAIN: Trickles trigonometry math into the motor queue one segment at a time
   processMathPlanner();
 
   updateLedMode();
@@ -154,7 +168,7 @@ void loop() {
   }
 
   // Handle final SYNC command
-  if (!isDrawingLine && (cmdHead == cmdTail) && (stepHead == stepTail) && stepsRemaining == 0 && owesSyncOK) {
+  if (!isDrawingLine && !hasPendingCmd && (cmdHead == cmdTail) && (stepHead == stepTail) && stepsRemaining == 0 && owesSyncOK) {
     Serial.println(F("OK"));
     owesSyncOK = false;
   }
@@ -166,7 +180,6 @@ void loop() {
 void runStepperEngine() {
   if (paused) return;
 
-  // If we finished the last segment, grab the next one from the queue instantly
   if (stepsRemaining == 0) {
     if (stepHead != stepTail) { 
       currentDa = stepDa[stepTail];
@@ -180,11 +193,10 @@ void runStepperEngine() {
       errA = stepsRemaining / 2;
       errB = stepsRemaining / 2;
     } else {
-      return; // Queue is empty, wait for the Brain.
+      return; 
     }
   }
 
-  // If it's time to take a step, pulse the motors!
   if (stepsRemaining > 0) {
     unsigned long currentMicros = micros();
     if (currentMicros - lastStepMicros >= currentStepDelay) {
@@ -200,7 +212,7 @@ void runStepperEngine() {
       if (stepA) digitalWrite(stepArm, HIGH);
       if (stepB) digitalWrite(stepBase, HIGH);
       
-      delayMicroseconds(2); // TMC2209 pulse
+      delayMicroseconds(2); 
       
       if (stepA) digitalWrite(stepArm, LOW);
       if (stepB) digitalWrite(stepBase, LOW);
@@ -217,7 +229,6 @@ void runStepperEngine() {
 // THE BRAIN (Trickle Math Engine)
 // ==========================================
 void processMathPlanner() {
-  // Grab a new incoming line from Python
   if (!isDrawingLine && (cmdHead != cmdTail)) {
     lineTargetTheta = cmdTheta[cmdTail];
     lineTargetRho = cmdRho[cmdTail];
@@ -237,9 +248,8 @@ void processMathPlanner() {
     isDrawingLine = true;
   }
 
-  // Calculate exactly ONE segment and push it to the motors
   if (isDrawingLine) {
-    if (((stepHead + 1) % STEP_QUEUE_SIZE) != stepTail) { // If the motor queue has room
+    if (((stepHead + 1) % STEP_QUEUE_SIZE) != stepTail) { 
       float nextTheta = planTheta + (lineDistTheta * (float)lineCurrentSegment / lineTotalSegments);
       float nextRho = planRho + (lineDistRho * (float)lineCurrentSegment / lineTotalSegments);
 
@@ -261,7 +271,6 @@ void processMathPlanner() {
 
       lineCurrentSegment++;
       
-      // If the line is finished, reset precision variables safely
       if (lineCurrentSegment > lineTotalSegments) {
         planTheta = lineTargetTheta; planRho = lineTargetRho;
         
@@ -323,13 +332,14 @@ void handleCommand(char* cmd) {
   else if (strcasecmp(start, "CLEAR") == 0) {
     paused = true; digitalWrite(enPin, HIGH); 
     cmdHead = 0; cmdTail = 0; stepHead = 0; stepTail = 0; stepsRemaining = 0; isDrawingLine = false; owesSyncOK = false;
+    hasPendingCmd = false; // Clear the holding pattern too!
     planTheta = 0; planRho = 0; IKResult zeroPos = calculateIK(0, 0, 0);
     planBaseSteps = zeroPos.baseSteps; planElbowSteps = zeroPos.elbowSteps;
     curBaseSteps = zeroPos.baseSteps; curElbowSteps = zeroPos.elbowSteps;
     Serial.println(F("CLEARED"));
   }
   else if (strcasecmp(start, "CALIBRATE") == 0) {
-    if ((cmdHead == cmdTail) && (stepHead == stepTail) && stepsRemaining == 0) calibrate();
+    if ((cmdHead == cmdTail) && (stepHead == stepTail) && stepsRemaining == 0 && !hasPendingCmd) calibrate();
   }
   else if (strcasecmp(start, "START_BASE") == 0) {
     baseCalRotating = true; digitalWrite(enPin, LOW);
@@ -345,6 +355,7 @@ void handleCommand(char* cmd) {
     planBaseSteps = zeroPos.baseSteps; planElbowSteps = zeroPos.elbowSteps;
     curBaseSteps = zeroPos.baseSteps; curElbowSteps = zeroPos.elbowSteps;
     baseCalRotating = false; cmdHead = 0; cmdTail = 0; stepHead = 0; stepTail = 0; stepsRemaining = 0; isDrawingLine = false; owesSyncOK = false;
+    hasPendingCmd = false; // Clear the holding pattern too!
     
     int eeAddr = 0; EEPROM.put(eeAddr, curBaseSteps); eeAddr += sizeof(long);
     EEPROM.put(eeAddr, curElbowSteps); eeAddr += sizeof(long);
@@ -375,11 +386,17 @@ void handleCommand(char* cmd) {
       float targetTheta = atof(start);
       float targetRho = atof(spacePtr + 1);
 
+      // Check if the inbox has room
       if (((cmdHead + 1) % CMD_QUEUE_SIZE) != cmdTail) {
         cmdTheta[cmdHead] = targetTheta;
         cmdRho[cmdHead] = targetRho;
         cmdHead = (cmdHead + 1) % CMD_QUEUE_SIZE;
         Serial.println(F("OK")); 
+      } else {
+        // INBOX FULL! Hold it securely in our hands and do NOT say OK yet.
+        hasPendingCmd = true;
+        pendingTheta = targetTheta;
+        pendingRho = targetRho;
       }
     }
   }
@@ -418,7 +435,8 @@ void calibrate() {
   planTheta = 0; planRho = 0; IKResult zeroPos = calculateIK(0, 0, 0); 
   planBaseSteps = zeroPos.baseSteps; planElbowSteps = zeroPos.elbowSteps;
   curBaseSteps = zeroPos.baseSteps; curElbowSteps = zeroPos.elbowSteps;
-  cmdHead = 0; cmdTail = 0; stepHead = 0; stepTail = 0; owesSyncOK = false; Serial.println(F("CALIBRATION_COMPLETE"));
+  cmdHead = 0; cmdTail = 0; stepHead = 0; stepTail = 0; owesSyncOK = false; hasPendingCmd = false; 
+  Serial.println(F("CALIBRATION_COMPLETE"));
 }
 
 void updateLedMode() {
