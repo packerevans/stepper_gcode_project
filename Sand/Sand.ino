@@ -41,7 +41,7 @@ const float interpolationRes = 1.0;
 // --- PURE SPEED SETTINGS ---
 // A constant, unchanging delay. The motors will hum at a perfect RPM.
 int currentStepDelay = 1000; 
-float SPEED_MULTIPLIER = 1.0;
+float SPEED_MULTIPLIER = 4.0;
 
 // --- RAW STEP RESERVOIR ---
 #define QUEUE_SIZE 128 
