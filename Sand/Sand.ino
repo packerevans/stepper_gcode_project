@@ -1,5 +1,5 @@
 /*
- * Sand Table Firmware - Raw Step Pre-Calculation Pipeline
+ * Sand Table Firmware - Pure Motor RPM (Constant Step Rate)
  * Optimized for LGT8F328P (32MHz) & TMC2209 Stepper Drivers
  */
 
@@ -38,13 +38,12 @@ const float stepsPerDeg = 8.888888;
 const float stepsPerRad = stepsPerDeg * (180.0 / PI);
 const float interpolationRes = 1.0; 
 
-// --- SPEED SETTINGS ---
-int centerDelay = 250;     
-int perimeterDelay = 1200; 
+// --- PURE SPEED SETTINGS ---
+// A constant, unchanging delay. The motors will hum at a perfect RPM.
+int currentStepDelay = 1000; 
 float SPEED_MULTIPLIER = 1.0;
 
 // --- RAW STEP RESERVOIR ---
-// We now store raw steps, skipping math during movement!
 #define QUEUE_SIZE 128 
 long qDa[QUEUE_SIZE];
 long qDb[QUEUE_SIZE];
@@ -57,14 +56,12 @@ bool isQueueFull() { return ((qHead + 1) % QUEUE_SIZE) == qTail; }
 bool isQueueEmpty() { return qHead == qTail; }
 
 // --- THE PLANNER TRACKERS ---
-// The brain tracks where the math is currently at
 float planTheta = 0;
 float planRho = 0;
 long planBaseSteps = 0;
 long planElbowSteps = 0;
 
 // --- THE PHYSICAL TRACKERS ---
-// The motors track where the arm is actually at
 long curBaseSteps = 0;
 long curElbowSteps = 0;
 
@@ -145,7 +142,6 @@ void loop() {
   }
 
   // --- THE CONSUMER ENGINE ---
-  // Constantly empty the raw step queue. No math allowed here!
   if (!isQueueEmpty()) {
     executeNextMove();
   } else if (!isExecutingThr && owesSyncOK) {
@@ -165,8 +161,8 @@ void executeNextMove() {
 
   moveBresenham(da, db, delayUs);
   
-  curBaseSteps += db; // Base
-  curElbowSteps += da; // Arm/Elbow
+  curBaseSteps += db; 
+  curElbowSteps += da; 
 
   isExecutingThr = false;
 }
@@ -196,41 +192,20 @@ void planMove(float targetTheta, float targetRho) {
 
     IKResult target = calculateIK(x, y, planBaseSteps);
 
-    long da = target.elbowSteps - planElbowSteps; // Arm
-    long db = target.baseSteps - planBaseSteps;   // Base
+    long da = target.elbowSteps - planElbowSteps; 
+    long db = target.baseSteps - planBaseSteps;   
     long maxSteps = max(abs(da), abs(db));
 
     if (maxSteps > 0) {
-      float stepsPerMmEdge = stepsPerRad / tableRadius; 
-      float targetTimeMicros = perimeterDelay * stepsPerMmEdge;
-      int delayUs = round(targetTimeMicros / maxSteps);
+      // THE FIX: No more math. Just raw, pure, constant motor RPM.
+      int finalDelay = currentStepDelay;
 
-      if (delayUs < centerDelay) delayUs = centerDelay;
-
-      // Soft-Start Cornering Math
-      static int lastDirArm = -1; static int lastDirBase = -1; static int brakeCounter = 0;
-      int dirA = (da > 0) ? 1 : ((da < 0) ? 0 : lastDirArm);
-      int dirB = (db > 0) ? 1 : ((db < 0) ? 0 : lastDirBase);
-      
-      if (lastDirArm != -1 && lastDirBase != -1) {
-        if (dirA != lastDirArm || dirB != lastDirBase) brakeCounter = 10; 
-      }
-      lastDirArm = dirA; lastDirBase = dirB;
-      
-      int finalDelay = delayUs;
-      if (brakeCounter > 0) {
-        finalDelay = round(delayUs * (1.0 + 0.3 * brakeCounter));
-        brakeCounter--;
-      }
-
-      // If the queue is full, keep spinning the motors until a spot opens up!
       while (isQueueFull()) {
         executeNextMove();
-        processSerialQueue(); // Keep listening for Pause/Clear
+        processSerialQueue(); 
         if (shouldAbort) break;
       }
 
-      // Push raw steps to the Consumer
       qDa[qHead] = da;
       qDb[qHead] = db;
       qDelay[qHead] = finalDelay;
@@ -244,7 +219,6 @@ void planMove(float targetTheta, float targetRho) {
   planTheta = targetTheta; 
   planRho = targetRho;
   
-  // Internal Precision Saver
   const long baseRevSteps = round((2.0 * PI) * stepsPerRad);
   const long elbowRevSteps = round((2.0 * PI) * stepsPerRad * gearRatio);
 
@@ -354,8 +328,8 @@ void handleCommand(char* cmd) {
     float newMult = atof(start + 6);
     if (newMult > 0.1 && newMult < 10.0) {
       SPEED_MULTIPLIER = newMult;
-      centerDelay = 250 / SPEED_MULTIPLIER;
-      perimeterDelay = 1200 / SPEED_MULTIPLIER;
+      // THE FIX: Directly scale the 1000us baseline delay!
+      currentStepDelay = round(1000.0 / SPEED_MULTIPLIER);
       Serial.print(F("SPEED_SET:")); Serial.println(SPEED_MULTIPLIER);
     }
   }
