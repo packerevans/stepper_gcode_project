@@ -1,6 +1,6 @@
 /*
  * Sand Table Firmware - Continuous-Time State Machine (Non-Blocking)
- * Featuring "Soft Pause" Batch Draining & 3.0mm Wiggle Room
+ * Bresenham Drift Patch & 3.0mm Wiggle Room
  * Optimized for LGT8F328P (32MHz) & TMC2209 Stepper Drivers
  */
 
@@ -62,7 +62,7 @@ volatile int stepTail = 0;
 bool hasPendingCmd = false;
 float pendingTheta = 0;
 float pendingRho = 0;
-bool isSoftPausing = false; // NEW: The Soft Pause Flag
+bool isSoftPausing = false; 
 
 // --- PLANNER STATE ---
 bool isDrawingLine = false;
@@ -82,6 +82,7 @@ long curBaseSteps = 0;
 long curElbowSteps = 0;
 unsigned long lastStepMicros = 0;
 long stepsRemaining = 0;
+long currentMaxSteps = 0; // THE FIX: A constant number to lock the Bresenham math!
 long currentDa = 0;
 long currentDb = 0;
 long errA = 0;
@@ -163,8 +164,6 @@ void loop() {
     digitalWrite(stepBase, HIGH); delayMicroseconds(2); digitalWrite(stepBase, LOW); delayMicroseconds(1000); 
   }
 
-  // --- THE SOFT PAUSE TRIGGER ---
-  // Waits until all buffers are completely empty before locking the motors
   if (isSoftPausing && !hasPendingCmd && (cmdHead == cmdTail) && (stepHead == stepTail) && stepsRemaining == 0) {
     isSoftPausing = false;
     paused = true;
@@ -190,8 +189,9 @@ void runStepperEngine() {
       digitalWrite(dirBase, (currentDb >= 0) ? HIGH : LOW);
       
       stepsRemaining = max(abs(currentDa), abs(currentDb));
-      errA = stepsRemaining / 2;
-      errB = stepsRemaining / 2;
+      currentMaxSteps = stepsRemaining; // THE FIX: Lock in the total steps for this segment!
+      errA = currentMaxSteps / 2;
+      errB = currentMaxSteps / 2;
     } else {
       return; 
     }
@@ -206,8 +206,9 @@ void runStepperEngine() {
       long bd = abs(currentDb);
       bool stepA = false; bool stepB = false;
 
-      errA -= ad; if (errA < 0) { stepA = true; errA += stepsRemaining; }
-      errB -= bd; if (errB < 0) { stepB = true; errB += stepsRemaining; }
+      // THE FIX: Use the locked currentMaxSteps to refill the error tracker!
+      errA -= ad; if (errA < 0) { stepA = true; errA += currentMaxSteps; }
+      errB -= bd; if (errB < 0) { stepB = true; errB += currentMaxSteps; }
 
       if (stepA) digitalWrite(stepArm, HIGH);
       if (stepB) digitalWrite(stepBase, HIGH);
