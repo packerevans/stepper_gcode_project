@@ -436,8 +436,10 @@ void calibrate() {
   // Automatic calibration homes to the outer edge (Rho = 1.0)
   planTheta = 0; planRho = 1.0; 
   IKResult edgePos = calculateIK(tableRadius, 0, 0); 
-  planBaseSteps = edgePos.baseSteps; planElbowSteps = edgePos.elbowSteps;
-  curBaseSteps = edgePos.baseSteps; curElbowSteps = edgePos.elbowSteps;
+  planBaseSteps = edgePos.baseSteps; 
+  planElbowSteps = edgePos.elbowSteps + 30; // Offset arm by 30 ticks
+  curBaseSteps = edgePos.baseSteps; 
+  curElbowSteps = edgePos.elbowSteps + 30; // Offset arm by 30 ticks
   
   cmdHead = 0; cmdTail = 0; stepHead = 0; stepTail = 0; stepsRemaining = 0; 
   isDrawingLine = false; owesSyncOK = false; hasPendingCmd = false; isSoftPausing = false;
