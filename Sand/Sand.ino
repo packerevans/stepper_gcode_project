@@ -437,9 +437,9 @@ void calibrate() {
   planTheta = 0; planRho = 1.0; 
   IKResult edgePos = calculateIK(tableRadius, 0, 0); 
   planBaseSteps = edgePos.baseSteps; 
-  planElbowSteps = edgePos.elbowSteps + 30; // Offset arm by 30 ticks
+  planElbowSteps = edgePos.elbowSteps + 60; // Offset arm by 60 ticks
   curBaseSteps = edgePos.baseSteps; 
-  curElbowSteps = edgePos.elbowSteps + 30; // Offset arm by 30 ticks
+  curElbowSteps = edgePos.elbowSteps + 60; // Offset arm by 60 ticks
   
   cmdHead = 0; cmdTail = 0; stepHead = 0; stepTail = 0; stepsRemaining = 0; 
   isDrawingLine = false; owesSyncOK = false; hasPendingCmd = false; isSoftPausing = false;
