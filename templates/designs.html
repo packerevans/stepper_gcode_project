@@ -557,9 +557,23 @@
         function renderGrid(fs) {
             let g=document.getElementById('grid'); g.innerHTML='';
             fs.forEach(f=>{ 
-                let d=document.createElement('div'), clean=f.replace('.txt','').replace('.thr',''); d.className='card'; d.dataset.name=f; d.dataset.baseTime="0"; d.onclick=(e)=>{if(e.target.className!=='select-dot')runDesign(f)}; 
-                d.innerHTML=`<div class="card-img-wrap"><canvas data-f="${f}" width="300" height="300"></canvas><div class="select-dot" onclick="toggleSelect('${f}', event)"></div></div><div class="card-body"><h3 class="card-title">${clean}</h3><div class="card-meta">Est: <span id="t-${clean}">...</span></div></div>`; 
-                g.appendChild(d); observer.observe(d.querySelector('canvas')); 
+                let d=document.createElement('div'), clean=f.name, fname=f.filename; 
+                d.className='card'; d.dataset.name=fname; d.dataset.baseTime="0"; 
+                d.onclick=(e)=>{if(e.target.className!=='select-dot')runDesign(fname)}; 
+                
+                let imgContent = '';
+                if (f.thumbnail) {
+                    imgContent = `<img src="/designs/${f.thumbnail}" style="width:100%; height:100%; object-fit:contain; ${document.body.getAttribute('data-theme')==='dark'?'filter:invert(1);':''}">`;
+                    // Still need to load preview to get the estimated time
+                    setTimeout(() => loadPreview(null, fname), 100);
+                } else {
+                    imgContent = `<canvas data-f="${fname}" width="300" height="300"></canvas>`;
+                }
+
+                d.innerHTML=`<div class="card-img-wrap">${imgContent}<div class="select-dot" onclick="toggleSelect('${fname}', event)"></div></div><div class="card-body"><h3 class="card-title">${clean}</h3><div class="card-meta">Est: <span id="t-${clean}">...</span></div></div>`; 
+                g.appendChild(d); 
+                let cvs = d.querySelector('canvas');
+                if (cvs) observer.observe(cvs); 
             }); renderSel();
         }
         function loadPreview(cvs, f) {
@@ -570,13 +584,19 @@
                     else { let parts = l.split(/\s+/); if(parts.length >= 2) { theta = parseFloat(parts[0]); rho = parseFloat(parts[1]); } }
                     if(!isNaN(theta) && !isNaN(rho)) { let x = rho*202.6*Math.cos(theta), y = rho*202.6*Math.sin(theta); let ik = calculateIK(x, y, tb); tm += Math.max(Math.abs(ik.b-tb), Math.abs(ik.e-te)) * 2000; path.push(getXY(ik.b, ik.e)); tb=ik.b; te=ik.e; }
                 });
-                const card = cvs.closest('.card'), clean = f.replace('.txt','').replace('.thr',''); card.dataset.baseTime = tm;
-                document.getElementById(`t-${clean}`).textContent = formatTimeFromMicroseconds(tm * (globalSettings.speed || 1.0));
-                let ctxP = cvs.getContext('2d'), w=cvs.width, h=cvs.height; ctxP.clearRect(0,0,w,h);
-                let sc = (w/405)*0.9; ctxP.beginPath(); 
-                ctxP.strokeStyle = document.body.getAttribute('data-theme') === 'dark' ? '#fff' : '#000';
-                ctxP.lineWidth = 2;
-                path.forEach((p,i)=>{ if(i===0) ctxP.moveTo(w/2+p.x*sc, h/2+p.y*sc); else ctxP.lineTo(w/2+p.x*sc, h/2+p.y*sc); }); ctxP.stroke();
+                const clean = f.replace('.txt','').replace('.thr','');
+                const card = document.querySelector(`.card[data-name="${f}"]`);
+                if (card) card.dataset.baseTime = tm;
+                let tLabel = document.getElementById(`t-${clean}`);
+                if (tLabel) tLabel.textContent = formatTimeFromMicroseconds(tm * (globalSettings.speed || 1.0));
+                
+                if (cvs) {
+                    let ctxP = cvs.getContext('2d'), w=cvs.width, h=cvs.height; ctxP.clearRect(0,0,w,h);
+                    let sc = (w/405)*0.9; ctxP.beginPath(); 
+                    ctxP.strokeStyle = document.body.getAttribute('data-theme') === 'dark' ? '#fff' : '#000';
+                    ctxP.lineWidth = 2;
+                    path.forEach((p,i)=>{ if(i===0) ctxP.moveTo(w/2+p.x*sc, h/2+p.y*sc); else ctxP.lineTo(w/2+p.x*sc, h/2+p.y*sc); }); ctxP.stroke();
+                }
             });
         }
 

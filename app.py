@@ -9,6 +9,7 @@ import shutil
 from collections import deque
 import wifi_tools 
 from pyngrok import ngrok, conf 
+import thumbnailer
 
 app = Flask(__name__)
 app.secret_key = 'your_super_secret_key' 
@@ -795,8 +796,20 @@ def designs(): return render_template("designs.html")
 def serve_design_file(filename): return send_from_directory(DESIGNS_FOLDER, filename)
 @app.route('/api/designs')
 def list_designs():
-    try: return jsonify([f for f in os.listdir(DESIGNS_FOLDER) if f.endswith('.txt') or f.endswith('.thr')])
-    except: return jsonify([])
+    try:
+        files = [f for f in os.listdir(DESIGNS_FOLDER) if f.endswith('.txt') or f.endswith('.thr')]
+        results = []
+        for f in files:
+            thumb_name = f.replace('.txt', '.png').replace('.thr', '.png')
+            has_thumb = os.path.exists(os.path.join(DESIGNS_FOLDER, thumb_name))
+            results.append({
+                "filename": f,
+                "name": f.replace('.txt', '').replace('.thr', ''),
+                "thumbnail": thumb_name if has_thumb else None
+            })
+        return jsonify(results)
+    except:
+        return jsonify([])
 @app.route("/terminal/logs")
 def get_logs():
     with lock: return jsonify(list(serial_log))
@@ -818,6 +831,9 @@ if __name__ == "__main__":
     # 2. Connect Hardware & Scheduler
     connect_arduino() 
     SchedulerThread().start()
+    
+    # Start Thumbnailer
+    threading.Thread(target=thumbnailer.monitor_designs, args=(DESIGNS_FOLDER,), daemon=True).start()
     
     # 3. Auto-Start Tunnel (Background Thread)
     # This runs in background to avoid blocking server start
