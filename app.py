@@ -415,7 +415,14 @@ def read_from_serial():
                     if "CALIBRATION_COMPLETE" in line:
                         is_calibrating = False
                         calibration_done = True
-                        log_message("CALIBRATION COMPLETE!")
+                        current_theta = 0.0
+                        current_rho = 1.0
+                        log_message("CALIBRATION COMPLETE! Position set to 0, 1")
+                    
+                    if "ZERO_SAVED" in line:
+                        current_theta = 0.0
+                        current_rho = 0.0
+                        log_message("Origin Saved! Position set to 0, 0")
                     
                     if current_gcode_runner: current_gcode_runner.process_incoming_serial(line)
             else: time.sleep(0.01) 

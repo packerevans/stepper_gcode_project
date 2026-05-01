@@ -433,10 +433,21 @@ void calibrate() {
   }
   if (currentSteps >= maxHomingSteps) { Serial.println(F("ERROR: ARM HOMING FAILED")); return; }
 
-  planTheta = 0; planRho = 0; IKResult zeroPos = calculateIK(0, 0, 0); 
-  planBaseSteps = zeroPos.baseSteps; planElbowSteps = zeroPos.elbowSteps;
-  curBaseSteps = zeroPos.baseSteps; curElbowSteps = zeroPos.elbowSteps;
-  cmdHead = 0; cmdTail = 0; stepHead = 0; stepTail = 0; owesSyncOK = false; hasPendingCmd = false; isSoftPausing = false;
+  // Automatic calibration homes to the outer edge (Rho = 1.0)
+  planTheta = 0; planRho = 1.0; 
+  IKResult edgePos = calculateIK(tableRadius, 0, 0); 
+  planBaseSteps = edgePos.baseSteps; planElbowSteps = edgePos.elbowSteps;
+  curBaseSteps = edgePos.baseSteps; curElbowSteps = edgePos.elbowSteps;
+  
+  cmdHead = 0; cmdTail = 0; stepHead = 0; stepTail = 0; stepsRemaining = 0; 
+  isDrawingLine = false; owesSyncOK = false; hasPendingCmd = false; isSoftPausing = false;
+  
+  int eeAddr = 0; 
+  EEPROM.put(eeAddr, curBaseSteps); eeAddr += sizeof(long);
+  EEPROM.put(eeAddr, curElbowSteps); eeAddr += sizeof(long);
+  EEPROM.put(eeAddr, planTheta); eeAddr += sizeof(float); 
+  EEPROM.put(eeAddr, planRho);
+  
   Serial.println(F("CALIBRATION_COMPLETE"));
 }
 
