@@ -469,10 +469,21 @@ void calibrate() {
   // --- BASE HOMING ---
   digitalWrite(dirBase, HIGH);
   while (!baseHomed && currentSteps < maxHomingSteps) {
+    // Safety Net 1: Direct pre-step check
+    if (digitalRead(baseStopPin) == LOW) { baseHomed = true; break; }
+
     digitalWrite(stepBase, HIGH); 
     delayMicroseconds(2); 
     digitalWrite(stepBase, LOW);  
-    delayMicroseconds(2000); 
+    
+    // Safety Net 2: 40 rapid-fire 50us checks instead of 1 blind 2000us block
+    for(int i = 0; i < 40; i++) {
+        delayMicroseconds(50);
+        if (baseHomed || digitalRead(baseStopPin) == LOW) {
+            baseHomed = true;
+            break;
+        }
+    }
     currentSteps++;
   }
   if (currentSteps >= maxHomingSteps && !baseHomed) { Serial.println(F("ERROR: BASE HOMING FAILED")); return; }
@@ -482,10 +493,21 @@ void calibrate() {
   // --- ARM HOMING ---
   digitalWrite(dirArm, HIGH);
   while (!armHomed && currentSteps < maxHomingSteps) {
+    // Safety Net 1: Direct pre-step check
+    if (digitalRead(elbowStopPin) == LOW) { armHomed = true; break; }
+
     digitalWrite(stepArm, HIGH); 
     delayMicroseconds(2); 
     digitalWrite(stepArm, LOW);  
-    delayMicroseconds(2000); 
+    
+    // Safety Net 2: 40 rapid-fire 50us checks
+    for(int i = 0; i < 40; i++) {
+        delayMicroseconds(50);
+        if (armHomed || digitalRead(elbowStopPin) == LOW) {
+            armHomed = true;
+            break;
+        }
+    }
     currentSteps++;
   }
   if (currentSteps >= maxHomingSteps && !armHomed) { Serial.println(F("ERROR: ARM HOMING FAILED")); return; }
