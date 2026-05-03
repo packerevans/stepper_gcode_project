@@ -9,7 +9,12 @@ import shutil
 from collections import deque
 import wifi_tools 
 from pyngrok import ngrok, conf 
-import thumbnailer
+try:
+    import thumbnailer
+except ImportError:
+    thumbnailer = None
+    print("Warning: thumbnailer.py or its dependencies (Pillow) not found. Thumbnails will be disabled.")
+
 
 app = Flask(__name__)
 app.secret_key = 'your_super_secret_key' 
@@ -833,7 +838,10 @@ if __name__ == "__main__":
     SchedulerThread().start()
     
     # Start Thumbnailer
-    threading.Thread(target=thumbnailer.monitor_designs, args=(DESIGNS_FOLDER,), daemon=True).start()
+    if thumbnailer:
+        threading.Thread(target=thumbnailer.monitor_designs, args=(DESIGNS_FOLDER,), daemon=True).start()
+    else:
+        print("Thumbnailer disabled due to missing dependencies.")
     
     # 3. Auto-Start Tunnel (Background Thread)
     # This runs in background to avoid blocking server start

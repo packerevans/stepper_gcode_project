@@ -1,0 +1,5 @@
+Flask
+pyserial
+pyngrok
+Pillow
+waitress
