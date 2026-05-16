@@ -1,6 +1,6 @@
 /*
  * Sand Table Firmware - Continuous-Time State Machine (Non-Blocking)
- * Bresenham Drift Patch & 3.0mm Wiggle Room
+ * Bresenham Drift Patch & 0.5mm Wiggle Room
  * Optimized for LGT8F328P (32MHz) & TMC2209 Stepper Drivers
  */
 
@@ -48,10 +48,10 @@ const float L2 = 101.3;
 const float gearRatio = 1.0; // 1:1 ratio for the 48 - 54 - 48 setup
 const float stepsPerDeg = 8.888888;
 const float stepsPerRad = stepsPerDeg * (180.0 / PI);
-const float interpolationRes = 3.0; // The 3mm wiggle room for buttery sweeping!
+const float interpolationRes = 0.5; // Dropped to 0.5 for extreme micro-segmentation
 
 // --- PURE SPEED SETTINGS ---
-int currentStepDelay = 1000; 
+int currentStepDelay = 1000;
 float SPEED_MULTIPLIER = 1.0;
 
 // --- QUEUE 1: THE INBOX (Theta/Rho) ---
@@ -136,19 +136,19 @@ void setup() {
   EEPROM.get(eeAddr, curElbowSteps); eeAddr += sizeof(long);
   EEPROM.get(eeAddr, planTheta); eeAddr += sizeof(float);
   EEPROM.get(eeAddr, planRho);
-  
+
   if (curBaseSteps == -1 && curElbowSteps == -1) {
     planTheta = 0; planRho = 0;
     IKResult zeroPos = calculateIK(0, 0, 0);
     curBaseSteps = zeroPos.baseSteps; curElbowSteps = zeroPos.elbowSteps;
   }
   planBaseSteps = curBaseSteps; planElbowSteps = curElbowSteps;
-  
+
   pinMode(stepBase, OUTPUT); pinMode(dirBase, OUTPUT);
   pinMode(stepArm, OUTPUT);  pinMode(dirArm, OUTPUT);
   pinMode(enPin, OUTPUT);
   pinMode(elbowStopPin, INPUT_PULLUP); pinMode(baseStopPin, INPUT_PULLUP);
-  
+
   // Attach hardware interrupts to trigger on the falling edge (when switch is pressed to ground)
   attachInterrupt(digitalPinToInterrupt(baseStopPin), baseEndstopISR, FALLING);
   attachInterrupt(digitalPinToInterrupt(elbowStopPin), elbowEndstopISR, FALLING);
@@ -156,7 +156,8 @@ void setup() {
   pinMode(redPin, OUTPUT); pinMode(greenPin, OUTPUT); pinMode(bluePin, OUTPUT);
   pinMode(ms1, OUTPUT); pinMode(ms2, OUTPUT); pinMode(ms3, OUTPUT);
   
-  digitalWrite(ms1, HIGH); digitalWrite(ms2, HIGH); digitalWrite(ms3, LOW);
+  digitalWrite(ms1, HIGH); digitalWrite(ms2, HIGH);
+  digitalWrite(ms3, LOW);
   digitalWrite(enPin, LOW); 
   Serial.println(F("SAND_TABLE_READY"));
 }
@@ -175,7 +176,7 @@ void loop() {
 
   processMathPlanner();
   updateLedMode();
-  
+
   if (baseCalRotating && stepsRemaining == 0) {
     digitalWrite(dirBase, LOW);
     digitalWrite(stepBase, HIGH); delayMicroseconds(2); digitalWrite(stepBase, LOW); delayMicroseconds(1000);
@@ -195,6 +196,7 @@ void loop() {
 
 void runStepperEngine() {
   if (paused) return;
+
   if (stepsRemaining == 0) {
     if (stepHead != stepTail) { 
       currentDa = stepDa[stepTail];
@@ -206,7 +208,7 @@ void runStepperEngine() {
       
       stepsRemaining = max(abs(currentDa), abs(currentDb));
       currentMaxSteps = stepsRemaining;
-      
+
       // THE FIX: Lock in the total steps for this segment!
       errA = currentMaxSteps / 2;
       errB = currentMaxSteps / 2;
@@ -217,19 +219,19 @@ void runStepperEngine() {
 
   if (stepsRemaining > 0) {
     unsigned long currentMicros = micros();
+
     if (currentMicros - lastStepMicros >= currentStepDelay) {
       lastStepMicros = currentMicros;
       
       long ad = abs(currentDa);
       long bd = abs(currentDb);
       bool stepA = false; bool stepB = false;
-      
+
       // THE FIX: Use the locked currentMaxSteps to refill the error tracker!
       errA -= ad;
       if (errA < 0) { stepA = true; errA += currentMaxSteps; }
       errB -= bd;
-      if (errB < 0) { stepB = true; errB += currentMaxSteps;
-      }
+      if (errB < 0) { stepB = true; errB += currentMaxSteps; }
 
       if (stepA) digitalWrite(stepArm, HIGH);
       if (stepB) digitalWrite(stepBase, HIGH);
@@ -255,9 +257,10 @@ void processMathPlanner() {
 
     lineDistTheta = lineTargetTheta - planTheta;
     lineDistRho = lineTargetRho - planRho;
+
     while(lineDistTheta > PI) lineDistTheta -= (2.0 * PI);
     while(lineDistTheta < -PI) lineDistTheta += (2.0 * PI);
-    
+
     float avgR = ((planRho + lineTargetRho) / 2.0) * tableRadius;
     float totalDist = sqrt(pow(avgR * fabs(lineDistTheta), 2) + pow(fabs(lineDistRho * tableRadius), 2));
     
@@ -277,9 +280,10 @@ void processMathPlanner() {
       float y = r_mm * sin(nextTheta);
 
       IKResult target = calculateIK(x, y, planBaseSteps);
+
       long da = target.elbowSteps - planElbowSteps;
       long db = target.baseSteps - planBaseSteps;
-      
+
       if (max(abs(da), abs(db)) > 0) {
         stepDa[stepHead] = da;
         stepDb[stepHead] = db;
@@ -289,15 +293,15 @@ void processMathPlanner() {
       }
 
       lineCurrentSegment++;
+
       if (lineCurrentSegment > lineTotalSegments) {
         planTheta = lineTargetTheta; planRho = lineTargetRho;
+
         const long baseRevSteps = round((2.0 * PI) * stepsPerRad);
         const long elbowRevSteps = round((2.0 * PI) * stepsPerRad * gearRatio);
-        
-        while (planTheta > PI) { planTheta -= (2.0 * PI); planBaseSteps += baseRevSteps; planElbowSteps += elbowRevSteps;
-        }
-        while (planTheta < -PI) { planTheta += (2.0 * PI);
-        planBaseSteps -= baseRevSteps; planElbowSteps -= elbowRevSteps; }
+
+        while (planTheta > PI) { planTheta -= (2.0 * PI); planBaseSteps += baseRevSteps; planElbowSteps += elbowRevSteps; }
+        while (planTheta < -PI) { planTheta += (2.0 * PI); planBaseSteps -= baseRevSteps; planElbowSteps -= elbowRevSteps; }
         
         isDrawingLine = false;
       }
@@ -308,8 +312,7 @@ void processMathPlanner() {
 IKResult calculateIK(float x, float y, long referenceBaseSteps) {
   float dist = hypot(x, y);
   const float maxReach = L1 + L2;
-  if (dist > maxReach) { x *= (maxReach/dist); y *= (maxReach/dist);
-  dist = maxReach; }
+  if (dist > maxReach) { x *= (maxReach/dist); y *= (maxReach/dist); dist = maxReach; }
   
   if (dist < 1.0) {
     float lastT1 = -(float)referenceBaseSteps / stepsPerRad;
@@ -320,6 +323,7 @@ IKResult calculateIK(float x, float y, long referenceBaseSteps) {
   float cosBend = (dist * dist - L1 * L1 - L2 * L2) / (2.0 * L1 * L2);
   float bend = acos(max(-1.0f, min(1.0f, cosBend)));
   float t1 = atan2(y, x) - atan2(L2 * sin(bend), L1 + L2 * cos(bend));
+  
   t1 = t1 - (round((t1 - lastT1) / (2.0 * PI)) * 2.0 * PI);
   return { (long)round(-t1 * stepsPerRad), (long)round(-(bend + gearRatio * t1) * stepsPerRad) };
 }
@@ -343,7 +347,7 @@ void handleCommand(char* cmd) {
   char* start = cmd;
   while (*start == ' ' || *start == '\t') start++;
   if (strlen(start) == 0 || start[0] == '#') return;
-  
+
   if (strcasecmp(start, "PAUSE") == 0) {
     isSoftPausing = true; 
     Serial.println(F("STATUS:DRAINING_BATCH"));
@@ -361,6 +365,7 @@ void handleCommand(char* cmd) {
     isDrawingLine = false; owesSyncOK = false;
     hasPendingCmd = false; 
     planTheta = 0; planRho = 0;
+    
     IKResult zeroPos = calculateIK(0, 0, 0);
     planBaseSteps = zeroPos.baseSteps; planElbowSteps = zeroPos.elbowSteps;
     curBaseSteps = zeroPos.baseSteps; curElbowSteps = zeroPos.elbowSteps;
@@ -383,6 +388,7 @@ void handleCommand(char* cmd) {
     IKResult zeroPos = calculateIK(0, 0, 0);
     planBaseSteps = zeroPos.baseSteps; planElbowSteps = zeroPos.elbowSteps;
     curBaseSteps = zeroPos.baseSteps; curElbowSteps = zeroPos.elbowSteps;
+    
     baseCalRotating = false; cmdHead = 0; cmdTail = 0; stepHead = 0; stepTail = 0; stepsRemaining = 0;
     isDrawingLine = false; owesSyncOK = false;
     hasPendingCmd = false; isSoftPausing = false; paused = false;
@@ -410,6 +416,29 @@ void handleCommand(char* cmd) {
   }
   else if (strchr(start, ',') != NULL) {
     ledMode = 0; processRgbLine(start); Serial.println(F("RGB_OK"));
+  }
+  // NEW RAW COMMAND BLOCK
+  else if (strncasecmp(start, "RAW ", 4) == 0) {
+    char* spacePtr = strchr(start + 4, ' ');
+    if (spacePtr != NULL) {
+      *spacePtr = '\0';
+      long baseRaw = atol(start + 4);
+      long armRaw = atol(spacePtr + 1);
+
+      if (((stepHead + 1) % STEP_QUEUE_SIZE) != stepTail) {
+        stepDa[stepHead] = armRaw;  // Arm/Elbow is Da
+        stepDb[stepHead] = baseRaw; // Base is Db
+        stepHead = (stepHead + 1) % STEP_QUEUE_SIZE;
+
+        // CRITICAL: Update planner's "ghost" position
+        planBaseSteps += baseRaw;
+        planElbowSteps += armRaw;
+
+        Serial.println(F("RAW_QUEUED"));
+      } else {
+        Serial.println(F("ERR: STEP_Q_FULL"));
+      }
+    }
   }
   else {
     char* spacePtr = strchr(start, ' ');
@@ -440,13 +469,11 @@ void handleStepCommand(char* dir) {
   }
   else if (strcasecmp(dir, "BASE_R") == 0) {
     digitalWrite(dirBase, LOW);
-    for(int i=0; i<10; i++){ digitalWrite(stepBase, HIGH); delayMicroseconds(2); digitalWrite(stepBase, LOW); delayMicroseconds(1000);
-    }
+    for(int i=0; i<10; i++){ digitalWrite(stepBase, HIGH); delayMicroseconds(2); digitalWrite(stepBase, LOW); delayMicroseconds(1000); }
   }
   else if (strcasecmp(dir, "ARM_L") == 0) {
     digitalWrite(dirArm, HIGH);
-    for(int i=0; i<10; i++){ digitalWrite(stepArm, HIGH); delayMicroseconds(2); digitalWrite(stepArm, LOW); delayMicroseconds(1000);
-    }
+    for(int i=0; i<10; i++){ digitalWrite(stepArm, HIGH); delayMicroseconds(2); digitalWrite(stepArm, LOW); delayMicroseconds(1000); }
   }
   else if (strcasecmp(dir, "ARM_R") == 0) {
     digitalWrite(dirArm, LOW);
@@ -474,7 +501,7 @@ void calibrate() {
 
     digitalWrite(stepBase, HIGH); 
     delayMicroseconds(2); 
-    digitalWrite(stepBase, LOW);  
+    digitalWrite(stepBase, LOW);
     
     // Safety Net 2: 40 rapid-fire 50us checks instead of 1 blind 2000us block
     for(int i = 0; i < 40; i++) {
@@ -498,7 +525,7 @@ void calibrate() {
 
     digitalWrite(stepArm, HIGH); 
     delayMicroseconds(2); 
-    digitalWrite(stepArm, LOW);  
+    digitalWrite(stepArm, LOW);
     
     // Safety Net 2: 40 rapid-fire 50us checks
     for(int i = 0; i < 40; i++) {
@@ -514,10 +541,11 @@ void calibrate() {
 
   // Automatic calibration homes to the outer edge (Rho = 1.0)
   planTheta = 0; planRho = 1.0;
+  
   IKResult edgePos = calculateIK(tableRadius, 0, 0); 
-  planBaseSteps = edgePos.baseSteps - 20;   // Offset base by -20 ticks
+  planBaseSteps = edgePos.baseSteps - 20;  // Offset base by -20 ticks
   planElbowSteps = edgePos.elbowSteps + 60; // Offset arm by 60 ticks
-  curBaseSteps = edgePos.baseSteps - 20;    // Offset base by -20 ticks
+  curBaseSteps = edgePos.baseSteps - 20;   // Offset base by -20 ticks
   curElbowSteps = edgePos.elbowSteps + 60;  // Offset arm by 60 ticks
   
   cmdHead = 0; cmdTail = 0; stepHead = 0;
@@ -535,6 +563,7 @@ void calibrate() {
 
 void updateLedMode() {
   if (ledMode == 0 || numModeColors == 0) return;
+  
   unsigned long now = millis();
   if (ledMode == 1) { 
     if (now - lastLedUpdate >= ledInterval) {
@@ -543,14 +572,13 @@ void updateLedMode() {
       if (currentModeStep % 2 == 0) {
         int idx = currentModeStep / 2;
         analogWrite(redPin, modeColors[idx].r); analogWrite(greenPin, modeColors[idx].g); analogWrite(bluePin, modeColors[idx].b);
-      } else { analogWrite(redPin, 0); analogWrite(greenPin, 0); analogWrite(bluePin, 0);
-      }
+      } else { analogWrite(redPin, 0); analogWrite(greenPin, 0); analogWrite(bluePin, 0); }
     }
   }
   else if (ledMode == 2) { 
     float t = (float)((now - lastLedUpdate) % ledInterval) / ledInterval;
-    if (now - lastLedUpdate >= ledInterval) { lastLedUpdate = now; currentModeStep = (currentModeStep + 1) % numModeColors;
-    }
+    if (now - lastLedUpdate >= ledInterval) { lastLedUpdate = now; currentModeStep = (currentModeStep + 1) % numModeColors; }
+    
     int nextStep = (currentModeStep + 1) % numModeColors;
     int r = modeColors[currentModeStep].r + (modeColors[nextStep].r - modeColors[currentModeStep].r) * t;
     int g = modeColors[currentModeStep].g + (modeColors[nextStep].g - modeColors[currentModeStep].g) * t;
@@ -582,14 +610,15 @@ void processRgbLine(char* line) {
 void processModeCommand(char* data) {
   char* ptr = data; ledMode = atoi(ptr);
   ptr = strchr(ptr, ',');
+  
   if (!ptr) return; ptr++; ledInterval = atol(ptr);
   ptr = strchr(ptr, ','); if (!ptr) return; ptr++;
   numModeColors = 0;
+  
   while (ptr && numModeColors < 12) {
     modeColors[numModeColors].r = atoi(ptr); ptr = strchr(ptr, ',');
     if (!ptr) { numModeColors++; break; } ptr++;
-    modeColors[numModeColors].g = atoi(ptr); ptr = strchr(ptr, ','); if (!ptr) { numModeColors++; break;
-    } ptr++;
+    modeColors[numModeColors].g = atoi(ptr); ptr = strchr(ptr, ','); if (!ptr) { numModeColors++; break; } ptr++;
     modeColors[numModeColors].b = atoi(ptr); numModeColors++; ptr = strchr(ptr, ','); if (ptr) ptr++;
   }
   lastLedUpdate = millis();
