@@ -552,7 +552,7 @@ void calibrate() {
   for (long i = 0; i < maxMoves; i++) {
     if (i < absBase) { digitalWrite(stepBase, HIGH); delayMicroseconds(2); digitalWrite(stepBase, LOW); }
     if (i < absArm) { digitalWrite(stepArm, HIGH); delayMicroseconds(2); digitalWrite(stepArm, LOW); }
-    delayMicroseconds(1000); // 1ms delay for smooth travel
+    delayMicroseconds(3000); // 1ms delay for smooth travel
   }
 
   // --- SET MATHEMATICAL CENTER ---
