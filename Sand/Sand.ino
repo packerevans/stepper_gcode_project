@@ -496,14 +496,12 @@ void calibrate() {
   // --- BASE HOMING ---
   digitalWrite(dirBase, HIGH);
   while (!baseHomed && currentSteps < maxHomingSteps) {
-    // Safety Net 1: Direct pre-step check
     if (digitalRead(baseStopPin) == LOW) { baseHomed = true; break; }
 
     digitalWrite(stepBase, HIGH); 
     delayMicroseconds(2); 
     digitalWrite(stepBase, LOW);
     
-    // Safety Net 2: 40 rapid-fire 50us checks instead of 1 blind 2000us block
     for(int i = 0; i < 40; i++) {
         delayMicroseconds(50);
         if (baseHomed || digitalRead(baseStopPin) == LOW) {
@@ -520,14 +518,12 @@ void calibrate() {
   // --- ARM HOMING ---
   digitalWrite(dirArm, HIGH);
   while (!armHomed && currentSteps < maxHomingSteps) {
-    // Safety Net 1: Direct pre-step check
     if (digitalRead(elbowStopPin) == LOW) { armHomed = true; break; }
 
     digitalWrite(stepArm, HIGH); 
     delayMicroseconds(2); 
     digitalWrite(stepArm, LOW);
     
-    // Safety Net 2: 40 rapid-fire 50us checks
     for(int i = 0; i < 40; i++) {
         delayMicroseconds(50);
         if (armHomed || digitalRead(elbowStopPin) == LOW) {
@@ -539,14 +535,37 @@ void calibrate() {
   }
   if (currentSteps >= maxHomingSteps && !armHomed) { Serial.println(F("ERROR: ARM HOMING FAILED")); return; }
 
-  // Automatic calibration homes to the outer edge (Rho = 1.0)
-  planTheta = 0; planRho = 1.0;
+  // --- AUTOMATIC CENTER ALIGNMENT ---
+  // Drive from the limit switches directly to the physical center
+  Serial.println(F("STATUS:MOVING_TO_CENTER"));
   
-  IKResult edgePos = calculateIK(tableRadius, 0, 0); 
-  planBaseSteps = edgePos.baseSteps;  // Offset base by -20 ticks
-  planElbowSteps = edgePos.elbowSteps; // Offset arm by 60 ticks
-  curBaseSteps = edgePos.baseSteps;   // Offset base by -20 ticks
-  curElbowSteps = edgePos.elbowSteps;  // Offset arm by 60 ticks
+  long baseCenterOffset = 800;   // Your tested RAW Base value
+  long armCenterOffset = -600;   // Your tested RAW Arm value
+
+  digitalWrite(dirBase, (baseCenterOffset >= 0) ? HIGH : LOW);
+  digitalWrite(dirArm, (armCenterOffset >= 0) ? HIGH : LOW);
+
+  long absBase = abs(baseCenterOffset);
+  long absArm = abs(armCenterOffset);
+  long maxMoves = max(absBase, absArm);
+
+  for (long i = 0; i < maxMoves; i++) {
+    if (i < absBase) { digitalWrite(stepBase, HIGH); delayMicroseconds(2); digitalWrite(stepBase, LOW); }
+    if (i < absArm) { digitalWrite(stepArm, HIGH); delayMicroseconds(2); digitalWrite(stepArm, LOW); }
+    delayMicroseconds(1000); // 1ms delay for smooth travel
+  }
+
+  // --- SET MATHEMATICAL CENTER ---
+  // We are physically at the center. Tell the planner we are at Theta = 0, Rho = 0.
+  planTheta = 0; 
+  planRho = 0;
+  
+  IKResult centerPos = calculateIK(0, 0, 0); 
+  
+  planBaseSteps = centerPos.baseSteps;
+  planElbowSteps = centerPos.elbowSteps;
+  curBaseSteps = centerPos.baseSteps;
+  curElbowSteps = centerPos.elbowSteps;
   
   cmdHead = 0; cmdTail = 0; stepHead = 0;
   stepTail = 0; stepsRemaining = 0; 
