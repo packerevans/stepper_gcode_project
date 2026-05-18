@@ -540,7 +540,7 @@ void calibrate() {
   Serial.println(F("STATUS:MOVING_TO_CENTER"));
   
   long baseCenterOffset = 800;   // Your tested RAW Base value
-  long armCenterOffset = -600;   // Your tested RAW Arm value
+  long armCenterOffset = -660;   // Your tested RAW Arm value
 
   digitalWrite(dirBase, (baseCenterOffset >= 0) ? HIGH : LOW);
   digitalWrite(dirArm, (armCenterOffset >= 0) ? HIGH : LOW);
