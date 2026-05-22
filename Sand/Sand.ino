@@ -1,6 +1,6 @@
 /*
  * Sand Table Firmware - Continuous-Time State Machine (Non-Blocking)
- * Bresenham Drift Patch & 0.5mm Wiggle Room
+ * Bresenham Drift Patch, Zero-Drift Spiral Fix & Auto-Centering Magnetic Homing
  * Optimized for LGT8F328P (32MHz) & TMC2209 Stepper Drivers
  */
 
@@ -21,9 +21,11 @@ const int enPin    = 15;
 
 const int elbowStopPin = 2;
 const int baseStopPin  = 3;
+
 const int redPin   = 10;
 const int greenPin = 9;
 const int bluePin  = 11;
+
 const int ms1 = 17; 
 const int ms2 = 18; 
 const int ms3 = 19;
@@ -45,10 +47,10 @@ void elbowEndstopISR() {
 const float tableRadius = 202.6; 
 const float L1 = 101.3;          
 const float L2 = 101.3;
-const float gearRatio = 1.209; // UPDATED: 1.209 base coupling, 1:1 isolated arm
+const float gearRatio = 1.209; // 1.209 base coupling, 1:1 isolated arm
 const float stepsPerDeg = 8.888888;
 const float stepsPerRad = stepsPerDeg * (180.0 / PI);
-const float interpolationRes = 0.5; // Micro-segmentation
+const float interpolationRes = 0.5; // Micro-segmentation in mm
 
 // --- PURE SPEED SETTINGS ---
 int currentStepDelay = 1000;
@@ -93,7 +95,7 @@ long curBaseSteps = 0;
 long curElbowSteps = 0;
 unsigned long lastStepMicros = 0;
 long stepsRemaining = 0;
-long currentMaxSteps = 0; // THE FIX: A constant number to lock the Bresenham math!
+long currentMaxSteps = 0; // Locks the Bresenham math
 long currentDa = 0;
 long currentDb = 0;
 long errA = 0;
@@ -121,6 +123,8 @@ void processMathPlanner();
 void runStepperEngine();
 IKResult calculateIK(float x, float y, long referenceBaseSteps);
 void calibrate();
+void findMagneticCenter(int stepPin, int dirPin, int stopPin);
+void pulseStepper(int stepPin);
 void updateLedMode();
 void processRgbLine(char* line);
 void processModeCommand(char* data);
@@ -131,8 +135,7 @@ void setup() {
   Serial.setTimeout(10);
 
   int eeAddr = 0;
-  EEPROM.get(eeAddr, curBaseSteps);
-  eeAddr += sizeof(long);
+  EEPROM.get(eeAddr, curBaseSteps); eeAddr += sizeof(long);
   EEPROM.get(eeAddr, curElbowSteps); eeAddr += sizeof(long);
   EEPROM.get(eeAddr, planTheta); eeAddr += sizeof(float);
   EEPROM.get(eeAddr, planRho);
@@ -149,15 +152,14 @@ void setup() {
   pinMode(enPin, OUTPUT);
   pinMode(elbowStopPin, INPUT_PULLUP); pinMode(baseStopPin, INPUT_PULLUP);
 
-  // Attach hardware interrupts to trigger on the falling edge (when switch is pressed to ground)
+  // Attach hardware interrupts to trigger on the falling edge
   attachInterrupt(digitalPinToInterrupt(baseStopPin), baseEndstopISR, FALLING);
   attachInterrupt(digitalPinToInterrupt(elbowStopPin), elbowEndstopISR, FALLING);
   
   pinMode(redPin, OUTPUT); pinMode(greenPin, OUTPUT); pinMode(bluePin, OUTPUT);
   pinMode(ms1, OUTPUT); pinMode(ms2, OUTPUT); pinMode(ms3, OUTPUT);
   
-  digitalWrite(ms1, HIGH); digitalWrite(ms2, HIGH);
-  digitalWrite(ms3, LOW);
+  digitalWrite(ms1, HIGH); digitalWrite(ms2, HIGH); digitalWrite(ms3, LOW);
   digitalWrite(enPin, LOW); 
   Serial.println(F("SAND_TABLE_READY"));
 }
@@ -209,7 +211,7 @@ void runStepperEngine() {
       stepsRemaining = max(abs(currentDa), abs(currentDb));
       currentMaxSteps = stepsRemaining;
 
-      // THE FIX: Lock in the total steps for this segment!
+      // Lock in the total steps for this segment to eliminate tracking drift
       errA = currentMaxSteps / 2;
       errB = currentMaxSteps / 2;
     } else {
@@ -219,7 +221,6 @@ void runStepperEngine() {
 
   if (stepsRemaining > 0) {
     unsigned long currentMicros = micros();
-
     if (currentMicros - lastStepMicros >= currentStepDelay) {
       lastStepMicros = currentMicros;
       
@@ -227,9 +228,9 @@ void runStepperEngine() {
       long bd = abs(currentDb);
       bool stepA = false; bool stepB = false;
 
-      // THE FIX: Use the locked currentMaxSteps to refill the error tracker!
       errA -= ad;
       if (errA < 0) { stepA = true; errA += currentMaxSteps; }
+      
       errB -= bd;
       if (errB < 0) { stepB = true; errB += currentMaxSteps; }
 
@@ -293,38 +294,35 @@ void processMathPlanner() {
       }
 
       lineCurrentSegment++;
-if (lineCurrentSegment > lineTotalSegments) {
+
+      if (lineCurrentSegment > lineTotalSegments) {
         planTheta = lineTargetTheta; planRho = lineTargetRho;
         const long baseRevSteps = round((2.0 * PI) * stepsPerRad);
         
         bool didWrap = false;
-        
+
         while (planTheta > PI) { 
-          planTheta -= (2.0 * PI); 
+          planTheta -= (2.0 * PI);
           planBaseSteps += baseRevSteps; 
           didWrap = true; 
         }
         while (planTheta < -PI) { 
-          planTheta += (2.0 * PI); 
+          planTheta += (2.0 * PI);
           planBaseSteps -= baseRevSteps; 
           didWrap = true; 
         }
         
-        // THE FIX: If we wrapped the coordinate system, recalculate the exact elbow steps 
-        // to prevent gearRatio rounding error from accumulating.
+        // Prevents gearRatio rounding error from accumulating during continuous spirals
         if (didWrap) {
           float r_mm = planRho * tableRadius;
           float x = r_mm * cos(planTheta);
           float y = r_mm * sin(planTheta);
-          
-          // Use the newly wrapped planBaseSteps as the reference to lock the math perfectly
           IKResult wrappedPos = calculateIK(x, y, planBaseSteps);
           planElbowSteps = wrappedPos.elbowSteps;
         }
         
         isDrawingLine = false;
       }
-
     }
   }
 }
@@ -343,7 +341,7 @@ IKResult calculateIK(float x, float y, long referenceBaseSteps) {
   float cosBend = (dist * dist - L1 * L1 - L2 * L2) / (2.0 * L1 * L2);
   float bend = acos(max(-1.0f, min(1.0f, cosBend)));
   float t1 = atan2(y, x) - atan2(L2 * sin(bend), L1 + L2 * cos(bend));
-  
+
   t1 = t1 - (round((t1 - lastT1) / (2.0 * PI)) * 2.0 * PI);
   return { (long)round(-t1 * stepsPerRad), (long)round(-(bend + gearRatio * t1) * stepsPerRad) };
 }
@@ -385,7 +383,6 @@ void handleCommand(char* cmd) {
     isDrawingLine = false; owesSyncOK = false;
     hasPendingCmd = false; 
     planTheta = 0; planRho = 0;
-    
     IKResult zeroPos = calculateIK(0, 0, 0);
     planBaseSteps = zeroPos.baseSteps; planElbowSteps = zeroPos.elbowSteps;
     curBaseSteps = zeroPos.baseSteps; curElbowSteps = zeroPos.elbowSteps;
@@ -437,7 +434,6 @@ void handleCommand(char* cmd) {
   else if (strchr(start, ',') != NULL) {
     ledMode = 0; processRgbLine(start); Serial.println(F("RGB_OK"));
   }
-  // NEW RAW COMMAND BLOCK
   else if (strncasecmp(start, "RAW ", 4) == 0) {
     char* spacePtr = strchr(start + 4, ' ');
     if (spacePtr != NULL) {
@@ -446,11 +442,11 @@ void handleCommand(char* cmd) {
       long armRaw = atol(spacePtr + 1);
 
       if (((stepHead + 1) % STEP_QUEUE_SIZE) != stepTail) {
-        stepDa[stepHead] = armRaw;  // Arm/Elbow is Da
-        stepDb[stepHead] = baseRaw; // Base is Db
+        stepDa[stepHead] = armRaw;  // Arm/Elbow
+        stepDb[stepHead] = baseRaw; // Base
         stepHead = (stepHead + 1) % STEP_QUEUE_SIZE;
-
-        // CRITICAL: Update planner's "ghost" position
+        
+        // Update planner's "ghost" position
         planBaseSteps += baseRaw;
         planElbowSteps += armRaw;
 
@@ -484,8 +480,8 @@ void handleCommand(char* cmd) {
 void handleStepCommand(char* dir) {
   digitalWrite(enPin, LOW);
   if (strcasecmp(dir, "BASE_L") == 0) {
-    digitalWrite(dirBase, HIGH); for(int i=0; i<10; i++){ digitalWrite(stepBase, HIGH); delayMicroseconds(2); digitalWrite(stepBase, LOW);
-    delayMicroseconds(1000); }
+    digitalWrite(dirBase, HIGH); 
+    for(int i=0; i<10; i++){ digitalWrite(stepBase, HIGH); delayMicroseconds(2); digitalWrite(stepBase, LOW); delayMicroseconds(1000); }
   }
   else if (strcasecmp(dir, "BASE_R") == 0) {
     digitalWrite(dirBase, LOW);
@@ -500,6 +496,8 @@ void handleStepCommand(char* dir) {
     for(int i=0; i<10; i++){ digitalWrite(stepArm, HIGH); delayMicroseconds(2); digitalWrite(stepArm, LOW); delayMicroseconds(1000); }
   }
 }
+
+// --- MAGNETIC AUTO-CENTERING CALIBRATION ---
 
 void calibrate() {
   paused = false;
@@ -519,7 +517,7 @@ void calibrate() {
   findMagneticCenter(stepArm, dirArm, elbowStopPin);
 
   // --- SET MATHEMATICAL CENTER ---
-  // We are firmly in the center of both switches. Set this physical spot to 0,0.
+  // We are firmly in the true magnetic center of both switches. Set to 0,0.
   planTheta = 0; 
   planRho = 0;
   IKResult centerPos = calculateIK(0, 0, 0); 
@@ -548,12 +546,10 @@ void calibrate() {
 
   Serial.println(F("CALIBRATION_COMPLETE"));
   
-  // 3. Send automated 0 0 coordinate through the flow
+  // 3. Send automated 0 0 coordinate through the flow to confirm
   char zeroCmd[] = "0 0";
   handleCommand(zeroCmd);
 }
-
-// --- NEW HELPER FUNCTIONS ---
 
 void findMagneticCenter(int stepPin, int dirPin, int stopPin) {
   long maxHomingSteps = stepsPerRad * PI * 2.5; 
@@ -566,8 +562,13 @@ void findMagneticCenter(int stepPin, int dirPin, int stopPin) {
     steps++;
   }
 
+  // Safety Timeout
+  if (steps >= maxHomingSteps) {
+    Serial.println(F("ERR: HOMING_TIMEOUT"));
+    return;
+  }
+
   // Phase 2: Keep going forward until switch comes back as HIGH (untripped).
-  // Count these steps to get the width of the magnetic field.
   long magnetWidthSteps = 0;
   while (digitalRead(stopPin) == LOW && magnetWidthSteps < 5000) { 
     pulseStepper(stepPin);
@@ -577,31 +578,34 @@ void findMagneticCenter(int stepPin, int dirPin, int stopPin) {
   // Phase 3: Wait a sec
   delay(1000);
 
-  // Phase 4: Go the other direction (towards the magnet)
+  // Phase 4: Reverse direction (towards the magnet)
   digitalWrite(dirPin, LOW);
   
-  // Phase 5: Move reverse until the switch goes LOW (hit the trailing edge)
+  // Phase 5: Move reverse until the switch goes LOW again (hit the trailing edge)
   long reverseTimeout = 0;
   while (digitalRead(stopPin) == HIGH && reverseTimeout < 5000) {
     pulseStepper(stepPin);
     reverseTimeout++;
   }
 
-  // Phase 6: Divide width by 2 and move that amount to set firmly in the center
+  // Phase 6: Divide total measured width by 2 and move to the exact center
   long centerSteps = magnetWidthSteps / 2;
   for (long i = 0; i < centerSteps; i++) {
     pulseStepper(stepPin);
   }
   
-  delay(500); // Give inertia a half-second to settle before moving the next arm
+  // Give mechanical inertia a half-second to settle
+  delay(500); 
 }
 
 void pulseStepper(int stepPin) {
   digitalWrite(stepPin, HIGH); 
   delayMicroseconds(2); 
   digitalWrite(stepPin, LOW);
-  delayMicroseconds(2500); // 2.5ms steady pulse for homing
+  delayMicroseconds(2500); // 2.5ms steady pulse for precise homing
 }
+
+// --- LED CONTROLS ---
 
 void updateLedMode() {
   if (ledMode == 0 || numModeColors == 0) return;
@@ -652,11 +656,9 @@ void processRgbLine(char* line) {
 void processModeCommand(char* data) {
   char* ptr = data; ledMode = atoi(ptr);
   ptr = strchr(ptr, ',');
-  
   if (!ptr) return; ptr++; ledInterval = atol(ptr);
   ptr = strchr(ptr, ','); if (!ptr) return; ptr++;
   numModeColors = 0;
-  
   while (ptr && numModeColors < 12) {
     modeColors[numModeColors].r = atoi(ptr); ptr = strchr(ptr, ',');
     if (!ptr) { numModeColors++; break; } ptr++;
