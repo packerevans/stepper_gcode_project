@@ -293,18 +293,38 @@ void processMathPlanner() {
       }
 
       lineCurrentSegment++;
-
-      if (lineCurrentSegment > lineTotalSegments) {
+if (lineCurrentSegment > lineTotalSegments) {
         planTheta = lineTargetTheta; planRho = lineTargetRho;
-
         const long baseRevSteps = round((2.0 * PI) * stepsPerRad);
-        const long elbowRevSteps = round((2.0 * PI) * stepsPerRad * gearRatio);
-
-        while (planTheta > PI) { planTheta -= (2.0 * PI); planBaseSteps += baseRevSteps; planElbowSteps += elbowRevSteps; }
-        while (planTheta < -PI) { planTheta += (2.0 * PI); planBaseSteps -= baseRevSteps; planElbowSteps -= elbowRevSteps; }
+        
+        bool didWrap = false;
+        
+        while (planTheta > PI) { 
+          planTheta -= (2.0 * PI); 
+          planBaseSteps += baseRevSteps; 
+          didWrap = true; 
+        }
+        while (planTheta < -PI) { 
+          planTheta += (2.0 * PI); 
+          planBaseSteps -= baseRevSteps; 
+          didWrap = true; 
+        }
+        
+        // THE FIX: If we wrapped the coordinate system, recalculate the exact elbow steps 
+        // to prevent gearRatio rounding error from accumulating.
+        if (didWrap) {
+          float r_mm = planRho * tableRadius;
+          float x = r_mm * cos(planTheta);
+          float y = r_mm * sin(planTheta);
+          
+          // Use the newly wrapped planBaseSteps as the reference to lock the math perfectly
+          IKResult wrappedPos = calculateIK(x, y, planBaseSteps);
+          planElbowSteps = wrappedPos.elbowSteps;
+        }
         
         isDrawingLine = false;
       }
+
     }
   }
 }
