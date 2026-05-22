@@ -506,8 +506,7 @@ void calibrate() {
   digitalWrite(enPin, LOW); 
   Serial.println(F("STATUS:CALIBRATING"));
   
-  // 1. Temporarily detach interrupts so they don't get confused 
-  // while we intentionally bounce in and out of the magnetic fields.
+  // 1. Detach interrupts so our intentional bouncing doesn't trigger false flags
   detachInterrupt(digitalPinToInterrupt(baseStopPin));
   detachInterrupt(digitalPinToInterrupt(elbowStopPin));
 
@@ -520,8 +519,7 @@ void calibrate() {
   findMagneticCenter(stepArm, dirArm, elbowStopPin);
 
   // --- SET MATHEMATICAL CENTER ---
-  // We are now physically dead-center on both magnets. 
-  // We treat this exact spot as Theta = 0, Rho = 0.
+  // We are firmly in the center of both switches. Set this physical spot to 0,0.
   planTheta = 0; 
   planRho = 0;
   IKResult centerPos = calculateIK(0, 0, 0); 
@@ -531,6 +529,7 @@ void calibrate() {
   curBaseSteps = centerPos.baseSteps;
   curElbowSteps = centerPos.elbowSteps;
 
+  // Clear queues
   cmdHead = 0; cmdTail = 0; stepHead = 0; stepTail = 0; stepsRemaining = 0; 
   isDrawingLine = false; owesSyncOK = false; hasPendingCmd = false; isSoftPausing = false;
   
@@ -541,13 +540,17 @@ void calibrate() {
   EEPROM.put(eeAddr, planTheta); eeAddr += sizeof(float);
   EEPROM.put(eeAddr, planRho);
   
-  // 2. Reattach the safety interrupts now that we are done
+  // 2. Reattach the safety interrupts
   baseHomed = false;
   armHomed = false;
   attachInterrupt(digitalPinToInterrupt(baseStopPin), baseEndstopISR, FALLING);
   attachInterrupt(digitalPinToInterrupt(elbowStopPin), elbowEndstopISR, FALLING);
 
   Serial.println(F("CALIBRATION_COMPLETE"));
+  
+  // 3. Send automated 0 0 coordinate through the flow
+  char zeroCmd[] = "0 0";
+  handleCommand(zeroCmd);
 }
 
 // --- NEW HELPER FUNCTIONS ---
@@ -556,46 +559,48 @@ void findMagneticCenter(int stepPin, int dirPin, int stopPin) {
   long maxHomingSteps = stepsPerRad * PI * 2.5; 
   long steps = 0;
   
-  // Phase 1: Move forward until we hit the leading edge of the magnet (Pin goes LOW)
+  // Phase 1: Move forward until the magnet is pressed (Switch goes LOW)
   digitalWrite(dirPin, HIGH);
   while (digitalRead(stopPin) == HIGH && steps < maxHomingSteps) {
     pulseStepper(stepPin);
     steps++;
   }
-  
-  if (steps >= maxHomingSteps) {
-    Serial.println(F("ERR: HOMING_TIMEOUT"));
-    return; 
-  }
 
-  // Phase 2: We hit the magnet! Keep going forward until we leave the magnet (Pin goes HIGH).
-  // We count exactly how many steps wide the magnetic field is.
+  // Phase 2: Keep going forward until switch comes back as HIGH (untripped).
+  // Count these steps to get the width of the magnetic field.
   long magnetWidthSteps = 0;
   while (digitalRead(stopPin) == LOW && magnetWidthSteps < 5000) { 
     pulseStepper(stepPin);
     magnetWidthSteps++;
   }
 
-  // Phase 3: Wait a second, just as you requested
+  // Phase 3: Wait a sec
   delay(1000);
 
-  // Phase 4: Reverse direction and move back exactly half the width of the magnet
+  // Phase 4: Go the other direction (towards the magnet)
   digitalWrite(dirPin, LOW);
-  long centerSteps = magnetWidthSteps / 2;
   
+  // Phase 5: Move reverse until the switch goes LOW (hit the trailing edge)
+  long reverseTimeout = 0;
+  while (digitalRead(stopPin) == HIGH && reverseTimeout < 5000) {
+    pulseStepper(stepPin);
+    reverseTimeout++;
+  }
+
+  // Phase 6: Divide width by 2 and move that amount to set firmly in the center
+  long centerSteps = magnetWidthSteps / 2;
   for (long i = 0; i < centerSteps; i++) {
     pulseStepper(stepPin);
   }
   
-  // Small pause before moving to the next axis
-  delay(500);
+  delay(500); // Give inertia a half-second to settle before moving the next arm
 }
 
 void pulseStepper(int stepPin) {
   digitalWrite(stepPin, HIGH); 
   delayMicroseconds(2); 
   digitalWrite(stepPin, LOW);
-  delayMicroseconds(2500); // 2.5ms delay for a smooth, steady homing speed
+  delayMicroseconds(2500); // 2.5ms steady pulse for homing
 }
 
 void updateLedMode() {
