@@ -516,22 +516,30 @@ void calibrate() {
   Serial.println(F("HOMING_ARM..."));
   findMagneticCenter(stepArm, dirArm, elbowStopPin);
 
-  // --- SET MATHEMATICAL CENTER ---
-  // We are firmly in the true magnetic center of both switches. Set to 0,0.
-  planTheta = 0; 
-  planRho = 0;
-  IKResult centerPos = calculateIK(0, 0, 0); 
+  // --- SET MATHEMATICAL PERIMETER ---
+  // We are firmly in the true magnetic center of both switches at the edge of the table.
+  // The physical spot is Theta = 0, Rho = 1.0 (perimeter).
+  planTheta = 0.0; 
+  planRho = 1.0;
   
-  planBaseSteps = centerPos.baseSteps;
-  planElbowSteps = centerPos.elbowSteps;
-  curBaseSteps = centerPos.baseSteps;
-  curElbowSteps = centerPos.elbowSteps;
+  // Calculate the IK for the perimeter based on the table's radius
+  float r_mm = planRho * tableRadius;
+  float startX = r_mm * cos(planTheta);
+  float startY = r_mm * sin(planTheta);
+  
+  // Set absolute zero reference for the base steps at this perimeter point
+  IKResult perimeterPos = calculateIK(startX, startY, 0); 
+  
+  planBaseSteps = perimeterPos.baseSteps;
+  planElbowSteps = perimeterPos.elbowSteps;
+  curBaseSteps = perimeterPos.baseSteps;
+  curElbowSteps = perimeterPos.elbowSteps;
 
   // Clear queues
   cmdHead = 0; cmdTail = 0; stepHead = 0; stepTail = 0; stepsRemaining = 0; 
   isDrawingLine = false; owesSyncOK = false; hasPendingCmd = false; isSoftPausing = false;
   
-  // Save zero to EEPROM
+  // Save position to EEPROM
   int eeAddr = 0; 
   EEPROM.put(eeAddr, curBaseSteps); eeAddr += sizeof(long);
   EEPROM.put(eeAddr, curElbowSteps); eeAddr += sizeof(long);
@@ -546,7 +554,7 @@ void calibrate() {
 
   Serial.println(F("CALIBRATION_COMPLETE"));
   
-  // 3. Send automated 0 0 coordinate through the flow to confirm
+  // 3. Send automated 0 0 coordinate to drive ball to the center
   char zeroCmd[] = "0 0";
   handleCommand(zeroCmd);
 }
@@ -569,6 +577,7 @@ void findMagneticCenter(int stepPin, int dirPin, int stopPin) {
   }
 
   // Phase 2: Keep going forward until switch comes back as HIGH (untripped).
+  // This satisfies the requirement to measure the full width of the magnet.
   long magnetWidthSteps = 0;
   while (digitalRead(stopPin) == LOW && magnetWidthSteps < 5000) { 
     pulseStepper(stepPin);
