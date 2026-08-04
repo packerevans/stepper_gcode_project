@@ -420,14 +420,13 @@
         }
 
         async function generateAutoMathMode() {
-            showPopup("GENERATING AUTO MATH...");
+            showPopup("AUTO MATH STARTED!");
             
             const equations = ['lissajous', 'hypotrochoid', 'rose', 'superformula', 'spiral', 'butterfly'];
             const eqType = equations[Math.floor(Math.random() * equations.length)];
             const tableR = 202.6;
-            const layers = Math.floor(Math.random() * 30) + 20; // 20 to 50 layered iterations
-            const rotStep = (Math.floor(Math.random() * 12) + 3) * (Math.PI / 180); // 3° to 15° rotation per layer
-            const scaleOsc = 0.015; // Smooth incremental scale oscillation
+            const layers = Math.floor(Math.random() * 40) + 30; // 30 to 70 layered iterations
+            const rotStep = (Math.floor(Math.random() * 10) + 2) * (Math.PI / 180); // Smooth 2° to 12° morph step
 
             let gcodeLines = [];
             let currentTheta = 0;
@@ -435,7 +434,7 @@
 
             for (let layer = 0; layer < layers; layer++) {
                 const angleOffset = layer * rotStep;
-                const scaleFactor = 1.0 - (Math.sin(layer * 0.2) * 0.3);
+                const scaleFactor = 0.95 - (Math.sin(layer * 0.15) * 0.25);
                 const stepsPerLayer = 180;
 
                 for (let i = 0; i <= stepsPerLayer; i++) {
@@ -495,24 +494,15 @@
             }
 
             const autoGCode = gcodeLines.join('\n');
-            const autoFilename = `AutoMath_${eqType}_${Date.now()}.txt`;
 
-            // Save and run instantly
-            await fetch(`${BASE_URL}/save_design`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ filename: autoFilename, gcode: autoGCode })
-            });
-
+            // Send directly to runtime memory execution queue WITHOUT saving to disk
             await fetch(`${BASE_URL}/send_gcode_block`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ gcode: autoGCode, filename: autoFilename })
+                body: JSON.stringify({ gcode: autoGCode, filename: `[AutoMode] ${eqType}` })
             });
 
-            showPopup("AUTO MATH STARTED!");
             updateQ();
-            loadLib();
         }
 
         async function cancelLoop() { 
