@@ -691,6 +691,14 @@
             }, 200);
         }
 
+        let sendStateTimeout = null;
+        function sendCurrentStateDebounced() {
+            if (sendStateTimeout) clearTimeout(sendStateTimeout);
+            sendStateTimeout = setTimeout(() => {
+                sendCurrentState();
+            }, 40); // 25 FPS max rate
+        }
+
         async function sendCurrentState() {
             const overlay = document.getElementById('loadingOverlay');
             overlay.style.display = 'flex';
