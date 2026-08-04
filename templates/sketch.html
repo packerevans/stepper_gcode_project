@@ -1316,11 +1316,13 @@
                 });
             }
 
-            // 3. Chain shapes together with interpolation (Smooth connections)
+            // 3. Apply Chaikin Corner Smoothing Algorithm to eliminate divots and jagged edges
+            let smoothedPool = pool.map(sh => chaikinSmooth(sh, 2));
+
             processedPoints = [];
             let lastX = 0, lastY = 0;
             
-            pool.forEach((sh, shIdx) => {
+            smoothedPool.forEach((sh, shIdx) => {
                 if(sh.length === 0) return;
                 
                 // Interpolate from last shape to start of this shape
@@ -1366,10 +1368,30 @@
             render();
         }
 
-function interpolateBetween(x1, y1, x2, y2, targetArray) {
+        // Chaikin Corner Smoothing Algorithm for smooth organic curves
+        function chaikinSmooth(points, iterations = 2) {
+            if (points.length < 3) return points;
+            let current = points;
+            for (let it = 0; it < iterations; it++) {
+                let next = [];
+                next.push(current[0]);
+                for (let i = 0; i < current.length - 1; i++) {
+                    let p0 = current[i];
+                    let p1 = current[i + 1];
+                    let q = { x: 0.75 * p0.x + 0.25 * p1.x, y: 0.75 * p0.y + 0.25 * p1.y, type: 'point' };
+                    let r = { x: 0.25 * p0.x + 0.75 * p1.x, y: 0.25 * p0.y + 0.75 * p1.y, type: 'point' };
+                    next.push(q);
+                    next.push(r);
+                }
+                next.push(current[current.length - 1]);
+                current = next;
+            }
+            return current;
+        }
+
+        function interpolateBetween(x1, y1, x2, y2, targetArray) {
             const dist = Math.hypot(x2-x1, y2-y1);
-            // THE FIX: Increased from 1.0 to 4.0 to stop serial starvation!
-            const steps = Math.max(1, Math.floor(dist / 6.0)); 
+            const steps = Math.max(1, Math.floor(dist / 4.0)); 
             for(let i=0; i<=steps; i++) {
                 const t = i/steps;
                 targetArray.push({
