@@ -584,6 +584,8 @@ def git_pull():
 @app.route("/update_firmware", methods=["POST"])
 def update_firmware():
     global arduino, arduino_connected
+    d = request.json or {}
+    auto_reboot = d.get("reboot", False)
     
     # 1. Paths & Setup
     SKETCH_PATH = "/home/sandtable2/stepper_gcode_project/Sand"
@@ -620,7 +622,13 @@ def update_firmware():
         
         log_message("Firmware Updated Successfully!")
         connect_arduino()
-        return jsonify(success=True, message="Success!")
+
+        if auto_reboot:
+            log_message("Auto-Rebooting Pi Host System...")
+            subprocess.Popen(["sudo", "reboot"])
+            return jsonify(success=True, message="Firmware updated! Rebooting Raspberry Pi...")
+
+        return jsonify(success=True, message="Firmware Updated Successfully!")
 
     except Exception as e:
         log_message(f"Update Failed: {str(e)}")
