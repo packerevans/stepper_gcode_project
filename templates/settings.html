@@ -792,11 +792,11 @@
                 let tokenGroup = document.getElementById('token-input-group');
                 
                 if (d.public_url) {
-                    indicator.innerHTML = `<span style="color:#b2fab4;">● ACTIVE</span>`;
+                    indicator.innerHTML = `<span style="color:#10b981;">● ACTIVE</span>`;
                     statusDiv.innerHTML = `<a href="${d.public_url}" target="_blank" style="color:var(--color-primary); word-break: break-all;">${d.public_url}</a>`;
                     tokenGroup.style.display = 'none';
                 } else {
-                    indicator.innerHTML = `<span style="color:#ffb3b3;">● INACTIVE</span>`;
+                    indicator.innerHTML = `<span style="color:#ef4444;">● INACTIVE</span>`;
                     statusDiv.innerHTML = `(Set Auth Token above)`;
                     tokenGroup.style.display = 'block';
                     if (d.has_token) {
