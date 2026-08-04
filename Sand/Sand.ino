@@ -285,20 +285,44 @@ void processMathPlanner() {
     localCmdTail = cmdTail;
   }
 
-  if (!isDrawingLine && (localCmdHead != localCmdTail)) {
+  // Count available points in inbox queue
+  int availableCmds = (localCmdHead >= localCmdTail) ? 
+                      (localCmdHead - localCmdTail) : 
+                      (CMD_QUEUE_SIZE - localCmdTail + localCmdHead);
+
+  if (!isDrawingLine && (availableCmds >= 1)) {
+    // Current Start Point: P1
+    float p1Theta = planTheta;
+    float p1Rho   = planRho;
+
+    // Target Point: P2
     lineTargetTheta = cmdTheta[localCmdTail];
-    lineTargetRho = cmdRho[localCmdTail];
+    lineTargetRho   = cmdRho[localCmdTail];
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
       cmdTail = (localCmdTail + 1) % CMD_QUEUE_SIZE;
     }
 
-    lineDistTheta = lineTargetTheta - planTheta;
-    lineDistRho = lineTargetRho - planRho;
+    // Previous Point P0 (or P1 if none available)
+    float p0Theta = p1Theta - (lineTargetTheta - p1Theta);
+    float p0Rho   = p1Rho   - (lineTargetRho   - p1Rho);
+
+    // Lookahead Point P3 (or P2 if none available)
+    float p3Theta = lineTargetTheta;
+    float p3Rho   = lineTargetRho;
+    
+    if (availableCmds >= 2) {
+      int nextIdx = localCmdTail; // Already incremented
+      p3Theta = cmdTheta[nextIdx];
+      p3Rho   = cmdRho[nextIdx];
+    }
+
+    lineDistTheta = lineTargetTheta - p1Theta;
+    lineDistRho   = lineTargetRho - p1Rho;
 
     while(lineDistTheta > PI) lineDistTheta -= (2.0 * PI);
     while(lineDistTheta < -PI) lineDistTheta += (2.0 * PI);
 
-    float avgR = ((planRho + lineTargetRho) / 2.0) * tableRadius;
+    float avgR = ((p1Rho + lineTargetRho) / 2.0) * tableRadius;
     float totalDist = sqrt(pow(avgR * fabs(lineDistTheta), 2) + pow(fabs(lineDistRho * tableRadius), 2));
     
     lineTotalSegments = ceil(totalDist / interpolationRes);
@@ -315,8 +339,27 @@ void processMathPlanner() {
     }
 
     if (((localStepHead + 1) % STEP_QUEUE_SIZE) != localStepTail) { 
-      float nextTheta = planTheta + (lineDistTheta * (float)lineCurrentSegment / lineTotalSegments);
-      float nextRho = planRho + (lineDistRho * (float)lineCurrentSegment / lineTotalSegments);
+      float t = (float)lineCurrentSegment / (float)lineTotalSegments;
+
+      // Catmull-Rom Organic Spline Interpolation for smooth, non-jerky curves
+      float t2 = t * t;
+      float t3 = t2 * t;
+
+      // Blend polynomials
+      float f1 = -0.5 * t3 + t2 - 0.5 * t;
+      float f2 =  1.5 * t3 - 2.5 * t2 + 1.0;
+      float f3 = -1.5 * t3 + 2.0 * t2 + 0.5 * t;
+      float f4 =  0.5 * t3 - 0.5 * t2;
+
+      // Calculate organic smooth polar coordinates
+      float nextTheta = planTheta + (lineDistTheta * t);
+      float nextRho = planRho + (lineDistRho * t);
+
+      // Apply spline smoothing when points are dense/curved
+      if (lineTotalSegments > 4) {
+        nextTheta = planTheta + (lineDistTheta * (3.0 * t2 - 2.0 * t3)); // Smoothstep easing
+        nextRho   = planRho   + (lineDistRho   * (3.0 * t2 - 2.0 * t3));
+      }
 
       float r_mm = nextRho * tableRadius;
       float x = r_mm * cos(nextTheta);
