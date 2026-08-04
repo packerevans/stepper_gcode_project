@@ -10,15 +10,16 @@
         :root {
             --primary: #a1c4fd; 
             --secondary: #7fb2f0; 
-            --bg: #f4f4f4; 
+            --bg: #ffffff; 
             --panel: #ffffff; 
-            --text: #333;
-            --accent: #2ecc71;
-            --danger: #e74c3c;
+            --text: #000000;
+            --accent: #000000;
+            --danger: #ef4444;
             --btn-text: #000;
+            --color-border: #000000;
         }
         body[data-theme='dark'] {
-            --bg: #121212; --panel: #1e1e1e; --text: #e0e0e0; --btn-text: #fff;
+            --bg: #000000; --panel: #0a0a0a; --text: #ffffff; --btn-text: #fff; --color-border: #ffffff;
         }
 
         body {
@@ -26,6 +27,8 @@
             background: var(--bg); color: var(--text);
             margin: 0; padding: 0; height: 100vh;
             display: flex; flex-direction: column; overflow: hidden;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         /* --- Global Navigation --- */

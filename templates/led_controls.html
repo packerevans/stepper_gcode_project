@@ -11,26 +11,30 @@
         :root {
             --color-primary: #a1c4fd;
             --color-secondary: #7fb2f0;
-            --color-background: #f0f0f0; 
+            --color-background: #ffffff; 
             --color-surface: #ffffff; 
-            --color-text: #333333;
+            --color-text: #000000;
+            --color-border: #000000;
             --color-shadow: rgba(0, 0, 0, 0.08);
             --border-radius: 0 !important;
         }
 
         body[data-theme='dark'] {
-            --color-background: #1e1e1e;
-            --color-surface: #2c2c2c;
-            --color-text: #e0e0e0;
+            --color-background: #000000;
+            --color-surface: #0a0a0a;
+            --color-text: #ffffff;
+            --color-border: #ffffff;
             --color-shadow: rgba(255, 255, 255, 0.08);
         }
         
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Segoe UI', Roboto, sans-serif;
             background: var(--color-background);
             color: var(--color-text);
             padding: 0; margin: 0;
             transition: background 0.3s, color 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         /* --- Global Navigation --- */
