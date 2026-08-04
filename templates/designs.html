@@ -494,12 +494,16 @@
             }
 
             const autoGCode = gcodeLines.join('\n');
+            const autoName = `[AutoMode] ${eqType}`;
+
+            // Pre-cache memory GCode path for Live View preview before sending to serial execution
+            prepareLivePath(autoName, autoGCode);
 
             // Send directly to runtime memory execution queue WITHOUT saving to disk
             await fetch(`${BASE_URL}/send_gcode_block`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ gcode: autoGCode, filename: `[AutoMode] ${eqType}` })
+                body: JSON.stringify({ gcode: autoGCode, filename: autoName })
             });
 
             updateQ();
@@ -633,10 +637,13 @@
             requestAnimationFrame(liveAnimationLoop);
         }
 
-        async function prepareLivePath(name) {
+        async function prepareLivePath(name, rawGcode = null) {
             try {
-                let r = await fetch(`${BASE_URL}/designs/${name}.txt`); 
-                let gcode = await r.text();
+                let gcode = rawGcode;
+                if (!gcode) {
+                    let r = await fetch(`${BASE_URL}/designs/${name}.txt`); 
+                    gcode = await r.text();
+                }
                 const lines = gcode.split('\n').map(l => l.split('#')[0].split(';')[0].trim()).filter(l => l !== "");
                 let path = []; let tb = 0; let te = 0;
                 lines.forEach(l => {
