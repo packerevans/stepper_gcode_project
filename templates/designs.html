@@ -289,7 +289,7 @@
             <button class="action-btn" onclick="shuffleLoop()">Shuffle All</button>
             <button class="action-btn" onclick="resumeDesign()">Resume</button>
             <button class="action-btn" onclick="pauseDesign()">Pause</button>
-            <button class="action-btn danger" onclick="abortDesign()">Abort</button>
+            <button class="action-btn danger" onclick="clearQueue()">Clear Queue</button>
         </div>
     </div>
 
@@ -549,11 +549,15 @@
             if(data.success) { if (data.message === "Queued") showPopup("ADDED TO QUEUE"); else showPopup("SENT!"); updateQ(); } else showPopup("Error!", true); 
         }
 
-        async function abortDesign() {
-            if(!confirm("Abort current design and clear queue/loop?")) return;
+        async function clearQueue() {
+            if(!confirm("Clear all active jobs, loop playlist, and queue?")) return;
             await fetch(`${BASE_URL}/send`, { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({command: "CLEAR"}) });
-            showPopup("STOPPED!");
-            setTimeout(() => location.reload(), 1000);
+            showPopup("QUEUE CLEARED!");
+            updateQ();
+        }
+
+        async function abortDesign() {
+            await clearQueue();
         }
 
         function sendCmd(c, p) { if(p) showPopup(p); fetch(`${BASE_URL}/send`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({command:c})}); }
