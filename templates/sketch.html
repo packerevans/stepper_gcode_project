@@ -166,6 +166,28 @@
             .controls-panel { flex: 1; border-radius: 0 !important; background: var(--panel); padding: 15px; }
         }
 
+        .loading-overlay {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255,255,255,0.85); display: none; flex-direction: column;
+            align-items: center; justify-content: center; color: #000; z-index: 100;
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        }
+        body[data-theme='dark'] .loading-overlay { background: rgba(0,0,0,0.85); color: #fff; }
+
+        .spinner {
+            width: 36px; height: 36px;
+            border: 3px solid rgba(0,0,0,0.1);
+            border-top: 3px solid #000000;
+            border-radius: 50% !important;
+            animation: spin 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+            margin: 0 auto 12px auto;
+        }
+        body[data-theme='dark'] .spinner {
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top: 3px solid #ffffff;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
         .canvas-wrapper {
             position: relative;
             width: 95vmin; 
@@ -300,8 +322,11 @@
         <a href="/settings" id="nav-settings"><span class="icon"><svg viewBox="0 0 24 24"><path d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.35 19.43,11.03L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.97 19.05,5.05L16.56,6.05C16.04,5.66 15.47,5.34 14.86,5.08L14.48,2.42C14.44,2.18 14.24,2 14,2H10C9.76,2 9.56,2.18 9.52,2.42L9.14,5.08C8.53,5.34 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.97 4.46,5.05 4.34,5.27L2.34,8.73C2.22,8.95 2.27,9.22 2.46,9.37L4.57,11.03C4.53,11.35 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.22,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.95C7.96,18.34 8.53,18.66 9.14,18.92L9.52,21.58C9.56,21.82 9.76,22 10,22H14C14.24,22 14.44,21.82 14.48,21.58L14.86,18.92C15.47,18.66 16.04,18.34 16.56,17.95L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z"/></svg></span><span>Settings</span></a>
     </nav>
 
-    <div class="app-container">
-        <div class="drawing-panel">
+        <div class="drawing-panel" style="position:relative;">
+            <div id="loadingOverlay" class="loading-overlay">
+                <div class="spinner"></div>
+                <div id="loadingText" style="font-weight:700; font-size:12px; letter-spacing:1px; text-transform:uppercase;">Processing...</div>
+            </div>
             <div class="canvas-wrapper" id="canvasContainer">
                 <canvas id="drawCanvas"></canvas>
             </div>
