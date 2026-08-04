@@ -776,7 +776,9 @@ def send_command():
     
     if arduino_connected: 
         log_message(f"TX (Raw): {cmd}")
-        lock.acquire(); arduino.write((cmd+"\n").encode()); lock.release(); return jsonify(success=True)
+        with lock:
+            arduino.write((cmd+"\n").encode())
+        return jsonify(success=True)
     return jsonify(success=False)
 
 @app.route("/wifi_setup")

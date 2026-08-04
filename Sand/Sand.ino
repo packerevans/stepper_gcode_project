@@ -6,6 +6,7 @@
 
 #include <Arduino.h>
 #include <EEPROM.h>
+#include <util/atomic.h>
 
 struct IKResult {
   long baseSteps;
@@ -114,6 +115,8 @@ bool baseCalRotating = false;
 char serialBuf[64];
 int bufIdx = 0;
 
+#define EEPROM_MAGIC 0x53414E44 // "SAND" magic signature
+
 // --- PROTOTYPES ---
 void processSerialQueue();
 void handleCommand(char* cmd);
@@ -121,7 +124,7 @@ void processMathPlanner();
 void runStepperEngine();
 IKResult calculateIK(float x, float y, long referenceBaseSteps);
 void calibrate();
-void findMagnetCenter(int stepPin, int dirPin, int stopPin); // Added to prevent compiler errors
+void findMagnetCenter(int stepPin, int dirPin, int stopPin); 
 void updateLedMode();
 void processRgbLine(char* line);
 void processModeCommand(char* data);
@@ -132,13 +135,16 @@ void setup() {
   Serial.setTimeout(10);
 
   int eeAddr = 0;
-  EEPROM.get(eeAddr, curBaseSteps);
-  eeAddr += sizeof(long);
-  EEPROM.get(eeAddr, curElbowSteps); eeAddr += sizeof(long);
-  EEPROM.get(eeAddr, planTheta); eeAddr += sizeof(float);
-  EEPROM.get(eeAddr, planRho);
+  uint32_t magic = 0;
+  EEPROM.get(eeAddr, magic);
+  eeAddr += sizeof(uint32_t);
 
-  if (curBaseSteps == -1 && curElbowSteps == -1) {
+  if (magic == EEPROM_MAGIC) {
+    EEPROM.get(eeAddr, curBaseSteps); eeAddr += sizeof(long);
+    EEPROM.get(eeAddr, curElbowSteps); eeAddr += sizeof(long);
+    EEPROM.get(eeAddr, planTheta); eeAddr += sizeof(float);
+    EEPROM.get(eeAddr, planRho);
+  } else {
     planTheta = 0; planRho = 0;
     IKResult zeroPos = calculateIK(0, 0, 0);
     curBaseSteps = zeroPos.baseSteps; curElbowSteps = zeroPos.elbowSteps;
@@ -167,10 +173,18 @@ void loop() {
   runStepperEngine();
   processSerialQueue();
 
-  if (hasPendingCmd && (((cmdHead + 1) % CMD_QUEUE_SIZE) != cmdTail)) {
-    cmdTheta[cmdHead] = pendingTheta;
-    cmdRho[cmdHead] = pendingRho;
-    cmdHead = (cmdHead + 1) % CMD_QUEUE_SIZE;
+  int localCmdHead, localCmdTail;
+  ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+    localCmdHead = cmdHead;
+    localCmdTail = cmdTail;
+  }
+
+  if (hasPendingCmd && (((localCmdHead + 1) % CMD_QUEUE_SIZE) != localCmdTail)) {
+    cmdTheta[localCmdHead] = pendingTheta;
+    cmdRho[localCmdHead] = pendingRho;
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+      cmdHead = (localCmdHead + 1) % CMD_QUEUE_SIZE;
+    }
     hasPendingCmd = false;
     Serial.println(F("OK")); 
   }
@@ -183,13 +197,21 @@ void loop() {
     digitalWrite(stepBase, HIGH); delayMicroseconds(2); digitalWrite(stepBase, LOW); delayMicroseconds(1000);
   }
 
-  if (isSoftPausing && !hasPendingCmd && (cmdHead == cmdTail) && (stepHead == stepTail) && stepsRemaining == 0) {
+  int localStepHead, localStepTail;
+  ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+    localCmdHead = cmdHead;
+    localCmdTail = cmdTail;
+    localStepHead = stepHead;
+    localStepTail = stepTail;
+  }
+
+  if (isSoftPausing && !hasPendingCmd && (localCmdHead == localCmdTail) && (localStepHead == localStepTail) && stepsRemaining == 0) {
     isSoftPausing = false;
     paused = true;
     Serial.println(F("PAUSED"));
   }
 
-  if (!isDrawingLine && !hasPendingCmd && (cmdHead == cmdTail) && (stepHead == stepTail) && stepsRemaining == 0 && owesSyncOK) {
+  if (!isDrawingLine && !hasPendingCmd && (localCmdHead == localCmdTail) && (localStepHead == localStepTail) && stepsRemaining == 0 && owesSyncOK) {
     Serial.println(F("OK"));
     owesSyncOK = false;
   }
@@ -199,10 +221,18 @@ void runStepperEngine() {
   if (paused) return;
 
   if (stepsRemaining == 0) {
-    if (stepHead != stepTail) { 
-      currentDa = stepDa[stepTail];
-      currentDb = stepDb[stepTail];
-      stepTail = (stepTail + 1) % STEP_QUEUE_SIZE;
+    int localStepHead, localStepTail;
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+      localStepHead = stepHead;
+      localStepTail = stepTail;
+    }
+
+    if (localStepHead != localStepTail) { 
+      currentDa = stepDa[localStepTail];
+      currentDb = stepDb[localStepTail];
+      ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        stepTail = (localStepTail + 1) % STEP_QUEUE_SIZE;
+      }
 
       digitalWrite(dirArm, (currentDa >= 0) ? HIGH : LOW);
       digitalWrite(dirBase, (currentDb >= 0) ? HIGH : LOW);
@@ -220,7 +250,7 @@ void runStepperEngine() {
   if (stepsRemaining > 0) {
     unsigned long currentMicros = micros();
 
-    if (currentMicros - lastStepMicros >= currentStepDelay) {
+    if (currentMicros - lastStepMicros >= (unsigned long)currentStepDelay) {
       lastStepMicros = currentMicros;
       
       long ad = abs(currentDa);
@@ -249,10 +279,18 @@ void runStepperEngine() {
 }
 
 void processMathPlanner() {
-  if (!isDrawingLine && (cmdHead != cmdTail)) {
-    lineTargetTheta = cmdTheta[cmdTail];
-    lineTargetRho = cmdRho[cmdTail];
-    cmdTail = (cmdTail + 1) % CMD_QUEUE_SIZE;
+  int localCmdHead, localCmdTail;
+  ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+    localCmdHead = cmdHead;
+    localCmdTail = cmdTail;
+  }
+
+  if (!isDrawingLine && (localCmdHead != localCmdTail)) {
+    lineTargetTheta = cmdTheta[localCmdTail];
+    lineTargetRho = cmdRho[localCmdTail];
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+      cmdTail = (localCmdTail + 1) % CMD_QUEUE_SIZE;
+    }
 
     lineDistTheta = lineTargetTheta - planTheta;
     lineDistRho = lineTargetRho - planRho;
@@ -270,7 +308,13 @@ void processMathPlanner() {
   }
 
   if (isDrawingLine) {
-    if (((stepHead + 1) % STEP_QUEUE_SIZE) != stepTail) { 
+    int localStepHead, localStepTail;
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+      localStepHead = stepHead;
+      localStepTail = stepTail;
+    }
+
+    if (((localStepHead + 1) % STEP_QUEUE_SIZE) != localStepTail) { 
       float nextTheta = planTheta + (lineDistTheta * (float)lineCurrentSegment / lineTotalSegments);
       float nextRho = planRho + (lineDistRho * (float)lineCurrentSegment / lineTotalSegments);
 
@@ -284,9 +328,11 @@ void processMathPlanner() {
       long db = target.baseSteps - planBaseSteps;
 
       if (max(abs(da), abs(db)) > 0) {
-        stepDa[stepHead] = da;
-        stepDb[stepHead] = db;
-        stepHead = (stepHead + 1) % STEP_QUEUE_SIZE;
+        stepDa[localStepHead] = da;
+        stepDb[localStepHead] = db;
+        ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+          stepHead = (localStepHead + 1) % STEP_QUEUE_SIZE;
+        }
         planBaseSteps = target.baseSteps;
         planElbowSteps = target.elbowSteps;
       }
@@ -360,7 +406,10 @@ void handleCommand(char* cmd) {
     paused = true;
     isSoftPausing = false;
     digitalWrite(enPin, HIGH); 
-    cmdHead = 0; cmdTail = 0; stepHead = 0; stepTail = 0; stepsRemaining = 0;
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+      cmdHead = 0; cmdTail = 0; stepHead = 0; stepTail = 0;
+    }
+    stepsRemaining = 0;
     isDrawingLine = false; owesSyncOK = false;
     hasPendingCmd = false; 
     planTheta = 0; planRho = 0;
@@ -371,7 +420,12 @@ void handleCommand(char* cmd) {
     Serial.println(F("CLEARED"));
   }
   else if (strcasecmp(start, "CALIBRATE") == 0) {
-    if ((cmdHead == cmdTail) && (stepHead == stepTail) && stepsRemaining == 0 && !hasPendingCmd) calibrate();
+    int localCmdHead, localCmdTail, localStepHead, localStepTail;
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+      localCmdHead = cmdHead; localCmdTail = cmdTail;
+      localStepHead = stepHead; localStepTail = stepTail;
+    }
+    if ((localCmdHead == localCmdTail) && (localStepHead == localStepTail) && stepsRemaining == 0 && !hasPendingCmd) calibrate();
   }
   else if (strcasecmp(start, "START_BASE") == 0) {
     baseCalRotating = true; digitalWrite(enPin, LOW);
@@ -388,11 +442,17 @@ void handleCommand(char* cmd) {
     planBaseSteps = zeroPos.baseSteps; planElbowSteps = zeroPos.elbowSteps;
     curBaseSteps = zeroPos.baseSteps; curElbowSteps = zeroPos.elbowSteps;
     
-    baseCalRotating = false; cmdHead = 0; cmdTail = 0; stepHead = 0; stepTail = 0; stepsRemaining = 0;
+    baseCalRotating = false; 
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+      cmdHead = 0; cmdTail = 0; stepHead = 0; stepTail = 0;
+    }
+    stepsRemaining = 0;
     isDrawingLine = false; owesSyncOK = false;
     hasPendingCmd = false; isSoftPausing = false; paused = false;
     
     int eeAddr = 0;
+    uint32_t magic = EEPROM_MAGIC;
+    EEPROM.put(eeAddr, magic); eeAddr += sizeof(uint32_t);
     EEPROM.put(eeAddr, curBaseSteps); eeAddr += sizeof(long);
     EEPROM.put(eeAddr, curElbowSteps); eeAddr += sizeof(long);
     EEPROM.put(eeAddr, planTheta); eeAddr += sizeof(float); EEPROM.put(eeAddr, planRho);
@@ -403,9 +463,9 @@ void handleCommand(char* cmd) {
   }
   else if (strncasecmp(start, "SPEED ", 6) == 0) {
     float newMult = atof(start + 6);
-    if (newMult > 0.1 && newMult < 10.0) {
+    if (newMult >= 0.1 && newMult <= 10.0) {
       SPEED_MULTIPLIER = newMult;
-      currentStepDelay = round(1000.0 / SPEED_MULTIPLIER);
+      currentStepDelay = max(10, (int)round(1000.0 / SPEED_MULTIPLIER));
       Serial.print(F("SPEED_SET:")); Serial.println(SPEED_MULTIPLIER);
     }
   }
@@ -423,10 +483,17 @@ void handleCommand(char* cmd) {
       long baseRaw = atol(start + 4);
       long armRaw = atol(spacePtr + 1);
 
-      if (((stepHead + 1) % STEP_QUEUE_SIZE) != stepTail) {
-        stepDa[stepHead] = armRaw;  
-        stepDb[stepHead] = baseRaw; 
-        stepHead = (stepHead + 1) % STEP_QUEUE_SIZE;
+      int localStepHead, localStepTail;
+      ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        localStepHead = stepHead; localStepTail = stepTail;
+      }
+
+      if (((localStepHead + 1) % STEP_QUEUE_SIZE) != localStepTail) {
+        stepDa[localStepHead] = armRaw;  
+        stepDb[localStepHead] = baseRaw; 
+        ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+          stepHead = (localStepHead + 1) % STEP_QUEUE_SIZE;
+        }
 
         planBaseSteps += baseRaw;
         planElbowSteps += armRaw;
@@ -444,10 +511,17 @@ void handleCommand(char* cmd) {
       float targetTheta = atof(start);
       float targetRho = atof(spacePtr + 1);
 
-      if (((cmdHead + 1) % CMD_QUEUE_SIZE) != cmdTail) {
-        cmdTheta[cmdHead] = targetTheta;
-        cmdRho[cmdHead] = targetRho;
-        cmdHead = (cmdHead + 1) % CMD_QUEUE_SIZE;
+      int localCmdHead, localCmdTail;
+      ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        localCmdHead = cmdHead; localCmdTail = cmdTail;
+      }
+
+      if (((localCmdHead + 1) % CMD_QUEUE_SIZE) != localCmdTail) {
+        cmdTheta[localCmdHead] = targetTheta;
+        cmdRho[localCmdHead] = targetRho;
+        ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+          cmdHead = (localCmdHead + 1) % CMD_QUEUE_SIZE;
+        }
         Serial.println(F("OK"));
       } else {
         hasPendingCmd = true;
@@ -521,8 +595,10 @@ void calibrate() {
   Serial.println(F("STATUS:CALIBRATING"));
   
   // Reset interrupt flags before starting
-  baseHomed = false;
-  armHomed = false;
+  ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+    baseHomed = false;
+    armHomed = false;
+  }
   
   // 1. Center the Base on its magnet
   findMagnetCenter(stepBase, dirBase, baseStopPin);
@@ -542,12 +618,16 @@ void calibrate() {
   curElbowSteps = edgePos.elbowSteps;
   
   // Wipe queues clean so we have a fresh start
-  cmdHead = 0; cmdTail = 0; stepHead = 0;
-  stepTail = 0; stepsRemaining = 0; 
+  ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+    cmdHead = 0; cmdTail = 0; stepHead = 0; stepTail = 0;
+  }
+  stepsRemaining = 0; 
   isDrawingLine = false; owesSyncOK = false; hasPendingCmd = false; isSoftPausing = false;
   
-  // Save position to EEPROM
+  // Save position to EEPROM with magic header
   int eeAddr = 0; 
+  uint32_t magic = EEPROM_MAGIC;
+  EEPROM.put(eeAddr, magic); eeAddr += sizeof(uint32_t);
   EEPROM.put(eeAddr, curBaseSteps); eeAddr += sizeof(long);
   EEPROM.put(eeAddr, curElbowSteps); eeAddr += sizeof(long);
   EEPROM.put(eeAddr, planTheta); eeAddr += sizeof(float);
@@ -623,3 +703,4 @@ void processModeCommand(char* data) {
   lastLedUpdate = millis();
   currentModeStep = 0;
 }
+

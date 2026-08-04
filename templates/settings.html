@@ -735,10 +735,11 @@
 
          async function addSchedule() {
             let time = document.getElementById('sch-time').value;
-            let action = document.getElementById('sch-type').value;
+            let typeVal = document.getElementById('sch-type').value;
+            let action = typeVal;
             let val = null;
-            if(action === 'sand_specific') val = document.getElementById('sch-file').value;
-            if(action === 'led_color') val = document.getElementById('sch-color').value;
+            if(typeVal === 'sand_specific') val = document.getElementById('sch-file').value;
+            if(typeVal === 'led_color') val = document.getElementById('sch-color').value;
 
             let days = [];
             for(let i=0; i<7; i++) if(document.getElementById('d'+i).checked) days.push(i);
@@ -747,7 +748,7 @@
 
             await fetch('/api/schedules', {
                 method: 'POST', headers: {'Content-Type':'application/json'},
-                body: JSON.stringify({time, action, value: val, days})
+                body: JSON.stringify({time, type: action, value: val, days})
             });
             showPopup("Automation Created!");
             loadSchedules();
@@ -776,7 +777,7 @@
             if(!key) return;
             await fetch('/api/tunnel/key', {
                 method: 'POST', headers: {'Content-Type':'application/json'},
-                body: JSON.stringify({key})
+                body: JSON.stringify({token: key})
             });
             showPopup("Tunnel Updated");
             getTunnelStatus();

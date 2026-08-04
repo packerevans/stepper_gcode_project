@@ -318,7 +318,7 @@
             } catch(e){}
         }
 
-        const L1=101.3, L2=101.3, R=9/8, S_RAD=(3200/360)*(180/Math.PI);
+        const L1=101.3, L2=101.3, gearRatio=1.209, S_RAD=(3200/360)*(180/Math.PI);
         function calculateIK(x, y, lastB) {
             let d = Math.hypot(x, y); const maxR = L1+L2; if(d > maxR) { x*=(maxR/d); y*=(maxR/d); d=maxR; }
             if(d < 1) return { b: lastB, e: -Math.PI * S_RAD };
@@ -326,10 +326,10 @@
             let bend = Math.acos(Math.max(-1, Math.min(1, cosB)));
             let t1 = Math.atan2(y, x) - Math.atan2(L2*Math.sin(bend), L1+L2*Math.cos(bend));
             let lastT1 = -lastB / S_RAD; t1 = t1 - (Math.round((t1 - lastT1) / (Math.PI*2)) * (Math.PI*2));
-            return { b: -t1 * S_RAD, e: -(bend + 1.125*t1) * S_RAD };
+            return { b: -t1 * S_RAD, e: -(bend + gearRatio*t1) * S_RAD };
         }
         function getXY(b, e) {
-            let t1 = -b / S_RAD; let bend = -e / S_RAD - 1.125*t1;
+            let t1 = -b / S_RAD; let bend = -e / S_RAD - gearRatio*t1;
             return { x: L1*Math.cos(t1) + L2*Math.cos(t1+bend), y: L1*Math.sin(t1) + L2*Math.sin(t1+bend) };
         }
 
