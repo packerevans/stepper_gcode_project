@@ -600,20 +600,51 @@
 
         function doRandomDesign() {
             clearCanvas();
-            const shapes = ['circle', 'square', 'triangle', 'hexagon', 'star', 'organic'];
+            const shapes = [
+                'lissajous', 'hypotrochoid', 'rose', 'superformula', 
+                'fermat_spiral', 'butterfly', 'epicycloid', 'organic',
+                'star', 'hexagon', 'pentagon'
+            ];
             const baseShape = shapes[Math.floor(Math.random() * shapes.length)];
+            let equationName = "";
+
             if (baseShape === 'organic') {
                 rawPoints = generateOrganicShape();
+                equationName = "Organic Deformed Circle";
+            } else if (baseShape === 'lissajous') {
+                rawPoints = generateLissajous();
+                equationName = "Lissajous Harmonic Curve: x=A·sin(a·t+δ), y=B·sin(b·t)";
+            } else if (baseShape === 'hypotrochoid') {
+                rawPoints = generateHypotrochoid();
+                equationName = "Hypotrochoid Spirograph: x=(R-r)cos t + d·cos((R-r)t/r)";
+            } else if (baseShape === 'rose') {
+                rawPoints = generateRoseCurve();
+                equationName = "Rhodonea Rose Curve: r = a·cos(k·θ)";
+            } else if (baseShape === 'superformula') {
+                rawPoints = generateSuperformula();
+                equationName = "Gielis Superformula: r(φ) = [|cos(mφ/4)/a|^n2 + |sin(mφ/4)/b|^n3]^(-1/n1)";
+            } else if (baseShape === 'fermat_spiral') {
+                rawPoints = generateFermatSpiral();
+                equationName = "Fermat Parabolic Spiral: r² = a²·θ";
+            } else if (baseShape === 'butterfly') {
+                rawPoints = generateButterflyCurve();
+                equationName = "Fay's Butterfly Curve: r = e^sin(θ) - 2cos(4θ) + sin⁵((2θ-π)/24)";
+            } else if (baseShape === 'epicycloid') {
+                rawPoints = generateEpicycloid();
+                equationName = "Epicycloid Cardioid: x=(R+r)cos t - r·cos((R+r)t/r)";
             } else {
-                addShape(baseShape); 
+                addShape(baseShape);
+                equationName = baseShape.charAt(0).toUpperCase() + baseShape.slice(1);
             }
-            const dx = (Math.random() - 0.5) * 80;
-            const dy = (Math.random() - 0.5) * 80;
-            const scaleFac = 0.5 + Math.random() * 1.0; 
+
+            const dx = (Math.random() - 0.5) * 60;
+            const dy = (Math.random() - 0.5) * 60;
+            const scaleFac = 0.6 + Math.random() * 0.8; 
             rawPoints.forEach(p => { if (p.type === 'point') { p.x = p.x * scaleFac + dx; p.y = p.y * scaleFac + dy; } });
+
             const effects = ['loop', 'sandify', 'none'];
             const effect = effects[Math.floor(Math.random() * effects.length)];
-            let recipeHTML = `<b>Base Shape:</b> ${baseShape.charAt(0).toUpperCase() + baseShape.slice(1)}<br>`;
+            let recipeHTML = `<b>Math Equation:</b> ${equationName}<br>`;
             if (effect === 'loop') {
                 activeEffectType = 'loop';
                 currentTool = 'loop';
@@ -654,11 +685,128 @@
             } else {
                 activeEffectType = null;
                 currentTool = 'select'; 
-                recipeHTML += `<b>Filter:</b> Raw Geometry (None)`;
+                recipeHTML += `<b>Filter:</b> Pure Mathematical Geometry`;
                 render();
             }
             document.getElementById('recipeDisplay').innerHTML = recipeHTML;
             showPostGenSlider('scale');
+        }
+
+        // --- MATH EQUATION GENERATORS ---
+        function generateLissajous() {
+            const pts = [];
+            const a = Math.floor(Math.random() * 7) + 1;
+            const b = Math.floor(Math.random() * 7) + 1;
+            const delta = Math.random() * Math.PI;
+            const R = 75;
+            for (let i = 0; i <= 360; i++) {
+                const t = (i / 360) * Math.PI * 2;
+                const x = R * Math.sin(a * t + delta);
+                const y = R * Math.sin(b * t);
+                pts.push({ x, y, type: 'point', source: 'draw' });
+            }
+            pts.push({ type: 'break' });
+            return pts;
+        }
+
+        function generateHypotrochoid() {
+            const pts = [];
+            const R = 90;
+            const r = (Math.floor(Math.random() * 5) + 2) * 10;
+            const d = (Math.floor(Math.random() * 5) + 1) * 12;
+            const steps = 720;
+            for (let i = 0; i <= steps; i++) {
+                const t = (i / steps) * Math.PI * 8;
+                const x = (R - r) * Math.cos(t) + d * Math.cos(((R - r) * t) / r);
+                const y = (R - r) * Math.sin(t) - d * Math.sin(((R - r) * t) / r);
+                pts.push({ x: x * 0.7, y: y * 0.7, type: 'point', source: 'draw' });
+            }
+            pts.push({ type: 'break' });
+            return pts;
+        }
+
+        function generateRoseCurve() {
+            const pts = [];
+            const k = Math.floor(Math.random() * 8) + 2;
+            const a = 75;
+            const steps = (k % 2 === 0) ? 720 : 360;
+            for (let i = 0; i <= steps; i++) {
+                const theta = (i / 360) * Math.PI * 2;
+                const r = a * Math.cos(k * theta);
+                const x = r * Math.cos(theta);
+                const y = r * Math.sin(theta);
+                pts.push({ x, y, type: 'point', source: 'draw' });
+            }
+            pts.push({ type: 'break' });
+            return pts;
+        }
+
+        function generateSuperformula() {
+            const pts = [];
+            const a = 1, b = 1;
+            const m = Math.floor(Math.random() * 10) + 2;
+            const n1 = Math.random() * 2 + 0.2;
+            const n2 = Math.random() * 4 + 0.5;
+            const n3 = Math.random() * 4 + 0.5;
+            const R = 70;
+
+            for (let i = 0; i <= 360; i++) {
+                const phi = (i / 360) * Math.PI * 2;
+                const t1 = Math.pow(Math.abs(Math.cos(m * phi / 4) / a), n2);
+                const t2 = Math.pow(Math.abs(Math.sin(m * phi / 4) / b), n3);
+                const r = Math.pow(t1 + t2, -1 / n1);
+                const x = R * r * Math.cos(phi);
+                const y = R * r * Math.sin(phi);
+                if (!isNaN(x) && !isNaN(y)) pts.push({ x, y, type: 'point', source: 'draw' });
+            }
+            pts.push({ type: 'break' });
+            return pts;
+        }
+
+        function generateFermatSpiral() {
+            const pts = [];
+            const a = 8;
+            const turns = Math.floor(Math.random() * 4) + 3;
+            const totalSteps = turns * 180;
+            for (let i = 1; i <= totalSteps; i++) {
+                const theta = (i / 180) * Math.PI * 2;
+                const r = a * Math.sqrt(theta);
+                const x = r * Math.cos(theta);
+                const y = r * Math.sin(theta);
+                pts.push({ x, y, type: 'point', source: 'draw' });
+            }
+            pts.push({ type: 'break' });
+            return pts;
+        }
+
+        function generateButterflyCurve() {
+            const pts = [];
+            const steps = 720;
+            for (let i = 0; i <= steps; i++) {
+                const theta = (i / steps) * Math.PI * 12;
+                const r = 16 * (Math.exp(Math.sin(theta)) - 2 * Math.cos(4 * theta) + Math.pow(Math.sin((2 * theta - Math.PI) / 24), 5));
+                const x = r * Math.cos(theta);
+                const y = r * Math.sin(theta);
+                pts.push({ x, y, type: 'point', source: 'draw' });
+            }
+            pts.push({ type: 'break' });
+            return pts;
+        }
+
+        function generateEpicycloid() {
+            const pts = [];
+            const R = 60;
+            const k = Math.floor(Math.random() * 5) + 2;
+            const r = R / k;
+            const steps = 360;
+            for (let i = 0; i <= steps; i++) {
+                const t = (i / steps) * Math.PI * 2;
+                const x = (R + r) * Math.cos(t) - r * Math.cos(((R + r) * t) / r);
+                const y = (R + r) * Math.sin(t) - r * Math.sin(((R + r) * t) / r);
+                pts.push({ x: x * 0.9, y: y * 0.9, type: 'point', source: 'draw' });
+            }
+            pts.push({ type: 'break' });
+            return pts;
         }
 
         function generateOrganicShape() {
