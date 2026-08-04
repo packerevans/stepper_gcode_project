@@ -557,8 +557,9 @@
             return new Promise((resolve, reject) => {
                 document.getElementById('recipeDisplay').innerHTML = `<div class="spinner"></div> <b>Dreaming up:</b><br>"${prompt}"<br><i>Waiting for AI Image Generation...</i>`;
                 
-                const aiQuery = prompt + " simple black and white clip art";
-                const imgUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(aiQuery)}?width=800&height=800&nologo=true&seed=${Math.floor(Math.random()*10000)}`;
+                // Enhanced prompt engineering specifically tailored for sand table vector tracing
+                const aiQuery = `${prompt}, simple minimalist black and white vector clip art, clean dark continuous lines, stark white background, solid black line art, high contrast, no shading, no grayscale, no color, outline drawing, vector icon`;
+                const imgUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(aiQuery)}?width=800&height=800&nologo=true&enhance=true&seed=${Math.floor(Math.random()*100000)}`;
                 
                 const img = new Image();
                 img.crossOrigin = "Anonymous";
