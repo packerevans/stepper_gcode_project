@@ -499,29 +499,37 @@
             stick.style.transform = `translate(${dx}px, ${dy}px)`;
         }
 
+        let lastSentTheta = 0;
+
         function startMoveLoop() {
             if (moveInterval || isCentering) return;
             moveInterval = setInterval(() => {
                 if (Math.abs(joyPos.x) < 5 && Math.abs(joyPos.y) < 5) return;
-                const stepScale = 0.012; // Slower for better control
+                const stepScale = 0.015; // Smooth incremental movement
                 let curX = ballPos.rho * Math.cos(ballPos.theta);
                 let curY = ballPos.rho * Math.sin(ballPos.theta);
                 curX += (joyPos.x / 80) * stepScale;
                 curY += (joyPos.y / 80) * stepScale;
                 let newRho = Math.sqrt(curX*curX + curY*curY);
-                let newTheta = Math.atan2(curY, curX);
+                let rawTheta = Math.atan2(curY, curX);
                 
                 if (newRho > 1.0) newRho = 1.0;
-                // Fix: if we are at the center, theta is 0
                 if (newRho < 0.005) {
                     newRho = 0;
-                    newTheta = 0;
+                    rawTheta = 0;
                 }
+
+                // Unwrap theta to prevent jumpy 360-degree motor rewinds
+                let diff = rawTheta - (lastSentTheta % (Math.PI * 2));
+                if (diff < -Math.PI) diff += Math.PI * 2;
+                if (diff > Math.PI) diff -= Math.PI * 2;
+                let newTheta = lastSentTheta + diff;
+                lastSentTheta = newTheta;
                 
                 ballPos.rho = newRho;
                 ballPos.theta = newTheta;
                 sendMove();
-            }, 100); 
+            }, 60); // 16 Hz move update rate for fluid control
         }
 
         function stopMoveLoop() {
