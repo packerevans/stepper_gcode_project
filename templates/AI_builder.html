@@ -981,12 +981,26 @@
                 let pool = []; for(let s=0; s<sym; s++) { const ang = s * (Math.PI*2/sym), c = Math.cos(ang), si = Math.sin(ang); shapes.forEach(sh => pool.push(sh.map(p => ({ x: p.x*c - p.y*si, y: p.x*si + p.y*c, type: 'point' })))); }
                 processedPoints = []; pool.forEach((sh, i) => { if(i > 0) processedPoints.push({x: sh[0].x, y: sh[0].y, type:'point'}); sh.forEach(p => processedPoints.push(p)); });
             }
-            generatedGCode = processedPoints.map(p => {
+            let currentTheta = 0;
+            let lastRawTheta = 0;
+
+            generatedGCode = processedPoints.map((p, i) => {
                 if (p.type === 'cmd') return "";
-                let theta = Math.atan2(p.y, p.x);
+                let rawTheta = Math.atan2(p.y, p.x);
                 let rho = Math.hypot(p.x, p.y) / tableR;
                 if (rho > 1.0) rho = 1.0; // Clamps points to the perimeter
-                return `${theta.toFixed(4)} ${rho.toFixed(4)}`;
+
+                if (i > 0) {
+                    let diff = rawTheta - lastRawTheta;
+                    if (diff < -Math.PI) diff += Math.PI * 2;
+                    if (diff > Math.PI) diff -= Math.PI * 2;
+                    currentTheta += diff;
+                } else {
+                    currentTheta = rawTheta;
+                }
+                
+                lastRawTheta = rawTheta;
+                return `${currentTheta.toFixed(4)} ${rho.toFixed(4)}`;
             }).filter(l => l !== "").join('\n');
             document.getElementById('designPhaseControls').style.display = 'none'; document.getElementById('productionPhaseControls').style.display = 'block'; document.getElementById('simulationArea').style.display = 'block'; render();
         }
