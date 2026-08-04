@@ -752,7 +752,7 @@ def send_command():
     global is_paused
     cmd = request.json.get("command")
     if cmd == "CLEAR":
-        global is_looping, loop_playlist, is_paused; 
+        global is_looping, loop_playlist; 
         is_looping = False; loop_playlist = []; job_queue.clear(); is_paused = False
         if current_gcode_runner: current_gcode_runner.is_running = False
         if arduino_connected: 
@@ -760,8 +760,17 @@ def send_command():
                 arduino.write(b"CLEAR\n")
                 arduino.write(b"RESUME\n")
         return jsonify(success=True)
-    if cmd == "PAUSE": is_paused = True
-    elif cmd == "RESUME": is_paused = False
+    elif cmd == "PAUSE":
+        is_paused = True
+        if current_gcode_runner: current_gcode_runner.is_running = False
+        if arduino_connected:
+            with lock: arduino.write(b"PAUSE\n")
+        return jsonify(success=True)
+    elif cmd == "RESUME":
+        is_paused = False
+        if arduino_connected:
+            with lock: arduino.write(b"RESUME\n")
+        return jsonify(success=True)
     elif cmd.startswith("LED:") or cmd in ["POWER:ON", "POWER:OFF"]:
         # Use Serial Sender
         if cmd.startswith("LED:"):

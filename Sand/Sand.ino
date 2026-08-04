@@ -436,30 +436,34 @@ void handleCommand(char* cmd) {
   while (*start == ' ' || *start == '\t') start++;
   if (strlen(start) == 0 || start[0] == '#') return;
 
-  if (strcasecmp(start, "PAUSE") == 0) {
-    isSoftPausing = true; 
-    Serial.println(F("STATUS:DRAINING_BATCH"));
+  if (strcasecmp(start, "PAUSE") == 0 || strcasecmp(start, "P") == 0) {
+    paused = true;
+    isSoftPausing = false;
+    Serial.println(F("PAUSED"));
   }
   else if (strcasecmp(start, "RESUME") == 0 || strcasecmp(start, "R") == 0) {
     paused = false;
     isSoftPausing = false;
+    digitalWrite(enPin, LOW);
     Serial.println(F("RESUMED"));
   }
   else if (strcasecmp(start, "CLEAR") == 0) {
     paused = true;
     isSoftPausing = false;
-    digitalWrite(enPin, HIGH); 
+    digitalWrite(enPin, LOW); 
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
       cmdHead = 0; cmdTail = 0; stepHead = 0; stepTail = 0;
     }
     stepsRemaining = 0;
     isDrawingLine = false; owesSyncOK = false;
-    hasPendingCmd = false; 
-    planTheta = 0; planRho = 0;
+    hasPendingCmd = false;
     
-    IKResult zeroPos = calculateIK(0, 0, 0);
-    planBaseSteps = zeroPos.baseSteps; planElbowSteps = zeroPos.elbowSteps;
-    curBaseSteps = zeroPos.baseSteps; curElbowSteps = zeroPos.elbowSteps;
+    // Retain physical motor step position so new commands start seamlessly from current arm position
+    float curX = (curElbowSteps / stepsPerRad); // Approximate current position
+    planTheta = atan2(curX, 1.0);
+    planBaseSteps = curBaseSteps;
+    planElbowSteps = curElbowSteps;
+    
     Serial.println(F("CLEARED"));
   }
   else if (strcasecmp(start, "CALIBRATE") == 0) {
