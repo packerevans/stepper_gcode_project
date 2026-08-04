@@ -254,8 +254,9 @@
 
     <div class="controls-wrapper">
         <div class="main-actions">
+            <button class="action-btn btn-primary" onclick="generateAutoMathMode()">Auto Mode</button>
             <button class="action-btn" onclick="shuffleLoop()">Shuffle All</button>
-            <button class="action-btn btn-primary" onclick="resumeDesign()">Resume</button>
+            <button class="action-btn" onclick="resumeDesign()">Resume</button>
             <button class="action-btn" onclick="pauseDesign()">Pause</button>
             <button class="action-btn danger" onclick="abortDesign()">Abort</button>
         </div>
@@ -387,17 +388,100 @@
             selectedFiles.clear(); renderSel(); updateQ();
         }
 
-        async function shuffleLoop() {
-            if(allFiles.length === 0) return;
-            showPopup("SHUFFLING!");
-            // Create a shuffled copy of allFiles
-            let shuffled = [...allFiles].sort(() => Math.random() - 0.5);
-            await fetch(`${BASE_URL}/set_loop`, { 
-                method: "POST", 
-                headers: {"Content-Type": "application/json"}, 
-                body: JSON.stringify({filenames: shuffled}) 
+        async function generateAutoMathMode() {
+            showPopup("GENERATING AUTO MATH...");
+            
+            const equations = ['lissajous', 'hypotrochoid', 'rose', 'superformula', 'spiral', 'butterfly'];
+            const eqType = equations[Math.floor(Math.random() * equations.length)];
+            const tableR = 202.6;
+            const layers = Math.floor(Math.random() * 30) + 20; // 20 to 50 layered iterations
+            const rotStep = (Math.floor(Math.random() * 12) + 3) * (Math.PI / 180); // 3° to 15° rotation per layer
+            const scaleOsc = 0.015; // Smooth incremental scale oscillation
+
+            let gcodeLines = [];
+            let currentTheta = 0;
+            let lastRawTheta = 0;
+
+            for (let layer = 0; layer < layers; layer++) {
+                const angleOffset = layer * rotStep;
+                const scaleFactor = 1.0 - (Math.sin(layer * 0.2) * 0.3);
+                const stepsPerLayer = 180;
+
+                for (let i = 0; i <= stepsPerLayer; i++) {
+                    const t = (i / stepsPerLayer) * Math.PI * 2;
+                    let x = 0, y = 0;
+
+                    if (eqType === 'lissajous') {
+                        const a = 3, b = 4, delta = Math.PI / 4;
+                        x = 140 * Math.sin(a * t + delta);
+                        y = 140 * Math.sin(b * t);
+                    } else if (eqType === 'hypotrochoid') {
+                        const R = 150, r = 50, d = 40;
+                        x = (R - r) * Math.cos(t) + d * Math.cos(((R - r) * t) / r);
+                        y = (R - r) * Math.sin(t) - d * Math.sin(((R - r) * t) / r);
+                    } else if (eqType === 'rose') {
+                        const k = 5, a = 150;
+                        const rVal = a * Math.cos(k * t);
+                        x = rVal * Math.cos(t);
+                        y = rVal * Math.sin(t);
+                    } else if (eqType === 'superformula') {
+                        const m = 6, n1 = 0.5, n2 = 1.7, n3 = 1.7;
+                        const t1 = Math.pow(Math.abs(Math.cos(m * t / 4)), n2);
+                        const t2 = Math.pow(Math.abs(Math.sin(m * t / 4)), n3);
+                        const rVal = 140 * Math.pow(t1 + t2, -1 / n1);
+                        x = rVal * Math.cos(t);
+                        y = rVal * Math.sin(t);
+                    } else if (eqType === 'butterfly') {
+                        const rVal = 16 * (Math.exp(Math.sin(t)) - 2 * Math.cos(4 * t) + Math.pow(Math.sin((2 * t - Math.PI) / 24), 5));
+                        x = rVal * Math.cos(t);
+                        y = rVal * Math.sin(t);
+                    } else { // spiral
+                        const rVal = (t / (Math.PI * 2)) * 140;
+                        x = rVal * Math.cos(t);
+                        y = rVal * Math.sin(t);
+                    }
+
+                    // Rotate and scale per layer
+                    const rx = (x * Math.cos(angleOffset) - y * Math.sin(angleOffset)) * scaleFactor;
+                    const ry = (x * Math.sin(angleOffset) + y * Math.cos(angleOffset)) * scaleFactor;
+
+                    let rawTheta = Math.atan2(ry, rx);
+                    let rho = Math.hypot(rx, ry) / tableR;
+                    if (rho > 1.0) rho = 1.0;
+
+                    if (gcodeLines.length > 0) {
+                        let diff = rawTheta - lastRawTheta;
+                        if (diff < -Math.PI) diff += Math.PI * 2;
+                        if (diff > Math.PI) diff -= Math.PI * 2;
+                        currentTheta += diff;
+                    } else {
+                        currentTheta = rawTheta;
+                    }
+
+                    lastRawTheta = rawTheta;
+                    gcodeLines.push(`${currentTheta.toFixed(4)} ${rho.toFixed(4)}`);
+                }
+            }
+
+            const autoGCode = gcodeLines.join('\n');
+            const autoFilename = `AutoMath_${eqType}_${Date.now()}.txt`;
+
+            // Save and run instantly
+            await fetch(`${BASE_URL}/save_design`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ filename: autoFilename, gcode: autoGCode })
             });
+
+            await fetch(`${BASE_URL}/send_gcode_block`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ gcode: autoGCode, filename: autoFilename })
+            });
+
+            showPopup("AUTO MATH STARTED!");
             updateQ();
+            loadLib();
         }
 
         async function cancelLoop() { 
