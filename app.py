@@ -807,12 +807,21 @@ def list_designs():
         files = [f for f in os.listdir(DESIGNS_FOLDER) if f.endswith('.txt') or f.endswith('.thr')]
         results = []
         for f in files:
+            file_path = os.path.join(DESIGNS_FOLDER, f)
             thumb_name = f.replace('.txt', '.png').replace('.thr', '.png')
             has_thumb = os.path.exists(os.path.join(DESIGNS_FOLDER, thumb_name))
+            
+            # Fast line count for time estimation without network roundtrips
+            line_count = 0
+            try:
+                line_count = sum(1 for line in open(file_path, 'r', errors='ignore') if line.strip() and not line.startswith('#'))
+            except: pass
+
             results.append({
                 "filename": f,
                 "name": f.replace('.txt', '').replace('.thr', ''),
-                "thumbnail": thumb_name if has_thumb else None
+                "thumbnail": thumb_name if has_thumb else None,
+                "lines": line_count
             })
         return jsonify(results)
     except:

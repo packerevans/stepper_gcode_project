@@ -552,30 +552,49 @@
             const ballPt = path[Math.min(splitIdx, path.length - 1)]; if (ballPt) { ctx.beginPath(); ctx.fillStyle = '#f00'; ctx.arc(w/2 + ballPt.x * sc, h/2 + ballPt.y * sc, 5, 0, Math.PI*2); ctx.fill(); }
         }
 
-        async function loadLib() { let g=document.getElementById('grid'); g.innerHTML='Loading...'; let r=await fetch(`${BASE_URL}/api/designs`), files=await r.json(); allFiles=files; renderGrid(files.slice(0,15)); if(files.length>15) document.getElementById('more-btn').style.display='inline-block'; }
+        async function loadLib() { 
+            let g=document.getElementById('grid'); g.innerHTML='Loading...'; 
+            try {
+                let r=await fetch(`${BASE_URL}/api/designs`);
+                let files=await r.json(); 
+                allFiles=files; 
+                renderGrid(files.slice(0, 15)); 
+                if(files.length > 15) document.getElementById('more-btn').style.display='inline-block'; 
+            } catch(e) { g.innerHTML = 'Error loading designs.'; }
+        }
+
         function showAll() { renderGrid(allFiles); document.getElementById('more-btn').style.display='none'; showPopup("SHOWING ALL"); }
+
         function renderGrid(fs) {
             let g=document.getElementById('grid'); g.innerHTML='';
             fs.forEach(f=>{ 
                 let d=document.createElement('div'), clean=f.name, fname=f.filename; 
-                d.className='card'; d.dataset.name=fname; d.dataset.baseTime="0"; 
-                d.onclick=(e)=>{if(e.target.className!=='select-dot')runDesign(fname)}; 
+                d.className='card'; d.dataset.name=fname; 
+                
+                // Fast initial time estimation based on server line count (~2.5 sec per line segment average)
+                let approxTimeUs = (f.lines || 100) * 2500000;
+                d.dataset.baseTime = approxTimeUs; 
+
+                d.onclick=(e)=>{ if(e.target.className!=='select-dot') runDesign(fname); }; 
                 
                 let imgContent = '';
                 if (f.thumbnail) {
-                    imgContent = `<img src="/designs/${f.thumbnail}" style="width:100%; height:100%; object-fit:contain; ${document.body.getAttribute('data-theme')==='dark'?'filter:invert(1);':''}">`;
-                    // Still need to load preview to get the estimated time
-                    setTimeout(() => loadPreview(null, fname), 100);
+                    imgContent = `<img src="/designs/${f.thumbnail}" loading="lazy" style="width:100%; height:100%; object-fit:contain; ${document.body.getAttribute('data-theme')==='dark'?'filter:invert(1);':''}">`;
                 } else {
                     imgContent = `<canvas data-f="${fname}" width="300" height="300"></canvas>`;
                 }
 
-                d.innerHTML=`<div class="card-img-wrap">${imgContent}<div class="select-dot" onclick="toggleSelect('${fname}', event)"></div></div><div class="card-body"><h3 class="card-title">${clean}</h3><div class="card-meta">Est: <span id="t-${clean}">...</span></div></div>`; 
+                let displayTimeText = formatTimeFromMicroseconds(approxTimeUs * (globalSettings.speed || 1.0));
+
+                d.innerHTML=`<div class="card-img-wrap">${imgContent}<div class="select-dot" onclick="toggleSelect('${fname}', event)"></div></div><div class="card-body"><h3 class="card-title">${clean}</h3><div class="card-meta">Est: <span id="t-${clean}">${displayTimeText}</span></div></div>`; 
                 g.appendChild(d); 
+                
                 let cvs = d.querySelector('canvas');
                 if (cvs) observer.observe(cvs); 
-            }); renderSel();
+            }); 
+            renderSel();
         }
+
         function loadPreview(cvs, f) {
             fetch(`${BASE_URL}/designs/${f}`).then(r => r.text()).then(async t => {
                 let tm = 0; let lines = t.split('\n'); let path = []; let tb=0, te=0;
