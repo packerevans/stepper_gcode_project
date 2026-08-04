@@ -729,17 +729,42 @@ def send_gcode_block_route():
 
 @app.route("/delete_design", methods=["POST"])
 def delete_design():
-    f = request.json.get("filename")
-    if not f: return jsonify(success=False)
-    p = os.path.join(DESIGNS_FOLDER, f)
-    if os.path.exists(p):
-        os.remove(p)
-        # Attempt to remove corresponding thumbnail if it exists
-        thumb = p.replace('.txt', '.png').replace('.thr', '.png')
-        if os.path.exists(thumb):
-            os.remove(thumb)
-        return jsonify(success=True)
-    return jsonify(success=False)
+    try:
+        f = request.json.get("filename", "")
+        if not f: return jsonify(success=False, error="No filename provided")
+        
+        # Sanitize filename to prevent path traversal vulnerability
+        safe_filename = os.path.basename(f)
+        target_path = os.path.normpath(os.path.join(DESIGNS_FOLDER, safe_filename))
+
+        # Security check: Ensure file is inside DESIGNS_FOLDER
+        if not target_path.startswith(os.path.abspath(DESIGNS_FOLDER)):
+            return jsonify(success=False, error="Invalid path"), 400
+
+        deleted_any = False
+
+        # 1. Delete main design file (.txt or .thr)
+        if os.path.exists(target_path):
+            os.remove(target_path)
+            deleted_any = True
+
+        # 2. Delete corresponding thumbnail image if present (.png / .jpg)
+        base_name = os.path.splitext(safe_filename)[0]
+        for ext in ['.png', '.jpg', '.jpeg']:
+            thumb_path = os.path.join(DESIGNS_FOLDER, base_name + ext)
+            if os.path.exists(thumb_path):
+                try: os.remove(thumb_path)
+                except: pass
+
+        if deleted_any:
+            log_message(f"Deleted design file & assets: {safe_filename}")
+            return jsonify(success=True)
+        else:
+            log_message(f"File not found for deletion: {safe_filename}")
+            return jsonify(success=False, error="File not found")
+    except Exception as e:
+        log_message(f"Delete Error: {str(e)}")
+        return jsonify(success=False, error=str(e)), 500
 
 @app.route("/save_design", methods=["POST"])
 def save_design():
