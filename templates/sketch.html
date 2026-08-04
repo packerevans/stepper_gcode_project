@@ -153,17 +153,46 @@
         body[data-theme='dark'] .theme-toggle .moon { display: block; }
 
         .app-container {
-            display: flex; flex-direction: column; height: 100%; width: 100%;
-            padding: 10px; box-sizing: border-box; gap: 10px; overflow-y: auto;
+            display: flex; flex-direction: column; width: 100%; height: calc(100vh - 120px);
+            padding: 15px; box-sizing: border-box; gap: 20px; overflow-y: auto;
         }
         @media (min-width: 768px) {
-            .app-container { flex-direction: row; overflow: hidden; }
-            .drawing-panel { flex: 2; border-radius: 0 !important; background: var(--panel); position: relative; display: flex; align-items: center; justify-content: center; }
-            .controls-panel { flex: 1; max-width: 400px; border-radius: 0 !important; background: var(--panel); padding: 20px; overflow-y: auto; }
+            .app-container { 
+                flex-direction: row; 
+                overflow: hidden; 
+                justify-content: center; 
+                align-items: stretch;
+                max-width: 1400px; 
+                margin: 0 auto;
+                height: calc(100vh - 130px);
+            }
+            .drawing-panel { 
+                flex: 2; 
+                border-radius: 0 !important; 
+                background: var(--color-surface); 
+                border: 2px solid var(--color-border);
+                position: relative; 
+                display: flex; 
+                align-items: center; 
+                justify-content: center; 
+                padding: 15px;
+                overflow: hidden;
+            }
+            .controls-panel { 
+                flex: 1; 
+                min-width: 340px;
+                max-width: 420px; 
+                border-radius: 0 !important; 
+                background: var(--color-surface); 
+                border: 2px solid var(--color-border);
+                padding: 20px; 
+                overflow-y: auto; 
+            }
         }
         @media (max-width: 767px) {
-            .drawing-panel { width: 100%; aspect-ratio: 1/1; border-radius: 0 !important; background: var(--panel); flex-shrink: 0; position: relative;}
-            .controls-panel { flex: 1; border-radius: 0 !important; background: var(--panel); padding: 15px; }
+            .app-container { height: auto; overflow-y: auto; }
+            .drawing-panel { width: 100%; aspect-ratio: 1/1; border-radius: 0 !important; background: var(--color-surface); flex-shrink: 0; position: relative;}
+            .controls-panel { width: 100%; border-radius: 0 !important; background: var(--color-surface); padding: 15px; box-sizing: border-box; }
         }
 
         .loading-overlay {
