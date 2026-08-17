@@ -356,8 +356,8 @@ class GCodeRunner(threading.Thread):
         global current_gcode_runner, current_job_name, is_paused
         current_gcode_runner = self
         current_job_name = self.filename
-        is_paused = False 
-        
+        is_paused = False
+
         log_message(f"Job Started: {self.filename}")
 
         while self.is_running and self.lines_sent < self.total_lines:
@@ -366,12 +366,20 @@ class GCodeRunner(threading.Thread):
                 if not self.slot_available_event.wait(timeout=10.0): break
             if self.is_running:
                 if not self.send_line(self.lines[self.lines_sent]): break
-                time.sleep(0.002) 
+                time.sleep(0.002)
 
         if self.is_running:
             while self.credits < self.ARDUINO_BUFFER_SIZE:
                 time.sleep(0.2)
                 if not self.is_running: break
+
+        if self.is_running:
+            log_message("Waiting for Arduino to finish all moves (SYNC)...")
+            with lock: arduino.write(b"SYNC\n")
+            self.credits = 0
+            self.slot_available_event.clear()
+            if not self.slot_available_event.wait(timeout=120.0):
+                log_message("SYNC timeout - Arduino may still be moving")
 
         current_job_name = None
         current_gcode_runner = None
