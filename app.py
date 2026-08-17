@@ -6,6 +6,7 @@ import socket
 import json
 import datetime
 import shutil
+import math
 from collections import deque
 import wifi_tools 
 from pyngrok import ngrok, conf 
@@ -256,17 +257,70 @@ class SchedulerThread(threading.Thread):
                     start_job({'gcode': gcode, 'filename': val})
 
 # === THETA-RHO RUNNER ===
+def generate_transition_path(from_theta, from_rho, to_theta, to_rho, steps=20):
+    """Generate a straight-line Cartesian path between two polar positions.
+    This prevents the spiral artifact that occurs when linearly interpolating
+    in polar coordinates between distant points."""
+    TABLE_R = 202.6
+    # Convert polar to Cartesian
+    x1 = from_rho * TABLE_R * math.cos(from_theta)
+    y1 = from_rho * TABLE_R * math.sin(from_theta)
+    x2 = to_rho * TABLE_R * math.cos(to_theta)
+    y2 = to_rho * TABLE_R * math.sin(to_theta)
+
+    dist = math.hypot(x2 - x1, y2 - y1)
+    if dist < 2.0:
+        return []
+
+    waypoints = []
+    running_theta = from_theta
+    last_raw = math.atan2(y1, x1)
+
+    for i in range(1, steps + 1):
+        t = i / steps
+        x = x1 + (x2 - x1) * t
+        y = y1 + (y2 - y1) * t
+
+        raw_theta = math.atan2(y, x)
+        diff = raw_theta - last_raw
+        if diff > math.pi: diff -= 2 * math.pi
+        if diff < -math.pi: diff += 2 * math.pi
+        running_theta += diff
+        last_raw = raw_theta
+
+        rho = math.hypot(x, y) / TABLE_R
+        if rho > 1.0: rho = 1.0
+        waypoints.append(f"{running_theta:.4f} {rho:.4f}")
+
+    return waypoints
+
 class GCodeRunner(threading.Thread):
     def __init__(self, gcode_block, filename, on_complete=None):
         super().__init__(daemon=True)
         # Parse lines, stripping comments and keeping non-empty lines
         self.lines = [l.split('#')[0].strip() for l in gcode_block.split('\n') if l.split('#')[0].strip()]
+
+        # Prepend a straight-line transition from current position to design start
+        if self.lines:
+            first_line = self.lines[0].split()
+            if len(first_line) >= 2:
+                try:
+                    target_theta = float(first_line[0])
+                    target_rho = float(first_line[1])
+                    transition = generate_transition_path(
+                        current_theta, current_rho, target_theta, target_rho
+                    )
+                    if transition:
+                        self.lines = transition + self.lines
+                except (ValueError, IndexError):
+                    pass
+
         self.total_lines = len(self.lines)
         self.filename = filename
         self.is_running = True
         self.on_complete = on_complete
         self.ARDUINO_BUFFER_SIZE = 1 # Simple 1-line-at-a-time for Theta-Rho
-        self.credits = self.ARDUINO_BUFFER_SIZE 
+        self.credits = self.ARDUINO_BUFFER_SIZE
         self.lines_sent = 0
         self.slot_available_event = threading.Event()
 

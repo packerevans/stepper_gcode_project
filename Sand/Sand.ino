@@ -53,7 +53,11 @@ const float interpolationRes = 0.2; // 0.2mm micro-segmentation for ultra-smooth
 
 // --- PURE SPEED SETTINGS ---
 int currentStepDelay = 1000;
+int minStepDelay = 1000;
+int maxStepDelay = 4000;
+int activeStepDelay = 4000;
 float SPEED_MULTIPLIER = 1.0;
+const int ACCEL_RAMP_STEPS = 80;
 
 // --- QUEUE 1: THE INBOX (Theta/Rho) ---
 #define CMD_QUEUE_SIZE 32 
@@ -250,7 +254,20 @@ void runStepperEngine() {
   if (stepsRemaining > 0) {
     unsigned long currentMicros = micros();
 
-    if (currentMicros - lastStepMicros >= (unsigned long)currentStepDelay) {
+    // Trapezoidal acceleration: ramp up at start, ramp down near end
+    long stepsCompleted = currentMaxSteps - stepsRemaining;
+    long rampPhase = min((long)ACCEL_RAMP_STEPS, currentMaxSteps / 2);
+    if (stepsCompleted < rampPhase) {
+      // Accelerating
+      activeStepDelay = maxStepDelay - (long)(maxStepDelay - minStepDelay) * stepsCompleted / rampPhase;
+    } else if (stepsRemaining < rampPhase) {
+      // Decelerating
+      activeStepDelay = maxStepDelay - (long)(maxStepDelay - minStepDelay) * stepsRemaining / rampPhase;
+    } else {
+      activeStepDelay = minStepDelay;
+    }
+
+    if (currentMicros - lastStepMicros >= (unsigned long)activeStepDelay) {
       lastStepMicros = currentMicros;
       
       long ad = abs(currentDa);
@@ -338,28 +355,14 @@ void processMathPlanner() {
       localStepTail = stepTail;
     }
 
-    if (((localStepHead + 1) % STEP_QUEUE_SIZE) != localStepTail) { 
+    if (((localStepHead + 1) % STEP_QUEUE_SIZE) != localStepTail) {
       float t = (float)lineCurrentSegment / (float)lineTotalSegments;
 
-      // Catmull-Rom Organic Spline Interpolation for smooth, non-jerky curves
-      float t2 = t * t;
-      float t3 = t2 * t;
-
-      // Blend polynomials
-      float f1 = -0.5 * t3 + t2 - 0.5 * t;
-      float f2 =  1.5 * t3 - 2.5 * t2 + 1.0;
-      float f3 = -1.5 * t3 + 2.0 * t2 + 0.5 * t;
-      float f4 =  0.5 * t3 - 0.5 * t2;
-
-      // Calculate organic smooth polar coordinates
+      // Pure linear interpolation — the Pi sends densely pre-interpolated points,
+      // so firmware just connects them without adding easing that would cause
+      // spiral artifacts on design transitions
       float nextTheta = planTheta + (lineDistTheta * t);
       float nextRho = planRho + (lineDistRho * t);
-
-      // Apply spline smoothing when points are dense/curved
-      if (lineTotalSegments > 4) {
-        nextTheta = planTheta + (lineDistTheta * (3.0 * t2 - 2.0 * t3)); // Smoothstep easing
-        nextRho   = planRho   + (lineDistRho   * (3.0 * t2 - 2.0 * t3));
-      }
 
       float r_mm = nextRho * tableRadius;
       float x = r_mm * cos(nextTheta);
@@ -512,7 +515,9 @@ void handleCommand(char* cmd) {
     float newMult = atof(start + 6);
     if (newMult >= 0.1 && newMult <= 10.0) {
       SPEED_MULTIPLIER = newMult;
-      currentStepDelay = max(10, (int)round(1000.0 / SPEED_MULTIPLIER));
+      minStepDelay = max(10, (int)round(1000.0 / SPEED_MULTIPLIER));
+      maxStepDelay = max(minStepDelay + 500, (int)round(4000.0 / SPEED_MULTIPLIER));
+      currentStepDelay = minStepDelay;
       Serial.print(F("SPEED_SET:")); Serial.println(SPEED_MULTIPLIER);
     }
   }
