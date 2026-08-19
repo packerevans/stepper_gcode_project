@@ -493,11 +493,17 @@
             // Pre-cache memory GCode path for Live View preview before sending to serial execution
             prepareLivePath(autoName, autoGCode);
 
-            // Send directly to runtime memory execution queue WITHOUT saving to disk
-            await fetch(`${BASE_URL}/send_gcode_block`, {
+            // Save to disk and loop forever until user pauses
+            await fetch(`${BASE_URL}/save_design`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ gcode: autoGCode, filename: autoName })
+                body: JSON.stringify({ gcode: autoGCode, filename: `${autoName}.txt` })
+            });
+
+            await fetch(`${BASE_URL}/set_loop`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ filenames: [`${autoName}.txt`] })
             });
 
             updateQ();
