@@ -55,6 +55,9 @@ const float interpolationRes = 0.2; // 0.2mm micro-segmentation for ultra-smooth
 int minStepDelay = 1000;
 int activeStepDelay = 1000;
 float SPEED_MULTIPLIER = 1.0;
+const int STARTUP_RAMP_STEPS = 20;
+long globalStepCount = 0;
+bool motorWasIdle = true;
 
 // --- QUEUE 1: THE INBOX (Theta/Rho) ---
 #define CMD_QUEUE_SIZE 32 
@@ -228,7 +231,7 @@ void runStepperEngine() {
       localStepTail = stepTail;
     }
 
-    if (localStepHead != localStepTail) { 
+    if (localStepHead != localStepTail) {
       currentDa = stepDa[localStepTail];
       currentDb = stepDb[localStepTail];
       ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
@@ -237,13 +240,15 @@ void runStepperEngine() {
 
       digitalWrite(dirArm, (currentDa >= 0) ? HIGH : LOW);
       digitalWrite(dirBase, (currentDb >= 0) ? HIGH : LOW);
-      
+
       stepsRemaining = max(abs(currentDa), abs(currentDb));
       currentMaxSteps = stepsRemaining;
 
       errA = currentMaxSteps / 2;
       errB = currentMaxSteps / 2;
     } else {
+      motorWasIdle = true;
+      globalStepCount = 0;
       return;
     }
   }
@@ -251,7 +256,13 @@ void runStepperEngine() {
   if (stepsRemaining > 0) {
     unsigned long currentMicros = micros();
 
-    activeStepDelay = minStepDelay;
+    if (motorWasIdle && globalStepCount < STARTUP_RAMP_STEPS) {
+      int startDelay = minStepDelay * 3;
+      activeStepDelay = startDelay - (long)(startDelay - minStepDelay) * globalStepCount / STARTUP_RAMP_STEPS;
+    } else {
+      activeStepDelay = minStepDelay;
+      motorWasIdle = false;
+    }
 
     if (currentMicros - lastStepMicros >= (unsigned long)activeStepDelay) {
       lastStepMicros = currentMicros;
@@ -277,6 +288,7 @@ void runStepperEngine() {
       if (stepB) curBaseSteps += (currentDb >= 0 ? 1 : -1);
 
       stepsRemaining--;
+      globalStepCount++;
     }
   }
 }
