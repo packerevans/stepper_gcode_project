@@ -323,6 +323,8 @@ class GCodeRunner(threading.Thread):
         self.credits = self.ARDUINO_BUFFER_SIZE
         self.lines_sent = 0
         self.slot_available_event = threading.Event()
+        self.pause_event = threading.Event()
+        self.pause_event.set()
 
     def process_incoming_serial(self, line):
         clean_line = line.strip().upper()
@@ -361,6 +363,10 @@ class GCodeRunner(threading.Thread):
         log_message(f"Job Started: {self.filename}")
 
         while self.is_running and self.lines_sent < self.total_lines:
+            if not self.pause_event.is_set():
+                self.pause_event.wait()
+                if not self.is_running:
+                    break
             if self.credits <= 0:
                 self.slot_available_event.clear()
                 if not self.slot_available_event.wait(timeout=10.0): break
@@ -847,22 +853,27 @@ def send_command():
     global is_paused
     cmd = request.json.get("command")
     if cmd == "CLEAR":
-        global is_looping, loop_playlist; 
+        global is_looping, loop_playlist;
         is_looping = False; loop_playlist = []; job_queue.clear(); is_paused = False
-        if current_gcode_runner: current_gcode_runner.is_running = False
-        if arduino_connected: 
-            with lock: 
+        if current_gcode_runner:
+            current_gcode_runner.is_running = False
+            current_gcode_runner.pause_event.set()
+        if arduino_connected:
+            with lock:
                 arduino.write(b"CLEAR\n")
                 arduino.write(b"RESUME\n")
         return jsonify(success=True)
     elif cmd == "PAUSE":
         is_paused = True
-        if current_gcode_runner: current_gcode_runner.is_running = False
+        if current_gcode_runner:
+            current_gcode_runner.pause_event.clear()
         if arduino_connected:
             with lock: arduino.write(b"PAUSE\n")
         return jsonify(success=True)
     elif cmd == "RESUME":
         is_paused = False
+        if current_gcode_runner:
+            current_gcode_runner.pause_event.set()
         if arduino_connected:
             with lock: arduino.write(b"RESUME\n")
         return jsonify(success=True)

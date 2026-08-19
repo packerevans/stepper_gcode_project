@@ -52,12 +52,9 @@ const float stepsPerRad = stepsPerDeg * (180.0 / PI);
 const float interpolationRes = 0.2; // 0.2mm micro-segmentation for ultra-smooth motion
 
 // --- PURE SPEED SETTINGS ---
-int currentStepDelay = 1000;
 int minStepDelay = 1000;
-int maxStepDelay = 4000;
-int activeStepDelay = 4000;
+int activeStepDelay = 1000;
 float SPEED_MULTIPLIER = 1.0;
-const int ACCEL_RAMP_STEPS = 80;
 
 // --- QUEUE 1: THE INBOX (Theta/Rho) ---
 #define CMD_QUEUE_SIZE 32 
@@ -254,18 +251,7 @@ void runStepperEngine() {
   if (stepsRemaining > 0) {
     unsigned long currentMicros = micros();
 
-    // Trapezoidal acceleration: ramp up at start, ramp down near end
-    long stepsCompleted = currentMaxSteps - stepsRemaining;
-    long rampPhase = min((long)ACCEL_RAMP_STEPS, currentMaxSteps / 2);
-    if (stepsCompleted < rampPhase) {
-      // Accelerating
-      activeStepDelay = maxStepDelay - (long)(maxStepDelay - minStepDelay) * stepsCompleted / rampPhase;
-    } else if (stepsRemaining < rampPhase) {
-      // Decelerating
-      activeStepDelay = maxStepDelay - (long)(maxStepDelay - minStepDelay) * stepsRemaining / rampPhase;
-    } else {
-      activeStepDelay = minStepDelay;
-    }
+    activeStepDelay = minStepDelay;
 
     if (currentMicros - lastStepMicros >= (unsigned long)activeStepDelay) {
       lastStepMicros = currentMicros;
@@ -308,38 +294,19 @@ void processMathPlanner() {
                       (CMD_QUEUE_SIZE - localCmdTail + localCmdHead);
 
   if (!isDrawingLine && (availableCmds >= 1)) {
-    // Current Start Point: P1
-    float p1Theta = planTheta;
-    float p1Rho   = planRho;
-
-    // Target Point: P2
     lineTargetTheta = cmdTheta[localCmdTail];
     lineTargetRho   = cmdRho[localCmdTail];
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
       cmdTail = (localCmdTail + 1) % CMD_QUEUE_SIZE;
     }
 
-    // Previous Point P0 (or P1 if none available)
-    float p0Theta = p1Theta - (lineTargetTheta - p1Theta);
-    float p0Rho   = p1Rho   - (lineTargetRho   - p1Rho);
-
-    // Lookahead Point P3 (or P2 if none available)
-    float p3Theta = lineTargetTheta;
-    float p3Rho   = lineTargetRho;
-    
-    if (availableCmds >= 2) {
-      int nextIdx = localCmdTail; // Already incremented
-      p3Theta = cmdTheta[nextIdx];
-      p3Rho   = cmdRho[nextIdx];
-    }
-
-    lineDistTheta = lineTargetTheta - p1Theta;
-    lineDistRho   = lineTargetRho - p1Rho;
+    lineDistTheta = lineTargetTheta - planTheta;
+    lineDistRho   = lineTargetRho - planRho;
 
     while(lineDistTheta > PI) lineDistTheta -= (2.0 * PI);
     while(lineDistTheta < -PI) lineDistTheta += (2.0 * PI);
 
-    float avgR = ((p1Rho + lineTargetRho) / 2.0) * tableRadius;
+    float avgR = ((planRho + lineTargetRho) / 2.0) * tableRadius;
     float totalDist = sqrt(pow(avgR * fabs(lineDistTheta), 2) + pow(fabs(lineDistRho * tableRadius), 2));
     
     lineTotalSegments = ceil(totalDist / interpolationRes);
@@ -358,15 +325,15 @@ void processMathPlanner() {
     if (((localStepHead + 1) % STEP_QUEUE_SIZE) != localStepTail) {
       float t = (float)lineCurrentSegment / (float)lineTotalSegments;
 
-      // Pure linear interpolation — the Pi sends densely pre-interpolated points,
-      // so firmware just connects them without adding easing that would cause
-      // spiral artifacts on design transitions
-      float nextTheta = planTheta + (lineDistTheta * t);
-      float nextRho = planRho + (lineDistRho * t);
+      float startR = planRho * tableRadius;
+      float startX = startR * cos(planTheta);
+      float startY = startR * sin(planTheta);
+      float endR = lineTargetRho * tableRadius;
+      float endX = endR * cos(lineTargetTheta);
+      float endY = endR * sin(lineTargetTheta);
 
-      float r_mm = nextRho * tableRadius;
-      float x = r_mm * cos(nextTheta);
-      float y = r_mm * sin(nextTheta);
+      float x = startX + (endX - startX) * t;
+      float y = startY + (endY - startY) * t;
 
       IKResult target = calculateIK(x, y, planBaseSteps);
 
@@ -516,8 +483,7 @@ void handleCommand(char* cmd) {
     if (newMult >= 0.1 && newMult <= 10.0) {
       SPEED_MULTIPLIER = newMult;
       minStepDelay = max(10, (int)round(1000.0 / SPEED_MULTIPLIER));
-      maxStepDelay = max(minStepDelay + 500, (int)round(4000.0 / SPEED_MULTIPLIER));
-      currentStepDelay = minStepDelay;
+      activeStepDelay = minStepDelay;
       Serial.print(F("SPEED_SET:")); Serial.println(SPEED_MULTIPLIER);
     }
   }
